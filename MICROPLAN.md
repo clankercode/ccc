@@ -18,3 +18,4 @@ Define and implement the first shared `ccc` CLI shape.
 ## Current Output
 
 - planned parser/config design doc added at `CCC_PARSER_CONFIG_DESIGN.md`
+- remaining-language scaffold doc added at `ROADMAP_LANGUAGE_SCAFFOLDS.md`

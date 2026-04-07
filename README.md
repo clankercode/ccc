@@ -4,8 +4,8 @@ Small libraries for calling coding CLIs from normal programs.
 
 Current implementation order:
 
-- Python first
-- Rust second
+- Python first: implemented
+- Rust second: implemented
 - then docs, C, TS, Elixir, and OCaml
 
 Target CLIs include:
@@ -37,9 +37,14 @@ Python package:
 - import path: `call_coding_clis`
 - current API: `CommandSpec`, `CompletedRun`, `Runner`
 
+Rust crate:
+
+- crate name: `call-coding-clis`
+- library name: `call_coding_clis`
+- current API: `CommandSpec`, `CompletedRun`, `Runner`
+
 Planned roadmap:
 
-- Rust crate matching the first-pass runner abstraction
 - first-pass `ccc` CLI contract shared across implementations
 - docs for runner-specific patterns and prompt/output handling
 - C bindings or C-facing interface notes

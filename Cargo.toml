@@ -1,0 +1,10 @@
+[package]
+name = "call-coding-clis"
+version = "0.1.0"
+edition = "2024"
+license = "Unlicense"
+description = "Minimal subprocess wrappers for coding CLIs"
+
+[lib]
+name = "call_coding_clis"
+path = "rust/src/lib.rs"

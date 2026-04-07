@@ -13,13 +13,12 @@ Define and implement the first shared `ccc` CLI shape in `call-coding-clis`, wit
 
 ## Current Status
 - Iteration: 4
-- Newly satisfied AC: ["Python exposes a `ccc` CLI entrypoint.", "Rust exposes a `ccc` CLI entrypoint.", "`ccc \"<Prompt>\"` works in both implementations with the same first-pass argument shape.", "The first-pass CLI contract is documented clearly enough to guide the later language ports.", "Tests cover the new CLI argument handling and command-shape behavior."]
-- Remaining AC: ["Milestone commits are created at convenient intervals during development."]
+- Newly satisfied AC: ["Milestone commits are created at convenient intervals during development."]
+- Remaining AC: []
 
 ## Current Plan
-- The shared `ccc` CLI shape is implemented and verified in Python and Rust.
-- Create the milestone commit.
-- Reassess and auto-advance to the next `call-coding-clis` goal.
+- The shared `ccc` CLI shape and planned syntax notes are committed.
+- Auto-advance into the next goal: write the parser/config microplan for expanded `ccc` syntax and then begin remaining language roadmap scaffolding.
 
 ## Blockers / Notes
 - Keep the first `ccc` contract intentionally small.

@@ -69,6 +69,7 @@ Planned roadmap:
 
 - first-pass `ccc` CLI contract shared across implementations
 - parser and config design for planned alias, thinking, runner, and provider/model selectors
+- explicit design doc: `CCC_PARSER_CONFIG_DESIGN.md`
 - docs for runner-specific patterns and prompt/output handling
 - C bindings or C-facing interface notes
 - TypeScript package

@@ -14,3 +14,7 @@ Define and implement the first shared `ccc` CLI shape.
 - Iteration 4: document the gap between the shipped `ccc "<Prompt>"` contract and the planned expanded syntax, without changing implementation yet.
 - Iteration 5: write the parser/config microplan for `@alias`, `+0..+4`, `:provider:model` or `:model`, runner selectors, and config-backed defaults.
 - Iteration 6+: implement expanded syntax only after precedence, ambiguity handling, and config shape are explicitly documented.
+
+## Current Output
+
+- planned parser/config design doc added at `CCC_PARSER_CONFIG_DESIGN.md`

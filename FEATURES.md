@@ -12,18 +12,18 @@
 | 6 | Ruby | active | 2026-04-08 |
 | 7 | Perl | active | 2026-04-08 |
 | 8 | C++ | active | 2026-04-08 |
-| 9 | Zig | planned | - |
-| 10 | D | planned | - |
-| 11 | F# | planned | - |
-| 12 | Haskell | planned | - |
-| 13 | Nim | planned | - |
-| 14 | Crystal | planned | - |
-| 15 | PHP | planned | - |
-| 16 | PureScript | planned | - |
-| 17 | VBScript | planned | - |
-| 18 | x86-64 ASM | planned | - |
-| 19 | Elixir | planned | - |
-| 20 | OCaml | planned | - |
+| 9 | Zig | active | 2026-04-08 |
+| 10 | D | active | 2026-04-08 |
+| 11 | F# | active | 2026-04-08 |
+| 12 | Haskell | active | 2026-04-08 |
+| 13 | Nim | active | 2026-04-08 |
+| 14 | Crystal | active | 2026-04-08 |
+| 15 | PHP | active | 2026-04-08 |
+| 16 | PureScript | active | 2026-04-08 |
+| 17 | VBScript | active | 2026-04-08 |
+| 18 | x86-64 ASM | active | 2026-04-08 |
+| 19 | Elixir | active | 2026-04-08 |
+| 20 | OCaml | active | 2026-04-08 |
 
 ## Feature Definitions
 
@@ -84,22 +84,22 @@
 
 | Feature | Python | Rust | TypeScript | C | Go | Ruby | Perl | C++ | Zig | D | F# | Haskell | Nim | Crystal | PHP | PureScript | VBScript | ASM | Elixir | OCaml |
 |---------|--------|------|------------|---|-----|------|------|-----|-----|---|-----|---------|-----|---------|-----|-----------|----------|-----|--------|-------|
-| F01 build_prompt_spec | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F02 CommandSpec | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F03 CompletedRun | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F04 Runner.run | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F05 Runner.stream | yes | yes | yes | no | yes | yes | fake | fake | - | - | - | - | - | - | - | - | - | - | - | - |
-| F06 ccc CLI | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F07 Prompt trimming | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F08 Empty rejection | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F09 Usage on bad args | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F10 Stdin support | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F11 CWD support | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F12 Env override | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F13 Startup failure | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F14 Exit code fwd | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F15 CCC_REAL_OPENCODE | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
-| F28 Unit tests | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
+| F01 build_prompt_spec | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| F02 CommandSpec | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| F03 CompletedRun | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| F04 Runner.run | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| F05 Runner.stream | yes | yes | yes | no | yes | yes | fake | fake | yes | yes | yes | yes | yes | yes | yes | yes | yes | no | fake | yes |
+| F06 ccc CLI | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| F07 Prompt trimming | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| F08 Empty rejection | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| F09 Usage on bad args | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| F10 Stdin support | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | no | yes | yes |
+| F11 CWD support | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | no | yes | yes |
+| F12 Env override | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | no | yes | yes |
+| F13 Startup failure | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| F14 Exit code fwd | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| F15 CCC_REAL_OPENCODE | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| F28 Unit tests | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
 | F29 Contract tests | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
 | F30 Harness tests | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - |
 
@@ -128,12 +128,18 @@
 ## Progress Tracking
 
 ### Current Focus
-- Phase 1: Foundation — setting up tracking, researching JSON schemas, creating mock coding CLI plan
+- Phase 2 complete: All 20 languages scaffolded with v1 features
+- Phase 3: v2 parser/config features (pending)
+- Phase 4: v3 JSON output parsing (pending)
 
 ### Completed Milestones
-- (none yet)
+- Phase 1: Foundation — FEATURES.md, JSON fixtures, mock plan, all 8 original languages verified
+- Phase 2: All 12 remaining languages implemented (Zig, D, F#, Haskell, Nim, Crystal, PHP, PureScript, VBScript, x86-64 ASM, Elixir, OCaml)
 
 ### Notes
-- C Runner.stream is "no" (not implemented)
-- Perl and C++ Runner.stream is "fake passthrough" (not real concurrent streaming)
-- v2/v3 features not yet started for any language
+- C Runner.stream not implemented (known gap)
+- Perl/C++ Runner.stream is "fake passthrough"
+- ASM has no stdin/cwd/env support (raw syscalls, no libc)
+- VBScript is Windows-only (WSH)
+- PureScript requires spago toolchain to build
+- Contract/harness tests not yet wired for new 12 languages

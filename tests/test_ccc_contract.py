@@ -280,6 +280,7 @@ class CccContractTests(unittest.TestCase):
         self, result: subprocess.CompletedProcess[str]
     ) -> None:
         self.assertNotEqual(result.returncode, 0)
+        self.assertIn('ccc "<Prompt>"', result.stderr)
 
     def _write_opencode_stub(self, path: Path) -> None:
         path.write_text(

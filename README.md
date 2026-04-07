@@ -6,9 +6,9 @@ Current implementation order:
 
 - Python first: implemented
 - Rust second: implemented
-- TypeScript scaffold: implemented
-- C scaffold: implemented
-- then docs, C, TS, Elixir, and OCaml
+- TypeScript: implemented with runner and `ccc` coverage
+- C: implemented as a smoke-level `ccc` plus reusable runner library
+- next likely work: cross-language runner robustness and remaining design-first scaffolds
 
 Target CLIs include:
 
@@ -75,8 +75,8 @@ Planned roadmap:
 - parser and config design for planned alias, thinking, runner, and provider/model selectors
 - explicit design doc: `CCC_PARSER_CONFIG_DESIGN.md`
 - remaining language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
-- TypeScript scaffold with minimal runner and `ccc` entrypoint
-- C scaffold with reusable prompt-spec helper and `ccc` smoke coverage
+- cross-language startup-failure behavior normalization for implemented runners
+- deeper C parity only when it will not destabilize the stable shared `ccc` contract
 - Elixir design scaffold: `elixir/README.md`
 - OCaml design scaffold: `ocaml/README.md`
 - docs for runner-specific patterns and prompt/output handling
@@ -90,6 +90,7 @@ Missing / possible future features:
 - expanded `ccc` token parsing for `@alias`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
 - config-backed custom aliases, abbreviations, and default provider/model resolution
 - cross-language normalization of streaming event shapes and exit-code behavior
+- broader cross-language normalization of process-start failure handling beyond the current Python, Rust, C, and TypeScript coverage
 - richer stdin/cwd/env coverage and docs for every implementation
 - more concrete parity for C beyond the current prompt-spec and smoke-level scaffold
 - Elixir and OCaml implementations once local toolchains are available or design-first scaffolds are written

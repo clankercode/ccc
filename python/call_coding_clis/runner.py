@@ -39,15 +39,23 @@ class Runner:
         self._stream_executor = stream_executor or self._default_stream_executor
 
     def run(self, spec: CommandSpec) -> CompletedRun:
-        completed = self._executor(
-            spec.argv,
-            input=spec.stdin_text,
-            cwd=spec.cwd,
-            env=self._merged_env(spec.env),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        try:
+            completed = self._executor(
+                spec.argv,
+                input=spec.stdin_text,
+                cwd=spec.cwd,
+                env=self._merged_env(spec.env),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError as error:
+            return CompletedRun(
+                argv=list(spec.argv),
+                exit_code=1,
+                stdout="",
+                stderr=f"failed to start {spec.argv[0]}: {error}\n",
+            )
         return CompletedRun(
             argv=list(spec.argv),
             exit_code=int(completed.returncode),

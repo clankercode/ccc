@@ -16,12 +16,14 @@ Each language target should eventually provide:
 ## C
 
 - likely shape: small C library wrapping process spawning plus a thin `ccc` binary
-- initial deliverable: design-first notes around process APIs, streaming, and memory ownership
+- current state: reusable runner library plus smoke-level `ccc` coverage are implemented
+- likely next step: decide whether to wire `ccc` through the runner library without destabilizing the shared contract
 
 ## TypeScript
 
 - likely shape: package wrapping `child_process.spawn`
-- initial deliverable: mirror `CommandSpec`, `CompletedRun`, `Runner`, then add `ccc`
+- current state: `CommandSpec`/`Runner`/`ccc` implementation exists with subprocess and stream coverage
+- likely next step: continue tightening cross-language error and event-shape parity
 
 ## Elixir
 
@@ -39,5 +41,5 @@ Each language target should eventually provide:
 
 - Python and Rust are implemented first
 - parser/config design should stabilize before the remaining `ccc` ports claim compatibility
-- TypeScript is probably the next highest-leverage implementation after `precurl` stabilizes
-- C, Elixir, and OCaml can start as design-oriented scaffold docs before code
+- TypeScript and C are now implemented at different maturity levels
+- Elixir and OCaml remain design-first scaffolds

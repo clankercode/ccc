@@ -53,6 +53,17 @@ test('Runner.run executes a real subprocess by default', async () => {
   assert.equal(result.stdout.trim(), 'fixture-ok')
 })
 
+test('Runner.run reports missing binary startup failure', async () => {
+  const runner = new Runner()
+
+  const result = await runner.run({ argv: ['/definitely/missing/runner-binary'] })
+
+  assert.notEqual(result.exitCode, 0)
+  assert.equal(result.stdout, '')
+  assert.match(result.stderr, /failed to start/)
+  assert.match(result.stderr, /runner-binary/)
+})
+
 test('Runner.run preserves stdinText, cwd, and env', async () => {
   const runner = new Runner()
   const scriptPath = join(here, 'fixtures', 'run-shape.mjs')

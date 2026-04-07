@@ -11,5 +11,6 @@ Define and implement the first shared `ccc` CLI shape.
 - Adjacent fixes: keep the CLI contract easy to port to TS, Elixir, OCaml, and C later.
 
 ## Planned Next Iterations
-- Iteration 4: document the `ccc` CLI contract and add remaining call-coding-clis roadmap artifacts.
-- Iteration 5+: scaffold the next language deliverables needed after `precurl` integration stabilizes.
+- Iteration 4: document the gap between the shipped `ccc "<Prompt>"` contract and the planned expanded syntax, without changing implementation yet.
+- Iteration 5: write the parser/config microplan for `@alias`, `+0..+4`, `:provider:model` or `:model`, runner selectors, and config-backed defaults.
+- Iteration 6+: implement expanded syntax only after precedence, ambiguity handling, and config shape are explicitly documented.

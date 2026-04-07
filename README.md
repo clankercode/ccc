@@ -38,6 +38,22 @@ First-pass `ccc` contract:
 - initial command shape maps to `opencode run "<Prompt>"`
 - this is intentionally narrow and likely to grow later with explicit runner/model flags
 
+Planned `ccc` syntax growth (design notes only, not implemented yet):
+
+- the only implemented cross-language contract today is still `ccc "<Prompt>"`
+- the next syntax shapes under consideration are:
+  - `ccc @foo-bar "<Prompt>"` for a named alias or preset
+  - `ccc +0 "<Prompt>"` through `ccc +4 "<Prompt>"` for thinking level selection
+  - `ccc :provider:model "<Prompt>"` and `ccc :model "<Prompt>"` for explicit provider/model selection
+  - runner selectors such as `c`, `cc`, `oc`, `k`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `roocode`, `crush`, and `pi`
+- planned config support should eventually allow:
+  - custom alias definitions and abbreviations
+  - default provider selection
+  - default model selection
+  - bundled-runner defaults plus custom-name defaults
+- combination rules, precedence, and final parsing order are intentionally still undecided
+- until that design is locked, these forms are planned syntax only, not stable or implemented CLI behavior
+
 Python package:
 
 - import path: `call_coding_clis`
@@ -52,6 +68,7 @@ Rust crate:
 Planned roadmap:
 
 - first-pass `ccc` CLI contract shared across implementations
+- parser and config design for planned alias, thinking, runner, and provider/model selectors
 - docs for runner-specific patterns and prompt/output handling
 - C bindings or C-facing interface notes
 - TypeScript package

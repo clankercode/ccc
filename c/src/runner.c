@@ -64,6 +64,7 @@ int ccc_run_command(
     const char *const argv[],
     const char *stdin_text,
     const char *working_directory,
+    const char *const envp[],
     ccc_completed_run *out_run
 ) {
     if (argv == NULL || argv[0] == NULL || out_run == NULL) {
@@ -126,6 +127,11 @@ int ccc_run_command(
     if (child == 0) {
         if (working_directory != NULL && chdir(working_directory) != 0) {
             _exit(127);
+        }
+        if (envp != NULL) {
+            for (size_t index = 0; envp[index] != NULL; index += 1) {
+                putenv((char *)envp[index]);
+            }
         }
         if (stdin_text != NULL) {
             if (dup2(stdin_pipe[0], STDIN_FILENO) < 0) {

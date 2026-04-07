@@ -11,6 +11,7 @@ int ccc_run_command(
     const char *const argv[],
     const char *stdin_text,
     const char *working_directory,
+    const char *const envp[],
     ccc_completed_run *out_run
 );
 

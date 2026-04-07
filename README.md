@@ -76,7 +76,7 @@ Planned roadmap:
 - explicit design doc: `CCC_PARSER_CONFIG_DESIGN.md`
 - remaining language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
 - TypeScript scaffold with minimal runner and `ccc` entrypoint
-- C scaffold with minimal `ccc` smoke coverage
+- C scaffold with reusable prompt-spec helper and `ccc` smoke coverage
 - docs for runner-specific patterns and prompt/output handling
 - C bindings or C-facing interface notes
 - TypeScript package
@@ -89,7 +89,7 @@ Missing / possible future features:
 - config-backed custom aliases, abbreviations, and default provider/model resolution
 - cross-language normalization of streaming event shapes and exit-code behavior
 - richer stdin/cwd/env coverage and docs for every implementation
-- more concrete parity for C beyond the current smoke-level scaffold
+- more concrete parity for C beyond the current prompt-spec and smoke-level scaffold
 - Elixir and OCaml implementations once local toolchains are available or design-first scaffolds are written
 - v2 idea: parse structured JSON output from supported runners and render it consistently
 - v2 idea: templated or user-customizable rendering for structured output so humans can choose how `ccc` presents results

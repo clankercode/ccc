@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "prompt_spec.h"
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "usage: ccc \"<Prompt>\"\n");
@@ -12,6 +14,12 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    printf("opencode run %s\n", argv[1]);
+    char buffer[1024] = {0};
+    if (ccc_build_prompt_command(argv[1], buffer, sizeof(buffer)) != 0) {
+        fprintf(stderr, "prompt must not be empty\n");
+        return 1;
+    }
+
+    printf("%s\n", buffer);
     return 0;
 }

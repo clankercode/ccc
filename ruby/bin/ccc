@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/call_coding_clis"
+
+args = ARGV
+
+if args.length != 1
+  warn 'usage: ccc "<Prompt>"'
+  exit 1
+end
+
+begin
+  spec = CallCodingClis.build_prompt_spec(args[0])
+rescue ArgumentError => e
+  warn e.message
+  exit 1
+end
+
+if (real = ENV["CCC_REAL_OPENCODE"])
+  spec = CallCodingClis::CommandSpec.new(
+    argv: [real, *spec.argv[1..]],
+    stdin_text: spec.stdin_text,
+    cwd: spec.cwd,
+    env: spec.env
+  )
+end
+
+result = CallCodingClis::Runner.new.stream(spec) do |channel, text|
+  case channel
+  when "stdout" then $stdout.write(text)
+  when "stderr" then $stderr.write(text)
+  end
+end
+
+exit(result.exit_code)

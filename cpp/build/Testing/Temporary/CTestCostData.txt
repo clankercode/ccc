@@ -1,0 +1,20 @@
+BuildPromptSpec.ReturnsValidSpec 3 0.0014729
+BuildPromptSpec.RejectsEmpty 3 0.00104282
+BuildPromptSpec.RejectsWhitespace 3 0.00129399
+BuildPromptSpec.RejectsTabOnly 3 0.00205204
+BuildPromptSpec.TrimsLeading 3 0.00237243
+BuildPromptSpec.TrimsTrailing 3 0.00158226
+BuildPromptSpec.TrimsMixedWhitespace 3 0.00137935
+BuildPromptSpec.ValidPrompt 3 0.00121733
+BuildPromptSpec.EmptyRejected 3 0.00220353
+Run.ReturnsCompletedResult 3 0.00153156
+Run.UsesStdinAndEnv 3 0.00120532
+Run.ReportsMissingBinaryStartFailure 3 0.00224909
+Stream.EmitsStdoutAndStderrEvents 3 0.00144441
+Stream.ReportsMissingBinaryStartFailure 3 0.00140055
+CommandSpec.HoldsFields 3 0.00154431
+CccContract.HappyPath 1 0.0083119
+CccContract.EmptyPrompt 1 0.00605778
+CccContract.MissingPrompt 1 0.00631773
+CccContract.WhitespacePrompt 1 0.00691002
+---

@@ -1,0 +1,11 @@
+bin/ccc
+lib/Call/Coding.pm
+lib/Call/Coding/Clis.pm
+lib/Call/Coding/Clis/CommandSpec.pm
+lib/Call/Coding/Clis/CompletedRun.pm
+lib/Call/Coding/Clis/Runner.pm
+Makefile.PL
+MANIFEST
+t/01_build_prompt_spec.t
+t/02_runner.t
+t/03_ccc_binary.t

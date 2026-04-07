@@ -1,0 +1,111 @@
+# frozen_string_literal: true
+
+require "minitest/autorun"
+require "tmpdir"
+require "call_coding_clis"
+
+class TestCccCli < Minitest::Test
+  CCC_BIN = File.expand_path("../bin/ccc", __dir__)
+  RUBY_DIR = File.expand_path("..", __dir__)
+
+  def run_ccc(*args, env: {})
+    cmd = ["ruby", CCC_BIN, *args]
+    IO.popen(cmd, err: [:child, :out], chdir: RUBY_DIR, env: env) do |io|
+      out = io.read
+      status = $?
+      [out, status.exitstatus || 1]
+    end
+  end
+
+  def test_usage_with_no_args
+    output, status = run_ccc
+    assert_match(/usage: ccc/, output)
+    refute_equal 0, status
+  end
+
+  def test_usage_with_two_args
+    output, status = run_ccc("hello", "world")
+    assert_match(/usage: ccc/, output)
+    refute_equal 0, status
+  end
+
+  def test_empty_prompt
+    output, status = run_ccc("")
+    assert_match(/prompt must not be empty/, output)
+    refute_equal 0, status
+  end
+
+  def test_whitespace_only_prompt
+    output, status = run_ccc("   ")
+    assert_match(/prompt must not be empty/, output)
+    refute_equal 0, status
+  end
+
+  def test_happy_path
+    Dir.mktmpdir do |tmp|
+      stub = File.join(tmp, "opencode")
+      File.write(stub, <<~SH)
+        #!/bin/sh
+        if [ "$1" != "run" ]; then exit 9; fi
+        shift
+        printf 'opencode run %s\n' "$1"
+      SH
+      File.chmod(0o755, stub)
+
+      env = { "PATH" => "#{tmp}:#{ENV['PATH']}" }
+      output, status = run_ccc("Fix the failing tests", env: env)
+      assert_equal "opencode run Fix the failing tests\n", output
+      assert_equal 0, status
+    end
+  end
+
+  def test_exit_code_forwarding
+    Dir.mktmpdir do |tmp|
+      stub = File.join(tmp, "opencode")
+      File.write(stub, <<~SH)
+        #!/bin/sh
+        if [ "$1" != "run" ]; then exit 9; fi
+        exit 42
+      SH
+      File.chmod(0o755, stub)
+
+      env = { "PATH" => "#{tmp}:#{ENV['PATH']}" }
+      _output, status = run_ccc("anything", env: env)
+      assert_equal 42, status
+    end
+  end
+
+  def test_ccc_real_opencode_env
+    Dir.mktmpdir do |tmp|
+      real_stub = File.join(tmp, "my_real_opencode")
+      File.write(real_stub, <<~SH)
+        #!/bin/sh
+        printf 'real: %s\\n' "$*"
+      SH
+      File.chmod(0o755, real_stub)
+
+      env = {
+        "PATH" => "#{tmp}:#{ENV['PATH']}",
+        "CCC_REAL_OPENCODE" => real_stub
+      }
+      output, status = run_ccc("hello", env: env)
+      assert_equal "real: run hello\n", output
+      assert_equal 0, status
+    end
+  end
+
+  def test_nonexistent_binary_stderr
+    Dir.mktmpdir do |tmp|
+      empty_path = "#{tmp}/empty"
+      Dir.mkdir(empty_path)
+      env = { "PATH" => empty_path }
+      cmd = [Gem.ruby, CCC_BIN, "test"]
+      IO.popen(cmd, err: [:child, :out], chdir: RUBY_DIR, env: env) do |io|
+        out = io.read
+        st = $?
+        assert_match(/failed to start/, out)
+        refute_equal 0, st.exitstatus
+      end
+    end
+  end
+end

@@ -1,0 +1,5 @@
+if(EXISTS "/home/xertrov/src/call-coding-clis/cpp/build/tests/ccc_tests[1]_tests.cmake")
+  include("/home/xertrov/src/call-coding-clis/cpp/build/tests/ccc_tests[1]_tests.cmake")
+else()
+  add_test(ccc_tests_NOT_BUILT ccc_tests_NOT_BUILT)
+endif()

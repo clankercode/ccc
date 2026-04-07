@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/ccc_tests.dir/link.d CMakeFiles/ccc_tests.dir/test_prompt_spec.cpp.o CMakeFiles/ccc_tests.dir/test_runner.cpp.o CMakeFiles/ccc_tests.dir/test_ccc_contract.cpp.o -o ccc_tests  ../libccc_lib.a ../lib/libgtest_main.a ../lib/libgtest.a

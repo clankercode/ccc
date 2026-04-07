@@ -1,1 +1,0 @@
-/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/ccc.dir/link.d CMakeFiles/ccc.dir/src/ccc_cli.cpp.o -o ccc  libccc_lib.a

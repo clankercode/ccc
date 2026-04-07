@@ -1,2 +1,0 @@
-/usr/bin/ar qc libccc_lib.a CMakeFiles/ccc_lib.dir/src/build_prompt.cpp.o CMakeFiles/ccc_lib.dir/src/runner.cpp.o
-/usr/bin/ranlib libccc_lib.a

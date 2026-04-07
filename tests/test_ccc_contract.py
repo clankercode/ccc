@@ -272,6 +272,7 @@ class CccContractTests(unittest.TestCase):
     def assert_equal_output(self, result: subprocess.CompletedProcess[str]) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, EXPECTED)
+        self.assertEqual(result.stderr, "")
 
     def assert_rejects_empty(self, result: subprocess.CompletedProcess[str]) -> None:
         self.assertNotEqual(result.returncode, 0)

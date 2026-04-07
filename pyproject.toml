@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "call-coding-clis"
+version = "0.1.0"
+description = "Minimal subprocess wrappers for coding CLIs"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Unlicense" }
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+
+[tool.setuptools.packages.find]
+where = ["python"]

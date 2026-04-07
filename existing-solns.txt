@@ -1,0 +1,48 @@
+mco-org/mco
+https://github.com/mco-org/mco
+- Strongest direct analog on the orchestration side.
+- Neutral multi-CLI orchestrator for Claude Code, Codex CLI, Gemini CLI, OpenCode, Qwen.
+- Focus is running several coding CLIs in parallel and normalizing output.
+- More of a top-level orchestrator than an embeddable language library set.
+
+Enderfga/openclaw-claude-code
+https://github.com/Enderfga/openclaw-claude-code
+- Strongest direct analog on the programmable-wrapper side.
+- Turns coding CLIs into a programmable, headless engine with session management.
+- Has a unified session interface across Claude, Codex, Gemini, Cursor.
+- Closest to "library/API for driving coding CLIs programmatically", though mainly TypeScript.
+
+Gitlawb/openclaude
+https://github.com/Gitlawb/openclaude
+- Adjacent rather than identical.
+- One coding-agent CLI that can talk to many backends/providers.
+- Important reference for provider abstraction, routing, and headless server ideas.
+- Not mainly about wrapping external coding CLIs as subprocesses.
+
+nyldn/claude-octopus
+https://github.com/nyldn/claude-octopus
+- Strong orchestration/plugin analog.
+- Multi-provider workflow layer around Claude Code with Codex, Gemini, OpenCode, etc.
+- Good reference for cross-provider routing and consensus/review workflows.
+- Less of a reusable library API, more of a workflow/plugin system.
+
+openclaw/openclaw
+https://github.com/openclaw/openclaw
+- Adjacent ecosystem project.
+- Open-source assistant framework with plugins/tools that can drive coding engines.
+- Useful reference for plugin and tool-exposed control surfaces.
+
+Aider
+https://github.com/Aider-AI/aider
+- Older and important adjacent baseline.
+- A coding CLI that can work with multiple model providers.
+- Useful reference for terminal interaction patterns, repo context handling, and model abstraction.
+- Not a library for wrapping many external coding CLIs.
+
+Notes
+- I did not find a clear, mature project that is exactly: "small reusable libraries in many languages whose main job is to invoke coding CLIs as child processes with a shared abstraction".
+- The closest current split seems to be:
+  1. orchestrators/plugins that drive many coding CLIs,
+  2. single large coding CLIs that abstract many model providers,
+  3. framework/plugins that expose one CLI as a programmable engine.
+- That leaves some room for a smaller cross-language library family focused just on invocation, streaming, sessions, and normalization.

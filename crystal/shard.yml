@@ -1,0 +1,7 @@
+name: call-coding-clis
+version: 0.1.0
+license: Unlicense
+
+targets:
+  ccc:
+    main: src/call_coding_clis/ccc.cr

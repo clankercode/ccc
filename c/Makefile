@@ -17,6 +17,9 @@ build/test_runner: tests/test_runner.c src/runner.c
 	mkdir -p build
 	$(CC) $(CFLAGS) -o build/test_runner tests/test_runner.c src/runner.c
 
+clean:
+	rm -rf build
+
 test: build/test_ccc build/test_prompt_spec build/test_runner
 	./build/test_ccc
 	./build/test_prompt_spec

@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -160,6 +161,7 @@ int ccc_run_command(
         close(stdout_fd);
         close(stderr_fd);
         execvp(argv[0], (char *const *)argv);
+        dprintf(STDERR_FILENO, "failed to start %s: %s\n", argv[0], strerror(errno));
         _exit(127);
     }
 

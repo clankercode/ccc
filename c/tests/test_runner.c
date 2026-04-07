@@ -109,5 +109,25 @@ int main(void) {
     }
 
     ccc_free_completed_run(&result);
+
+    const char *missing_argv[] = {"/definitely/missing/runner-binary", NULL};
+    if (ccc_run_command(missing_argv, NULL, NULL, NULL, &result) != 0) {
+        fprintf(stderr, "runner missing-binary returned failure\n");
+        return 1;
+    }
+
+    if (result.exit_code == 0) {
+        fprintf(stderr, "missing binary should not exit successfully\n");
+        ccc_free_completed_run(&result);
+        return 1;
+    }
+
+    if (result.stderr_text == NULL || result.stderr_text[0] == '\0') {
+        fprintf(stderr, "missing binary stderr should not be empty\n");
+        ccc_free_completed_run(&result);
+        return 1;
+    }
+
+    ccc_free_completed_run(&result);
     return 0;
 }

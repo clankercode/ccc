@@ -1,5 +1,8 @@
 cpp/build/
 go/ccc
+target/
+__pycache__/
+*.pyc
 *.o
 *.a
 *.out

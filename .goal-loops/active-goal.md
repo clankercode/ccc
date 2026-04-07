@@ -1,24 +1,26 @@
 # Primary Goal
-Define and implement the first shared `ccc` CLI shape in `call-coding-clis`, with matching Python and Rust entrypoints and `ccc "<Prompt>"` working.
+Add the next concrete `call-coding-clis` implementation after Python and Rust: a TypeScript scaffold with the same minimal runner shape and a first-pass `ccc` entrypoint.
 
 ## Acceptance Criteria
 - A microplan exists in this repo and is kept current.
 - The repo has an `UNLICENSE` file.
-- Python exposes a `ccc` CLI entrypoint.
-- Rust exposes a `ccc` CLI entrypoint.
-- `ccc "<Prompt>"` works in both implementations with the same first-pass argument shape.
-- The first-pass CLI contract is documented clearly enough to guide the later language ports.
-- Tests cover the new CLI argument handling and command-shape behavior.
+- A TypeScript package scaffold exists.
+- TypeScript exposes the same minimal runner concepts as Python and Rust.
+- TypeScript exposes a first-pass `ccc` entrypoint with `ccc "<Prompt>"` behavior.
+- TypeScript tests cover the new runner and CLI command-shape behavior.
+- Repo docs are updated to reflect the new implementation state.
 - Milestone commits are created at convenient intervals during development.
 
 ## Current Status
-- Iteration: 4
-- Newly satisfied AC: ["Milestone commits are created at convenient intervals during development."]
-- Remaining AC: []
+- Iteration: 5
+- Newly satisfied AC: ["A TypeScript package scaffold exists.", "TypeScript exposes the same minimal runner concepts as Python and Rust.", "TypeScript exposes a first-pass `ccc` entrypoint with `ccc \"<Prompt>\"` behavior.", "TypeScript tests cover the new runner and CLI command-shape behavior.", "Repo docs are updated to reflect the new implementation state."]
+- Remaining AC: ["Milestone commits are created at convenient intervals during development."]
 
 ## Current Plan
-- The shared `ccc` CLI shape and planned syntax notes are committed.
-- Auto-advance into the next goal: write the parser/config microplan for expanded `ccc` syntax and then begin remaining language roadmap scaffolding.
+- Write the TypeScript microplan.
+- Add tests first for a small runner abstraction and `ccc` prompt-spec behavior.
+- Implement the TypeScript scaffold minimally.
+- Commit milestone and reassess.
 
 ## Blockers / Notes
 - Keep the first `ccc` contract intentionally small.

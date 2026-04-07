@@ -1,19 +1,18 @@
 # Microplan
 
 ## Current Milestone
-Define and implement the first shared `ccc` CLI shape.
+Add the TypeScript scaffold as the next concrete `call-coding-clis` implementation.
 
-## Iteration 3
-- Goal: add matching Python and Rust `ccc` entrypoints.
-- Approach: keep the first contract tiny, with `ccc "<Prompt>"` turning into a command spec that later providers can execute.
-- Files to change: Python package files, Rust crate files, tests, packaging/entrypoint files, `README.md`, and goal-loop state.
-- Verification: Python tests and `cargo test` both pass.
-- Adjacent fixes: keep the CLI contract easy to port to TS, Elixir, OCaml, and C later.
+## Iteration 6
+- Goal: create a minimal TypeScript package with runner abstractions and a first-pass `ccc` entrypoint.
+- Approach: mirror the Python/Rust concepts closely, keep the package tiny, and test the prompt-to-command-spec behavior first.
+- Files to change: TypeScript package files, tests, `README.md`, `MICROPLAN.md`, and goal-loop state.
+- Verification: the TypeScript tests pass locally.
+- Adjacent fixes: keep names and CLI behavior aligned with the shared contract.
 
 ## Planned Next Iterations
-- Iteration 4: document the gap between the shipped `ccc "<Prompt>"` contract and the planned expanded syntax, without changing implementation yet.
-- Iteration 5: write the parser/config microplan for `@alias`, `+0..+4`, `:provider:model` or `:model`, runner selectors, and config-backed defaults.
-- Iteration 6+: implement expanded syntax only after precedence, ambiguity handling, and config shape are explicitly documented.
+- Iteration 7: reassess whether to implement Elixir/OCaml/C scaffolds or deepen TypeScript functionality.
+- Iteration 8+: implement expanded `ccc` syntax only after precedence, ambiguity handling, and config shape are explicitly documented.
 
 ## Current Output
 

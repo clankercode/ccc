@@ -104,6 +104,41 @@ def _cpp_invoke(prompt):
     return [str(ROOT / "cpp" / "build" / "ccc"), prompt]
 
 
+def _zig_invoke(prompt):
+    return [str(ROOT / "zig" / "zig-out" / "bin" / "ccc"), prompt]
+
+
+def _d_invoke(prompt):
+    return [str(ROOT / "d" / "ccc"), prompt]
+
+
+def _fsharp_invoke(prompt):
+    return [
+        "dotnet",
+        "run",
+        "--project",
+        str(ROOT / "fsharp" / "src" / "App"),
+        "--",
+        prompt,
+    ]
+
+
+def _php_invoke(prompt):
+    return ["php", str(ROOT / "php" / "bin" / "ccc"), prompt]
+
+
+def _purescript_invoke(prompt):
+    return ["node", str(ROOT / "purescript" / "bin" / "ccc"), prompt]
+
+
+def _asm_invoke(prompt):
+    return [str(ROOT / "asm-x86_64" / "ccc"), prompt]
+
+
+def _ocaml_invoke(prompt):
+    return [str(ROOT / "ocaml" / "_build" / "default" / "bin" / "ccc.exe"), prompt]
+
+
 LANGUAGES = [
     LanguageSpec(
         "Python",
@@ -158,6 +193,41 @@ LANGUAGES = [
             ],
         ],
         invoke_fn=_cpp_invoke,
+    ),
+    LanguageSpec(
+        "Zig",
+        build_cmds=[["zig", "build"]],
+        build_cwd=ROOT / "zig",
+        invoke_fn=_zig_invoke,
+    ),
+    LanguageSpec(
+        "D",
+        build_cmds=[["dub", "build"]],
+        build_cwd=ROOT / "d",
+        invoke_fn=_d_invoke,
+    ),
+    LanguageSpec(
+        "F#",
+        invoke_fn=_fsharp_invoke,
+    ),
+    LanguageSpec(
+        "PHP",
+        invoke_fn=_php_invoke,
+    ),
+    LanguageSpec(
+        "PureScript",
+        invoke_fn=_purescript_invoke,
+    ),
+    LanguageSpec(
+        "x86-64 ASM",
+        build_cmds=[["make", "-C", "asm-x86_64"]],
+        invoke_fn=_asm_invoke,
+        env_extra={"CCC_REAL_OPENCODE": str(MOCK_BIN)},
+    ),
+    LanguageSpec(
+        "OCaml",
+        invoke_fn=_ocaml_invoke,
+        env_extra={"CCC_REAL_OPENCODE": str(MOCK_BIN)},
     ),
 ]
 

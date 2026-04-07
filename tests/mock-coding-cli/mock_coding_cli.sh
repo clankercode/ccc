@@ -152,7 +152,7 @@ emit_multiline() {
 }
 
 emit_large_output() {
-    _large=$(yes A | tr -d '\n' | head -c 4096)
+    _large=$(yes A 2>/dev/null | tr -d '\n' 2>/dev/null | head -c 4096)
     case "$SCHEMA" in
         opencode)    printf '{"response":"%s"}\n' "$_large" ;;
         claude-code)

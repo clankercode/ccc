@@ -1,0 +1,150 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/xertrov/src/call-coding-clis/fsharp/src/App/call-coding-clis-cli.fsproj": {}
+  },
+  "projects": {
+    "/home/xertrov/src/call-coding-clis/fsharp/src/App/call-coding-clis-cli.fsproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/xertrov/src/call-coding-clis/fsharp/src/App/call-coding-clis-cli.fsproj",
+        "projectName": "ccc",
+        "projectPath": "/home/xertrov/src/call-coding-clis/fsharp/src/App/call-coding-clis-cli.fsproj",
+        "packagesPath": "/home/xertrov/.nuget/packages/",
+        "outputPath": "/home/xertrov/src/call-coding-clis/fsharp/src/App/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/xertrov/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net9.0"
+        ],
+        "sources": {
+          "/usr/share/dotnet/sdk/9.0.115/FSharp/library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net9.0": {
+            "targetAlias": "net9.0",
+            "projectReferences": {
+              "/home/xertrov/src/call-coding-clis/fsharp/src/Library/call-coding-clis-lib.fsproj": {
+                "projectPath": "/home/xertrov/src/call-coding-clis/fsharp/src/Library/call-coding-clis-lib.fsproj"
+              }
+            }
+          }
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.100"
+      },
+      "frameworks": {
+        "net9.0": {
+          "targetAlias": "net9.0",
+          "dependencies": {
+            "FSharp.Core": {
+              "include": "Runtime, Compile, Build, Native, Analyzers, BuildTransitive",
+              "target": "Package",
+              "version": "[9.0.101, )",
+              "generatePathProperty": true
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[9.0.14, 9.0.14]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/9.0.115/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/home/xertrov/src/call-coding-clis/fsharp/src/Library/call-coding-clis-lib.fsproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/xertrov/src/call-coding-clis/fsharp/src/Library/call-coding-clis-lib.fsproj",
+        "projectName": "call-coding-clis-lib",
+        "projectPath": "/home/xertrov/src/call-coding-clis/fsharp/src/Library/call-coding-clis-lib.fsproj",
+        "packagesPath": "/home/xertrov/.nuget/packages/",
+        "outputPath": "/home/xertrov/src/call-coding-clis/fsharp/src/Library/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/xertrov/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net9.0"
+        ],
+        "sources": {
+          "/usr/share/dotnet/sdk/9.0.115/FSharp/library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net9.0": {
+            "targetAlias": "net9.0",
+            "projectReferences": {}
+          }
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.100"
+      },
+      "frameworks": {
+        "net9.0": {
+          "targetAlias": "net9.0",
+          "dependencies": {
+            "FSharp.Core": {
+              "include": "Runtime, Compile, Build, Native, Analyzers, BuildTransitive",
+              "target": "Package",
+              "version": "[9.0.101, )",
+              "generatePathProperty": true
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[9.0.14, 9.0.14]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/9.0.115/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

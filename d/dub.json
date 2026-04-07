@@ -1,0 +1,7 @@
+{
+    "name": "call-coding-clis",
+    "targetType": "executable",
+    "targetName": "ccc",
+    "sourcePaths": ["source"],
+    "mainSourceFile": "source/call_coding_clis/ccc.d"
+}

@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "UEkW8BwwmkM=",
+  "success": true,
+  "projectFilePath": "/home/xertrov/src/call-coding-clis/fsharp/src/Library/call-coding-clis-lib.fsproj",
+  "expectedPackageFiles": [
+    "/home/xertrov/.nuget/packages/fsharp.core/9.0.101/fsharp.core.9.0.101.nupkg.sha512",
+    "/home/xertrov/.nuget/packages/microsoft.aspnetcore.app.ref/9.0.14/microsoft.aspnetcore.app.ref.9.0.14.nupkg.sha512"
+  ],
+  "logs": []
+}

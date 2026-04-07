@@ -1,0 +1,37 @@
+#!/usr/bin/env php
+<?php
+
+require_once __DIR__ . '/../src/CommandSpec.php';
+require_once __DIR__ . '/../src/CompletedRun.php';
+require_once __DIR__ . '/../src/Runner.php';
+require_once __DIR__ . '/../src/build_prompt_spec.php';
+
+use Call\Coding\Clis\Runner;
+use function Call\Coding\Clis\build_prompt_spec;
+
+if ($argc !== 2) {
+    fwrite(STDERR, "usage: ccc \"<Prompt>\"\n");
+    exit(1);
+}
+
+try {
+    $spec = build_prompt_spec($argv[1]);
+} catch (\InvalidArgumentException $e) {
+    fwrite(STDERR, $e->getMessage());
+    exit(1);
+}
+
+if (($override = getenv('CCC_REAL_OPENCODE')) !== false) {
+    $spec->argv[0] = $override;
+}
+
+$runner = new Runner();
+$result = $runner->run($spec);
+
+if ($result->stdout !== '') {
+    fwrite(STDOUT, $result->stdout);
+}
+if ($result->stderr !== '') {
+    fwrite(STDERR, $result->stderr);
+}
+exit($result->exit_code);

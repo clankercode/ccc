@@ -50,9 +50,11 @@ For every implementation that claims `ccc` support:
 
 ### C
 
-- currently a scaffold, not full parity
-- supports first-pass `ccc "<Prompt>"` smoke behavior
-- does not yet claim runner-library parity with Python/Rust/TypeScript
+- supports first-pass `ccc "<Prompt>"`
+- runner library (`runner.c`/`runner.h`) provides subprocess execution with stdout/stderr capture, stdin/cwd/env support, and startup-failure reporting
+- `ccc` CLI executes commands through the runner library and forwards stdout/stderr and exit codes
+- `CCC_REAL_OPENCODE` environment variable allows overriding the runner binary for testing
+- passes all four cross-language contract tests (happy path, empty prompt, missing prompt, whitespace prompt)
 
 ## Non-Contract Behavior
 

@@ -12,3 +12,6 @@ path = "rust/src/lib.rs"
 [[bin]]
 name = "ccc"
 path = "rust/src/bin/ccc.rs"
+
+[dependencies]
+serde_json = "1"

@@ -2,15 +2,38 @@
 
 Small libraries for calling coding CLIs from normal programs.
 
-Current implementation order:
+## Implementation Status
 
-- Python first: implemented
-- Rust second: implemented
-- TypeScript: implemented with runner and `ccc` coverage
-- C: implemented with real subprocess execution in `ccc` plus reusable runner library
-- next likely work: cross-language runner robustness and remaining design-first scaffolds
+### Implemented (full runner + ccc CLI)
 
-Target CLIs include:
+- **Python**: implemented — `call_coding_clis` package with `CommandSpec`, `Runner`, `ccc` CLI
+- **Rust**: implemented — `call-coding-clis` crate with `CommandSpec`, `Runner`, `ccc` binary
+- **TypeScript**: implemented — runner + `ccc` CLI with streaming support
+- **C**: implemented — reusable runner library (`runner.c`/`runner.h`) plus `ccc` binary
+
+### Planned — Full Implementation
+
+- **C++**: modern C++ (C++17+), leveraging RAII, `std::process` or POSIX APIs, smart pointers, templates
+- **PureScript**: runs on Node.js backend, `purs` compile target, subprocess via Node `child_process`
+- **Zig**: native cross-compilation story, `std.process` for subprocess, comptime for build-time config
+- **D**: system-level access with GC-optional, `std.process` for subprocess execution
+- **F#**: .NET ecosystem, `System.Diagnostics.Process` for subprocess, functional API design
+- **Haskell**: strong type system, `process` package for subprocess, monadic runner abstraction
+- **Nim**: Python-like syntax compiled to C, `osproc` module for subprocess execution
+- **Go**: popular for CLI tools, `os/exec` package, goroutine-based streaming
+- **Crystal**: Ruby-like syntax compiled to native, `Process` stdlib module
+- **Ruby**: `IO.popen` / `Open3` for subprocess, gem packaging
+- **Perl**: `system`, `open3`, or `IPC::Run` for subprocess, CPAN distribution
+- **PHP**: `proc_open` / `symfony/process` for subprocess, Composer package
+- **VBScript**: WScript.Shell `Exec`/`Run` for subprocess, Windows-native
+- **x86-64 ASM**: raw Linux syscalls (`execve`, `write`, `exit`), minimal ELF binary `ccc`
+- **OCaml**: `Unix` module for subprocess, dune build — **goal: prove as much about the system as possible** using OCaml's type system and optionally formal verification tools (Why3/Alt-Ergo)
+
+### Planned — Full Implementation (continued)
+
+- **Elixir**: `System.cmd` or ports-based wrapper, bundled `ccc` escript or Mix task; Erlang fallback if Elixir toolchain issues arise
+
+## Target CLIs
 
 - OpenCode
 - Claude / Claude Code
@@ -20,29 +43,29 @@ Target CLIs include:
 - Qwen Code
 - similar terminal-first coding agents
 
-Current scope:
+## Current Scope
 
 - start a CLI process with a prompt or stdin payload
 - capture stdout/stderr and exit status
 - expose a small streaming interface
 - keep the abstraction subprocess-oriented and easy to mock in tests
 
-Cross-language CLI requirement:
+## Cross-Language CLI Requirement
 
 - every language library should also bundle a CLI named `ccc`
 - the `ccc` interface should have the same shape across languages
 - the interface is not fully designed yet, but `ccc "<Prompt>"` must work
- - library and CLI design should stay aligned so `precurl` can use the library layer while humans can use the same runner shape directly
- - `precurl` uses the Rust library layer for delegated LLM analysis — see the [precurl SECURITY.md](../precurl/SECURITY.md) for threat model and prompt-injection mitigation details
+- library and CLI design should stay aligned so `precurl` can use the library layer while humans can use the same runner shape directly
+- `precurl` uses the Rust library layer for delegated LLM analysis — see the [precurl SECURITY.md](../precurl/SECURITY.md) for threat model and prompt-injection mitigation details
 
-First-pass `ccc` contract:
+## First-Pass `ccc` Contract
 
 - `ccc "<Prompt>"`
 - initial command shape maps to `opencode run "<Prompt>"`
 - this is intentionally narrow and likely to grow later with explicit runner/model flags
 - explicit shared behavior doc: `CCC_BEHAVIOR_CONTRACT.md`
 
-Planned `ccc` syntax growth (design notes only, not implemented yet):
+## Planned `ccc` Syntax Growth (design notes only, not implemented yet)
 
 - the only implemented cross-language contract today is still `ccc "<Prompt>"`
 - the next syntax shapes under consideration are:
@@ -58,18 +81,18 @@ Planned `ccc` syntax growth (design notes only, not implemented yet):
 - combination rules, precedence, and final parsing order are intentionally still undecided
 - until that design is locked, these forms are planned syntax only, not stable or implemented CLI behavior
 
-Python package:
+## Python Package
 
 - import path: `call_coding_clis`
 - current API: `CommandSpec`, `CompletedRun`, `Runner`
 
-Rust crate:
+## Rust Crate
 
 - crate name: `call-coding-clis`
 - library name: `call_coding_clis`
 - current API: `CommandSpec`, `CompletedRun`, `Runner`
 
-Planned roadmap:
+## Planned Roadmap
 
 - first-pass `ccc` CLI contract shared across implementations
 - explicit contract doc for currently implemented behavior: `CCC_BEHAVIOR_CONTRACT.md`
@@ -87,7 +110,7 @@ Planned roadmap:
 - Elixir package
 - OCaml library
 
-Missing / possible future features:
+## Missing / Possible Future Features
 
 - expanded `ccc` token parsing for `@alias`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
 - config-backed custom aliases, abbreviations, and default provider/model resolution
@@ -100,4 +123,6 @@ Missing / possible future features:
 - v2 idea: parse structured JSON output from supported runners and render it consistently
 - v2 idea: templated or user-customizable rendering for structured output so humans can choose how `ccc` presents results
 
-This repo is early-stage, but it now contains working Python code and tests instead of notes only.
+## Licensing
+
+Unlicense — see `UNLICENSE`.

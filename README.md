@@ -32,6 +32,12 @@ Cross-language CLI requirement:
 - the interface is not fully designed yet, but `ccc "<Prompt>"` must work
 - library and CLI design should stay aligned so `precurl` can use the library layer while humans can use the same runner shape directly
 
+First-pass `ccc` contract:
+
+- `ccc "<Prompt>"`
+- initial command shape maps to `opencode run "<Prompt>"`
+- this is intentionally narrow and likely to grow later with explicit runner/model flags
+
 Python package:
 
 - import path: `call_coding_clis`

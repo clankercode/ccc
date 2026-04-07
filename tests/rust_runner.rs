@@ -1,4 +1,4 @@
-use call_coding_clis::{CommandSpec, CompletedRun, Runner};
+use call_coding_clis::{build_prompt_spec, CommandSpec, CompletedRun, Runner};
 use std::path::Path;
 
 #[test]
@@ -56,4 +56,16 @@ fn command_spec_preserves_cwd_stdin_and_env() {
     assert_eq!(spec.stdin_text.as_deref(), Some("hello"));
     assert_eq!(spec.cwd.as_deref(), Some(Path::new("/tmp/work")));
     assert_eq!(spec.env.get("MODEL").map(String::as_str), Some("glm-5.1"));
+}
+
+#[test]
+fn ccc_builds_prompt_command_spec() {
+    let spec = build_prompt_spec("Fix the failing tests").expect("prompt should be valid");
+
+    assert_eq!(spec.argv, vec!["opencode", "run", "Fix the failing tests"]);
+}
+
+#[test]
+fn ccc_rejects_empty_prompt() {
+    assert!(build_prompt_spec("   ").is_err());
 }

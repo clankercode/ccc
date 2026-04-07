@@ -99,6 +99,14 @@ impl Default for Runner {
     }
 }
 
+pub fn build_prompt_spec(prompt: &str) -> Result<CommandSpec, &'static str> {
+    let normalized_prompt = prompt.trim();
+    if normalized_prompt.is_empty() {
+        return Err("prompt must not be empty");
+    }
+    Ok(CommandSpec::new(["opencode", "run", normalized_prompt]))
+}
+
 fn default_run_executor(spec: CommandSpec) -> CompletedRun {
     let mut command = build_command(&spec);
     let output = command

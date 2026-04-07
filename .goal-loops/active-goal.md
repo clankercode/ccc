@@ -1,32 +1,30 @@
 # Primary Goal
-Build the first usable `call-coding-clis` milestone: a Python package first, then a Rust crate, that can reliably invoke coding CLIs with a small shared abstraction suitable for `precurl`.
+Define and implement the first shared `ccc` CLI shape in `call-coding-clis`, with matching Python and Rust entrypoints and `ccc "<Prompt>"` working.
 
 ## Acceptance Criteria
 - A microplan exists in this repo and is kept current.
 - The repo has an `UNLICENSE` file.
-- A Python package named `call_coding_clis` exists with a small public API for running coding CLIs and capturing/streaming results.
-- Python tests cover the core process-invocation behavior with mockable execution.
-- A Rust crate exists with a comparable first-pass API for invoking coding CLIs.
-- Rust tests cover core invocation/result handling.
-- The repo docs capture the cross-language requirement that each library bundles a same-shape CLI named `ccc`, with `ccc "<Prompt>"` supported.
-- The repo documentation explains current scope, supported runners, and the staged roadmap for Rust, docs, C, Python, TS, Elixir, and OCaml.
+- Python exposes a `ccc` CLI entrypoint.
+- Rust exposes a `ccc` CLI entrypoint.
+- `ccc "<Prompt>"` works in both implementations with the same first-pass argument shape.
+- The first-pass CLI contract is documented clearly enough to guide the later language ports.
+- Tests cover the new CLI argument handling and command-shape behavior.
 - Milestone commits are created at convenient intervals during development.
 
 ## Current Status
-- Iteration: 2
-- Newly satisfied AC: ["A Rust crate exists with a comparable first-pass API for invoking coding CLIs.", "Rust tests cover core invocation/result handling.", "The repo documentation explains current scope, supported runners, and the staged roadmap for Rust, docs, C, Python, TS, Elixir, and OCaml."]
+- Iteration: 4
+- Newly satisfied AC: ["Python exposes a `ccc` CLI entrypoint.", "Rust exposes a `ccc` CLI entrypoint.", "`ccc \"<Prompt>\"` works in both implementations with the same first-pass argument shape.", "The first-pass CLI contract is documented clearly enough to guide the later language ports.", "Tests cover the new CLI argument handling and command-shape behavior."]
 - Remaining AC: ["Milestone commits are created at convenient intervals during development."]
 
 ## Current Plan
-- Python and Rust milestones are implemented and verified.
-- Create a milestone commit for the Rust checkpoint.
-- Reassess the acceptance criteria.
-- Auto-advance to the next `call-coding-clis` milestone by defining and implementing the first shared `ccc` CLI contract.
+- The shared `ccc` CLI shape is implemented and verified in Python and Rust.
+- Create the milestone commit.
+- Reassess and auto-advance to the next `call-coding-clis` goal.
 
 ## Blockers / Notes
-- `precurl` will consume the Rust library first, but Python goes first for this repo.
-- Keep the abstraction minimal and subprocess-oriented.
-- Preserve room for a shared `ccc` CLI contract across languages.
+- Keep the first `ccc` contract intentionally small.
+- The only locked user-facing behavior is `ccc "<Prompt>"`.
+- Preserve room for provider/model selection without overdesigning the initial CLI.
 
 ## ON_GOAL_COMPLETE_NEXT_STEPS
 When this goal is satisfied, microplan the next tasks for the remaining `call-coding-clis` deliverables (docs, C, TS, Elixir, OCaml, and any cleanup needed for `precurl` integration), update this file, and continue automatically.

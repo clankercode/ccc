@@ -8,3 +8,7 @@ description = "Minimal subprocess wrappers for coding CLIs"
 [lib]
 name = "call_coding_clis"
 path = "rust/src/lib.rs"
+
+[[bin]]
+name = "ccc"
+path = "rust/src/bin/ccc.rs"

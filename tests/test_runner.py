@@ -62,6 +62,19 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(events, [("stdout", "hello"), ("stderr", "warn")])
         self.assertEqual(result.exit_code, 2)
 
+    def test_ccc_builds_prompt_command_spec(self) -> None:
+        from call_coding_clis.cli import build_prompt_spec
+
+        spec = build_prompt_spec("Fix the failing tests")
+
+        self.assertEqual(spec.argv, ["opencode", "run", "Fix the failing tests"])
+
+    def test_ccc_rejects_empty_prompt(self) -> None:
+        from call_coding_clis.cli import build_prompt_spec
+
+        with self.assertRaises(ValueError):
+            build_prompt_spec("   ")
+
 
 if __name__ == "__main__":
     unittest.main()

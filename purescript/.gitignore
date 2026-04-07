@@ -1,0 +1,6 @@
+output/
+.node-spago/
+node_modules/
+.spago/
+.purs*
+cache/

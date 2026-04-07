@@ -1,0 +1,20 @@
+workspace:
+  packageSet:
+    registry: 75.8.0
+  extraPackages: {}
+package:
+  name: call-coding-clis
+  dependencies:
+    - prelude
+    - effect
+    - console
+    - node-process
+    - strings
+    - maybe
+    - either
+    - nullable
+    - foreign-object
+    - arrays
+  test:
+    main: Test.Main
+    dependencies: []

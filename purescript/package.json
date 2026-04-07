@@ -1,0 +1,9 @@
+{
+  "name": "call-coding-clis-purescript",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "ccc": "./bin/ccc"
+  }
+}

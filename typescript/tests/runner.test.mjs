@@ -131,6 +131,24 @@ test('Runner.stream executes a real subprocess and emits output', async () => {
   ])
 })
 
+test('Runner.stream reports missing binary startup failure', async () => {
+  const runner = new Runner()
+  const events = []
+
+  const result = await runner.stream(
+    { argv: ['/definitely/missing/runner-binary'] },
+    (channel, chunk) => {
+      events.push([channel, chunk])
+    },
+  )
+
+  assert.notEqual(result.exitCode, 0)
+  assert.equal(result.stdout, '')
+  assert.match(result.stderr, /failed to start/)
+  assert.match(result.stderr, /runner-binary/)
+  assert.deepEqual(events, [['stderr', result.stderr]])
+})
+
 test('ccc entrypoint forwards streamed stdout and stderr', async () => {
   const scriptPath = join(here, '..', 'src', 'ccc.js')
   const runnerFixture = join(here, 'fixtures', 'ccc-runner.mjs')

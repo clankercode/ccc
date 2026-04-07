@@ -55,11 +55,13 @@ async function runChildProcess(spec, onEvent) {
       onEvent('stderr', text)
     })
     child.on('error', (error) => {
+      const startupError = `failed to start ${command}: ${error.message}\n`
+      onEvent('stderr', startupError)
       resolve({
         argv: spec.argv,
         exitCode: 1,
         stdout: '',
-        stderr: `failed to start ${command}: ${error.message}\n`,
+        stderr: startupError,
       })
     })
     child.on('close', (code) => {

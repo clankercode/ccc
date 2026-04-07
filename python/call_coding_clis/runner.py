@@ -68,22 +68,27 @@ class Runner:
         return CompletedRun(
             argv=list(spec.argv),
             exit_code=int(completed.returncode),
-            stdout="",
-            stderr="",
+            stdout=str(completed.stdout),
+            stderr=str(completed.stderr),
         )
 
     def _default_stream_executor(
         self, spec: CommandSpec, on_event: StreamCallback
     ) -> subprocess.CompletedProcess[str]:
-        process = subprocess.Popen(
-            spec.argv,
-            stdin=subprocess.PIPE if spec.stdin_text is not None else None,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=spec.cwd,
-            env=self._merged_env(spec.env),
-            text=True,
-        )
+        try:
+            process = subprocess.Popen(
+                spec.argv,
+                stdin=subprocess.PIPE if spec.stdin_text is not None else None,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=spec.cwd,
+                env=self._merged_env(spec.env),
+                text=True,
+            )
+        except OSError as error:
+            stderr = f"failed to start {spec.argv[0]}: {error}\n"
+            on_event("stderr", stderr)
+            return subprocess.CompletedProcess(spec.argv, 1, "", stderr)
         stdout, stderr = process.communicate(input=spec.stdin_text)
         if stdout:
             on_event("stdout", stdout)

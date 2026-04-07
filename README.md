@@ -91,6 +91,7 @@ Missing / possible future features:
 - config-backed custom aliases, abbreviations, and default provider/model resolution
 - cross-language normalization of streaming event shapes and exit-code behavior
 - broader cross-language normalization of process-start failure handling beyond the current Python, Rust, C, and TypeScript coverage
+- startup-failure coverage now exists across Python, Rust, TypeScript, and C, but deeper event-shape parity is still open
 - richer stdin/cwd/env coverage and docs for every implementation
 - more concrete parity for C beyond the current prompt-spec and smoke-level scaffold
 - Elixir and OCaml implementations once local toolchains are available or design-first scaffolds are written

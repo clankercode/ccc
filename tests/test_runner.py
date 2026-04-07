@@ -72,6 +72,21 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("failed to start", result.stderr)
         self.assertIn("runner-binary", result.stderr)
 
+    def test_stream_reports_missing_binary_start_failure(self) -> None:
+        from call_coding_clis import CommandSpec, Runner
+
+        events = []
+        result = Runner().stream(
+            CommandSpec(argv=["/definitely/missing/runner-binary"]),
+            lambda channel, chunk: events.append((channel, chunk)),
+        )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("failed to start", result.stderr)
+        self.assertIn("runner-binary", result.stderr)
+        self.assertEqual(events, [("stderr", result.stderr)])
+
     def test_ccc_builds_prompt_command_spec(self) -> None:
         from call_coding_clis.cli import build_prompt_spec
 

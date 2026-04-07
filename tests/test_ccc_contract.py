@@ -198,6 +198,77 @@ class CccContractTests(unittest.TestCase):
                 )
             )
 
+    def test_cross_language_ccc_rejects_whitespace_only_prompt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            self._write_opencode_stub(bin_dir / "opencode")
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+            whitespace_prompt = "   "
+
+            self.assert_rejects_empty(
+                subprocess.run(
+                    ["python3", "python/call_coding_clis/cli.py", whitespace_prompt],
+                    cwd=ROOT,
+                    env={**env, "PYTHONPATH": str(ROOT / "python")},
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            self.assert_rejects_empty(
+                subprocess.run(
+                    [
+                        "cargo",
+                        "run",
+                        "--quiet",
+                        "--bin",
+                        "ccc",
+                        "--",
+                        whitespace_prompt,
+                    ],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            self.assert_rejects_empty(
+                subprocess.run(
+                    ["node", "typescript/src/ccc.js", whitespace_prompt],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            subprocess.run(
+                ["make", "-C", "c", "build/ccc"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assert_rejects_empty(
+                subprocess.run(
+                    [str(ROOT / "c/build/ccc"), whitespace_prompt],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
     def assert_equal_output(self, result: subprocess.CompletedProcess[str]) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, EXPECTED)

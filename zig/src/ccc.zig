@@ -10,15 +10,40 @@ pub fn main() !void {
 
     _ = args_iter.skip();
 
-    var argv = std.ArrayList([]const u8).init(allocator);
-    defer argv.deinit();
+    var argv: std.ArrayList([]const u8) = .empty;
+    defer argv.deinit(allocator);
     while (args_iter.next()) |arg| {
-        try argv.append(arg);
+        try argv.append(allocator, arg);
     }
 
     if (argv.items.len == 0) {
         std.debug.print("usage: ccc [runner] [+thinking] [:provider:model] [:model] [@alias] <prompt>\n", .{});
         std.process.exit(1);
+    }
+
+    if (argv.items.len == 1) {
+        const prompt = std.mem.trim(u8, argv.items[0], " \t\n\r");
+        if (prompt.len == 0) {
+            std.debug.print("prompt must not be empty\n", .{});
+            std.process.exit(1);
+        }
+        var spec = runner.CommandSpec{ .argv = &.{ "opencode", "run", prompt } };
+        const real_opencode = std.process.getEnvVarOwned(allocator, "CCC_REAL_OPENCODE") catch null;
+        if (real_opencode) |opencode_path| {
+            var new_argv = try allocator.alloc([]const u8, 3);
+            new_argv[0] = opencode_path;
+            new_argv[1] = "run";
+            new_argv[2] = prompt;
+            spec.argv = new_argv;
+        }
+        const result = try runner.Runner.run(allocator, .{ .argv = spec.argv });
+        if (result.stdout_data.len > 0) {
+            try std.fs.File.stdout().writeAll(result.stdout_data);
+        }
+        if (result.stderr_data.len > 0) {
+            try std.fs.File.stderr().writeAll(result.stderr_data);
+        }
+        std.process.exit(result.exit_code);
     }
 
     var config = parser.CccConfig.init(allocator);

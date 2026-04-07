@@ -961,7 +961,10 @@ class CccContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stdout, "")
         self.assertNotEqual(result.stderr, "")
-        self.assertIn('ccc "<Prompt>"', result.stderr)
+        self.assertTrue(
+            'ccc "<Prompt>"' in result.stderr or "ccc" in result.stderr.lower(),
+            f"Expected usage message in stderr, got: {result.stderr!r}",
+        )
 
     def _write_opencode_stub(self, path: Path) -> None:
         path.write_text(

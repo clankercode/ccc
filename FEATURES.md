@@ -107,13 +107,13 @@
 
 | Feature | Python | Rust | TypeScript | C | Go | Ruby | Perl | C++ | Zig | D | F# | Haskell | Nim | Crystal | PHP | PureScript | VBScript | ASM | Elixir | OCaml |
 |---------|--------|------|------------|---|-----|------|------|-----|-----|---|-----|---------|-----|---------|-----|-----------|----------|-----|--------|-------|
-| F16 Runner selector | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
-| F17 Thinking level | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
-| F18 Provider/model | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
-| F19 Alias/preset | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
-| F20 Config loading | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
-| F21 Custom abbrevs | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
-| F22 Default prov/model | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
+| F16 Runner selector | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | yes | n/a | yes | yes |
+| F17 Thinking level | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | yes | n/a | yes | yes |
+| F18 Provider/model | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | yes | n/a | yes | yes |
+| F19 Alias/preset | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | yes | n/a | yes | yes |
+| F20 Config loading | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | yes | n/a | yes | yes |
+| F21 Custom abbrevs | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | yes | n/a | yes | yes |
+| F22 Default prov/model | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | yes | n/a | yes | yes |
 
 ### v3 JSON Output Features
 
@@ -128,13 +128,13 @@
 ## Progress Tracking
 
 ### Current Focus
-- Phase 2 complete: All 20 languages scaffolded with v1 features
-- Phase 3: v2 parser/config features (pending)
+- Phase 3 complete: v2 parser/config features implemented in 18/20 languages (ASM=n/a, PureScript=source-only pending spago)
 - Phase 4: v3 JSON output parsing (pending)
 
 ### Completed Milestones
 - Phase 1: Foundation — FEATURES.md, JSON fixtures, mock plan, all 8 original languages verified
 - Phase 2: All 12 remaining languages implemented (Zig, D, F#, Haskell, Nim, Crystal, PHP, PureScript, VBScript, x86-64 ASM, Elixir, OCaml)
+- Phase 3: v2 parser/config — parse_args, resolve_command, runner registry, config loading across 18/20 languages
 
 ### Notes
 - C Runner.stream not implemented (known gap)

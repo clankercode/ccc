@@ -11,7 +11,10 @@ except ModuleNotFoundError:
     except ModuleNotFoundError:
         tomllib = None
 
-from .parser import AliasDef, CccConfig
+try:
+    from .parser import AliasDef, CccConfig
+except ImportError:
+    from parser import AliasDef, CccConfig
 
 
 CONFIG_DIR_NAME = "ccc"

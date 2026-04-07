@@ -1,0 +1,4 @@
+(library
+  (name ccc_lib)
+  (modules command_spec completed_run error_format prompt_spec runner)
+  (libraries unix))

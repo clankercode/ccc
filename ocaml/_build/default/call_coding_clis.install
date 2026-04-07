@@ -1,0 +1,10 @@
+lib: [
+  "_build/install/default/lib/call_coding_clis/META"
+  "_build/install/default/lib/call_coding_clis/dune-package"
+]
+bin: [
+  "_build/install/default/bin/ccc"
+]
+doc: [
+  "_build/install/default/doc/call_coding_clis/README.md"
+]

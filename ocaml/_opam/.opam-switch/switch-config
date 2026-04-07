@@ -1,0 +1,13 @@
+opam-version: "2.0"
+synopsis: "ocaml-base-compiler = 5.4.1"
+opam-root: "/home/xertrov/.opam"
+invariant: [
+  "ocaml-base-compiler" {= "5.4.1"}
+]
+paths {
+  
+}
+variables {
+  user: "xertrov"
+  group: "xertrov"
+}

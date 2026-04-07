@@ -1,0 +1,6 @@
+(lang dune 3.16)
+
+(package
+  (name call_coding_clis)
+  (synopsis "OCaml implementation of call-coding-clis")
+  (license Unlicense))

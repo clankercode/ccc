@@ -1,0 +1,4 @@
+(executable
+  (name ccc)
+  (public_name ccc)
+  (libraries ccc_lib))

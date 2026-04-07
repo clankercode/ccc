@@ -221,6 +221,13 @@ TEST_CASES = [
         "A" * 4096 + "\n",
         "",
     ),
+    TestCase(
+        "unicode_prompt",
+        "réparer le bogue",
+        0,
+        "mock: unknown prompt 'réparer le bogue'\n",
+        "",
+    ),
 ]
 
 

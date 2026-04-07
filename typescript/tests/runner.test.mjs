@@ -156,7 +156,7 @@ test('ccc entrypoint forwards streamed stdout and stderr', async () => {
     env: {
       ...process.env,
       PATH: process.env.PATH,
-      CCC_RUNNER_PREFIX_JSON: JSON.stringify(['node', runnerFixture]),
+      CCC_REAL_OPENCODE: runnerFixture,
     },
   })
 

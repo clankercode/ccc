@@ -9,8 +9,8 @@ if (args.length !== 1) {
   process.exit(1)
 }
 
-const runnerPrefix = process.env.CCC_RUNNER_PREFIX_JSON
-  ? JSON.parse(process.env.CCC_RUNNER_PREFIX_JSON)
+const runnerPrefix = process.env.CCC_REAL_OPENCODE
+  ? [process.env.CCC_REAL_OPENCODE, 'run']
   : ['opencode', 'run']
 
 let spec

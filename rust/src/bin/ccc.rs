@@ -1,22 +1,46 @@
-use call_coding_clis::{build_prompt_spec, Runner};
+use call_coding_clis::{build_prompt_spec, load_config, parse_args, resolve_command, Runner};
 use std::env;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
-    if args.len() != 1 {
-        eprintln!("usage: ccc \"<Prompt>\"");
+
+    if args.is_empty() {
+        eprintln!("usage: ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"");
         return ExitCode::from(1);
     }
 
-    let mut spec = match build_prompt_spec(&args[0]) {
-        Ok(spec) => spec,
-        Err(message) => {
-            eprintln!("{message}");
+    let spec = if args.len() == 1 {
+        match build_prompt_spec(&args[0]) {
+            Ok(spec) => spec,
+            Err(message) => {
+                eprintln!("{message}");
+                return ExitCode::from(1);
+            }
+        }
+    } else {
+        let parsed = parse_args(&args);
+        if parsed.prompt.trim().is_empty() {
+            eprintln!("prompt must not be empty");
             return ExitCode::from(1);
+        }
+        let config = load_config(None);
+        match resolve_command(&parsed, Some(&config)) {
+            Ok((argv, env_overrides)) => {
+                let mut spec = call_coding_clis::CommandSpec::new(argv);
+                for (k, v) in env_overrides {
+                    spec = spec.with_env(k, v);
+                }
+                spec
+            }
+            Err(msg) => {
+                eprintln!("{msg}");
+                return ExitCode::from(1);
+            }
         }
     };
 
+    let mut spec = spec;
     if let Ok(real_opencode) = env::var("CCC_REAL_OPENCODE") {
         if !real_opencode.is_empty() {
             spec.argv[0] = real_opencode;

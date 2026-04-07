@@ -5,6 +5,12 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+mod parser;
+mod config;
+
+pub use parser::{ParsedArgs, CccConfig, AliasDef, RunnerInfo, parse_args, resolve_command, RUNNER_REGISTRY};
+pub use config::load_config;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommandSpec {
     pub argv: Vec<String>,

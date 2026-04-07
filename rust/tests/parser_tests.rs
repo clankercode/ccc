@@ -1,0 +1,175 @@
+use call_coding_clis::*;
+
+#[test]
+fn test_parse_prompt_only() {
+    let args: Vec<String> = vec!["hello world".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.prompt, "hello world");
+    assert!(parsed.runner.is_none());
+    assert!(parsed.thinking.is_none());
+    assert!(parsed.alias.is_none());
+}
+
+#[test]
+fn test_parse_runner_selector() {
+    let args: Vec<String> = vec!["cc".into(), "fix bug".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.runner.as_deref(), Some("cc"));
+    assert_eq!(parsed.prompt, "fix bug");
+}
+
+#[test]
+fn test_parse_thinking_level() {
+    let args: Vec<String> = vec!["+2".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.thinking, Some(2));
+    assert_eq!(parsed.prompt, "hello");
+}
+
+#[test]
+fn test_parse_provider_model() {
+    let args: Vec<String> = vec![":anthropic:claude-4".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.provider.as_deref(), Some("anthropic"));
+    assert_eq!(parsed.model.as_deref(), Some("claude-4"));
+}
+
+#[test]
+fn test_parse_alias() {
+    let args: Vec<String> = vec!["@work".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.alias.as_deref(), Some("work"));
+}
+
+#[test]
+fn test_parse_full_combo() {
+    let args: Vec<String> = vec![
+        "cc".into(),
+        "+3".into(),
+        ":anthropic:claude-4".into(),
+        "@fast".into(),
+        "fix tests".into(),
+    ];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.runner.as_deref(), Some("cc"));
+    assert_eq!(parsed.thinking, Some(3));
+    assert_eq!(parsed.provider.as_deref(), Some("anthropic"));
+    assert_eq!(parsed.model.as_deref(), Some("claude-4"));
+    assert_eq!(parsed.alias.as_deref(), Some("fast"));
+    assert_eq!(parsed.prompt, "fix tests");
+}
+
+#[test]
+fn test_resolve_default_runner_is_opencode() {
+    let parsed = ParsedArgs {
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[0], "opencode");
+    assert!(argv.contains(&"run".to_string()));
+    assert!(argv.contains(&"hello".to_string()));
+}
+
+#[test]
+fn test_resolve_claude_runner() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[0], "claude");
+}
+
+#[test]
+fn test_resolve_thinking_flags() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        thinking: Some(2),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _) = resolve_command(&parsed, None).unwrap();
+    assert!(argv.contains(&"--thinking".to_string()));
+    assert!(argv.contains(&"medium".to_string()));
+}
+
+#[test]
+fn test_resolve_model_flag() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        model: Some("claude-4".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _) = resolve_command(&parsed, None).unwrap();
+    assert!(argv.contains(&"--model".to_string()));
+    assert!(argv.contains(&"claude-4".to_string()));
+}
+
+#[test]
+fn test_resolve_provider_sets_env() {
+    let parsed = ParsedArgs {
+        provider: Some("anthropic".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (_, env) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        env.get("CCC_PROVIDER").map(|s| s.as_str()),
+        Some("anthropic")
+    );
+}
+
+#[test]
+fn test_resolve_empty_prompt_errors() {
+    let parsed = ParsedArgs {
+        prompt: "   ".into(),
+        ..Default::default()
+    };
+    assert!(resolve_command(&parsed, None).is_err());
+}
+
+#[test]
+fn test_resolve_config_default_runner() {
+    let config = CccConfig {
+        default_runner: "cc".into(),
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(argv[0], "claude");
+}
+
+#[test]
+fn test_resolve_alias() {
+    let config = CccConfig {
+        aliases: {
+            let mut m = std::collections::BTreeMap::new();
+            m.insert(
+                "work".into(),
+                AliasDef {
+                    runner: Some("cc".into()),
+                    thinking: Some(3),
+                    model: Some("claude-4".into()),
+                    ..Default::default()
+                },
+            );
+            m
+        },
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        alias: Some("work".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(argv[0], "claude");
+    assert!(argv.contains(&"--thinking".to_string()));
+    assert!(argv.contains(&"high".to_string()));
+}

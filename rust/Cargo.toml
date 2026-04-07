@@ -1,0 +1,12 @@
+[package]
+name = "call-coding-clis"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "ccc"
+path = "src/bin/ccc.rs"
+
+[lib]
+name = "call_coding_clis"
+path = "src/lib.rs"

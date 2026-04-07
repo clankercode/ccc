@@ -15,8 +15,9 @@ ccc "<Prompt>"
 That contract currently means:
 
 - exactly one positional prompt argument
-- empty prompts are rejected
-- the first-pass command shape resolves to `opencode run "<Prompt>"`
+- prompts are trimmed of leading/trailing whitespace before use
+- empty or whitespace-only prompts are rejected
+- the first-pass command shape resolves to `opencode run "<trimmed-Prompt>"`
 
 ## Cross-Language Expectations
 

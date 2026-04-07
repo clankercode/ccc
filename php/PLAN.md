@@ -1,58 +1,116 @@
 # PHP Implementation Plan — call-coding-clis
 
+## 0. Build & Run Instructions
+
+```bash
+cd php
+
+composer install          # install PHPUnit dev dependency, dump autoloader
+
+# Run all tests
+vendor/bin/phpunit
+
+# Run specific suite
+vendor/bin/phpunit --testsuite unit
+vendor/bin/phpunit --testsuite integration
+
+# Run CLI directly
+php bin/ccc "Fix the failing tests"
+
+# CLI is also executable via shebang after chmod +x
+chmod +x bin/ccc
+./bin/ccc "Fix the failing tests"
+```
+
+No build step required — PHP is interpreted. `composer install` is only needed for autoloading and dev dependencies.
+
 ## 1. Composer Package Structure
 
 ```
 php/
 ├── composer.json
+├── phpunit.xml
 ├── bin/
 │   └── ccc              # CLI entry point (chmod +x, #!/usr/bin/env php)
-└── src/
-    ├── CommandSpec.php
-    ├── CompletedRun.php
-    ├── Runner.php
-    └── build_prompt_spec.php
+├── src/
+│   ├── CommandSpec.php
+│   ├── CompletedRun.php
+│   ├── Runner.php
+│   └── build_prompt_spec.php
+└── tests/
+    ├── Unit/
+    │   └── BuildPromptSpecTest.php
+    └── Integration/
+        └── RunnerTest.php
 ```
 
-`composer.json` sketch:
+`composer.json`:
 
-- **name**: `call-coding-clis/php` (or `anomaly/call-coding-clis-php`)
-- **type**: `library`
-- **require**: `"php": ">=8.2"`
-- **require-dev**: `"phpunit/phpunit": "^10|^11"`
-- **autoload**: PSR-4 `CallCodingClis\\` → `src/`
-- **bin**: `["bin/ccc"]`
+```json
+{
+    "name": "call-coding-clis/php",
+    "description": "PHP library and CLI for call-coding-clis",
+    "type": "library",
+    "require": {
+        "php": ">=8.2"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10|^11"
+    },
+    "autoload": {
+        "psr-4": {
+            "CallCodingClis\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "CallCodingClis\\Tests\\": "tests/"
+        }
+    },
+    "bin": ["bin/ccc"]
+}
+```
 
-No external runtime dependencies. `symfony/process` is not required — `proc_open` from the standard library is sufficient and avoids a dependency for such a thin wrapper.
+No external runtime dependencies. `proc_open` from the standard library is sufficient.
 
 ## 2. Library API
+
+All source files must begin with `declare(strict_types=1);`.
 
 ### `CommandSpec` — `src/CommandSpec.php`
 
 ```php
-class CommandSpec
+declare(strict_types=1);
+
+namespace CallCodingClis;
+
+readonly class CommandSpec
 {
     public function __construct(
-        public readonly array $argv,
-        public readonly ?string $stdinText = null,
-        public readonly ?string $cwd = null,
-        public readonly array $env = [],
+        public array $argv,
+        public ?string $stdinText = null,
+        public ?string $cwd = null,
+        public array $env = [],
     ) {}
 }
 ```
 
-Immutability via `readonly` properties (PHP 8.2). Builder-style optional methods (`withStdin`, `withCwd`, `withEnv`) are unnecessary given the small surface; named args suffice.
+Uses PHP 8.2 `readonly class` for immutability on the entire value object. Builder-style methods (`withStdin`, `withCwd`, `withEnv`) are unnecessary given the small surface; named args suffice.
 
 ### `CompletedRun` — `src/CompletedRun.php`
 
 ```php
-class CompletedRun
+declare(strict_types=1);
+
+namespace CallCodingClis;
+
+readonly class CompletedRun
 {
     public function __construct(
-        public readonly array $argv,
-        public readonly int $exitCode,
-        public readonly string $stdout,
-        public readonly string $stderr,
+        public array $argv,
+        public int $exitCode,
+        public string $stdout,
+        public string $stderr,
     ) {}
 }
 ```
@@ -60,6 +118,10 @@ class CompletedRun
 ### `Runner` — `src/Runner.php`
 
 ```php
+declare(strict_types=1);
+
+namespace CallCodingClis;
+
 class Runner
 {
     public function run(CommandSpec $spec): CompletedRun
@@ -67,39 +129,94 @@ class Runner
 }
 ```
 
-Follows the Python/Rust pattern: `run()` captures all output, `stream()` calls the callback with `("stdout", $data)` / `("stderr", $data)` after completion (non-streaming passthrough like Rust). Injectability is not strictly needed for v1 parity but can be added later via an optional executor callable.
+Follows the Python/Rust pattern: `run()` captures all output, `stream()` calls the callback with `("stdout", $data)` / `("stderr", $data)` after completion (non-streaming passthrough like Rust). The `stream()` method is a non-streaming passthrough — it calls `run()` internally and then fires the callback, matching the Rust and TypeScript behavior.
+
+No executor injection for v1 (unlike Python/Rust). The Runner directly calls `proc_open`. This can be added later if needed for testing.
 
 ### `build_prompt_spec()` — `src/build_prompt_spec.php`
 
 ```php
+declare(strict_types=1);
+
+namespace CallCodingClis;
+
 function build_prompt_spec(string $prompt): CommandSpec
 ```
 
-Returns `CommandSpec` or throws `\InvalidArgumentException` on empty/whitespace input. Namespace: `CallCodingClis\build_prompt_spec` (or a class method; free function matches the Python/Rust convention).
+Returns `CommandSpec` or throws `\InvalidArgumentException` on empty/whitespace input. Free function matches the Python/Rust convention.
 
 ## 3. Subprocess via `proc_open`
 
-`Runner::run()` will use PHP's native `proc_open()`:
+`Runner::run()` uses PHP's native `proc_open()` with `bypass_shell` to avoid shell interpolation (matching how Python `subprocess.run` and Rust `Command::new` pass argv directly):
 
-1. Build a `descriptorspec` array: `0 => ["pipe", "r"]`, `1 => ["pipe", "w"]`, `2 => ["pipe", "w"]`.
-2. Call `proc_open($cmd, $descriptorspec, $pipes, $spec->cwd, $mergedEnv)`.
-   - `$cmd` is `$spec->argv[0]` with args passed via `$spec->argv` escaped with `escapeshellarg()` — **or** use the `bypass_shell: true` option (PHP 7.4+) to pass argv directly as an array to `proc_open` without shell interpolation, matching how Rust/Python do it.
-3. Write `$spec->stdinText` to `$pipes[0]`, close it.
-4. Read `$pipes[1]` and `$pipes[2]` into `$stdout` / `$stderr`.
-5. Close remaining pipes, call `proc_close()` to get exit code.
-6. On `proc_open` failure (returns `false`): return `CompletedRun` with `exitCode: 1`, `stderr: "failed to start {$spec->argv[0]}: <error>"`.
+```php
+$cmd = $spec->argv;
+if (($realOpenCode = getenv('CCC_REAL_OPENCODE')) !== false) {
+    $cmd[0] = $realOpenCode;
+}
 
-Key: `bypass_shell: true` is critical for correct argv passing. Without it, the binary name and arguments go through the shell, which would mangle quoting and break the contract test expectations.
+$descriptorspec = [
+    0 => ['pipe', 'r'],
+    1 => ['pipe', 'w'],
+    2 => ['pipe', 'w'],
+];
+
+$cwd = $spec->cwd;
+$env = $spec->env;
+$process = proc_open($cmd, $descriptorspec, $pipes, $cwd, $env, ['bypass_shell' => true]);
+```
+
+**`bypass_shell: true`** is critical. Without it, the binary name and arguments go through the shell, which mangles quoting and breaks contract test expectations. When `bypass_shell` is true, `$cmd` must be an array (not a string).
+
+**Important**: With `bypass_shell: true` and `$env = []`, PHP will still pass `$_SERVER` or `$_ENV` environment depending on SAPI. To ensure clean env behavior, if `$spec->env` is non-empty, merge it onto `getenv()`:
+
+```php
+$mergedEnv = null; // null means "inherit current env" for proc_open
+if ($spec->env !== []) {
+    $mergedEnv = getenv();       // get all current env vars as array
+    foreach ($spec->env as $k => $v) {
+        $mergedEnv[$k] = $v;    // override with spec values
+    }
+}
+```
+
+Pass `$mergedEnv` as the `$env` parameter to `proc_open`. When `$mergedEnv` is `null`, proc_open inherits the current environment (no overrides needed).
+
+### Execution steps:
+
+1. Build `$cmd` array from `$spec->argv`. If `CCC_REAL_OPENCODE` env var is set, replace `$cmd[0]`.
+2. Set up `$descriptorspec` with three pipes.
+3. Call `proc_open($cmd, $descriptorspec, $pipes, $spec->cwd, $mergedEnv, ['bypass_shell' => true])`.
+4. If `proc_open` returns `false`: return `CompletedRun` with `exitCode: 1`, `stderr: "failed to start {$spec->argv[0]}: proc_open failed\n"`.
+5. Write `$spec->stdinText` to `$pipes[0]` (if non-null), then close `$pipes[0]`.
+6. Read `$pipes[1]` and `$pipes[2]` into `$stdout` / `$stderr` via `stream_get_contents()`.
+7. Close `$pipes[1]` and `$pipes[2]`.
+8. Call `proc_close($process)` to get exit code. This returns the child's exit status, or `-1` on error.
+9. Return `CompletedRun` with the captured output.
+
+### Exit code handling:
+
+`proc_close()` returns:
+- The child process exit code on normal exit (0–255).
+- `-1` if the process could not be terminated or `pcntl_wexitstatus` fails.
+
+Map this like the C implementation:
+```php
+$rawExitCode = proc_close($process);
+$exitCode = ($rawExitCode >= 0) ? $rawExitCode : 1;
+```
 
 ## 4. `ccc` CLI as `bin/ccc`
 
 ```
 #!/usr/bin/env php
 <?php
-require __DIR__ . '/../vendor/autoload.php';
+declare(strict_types=1);
 
 use CallCodingClis\build_prompt_spec;
 use CallCodingClis\Runner;
+
+require __DIR__ . '/../vendor/autoload.php';
 
 $args = array_slice($argv, 1);
 if (count($args) !== 1) {
@@ -124,7 +241,11 @@ if ($result->stderr !== '') {
 exit($result->exitCode);
 ```
 
-Must be executable (`chmod +x`). When installed via `composer install`, Composer handles this automatically.
+Must be executable (`chmod +x`). The shebang line allows direct invocation (`./bin/ccc`). For the cross-language contract tests, the invocation is `["php", "php/bin/ccc", PROMPT]` — the shebang is not required for that path but enables standalone use.
+
+### `CCC_REAL_OPENCODE` env var
+
+The CLI reads `CCC_REAL_OPENCODE` from the environment and uses it to override `argv[0]` in the `Runner`. This is handled inside `Runner::run()` — when the env var is set, `$spec->argv[0]` is replaced with its value before calling `proc_open`. This matches the C implementation (`c/src/ccc.c:48`).
 
 ## 5. Prompt Trimming & Empty Rejection
 
@@ -139,7 +260,9 @@ function build_prompt_spec(string $prompt): CommandSpec
 }
 ```
 
-`trim()` handles leading/trailing whitespace. Empty/whitespace-only input (including `"   "`) triggers `InvalidArgumentException`. The error message matches other implementations: `"prompt must not be empty"`.
+`trim()` handles leading/trailing whitespace. Empty/whitespace-only input (including `"   "`) triggers `InvalidArgumentException`. The error message matches all other implementations: `"prompt must not be empty"`.
+
+The `InvalidArgumentException` is caught by `bin/ccc` and written to stderr followed by a newline (via `PHP_EOL`). The process exits with code 1.
 
 ## 6. Error Format: `argv[0]` Only
 

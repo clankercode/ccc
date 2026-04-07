@@ -4,6 +4,16 @@
 
 Minimal ELF64 static binary implementing the `ccc` CLI contract using raw Linux syscalls and zero libc dependency. Single NASM source file assembled and linked into a standalone executable.
 
+## Prerequisites
+
+- **NASM** ≥ 2.14 (`nasm --version`)
+- **GNU ld** (binutils, typically pre-installed on Linux)
+- **Linux x86-64** kernel (syscalls are Linux-specific)
+
+Install on Debian/Ubuntu: `sudo apt install nasm binutils`
+Install on Fedora:     `sudo dnf install nasm binutils`
+Install on Arch:       `sudo pacman -S nasm binutils`
+
 ## Toolchain & Build
 
 ### Assembler: NASM (Intel syntax)
@@ -11,20 +21,72 @@ Minimal ELF64 static binary implementing the `ccc` CLI contract using raw Linux 
 - Source: `asm-x86_64/ccc.asm`
 - Output: `asm-x86_64/ccc` (ELF64 executable)
 
-### Makefile targets
+### Makefile
 
 ```makefile
+NASM  := nasm
+LD    := ld
+FLAGS := -f elf64
+
+.PHONY: all clean debug test test-contract static-check
+
 all: ccc
 
 ccc: ccc.asm
-    nasm -f elf64 -o ccc.o ccc.asm
-    ld -o ccc ccc.o
+	$(NASM) $(FLAGS) -o ccc.o ccc.asm
+	$(LD) -o ccc ccc.o
+
+debug: ccc.asm
+	$(NASM) $(FLAGS) -g -F dwarf -o ccc.o ccc.asm
+	$(LD) -o ccc ccc.o
+
+static-check: ccc.asm
+	@echo "--- Verifying no dynamic dependencies ---"
+	$(NASM) $(FLAGS) -o ccc.o ccc.asm && $(LD) -o ccc ccc.o
+	ldd ./ccc 2>&1 | grep -q "not a dynamic executable" && echo "OK: static" || echo "FAIL: has dynamic deps"
+	file ./ccc
 
 clean:
-    rm -f ccc.o ccc
+	rm -f ccc.o ccc
+
+test: ccc test-stub/opencode
+	@echo "=== argc check (no args) ==="
+	./ccc; echo "exit: $$?"
+	@echo "=== argc check (too many args) ==="
+	./ccc a b; echo "exit: $$?"
+	@echo "=== empty prompt ==="
+	./ccc ""; echo "exit: $$?"
+	@echo "=== whitespace prompt ==="
+	./ccc "   "; echo "exit: $$?"
+	@echo "=== happy path ==="
+	PATH="$$PWD/test-stub:$$PATH" ./ccc "hello world"; echo "exit: $$?"
+	@echo "=== startup failure (nonexistent runner) ==="
+	CCC_REAL_OPENCODE=/nonexistent/binary ./ccc "test" 2>&1; echo "exit: $$?"
+
+test-contract: ccc
+	python3 -m pytest ../tests/test_ccc_contract.py -v --tb=short -k "contract" 2>&1 || true
+	@echo "NOTE: ASM binary must be registered in test_ccc_contract.py (see Cross-Language Test Registration section)"
+
+test-stub/opencode:
+	@mkdir -p test-stub
+	@printf '#!/bin/sh\nif [ "$$1" != "run" ]; then\n  exit 9\nfi\nshift\nprintf "opencode run %%s\\n" "$$1"\n' > test-stub/opencode
+	@chmod +x test-stub/opencode
 ```
 
-No `-g` by default. A `debug` target can add `-g -F dwarf` for GDB use.
+**Build from repo root:**
+```bash
+make -C asm-x86_64          # builds asm-x86_64/ccc
+make -C asm-x86_64 test     # runs quick smoke tests
+make -C asm-x86_64 clean    # removes artifacts
+```
+
+**Build standalone (no Makefile):**
+```bash
+cd asm-x86_64
+nasm -f elf64 -o ccc.o ccc.asm
+ld -o ccc ccc.o
+./ccc "hello world"
+```
 
 ### Why NASM over GAS
 
@@ -35,13 +97,15 @@ No `-g` by default. A `debug` target can add `-g -F dwarf` for GDB use.
 
 ## Linux Syscalls Used
 
-| Syscall | Nr (x86-64) | Purpose |
-|---------|-------------|---------|
-| `write`  | 1           | Error messages to stderr (fd 2) |
-| `fork`   | 57          | Create child process |
-| `execve` | 59          | Execute `opencode run "<prompt>"` |
-| `waitpid`| 61          | Reap child, extract exit status |
-| `exit`   | 60          | Terminate with exit code |
+| Syscall     | Nr (x86-64) | Purpose |
+|-------------|-------------|---------|
+| `write`     | 1           | Error messages to stderr (fd 2) |
+| `fork`      | 57          | Create child process |
+| `execve`    | 59          | Execute `opencode run "<prompt>"` |
+| `waitpid`   | 61          | Reap child, extract exit status |
+| `exit_group`| 231         | Terminate process with exit code |
+
+> **Why `exit_group` (231) instead of `exit` (60)?** `exit` only terminates the calling thread. `exit_group` terminates all threads in the process. Since we are single-threaded both are functionally equivalent, but `exit_group` is the canonical syscall for process termination on modern Linux and avoids any surprise if the binary is ever linked against code that spawns threads. Using `exit_group` matches what glibc's `exit()` wrapper emits internally.
 
 Syscall convention: `rax` = syscall number, args in `rdi rsi rdx r10 r8 r9`, return in `rax`. Clobber `rcx` and `r11`.
 
@@ -87,20 +151,24 @@ _start
 
 ## Prompt Handling — Stack-Only, No Heap
 
-### Whitespace check (reused from C impl logic)
+### Whitespace definition
 
-Input: `rsi` = pointer to null-terminated string.
-Scan byte-by-byte. Whitespace chars: `0x09` (tab), `0x0A` (LF), `0x0D` (CR), `0x20` (space).
+The C implementation uses `isspace()` from `<ctype.h>`, which on glibc matches: space (0x20), tab (0x09), newline (0x0A), vertical-tab (0x0B), form-feed (0x0C), carriage-return (0x0D). **The ASM implementation must match this exact set** to avoid behavioral divergence. Hardcode all six byte values in a comparison macro or lookup.
+
+> **Review note:** The original plan listed only 4 whitespace chars (tab, LF, CR, space). This missed VT (0x0B) and FF (0x0C). Since `isspace()` in the C impl includes them, the ASM binary must too — otherwise `" \v "` would be rejected by C but accepted (after trim) by ASM.
 
 ### Trim in-place
 
+Input: pointer to null-terminated string.
 Leading: advance pointer past whitespace bytes. Trailing: find last non-whitespace byte, write `0x00` after it.
 
 The prompt is in the argv area placed by the kernel. We modify it in-place — this is safe because the process image owns the stack and we never return the modified string to anyone else.
 
-### Empty/whitespace rejection
+### Empty-prompt check
 
 After trim, if first byte is `0x00` → empty prompt. Emit `"prompt must not be empty\n"` to stderr and `exit(1)`.
+
+> **Review note:** The C impl (`c/src/ccc.c:43`) checks `strlen(prompt) == 0 || is_whitespace_only(prompt)` after trim. The `is_whitespace_only` branch is **dead code** after `trim_in_place` — trim strips all leading/trailing whitespace, so a string that was whitespace-only becomes empty (strlen==0). The ASM impl correctly only needs to check for the null terminator after trim.
 
 ### Usage message (argc mismatch)
 
@@ -126,15 +194,47 @@ mov rax, 60              ; sys_exit
 syscall
 ```
 
+## Helper Routines
+
+### `write_str(fd, msg_ptr, msg_len)`
+
+Used by all error paths. Must handle **partial writes** — `sys_write` may return fewer bytes than requested (e.g., if stderr is redirected to a pipe with a full buffer, or on EINTR). Loop until all bytes are written.
+
+```
+; Input: rdi = fd, rsi = msg ptr, rdx = msg length
+; Clobbers: rax, rcx, r11, rdx
+.write_str:
+.loop:
+    mov rax, 1           ; sys_write
+    syscall
+    test rax, rax
+    jle  .done            ; error or EOF — silently stop (best-effort)
+    add  rsi, rax         ; advance pointer
+    sub  rdx, rax         ; decrease remaining count
+    jnz  .loop
+.done:
+    ret
+```
+
+### `strlen(ptr)`
+
+Returns length in `rax` of null-terminated string at `rsi`.
+
+### `is_whitespace(byte_in_al)`
+
+Returns `ZF=1` (je taken) if `al` is any of: 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x20. Implemented as a lookup into a 256-byte bitmask or as a cascade of `cmp`/`je` instructions.
+
 ## CCC_REAL_OPENCODE Override
 
-Scan `envp` (after `argv` NULL terminator) for a string starting with `CCC_REAL_OPENCODE=`. If found, the pointer past the `=` sign is the runner binary path. If not found, default to the literal `"opencode"`.
+Scan `envp` (after `argv` NULL terminator) for a string starting with `"CCC_REAL_OPENCODE="` (length 19). Compare the first 19 bytes; if they match, the pointer at offset +19 is the runner binary path. If not found, default to the literal `"opencode"`.
 
-This allows the existing `test_ccc_contract.py` to work: the test writes an `opencode` stub to a temp `bin/` dir and puts it first in `PATH`. We rely on the inherited environment, so `envp` must be passed to `execve` (third argument), not `NULL`. The child inherits PATH and finds the stub.
+> **Review note:** The original plan said "starting with" which could falsely match a longer key like `CCC_REAL_OPENCODE_EXTRA=foo`. Use an exact prefix-length match (19 bytes) followed by a check that byte 19 is not a null (i.e., there is a value after the `=`).
+
+Copy the env value into `runner_buf` (`.bss`, 256 bytes) to guarantee null-termination and avoid buffer issues. If the env value is ≥ 256 bytes, truncate and null-terminate — this is an edge case that only affects testing and the binary path won't work at that length anyway.
 
 ## Error Messages
 
-All error output goes to fd 2 (stderr) via `sys_write`:
+All error output goes to fd 2 (stderr) via `sys_write` (through the `write_str` helper):
 
 | Condition | Message | Exit code |
 |-----------|---------|-----------|
@@ -144,6 +244,16 @@ All error output goes to fd 2 (stderr) via `sys_write`:
 | `execve` fails (child) | `failed to start <name>: execve failed\n` | 127 |
 
 Messages match the C implementation's semantics. The `execve` error is deliberately simpler than the C version's `strerror(errno)` since we have no libc for errno/string conversion — a hardcoded suffix is sufficient and the contract only requires that startup-failure stderr contains `"failed to start"`.
+
+### `execve` error message construction
+
+The `"failed to start <name>: execve failed\n"` message must be constructed at runtime since `<name>` is dynamic. Strategy:
+
+1. `write_str(stderr, msg_exec_prefix)`  — `"failed to start "`
+2. `write_str(stderr, runner_ptr, runner_len)` — the runner name
+3. `write_str(stderr, msg_exec_suffix)`  — `": execve failed\n"`
+
+The runner name length is already known from the envp scan or defaults to 7 (strlen("opencode")).
 
 ## execve Argument Layout
 
@@ -178,23 +288,45 @@ Stack region (built in .bss or reserved stack space):
 
 - `exec_argv`: 4 qwords (argv pointers for execve: [runner, "run", prompt, NULL])
 - `status_buf`: 4 bytes (waitpid status)
-- `runner_buf`: 256 bytes (storage for env override path copy, if needed)
+- `runner_buf`: 256 bytes (storage for env override path copy, guaranteed null-terminated)
+
+### `.note.GNU-stack` (required)
+
+```
+section .note.GNU-stack noalloc noexec nowrite progbits
+```
+
+Without this section, GNU `ld` may mark the stack as executable (depending on linker version and defaults). Adding `noexec` explicitly prevents this and suppresses warnings on modern systems.
+
+## ELF Structure
+
+The resulting binary is a minimal ELF64 executable:
+
+- **Type:** `ET_EXEC` (2) — `ld` default for raw object files
+- **Machine:** `EM_X86_64` (62) — set by `nasm -f elf64`
+- **Entry point:** `_start` — set by `ld` default (first `.text` symbol)
+- **Program headers:** `PT_LOAD` for `.text` and `.rodata` (read+exec), `.data`/`.bss` (read+write)
+- **No interpreter:** fully static, no `PT_INTERP` — verify with `ldd ./ccc` → `"not a dynamic executable"`
+- **No section header table stripping needed** for basic correctness, but `strip ./ccc` can reduce size for distribution
 
 ## Linux x86-64 ABI Notes
 
-- Stack must be 16-byte aligned before making a syscall (kernel doesn't require this, but good practice)
+- **Syscalls do not require 16-byte stack alignment.** The kernel entry/exit path handles `rsp` internally. (The 16-byte alignment rule only applies to calling C functions via `call` instruction — which we never do.)
 - Red zone below `%rsp` is 128 bytes — we stay above it
-- Register preservation: syscalls clobber `rcx` and `r11`
+- Register preservation: syscalls clobber `rcx` and `r11`; all other registers are preserved across syscalls
 - We do not call any C functions, so no need to maintain full ABI callee-saved registers
 - `_start` is the entry point; no return address on stack
+- `fork()` in the child returns with the exact same register state as the parent at the point of the syscall — only `rax` changes (child pid or 0). All other registers are preserved.
 
 ## File Structure
 
 ```
 asm-x86_64/
   PLAN.md          this file
-  Makefile         nasm + ld build
+  Makefile         nasm + ld build, test, static-check
   ccc.asm          single source file, all code + data
+  test-stub/
+    opencode       shell script test double (generated by Makefile)
 ```
 
 ## Test Strategy

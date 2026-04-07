@@ -1,10 +1,27 @@
 # Crystal Implementation Plan
 
+## 0. Build & Run
+
+```sh
+# Build the CLI binary
+crystal build src/bin/ccc.cr -o ccc              # debug
+crystal build src/bin/ccc.cr -o ccc --release     # optimized
+
+# Run unit + integration specs
+crystal spec
+
+# Cross-language contract tests (from repo root)
+python3 tests/test_ccc_contract.py
+```
+
+Requires Crystal >= 1.0. Install via `brew install crystal` (macOS), `apt install crystal` (Debian/Ubuntu), or `shards` (source).
+
 ## 1. Shards Package Structure
 
 ```
 crystal/
   shard.yml
+  .gitignore               # ignore /ccc binary, /lib/
   src/
     call_coding_clis.cr      # library entrypoint, re-exports all public types
     command_spec.cr          # CommandSpec struct
@@ -32,6 +49,13 @@ targets:
     main: src/bin/ccc.cr
 dependencies: []
 development_dependencies: []
+```
+
+**.gitignore** (inside `crystal/`):
+
+```
+/ccc
+/lib/
 ```
 
 Note: Crystal shards convention places bin entrypoints under `src/bin/`. The library code lives in `src/`. All specs live in `spec/` and are run via `crystal spec`.
@@ -90,21 +114,42 @@ end
 
 Crystal supports alias types and procs natively. `StreamCallback` is `Proc(String, String, Nil)` — takes two strings (stream name, data), returns nil.
 
-The default `run_executor` uses `Process.new` + `Process::Status` (see section 3). The default `stream_executor` delegates to the run executor and fires callbacks — same as the Rust "non-streaming" approach for parity.
+**REVIEW NOTE:** The `@run_executor` and `@stream_executor` type declarations above use a shorthand that Crystal may not accept directly. Crystal proc types with arguments require `Proc(ArgTypes, ReturnType)` syntax. The instance variable declarations should be:
+
+```crystal
+@run_executor : Proc(CommandSpec, CompletedRun)
+@stream_executor : Proc(CommandSpec, Proc(String, String, Nil), CompletedRun)
+```
+
+Or use a `typedef`/`alias` for readability:
+
+```crystal
+alias RunExecutor = CommandSpec -> CompletedRun
+alias StreamExecutorType = CommandSpec, StreamCallback -> CompletedRun
+
+@run_executor : RunExecutor
+@stream_executor : StreamExecutorType
+```
+
+The default `run_executor` uses `Process.run` (see section 3). The default `stream_executor` delegates to the run executor and fires callbacks — same as the Rust "non-streaming" approach for parity.
 
 For testability, the constructor accepts optional executor procs (same injection pattern as Python/Rust).
 
 ### build_prompt_spec (`src/prompt_spec.cr`)
 
+**REVIEW NOTE:** Crystal requires top-level `def` to be wrapped in a module or class for proper namespacing when `require`d. Without a module, `build_prompt_spec` becomes a top-level method that could clash. Use the `CallCodingClis` module:
+
 ```crystal
-def build_prompt_spec(prompt : String) : CommandSpec
-  normalized = prompt.strip
-  raise ArgumentError.new("prompt must not be empty") if normalized.empty?
-  CommandSpec.new(["opencode", "run", normalized])
+module CallCodingClis
+  def self.build_prompt_spec(prompt : String) : CommandSpec
+    normalized = prompt.strip
+    raise ArgumentError.new("prompt must not be empty") if normalized.empty?
+    CommandSpec.new(["opencode", "run", normalized])
+  end
 end
 ```
 
-Note: Crystal's `String#strip` returns a new string (same semantics as Python). `String#empty?` checks length.
+All other public functions (`default_run_executor`, `merge_env`) should also be module methods (`def self.`) or private helpers within the `CallCodingClis` module. The CLI binary references them as `CallCodingClis.build_prompt_spec(...)` and `CallCodingClis::Runner.new`.
 
 ### Library Entrypoint (`src/call_coding_clis.cr`)
 
@@ -129,9 +174,13 @@ Use `Process.run` for blocking execution with captured output:
 def default_run_executor(spec : CommandSpec) : CompletedRun
   argv = spec.argv
   env = merge_env(spec.env)
+
+  return CompletedRun.new(argv: argv, exit_code: 1, stdout: "", stderr: "argv must not be empty\n") if argv.empty?
+
+  binary = ENV["CCC_REAL_OPENCODE"]? || argv[0]
   begin
     process = Process.run(
-      argv[0],
+      binary,
       argv[1..],
       input: Process::Redirect::Pipe,
       output: Process::Redirect::Capture,
@@ -153,7 +202,7 @@ def default_run_executor(spec : CommandSpec) : CompletedRun
       argv: argv,
       exit_code: 1,
       stdout: "",
-      stderr: "failed to start #{argv[0]}: #{ex.message}\n"
+      stderr: "failed to start #{binary}: #{ex.message}\n"
     )
   end
 end
@@ -164,8 +213,16 @@ Key Crystal semantics:
 - `Process::Redirect::Capture` captures stdout/stderr into `IO::Memory`.
 - `Errno` is the base class for system-level errors (like `Errno::ENOENT` for missing binary).
 - `process.exit_code` returns `Int32?` — `nil` when terminated by signal, so `|| 1` for safety.
+- `ENV["CCC_REAL_OPENCODE"]?` uses the nilable variant (`?`) to return `String?` — returns `nil` if unset (no exception).
+
+**REVIEW FIXES from original:**
+- `CCC_REAL_OPENCODE` override moved into `default_run_executor` (replacing `argv[0]` with the override value), not in `build_prompt_spec`. This keeps the library API pure — `build_prompt_spec` always produces `["opencode", "run", ...]`. The Runner layer handles the override, matching the C implementation's approach.
+- Guard added for `argv.empty?` to prevent `argv[0]` raise on an empty command.
+- Error message now uses `binary` (the potentially-overridden name) instead of `argv[0]`, matching the contract that reports the actual binary that was attempted.
 
 Alternative: use `Process.new` for lower-level control (separate fork, pipe management), but `Process.run` with the block form covers the contract.
+
+**CAVEAT:** `Process.run` block form + `Process::Redirect::Pipe` for input can deadlock if stdin data exceeds the pipe buffer and the child doesn't read. For this project's use case (small prompts piped to `opencode`), this is not a concern. If large stdin support is needed in the future, use `Process.new` with a fiber that writes stdin asynchronously.
 
 ### Default stream_executor
 
@@ -279,19 +336,42 @@ Crystal ships with a built-in spec framework (`crystal spec`), no external depen
 
 ### CCC_REAL_OPENCODE
 
-Read from `ENV["CCC_REAL_OPENCODE"]` in `build_prompt_spec` or in the `Runner` default executor. Strategy: override `argv[0]` (the `"opencode"` entry) with the env var value if set.
+Override happens in the Runner's `default_run_executor` (see section 3), not in `build_prompt_spec`. This keeps `build_prompt_spec` pure — it always produces `argv: ["opencode", "run", ...]`. The executor layer replaces `argv[0]` with the value of `ENV["CCC_REAL_OPENCODE"]` if set.
 
 ```crystal
-def opencode_binary : String
-  ENV["CCC_REAL_OPENCODE"]? || "opencode"
-end
+binary = ENV["CCC_REAL_OPENCODE"]? || argv[0]
 ```
 
-This keeps `build_prompt_spec` pure (library API unchanged) and pushes the override into the Runner layer — consistent with how the C implementation handles it.
+This matches the C implementation pattern (ccc.c reads `CCC_REAL_OPENCODE` and uses it as the runner binary).
 
 ### Cross-Language Contract Tests
 
-Add Crystal to `tests/test_ccc_contract.py` — compile the binary (`crystal build src/bin/ccc.cr -o crystal/ccc`) and run it alongside the other implementations. This requires Crystal to be installed on CI.
+Add Crystal to each test method in `tests/test_ccc_contract.py`. After the existing C block, add:
+
+```python
+subprocess.run(
+    ["crystal", "build", "crystal/src/bin/ccc.cr", "-o", "crystal/ccc"],
+    cwd=ROOT,
+    env=env,
+    capture_output=True,
+    text=True,
+    check=True,
+)
+self.assert_equal_output(
+    subprocess.run(
+        [str(ROOT / "crystal/ccc"), PROMPT],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+)
+```
+
+Repeat the same pattern for `test_cross_language_ccc_rejects_empty_prompt`, `test_cross_language_ccc_requires_one_prompt_argument`, and `test_cross_language_ccc_rejects_whitespace_only_prompt`, using the appropriate assertion helper (`assert_rejects_empty`, `assert_rejects_missing_prompt`).
+
+The cross-language tests use `CCC_REAL_OPENCODE` via the stub `opencode` placed on `PATH` — the C implementation demonstrates this pattern. The Crystal binary inherits the `PATH` from the `env` dict, so `opencode_binary` resolution works automatically.
 
 ## 9. Crystal-Specific Notes
 
@@ -324,7 +404,30 @@ Add Crystal to `tests/test_ccc_contract.py` — compile the binary (`crystal bui
 - `struct` for value types (stack-allocated, copied). Used for `CommandSpec` and `CompletedRun` since they are data carriers.
 - `class` for reference types. Used for `Runner` since it holds mutable state (executors).
 
-## 10. Parity Gaps (v1)
+## 10. CI Notes
+
+Crystal must be installed on CI runners. GitHub Actions:
+
+```yaml
+- uses: crystal-lang/install-crystal@v1
+```
+
+In cross-language contract tests, gate Crystal behind a feature flag or skip gracefully if `crystal` is not found:
+
+```python
+import shutil
+
+HAS_CRYSTAL = shutil.which("crystal") is not None
+
+# In each test method:
+if HAS_CRYSTAL:
+    subprocess.run(["crystal", "build", ...], ...)
+    self.assert_equal_output(subprocess.run([str(ROOT / "crystal/ccc"), ...], ...))
+```
+
+This prevents CI failures on runners without Crystal installed.
+
+## 11. Parity Gaps (v1)
 
 | Feature | Status |
 |---------|--------|

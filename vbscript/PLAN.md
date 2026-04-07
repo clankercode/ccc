@@ -16,7 +16,7 @@ vbscript/
   PLAN.md           -- This file
 ```
 
-All files are standalone `.vbs` — no modules, no imports. The "library" is loaded via `ExecuteGlobal` or simple inclusion via a helper function.
+All files are standalone `.vbs` — no modules, no imports. `ccc.vbs` and `test_ccc.vbs` include `runner.vbs` at runtime via `ExecuteGlobal` (see section 9.7).
 
 ---
 
@@ -81,13 +81,23 @@ Function BuildPromptSpec(prompt)
   If Len(trimmed) = 0 Then
     Err.Raise vbObjectError + 1, "BuildPromptSpec", "prompt must not be empty"
   End If
-  argv = Array("opencode", "run", trimmed)
+  runner = GetOpencodeBinary()
+  argv = Array(runner, "run", trimmed)
   Set BuildPromptSpec = MakeCommandSpec(argv, Empty, Empty, Nothing)
+End Function
+
+Function GetOpencodeBinary()
+  Set shell = CreateObject("WScript.Shell")
+  GetOpencodeBinary = shell.ExpandEnvironmentStrings("%CCC_REAL_OPENCODE%")
+  If GetOpencodeBinary = "%CCC_REAL_OPENCODE%" Then
+    GetOpencodeBinary = "opencode"
+  End If
 End Function
 ```
 
 - Uses VBScript's `Trim()` for whitespace removal
 - Raises error on empty/whitespace-only input (consistent with Python's `ValueError`)
+- `GetOpencodeBinary()` reads `CCC_REAL_OPENCODE` env var via `ExpandEnvironmentStrings`; falls back to `"opencode"` if unset. `ExpandEnvironmentStrings` returns the literal `%VAR%` when the var doesn't exist, so we detect that.
 
 ---
 
@@ -100,26 +110,39 @@ End Function
 ```vbscript
 Function RunnerRun(runner, spec)
   Set shell = CreateObject("WScript.Shell")
+
+  If Not IsEmpty(spec("cwd")) And Not IsNull(spec("cwd")) Then
+    If Len(spec("cwd")) > 0 Then
+      old_cwd = shell.CurrentDirectory
+      shell.CurrentDirectory = spec("cwd")
+    End If
+  End If
+
   cmd = JoinCommandLine(spec("argv"))
   On Error Resume Next
   Set exec = shell.Exec(cmd)
   If Err.Number <> 0 Then
     stderr_msg = "failed to start " & spec("argv")(0) & ": " & Err.Description & vbCrLf
     On Error GoTo 0
+    If Not IsEmpty(old_cwd) Then shell.CurrentDirectory = old_cwd
     Set RunnerRun = MakeCompletedRun(spec("argv"), 1, "", stderr_msg)
     Exit Function
   End If
   On Error GoTo 0
 
-  stdout_text = exec.StdOut.ReadAll
-  stderr_text = exec.StdErr.ReadAll
+  If Not IsEmpty(spec("stdin_text")) And Not IsNull(spec("stdin_text")) Then
+    exec.StdIn.Write spec("stdin_text")
+    exec.StdIn.Close
+  End If
 
   Do While exec.Status = 0
     WScript.Sleep 50
   Loop
 
-  If stdout_text = "" Then stdout_text = exec.StdOut.ReadAll
-  If stderr_text = "" Then stderr_text = exec.StdErr.ReadAll
+  stdout_text = exec.StdOut.ReadAll
+  stderr_text = exec.StdErr.ReadAll
+
+  If Not IsEmpty(old_cwd) Then shell.CurrentDirectory = old_cwd
 
   Set RunnerRun = MakeCompletedRun(spec("argv"), exec.ExitCode, stdout_text, stderr_text)
 End Function
@@ -128,7 +151,9 @@ End Function
 Key behaviors:
 - `Exec` requires the command as a single string (shell-parsed), not an argv array. Need `JoinCommandLine` to build a properly quoted command string.
 - `ExitCode` is available after the process terminates.
-- Streams must be drained. The pattern is: read while `Status = 0` (running), then read final buffer.
+- **Streams are read AFTER the process exits** (drain loop then `.ReadAll`). Reading before the loop risks deadlock if the child's stdout buffer fills while stderr is also filling. Post-exit reads are safe because the OS has already closed the child's pipe handles.
+- CWD is saved/restored around the `Exec` call via `shell.CurrentDirectory`.
+- Stdin is written and closed before the drain loop.
 
 ### 3.2 Command line joining
 
@@ -139,14 +164,15 @@ Function JoinCommandLine(argv)
   parts = ""
   For i = 0 To UBound(argv)
     part = argv(i)
-    If InStr(part, " ") > 0 Or InStr(part, """") > 0 Then
-      part = """" & Replace(part, """", "\""") & """"
-    End If
+    part = Replace(part, """", "\""")
+    part = """" & part & """"
     parts = parts & " " & part
   Next
-  JoinCommandLine = Mid(parts, 2)  ' strip leading space
+  JoinCommandLine = Mid(parts, 2)
 End Function
 ```
+
+**Always quote every argument** rather than quoting only when spaces are detected. This avoids `cmd.exe` misinterpretation of special characters (`&`, `|`, `>`, `<`, `^`, `%`) in unquoted args. The escaping is not perfect for all edge cases (nested quotes, `%` expansion), but covers the common case of prompt strings passed to `opencode run`.
 
 ### 3.3 CWD and env
 
@@ -174,6 +200,11 @@ This would give perfect output forwarding but no `CompletedRun` object.
 ```vbscript
 ' ccc.vbs -- entry point for "cscript ccc.vbs <Prompt>"
 ' Uses: cscript //nologo ccc.vbs "Fix the failing tests"
+
+Set fso = CreateObject("Scripting.FileSystemObject")
+Set lib_file = fso.OpenTextFile(fso.BuildPath(fso.GetParentFolderName(WScript.ScriptFullName), "runner.vbs"))
+ExecuteGlobal lib_file.ReadAll
+lib_file.Close
 
 Set args = WScript.Arguments.Unnamed
 If args.Count <> 1 Then
@@ -203,7 +234,8 @@ WScript.Quit result("exit_code")
 ### Invocation
 
 ```
-cscript //nologo vbscript/ccc.vbs "Fix the failing tests"
+cscript //nologo vbscript\ccc.vbs "Fix the failing tests"
+set CCC_REAL_OPENCODE=C:\path\to\opencode.exe && cscript //nologo vbscript\ccc.vbs "Fix the failing tests"
 ```
 
 Users would typically alias `ccc` to `cscript //nologo <path>\ccc.vbs`.
@@ -214,7 +246,7 @@ Users would typically alias `ccc` to `cscript //nologo <path>\ccc.vbs`.
 - Usage message on wrong arg count, exit 1
 - Prompt trimmed, empty rejected, exit 1
 - Stdout/stderr forwarded, exit code forwarded via `WScript.Quit`
-- `CCC_REAL_OPENCODE` env var support: override the binary name in `BuildPromptSpec` or in `JoinCommandLine`
+- `CCC_REAL_OPENCODE` env var overrides the opencode binary (resolved in `GetOpencodeBinary`, called by `BuildPromptSpec`)
 
 ---
 
@@ -260,24 +292,63 @@ A VBScript script that exercises the library functions directly and reports pass
 
 ```vbscript
 ' test_ccc.vbs
+Dim pass_count, fail_count
+pass_count = 0
+fail_count = 0
+
 Sub Assert(condition, name)
   If condition Then
     WScript.Echo "  PASS: " & name
+    pass_count = pass_count + 1
   Else
     WScript.Echo "  FAIL: " & name
-    WScript.Quit 1
+    fail_count = fail_count + 1
   End If
 End Sub
 
-' Test BuildPromptSpec
+' --- BuildPromptSpec tests ---
 On Error Resume Next
 Set spec = BuildPromptSpec("  hello  ")
 Assert Err.Number = 0, "BuildPromptSpec accepts padded prompt"
 Assert spec("argv")(2) = "hello", "BuildPromptSpec trims prompt"
+On Error GoTo 0
 
+On Error Resume Next
 Set spec = BuildPromptSpec("")
 Assert Err.Number <> 0, "BuildPromptSpec rejects empty prompt"
 On Error GoTo 0
+
+On Error Resume Next
+Set spec = BuildPromptSpec("   ")
+Assert Err.Number <> 0, "BuildPromptSpec rejects whitespace-only prompt"
+On Error GoTo 0
+
+' --- CommandSpec structure ---
+Set spec = BuildPromptSpec("test")
+Assert spec("argv")(0) = "opencode", "argv[0] is opencode"
+Assert spec("argv")(1) = "run", "argv[1] is run"
+Assert spec("argv")(2) = "test", "argv[2] is trimmed prompt"
+Assert IsEmpty(spec("stdin_text")), "stdin_text defaults to Empty"
+Assert IsEmpty(spec("cwd")), "cwd defaults to Empty"
+
+' --- CCC_REAL_OPENCODE ---
+Set shell = CreateObject("WScript.Shell")
+shell.Environment("Process")("CCC_REAL_OPENCODE") = "myopencode"
+Set spec = BuildPromptSpec("test")
+Assert spec("argv")(0) = "myopencode", "CCC_REAL_OPENCODE overrides binary"
+shell.Environment("Process").Remove "CCC_REAL_OPENCODE"
+Set spec = BuildPromptSpec("test")
+Assert spec("argv")(0) = "opencode", "fallback to opencode when env unset"
+
+' --- CompletedRun structure ---
+Set run = MakeCompletedRun(Array("echo"), 0, "out", "err")
+Assert run("exit_code") = 0, "CompletedRun exit_code"
+Assert run("stdout") = "out", "CompletedRun stdout"
+Assert run("stderr") = "err", "CompletedRun stderr"
+
+' --- Summary ---
+WScript.Echo pass_count & " passed, " & fail_count & " failed"
+If fail_count > 0 Then WScript.Quit 1
 ```
 
 Run with: `cscript //nologo vbscript/test_ccc.vbs`
@@ -358,18 +429,19 @@ echo opencode run %~2
 - Keys are case-sensitive by default (`.CompareMode = vbTextCompare` for case-insensitive)
 - Used to simulate the CommandSpec/CompletedRun/Runner "classes"
 
-### 9.7 No module system
+### 9.7 Library loading via `ExecuteGlobal`
 
-- All "library" code must be loaded via `ExecuteGlobal` or simply included in the same file
-- For `ccc.vbs`, include the library functions directly or load `runner.vbs` with:
+`ccc.vbs` and `test_ccc.vbs` load `runner.vbs` at startup using the calling script's directory (resolved via `WScript.ScriptFullName`), avoiding fragile relative paths:
 
 ```vbscript
 Set fso = CreateObject("Scripting.FileSystemObject")
-lib = fso.OpenTextFile("runner.vbs").ReadAll
-ExecuteGlobal lib
+script_dir = fso.GetParentFolderName(WScript.ScriptFullName)
+Set lib_file = fso.OpenTextFile(fso.BuildPath(script_dir, "runner.vbs"))
+ExecuteGlobal lib_file.ReadAll
+lib_file.Close
 ```
 
-This is fragile with relative paths. The pragmatic approach: either duplicate the library functions in `ccc.vbs` or use a fixed relative path.
+**Decision**: Load via `ExecuteGlobal` using `ScriptFullName`-relative paths. This keeps library code in one place without duplication and works regardless of the caller's CWD.
 
 ---
 
@@ -389,7 +461,7 @@ This is fragile with relative paths. The pragmatic approach: either duplicate th
 | Startup failure reporting | yes | yes | yes | yes | **yes** |
 | Exit code forwarding | yes | yes | yes | yes | **yes** (0–255 range) |
 | Cross-language tests | yes | yes | yes | yes | **no** (Windows-only) |
-| `CCC_REAL_OPENCODE` | yes | yes | yes | yes | **yes** |
+| `CCC_REAL_OPENCODE` | yes | yes | yes | yes | **yes** (`ExpandEnvironmentStrings`) |
 
 ### Notable gaps
 
@@ -419,8 +491,85 @@ This is fragile with relative paths. The pragmatic approach: either duplicate th
 
 ---
 
-## 12. Open Questions
+## 12. Build and Test Instructions
 
-- Should `ccc.vbs` include the library inline (simpler deployment) or load `runner.vbs` via `ExecuteGlobal` (DRY but fragile paths)?
-- Should we support `CCC_REAL_OPENCODE` by overriding the binary name or by using a custom `JoinCommandLine` that reads the env var?
-- Is the `cmd.exe` quoting concern a blocking issue, or acceptable given Windows-only usage?
+No build step required — VBScript is interpreted. Prerequisites: Windows with `cscript.exe` (ships with all modern Windows).
+
+### Unit tests (library functions)
+
+```cmd
+cscript //nologo vbscript\test_ccc.vbs
+```
+
+Exits 0 on all pass, 1 on first failure. Output is `PASS: <name>` / `FAIL: <name>` lines.
+
+### CLI smoke test (requires `opencode` on PATH or `CCC_REAL_OPENCODE` set)
+
+```cmd
+cscript //nologo vbscript\ccc.vbs "hello"
+echo %ERRORLEVEL%
+```
+
+### CLI with test stub
+
+```cmd
+rem Place opencode.cmd in a temp dir on PATH
+set PATH=C:\tmp\bin;%PATH%
+set CCC_REAL_OPENCODE=C:\tmp\bin\opencode.cmd
+cscript //nologo vbscript\ccc.vbs "Fix the failing tests"
+```
+
+---
+
+## 13. Cross-Language Test Registration
+
+`tests/test_ccc_contract.py` uses hardcoded inline `subprocess.run` calls per language. To add VBScript, append a new block to each test method:
+
+```python
+self.assert_equal_output(
+    subprocess.run(
+        ["cscript", "//nologo", str(ROOT / "vbscript" / "ccc.vbs"), PROMPT],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+)
+```
+
+Requirements for this to work:
+- **Windows runner** — `cscript` is not available on Unix
+- **Windows `opencode` stub** — the existing `_write_opencode_stub` writes a shell script (`.sh`). VBScript tests need a separate `_write_opencode_stub_cmd` helper that writes a `.cmd` file. Example:
+
+```python
+def _write_opencode_stub_cmd(self, path: Path) -> None:
+    path.write_text(
+        "@echo off\r\n"
+        'if "%~1"=="run" goto :run\r\n'
+        "exit /b 9\r\n"
+        ":run\r\n"
+        "echo opencode run %~2\r\n"
+    )
+```
+
+- **Guard** — wrap the VBScript block in a platform check so Unix CI doesn't fail:
+
+```python
+import platform
+if platform.system() == "Windows":
+    # ... VBScript subprocess.run block ...
+```
+
+Or gate it behind an environment variable: `if os.environ.get("CCC_TEST_VBSCRIPT"):`.
+
+---
+
+## 14. CI Notes
+
+No CI pipeline exists in this repository today (no `.github/workflows/`, no `Makefile` at root). When CI is added:
+
+- **VBScript tests must run in a `windows-latest` runner only.** `cscript` is unavailable on Linux/macOS.
+- **Separate job or matrix entry** — add a `windows-latest` job that runs `cscript //nologo vbscript\test_ccc.vbs` and optionally the cross-language contract tests with the VBScript registration block enabled.
+- **No build step** — VBScript is interpreted, so there is nothing to compile or install.
+- **Minimal dependencies** — only `cscript.exe` (pre-installed) and `opencode` (mocked via stub).

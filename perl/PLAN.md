@@ -1,6 +1,6 @@
 # Perl Implementation Plan
 
-## 1. CPAN Distribution Structure
+## 1. Directory Structure
 
 ```
 perl/
@@ -9,44 +9,76 @@ perl/
 ├── lib/
 │   └── Call/
 │       ├── Coding/
-│       │   └── Clis.pm          # re-exports build_prompt_spec, CommandSpec, CompletedRun, Runner
-│       ├── Coding/
+│       │   └── Clis.pm              # facade: exports build_prompt_spec
 │       │   └── Clis/
 │       │       ├── CommandSpec.pm
 │       │       ├── CompletedRun.pm
 │       │       └── Runner.pm
-│       └── Coding.pm
+│       └── Coding.pm                # empty, satisfies Call::Coding namespace
 ├── bin/
 │   └── ccc
 └── t/
     ├── 01_build_prompt_spec.t
     ├── 02_runner.t
-    ├── 03_cli.t
-    └── 04_ccc_binary.t
+    └── 03_ccc_binary.t
 ```
 
-Namespace: `Call::Coding::Clis`. The `Makefile.PL` declares the distribution name, dependencies, and installs `bin/ccc`. `MANIFEST` lists all shipped files.
+Namespace: `Call::Coding::Clis`. `Makefile.PL` declares the distribution, dependencies, and installs `bin/ccc`.
 
-**Dependencies (core-only preferred):**
-- `IPC::Open3` (core) — subprocess execution with stdout/stderr capture
-- `Symbol` (core) — gensym for stdin pipe handle
-- `Test::More` (core) — testing
-- No non-core CPAN deps required for the minimal implementation
+### Dependencies (all core)
 
-**Optional upgrade path:** `IPC::Run` provides cleaner API for streaming, but `IPC::Open3` is core and sufficient for `run()`. Decision: use `IPC::Open3` for `run()`, accept `IPC::Run` as an optional dep for a future streaming improvement.
+| Module       | Purpose                          |
+|--------------|----------------------------------|
+| `IPC::Open3` | subprocess execution with pipe I/O |
+| `Symbol`     | `gensym` for stderr pipe handle  |
+| `Exporter`   | re-export `build_prompt_spec`    |
+| `Test::More` | testing                          |
+| `FindBin`    | locate lib/ from bin/ccc         |
 
-## 2. Library API
+No non-core CPAN deps. `IPC::Run` is a future optional upgrade for real streaming.
+
+### MANIFEST
+
+```
+bin/ccc
+lib/Call/Coding.pm
+lib/Call/Coding/Clis.pm
+lib/Call/Coding/Clis/CommandSpec.pm
+lib/Call/Coding/Clis/CompletedRun.pm
+lib/Call/Coding/Clis/Runner.pm
+Makefile.PL
+MANIFEST
+t/01_build_prompt_spec.t
+t/02_runner.t
+t/03_ccc_binary.t
+```
+
+## 2. Build & Run
+
+```sh
+# Development (from repo root):
+perl -Iperl/lib perl/bin/ccc "Fix the failing tests"
+
+# Build and run tests:
+cd perl && perl Makefile.PL && make && make test
+
+# Install system-wide:
+make install
+```
+
+No build step required for development — `FindBin` + `use lib` resolves paths at runtime.
+
+## 3. Library API
 
 ### `Call::Coding::Clis::CommandSpec`
 
-Blessed hashref with accessor methods:
-
 ```perl
 package Call::Coding::Clis::CommandSpec;
+use strict;
+use warnings;
 
 sub new {
     my ($class, %args) = @_;
-    # %args: argv (required, arrayref), stdin_text, cwd, env (hashref)
     return bless \%args, $class;
 }
 
@@ -54,18 +86,20 @@ sub argv       { $_[0]->{argv} }
 sub stdin_text { $_[0]->{stdin_text} }
 sub cwd        { $_[0]->{cwd} }
 sub env        { $_[0]->{env} // {} }
+1;
 ```
 
-Follows the Python dataclass / Rust struct pattern. Plain hashref, no Moose/Moo — keeps the dependency footprint at zero.
+Plain blessed hashref, no Moose/Moo.
 
 ### `Call::Coding::Clis::CompletedRun`
 
 ```perl
 package Call::Coding::Clis::CompletedRun;
+use strict;
+use warnings;
 
 sub new {
     my ($class, %args) = @_;
-    # %args: argv, exit_code, stdout, stderr
     return bless \%args, $class;
 }
 
@@ -73,19 +107,24 @@ sub argv      { $_[0]->{argv} }
 sub exit_code { $_[0]->{exit_code} }
 sub stdout    { $_[0]->{stdout} }
 sub stderr    { $_[0]->{stderr} }
+1;
 ```
 
 ### `Call::Coding::Clis::Runner`
 
-Constructor accepts optional `executor` coderef (mirrors Python's injectable executor pattern for testability):
-
 ```perl
 package Call::Coding::Clis::Runner;
+use strict;
+use warnings;
+use IPC::Open3;
+use Symbol 'gensym';
+use Call::Coding::Clis::CommandSpec;
+use Call::Coding::Clis::CompletedRun;
 
 sub new {
     my ($class, %opts) = @_;
     my $self = bless {}, $class;
-    $self->{executor} = $opts{executor} // sub { _default_run(@_) };
+    $self->{executor} = $opts{executor} // \&_default_run;
     return $self;
 }
 
@@ -96,18 +135,86 @@ sub run {
 
 sub stream {
     my ($self, $spec, $on_event) = @_;
-    # Delegates to run() for now, then fires callbacks.
-    # Matches Rust's current non-streaming stream() behavior.
     my $result = $self->run($spec);
-    $on_event->('stdout', $result->stdout) if length $result->stdout;
-    $on_event->('stderr', $result->stderr) if length $result->stderr;
+    $on_event->('stdout', $result->stdout) if defined $result->stdout && length $result->stdout;
+    $on_event->('stderr', $result->stderr) if defined $result->stderr && length $result->stderr;
     return $result;
 }
+
+sub _default_run {
+    my ($spec) = @_;
+    my @argv   = @{$spec->argv};
+    my $argv0  = $argv[0];
+
+    local %ENV = (%ENV, %{$spec->env});
+
+    my ($child_pid, $stdin_w, $stdout_r, $stderr_r);
+    $stderr_r = gensym;
+
+    eval {
+        if (defined $spec->cwd) {
+            chdir $spec->cwd or die "chdir to $spec->cwd: $!\n";
+        }
+
+        $child_pid = open3($stdin_w, $stdout_r, $stderr_r, @argv);
+
+        if (defined $spec->stdin_text && length $spec->stdin_text) {
+            print $stdin_w $spec->stdin_text;
+        }
+        close $stdin_w;
+
+        my $stdout = do { local $/; <$stdout_r> };
+        my $stderr = do { local $/; <$stderr_r> };
+        close $stdout_r;
+        close $stderr_r;
+        waitpid($child_pid, 0);
+
+        my $exit_code = ($? & 127) == 0 ? ($? >> 8) : 1;
+
+        $stdout //= '';
+        $stderr //= '';
+
+        return Call::Coding::Clis::CompletedRun->new(
+            argv      => \@argv,
+            exit_code => $exit_code,
+            stdout    => $stdout,
+            stderr    => $stderr,
+        );
+    };
+    if ($@) {
+        (my $err = $@) =~ s/\s+$//;
+        return Call::Coding::Clis::CompletedRun->new(
+            argv      => \@argv,
+            exit_code => 1,
+            stdout    => '',
+            stderr    => "failed to start $argv0: $err\n",
+        );
+    }
+}
+1;
 ```
+
+**Critical fixes vs draft:**
+
+1. **stdin write before close** — the original draft closed `$stdin_w` before writing. Fixed: write first, then close.
+2. **`cwd` support** — `chdir` before `open3` inside the eval block. If `chdir` fails, the die is caught and formatted as a startup error.
+3. **Signal-killed child** — exit code uses `($? & 127) == 0 ? ($? >> 8) : 1` instead of bare `$? >> 8`, matching Rust behavior.
+4. **`$@` normalization** — trailing whitespace stripped before constructing the error string.
+5. **Close read handles** — `close $stdout_r; close $stderr_r` after reading to reap pipe buffers. Neglecting this can lose the child's exit status on some platforms.
+
+**Deadlock caveat:** `IPC::Open3` with separate stdout/stderr pipes can deadlock if the child produces >pipe-buffer-size output on one stream while the parent is blocked reading the other. This is acceptable for our use case (coding CLI output is typically small at the `run()` level). If real streaming is needed later, `IO::Select` or `IPC::Run` would be required.
 
 ### `Call::Coding::Clis::build_prompt_spec`
 
 ```perl
+package Call::Coding::Clis;
+use strict;
+use warnings;
+use Exporter 'import';
+use Call::Coding::Clis::CommandSpec;
+
+our @EXPORT_OK = qw(build_prompt_spec);
+
 sub build_prompt_spec {
     my ($prompt) = @_;
     $prompt = '' unless defined $prompt;
@@ -119,70 +226,19 @@ sub build_prompt_spec {
         argv => ['opencode', 'run', $trimmed],
     );
 }
+1;
 ```
 
-Exported by default from `Call::Coding::Clis`.
-
-### `Call::Coding::Clis` (top-level facade)
-
-Uses `Exporter` (core). Exports: `build_prompt_spec`. Also provides access to `CommandSpec`, `CompletedRun`, `Runner` via package names.
-
-## 3. Subprocess Execution (`IPC::Open3`)
-
-`_default_run` in `Runner`:
+### `Call::Coding` (namespace placeholder)
 
 ```perl
-use IPC::Open3;
-use Symbol 'gensym';
-
-sub _default_run {
-    my ($spec) = @_;
-    my @argv = @{$spec->argv};
-    my $argv0 = $argv[0];
-
-    local %ENV = (%ENV, %{$spec->env});
-
-    my ($stdin_w, $stdout_r, $stderr_r);
-    $stderr_r = gensym;
-
-    eval {
-        my $pid = open3($stdin_w, $stdout_r, $stderr_r, @argv);
-        close $stdin_w;
-        if (defined $spec->stdin_text) {
-            # Would need to write before close — restructure:
-            # Use a pipe, write, then close.
-        }
-        my $stdout = do { local $/; <$stdout_r> };
-        my $stderr = do { local $/; <$stderr_r> };
-        waitpid($pid, 0);
-        my $exit_code = $? >> 8;
-        $stdout //= '';
-        $stderr //= '';
-        return Call::Coding::Clis::CompletedRun->new(
-            argv      => \@argv,
-            exit_code => $exit_code,
-            stdout    => $stdout,
-            stderr    => $stderr,
-        );
-    };
-    if ($@) {
-        return Call::Coding::Clis::CompletedRun->new(
-            argv      => \@argv,
-            exit_code => 1,
-            stdout    => '',
-            stderr    => "failed to start $argv0: $@\n",
-        );
-    }
-}
+package Call::Coding;
+use strict;
+use warnings;
+1;
 ```
 
-**Key detail:** `IPC::Open3` throws on exec failure (ENOENT, permission denied). The `$@` message contains the OS error. The error format must be `"failed to start <argv[0]>: <error>"` per contract. We extract `$argv[0]` from `spec->argv->[0]` and interpolate `$@` as the error detail.
-
-**stdin handling:** If `spec->stdin_text` is defined, write it to `$stdin_w` before closing. This matches all other implementations.
-
-**env handling:** Merge `spec->env` overrides into `%ENV` inside a `local` block so parent process env is preserved.
-
-**`CCC_REAL_OPENCODE` support:** Not needed inside the library. The CLI binary reads `$ENV{CCC_REAL_OPENCODE}` and, if set, replaces `opencode` in the argv of the spec returned by `build_prompt_spec`. This keeps the library clean.
+Required so `use Call::Coding::Clis` resolves correctly through the `Call::Coding` namespace.
 
 ## 4. `bin/ccc` CLI
 
@@ -196,90 +252,72 @@ use lib "$FindBin::Bin/../lib";
 use Call::Coding::Clis qw(build_prompt_spec);
 use Call::Coding::Clis::Runner;
 
-my @args = @ARGV;
-
-if (@args != 1) {
+if (@ARGV != 1) {
     print STDERR 'usage: ccc "<Prompt>"', "\n";
     exit 1;
 }
 
-my $spec = eval { build_prompt_spec($args[0]) };
+my $spec = eval { build_prompt_spec($ARGV[0]) };
 if ($@) {
     print STDERR $@;
     exit 1;
 }
 
-my $runner = Call::Coding::Clis::Runner->new;
-
-# CCC_REAL_OPENCODE override
 if ($ENV{CCC_REAL_OPENCODE}) {
     $spec->{argv}[0] = $ENV{CCC_REAL_OPENCODE};
 }
 
+my $runner = Call::Coding::Clis::Runner->new;
 my $result = $runner->run($spec);
-print $result->stdout if length $result->stdout;
-print STDERR $result->stderr if length $result->stderr;
+
+if (defined $result->stdout && length $result->stdout) {
+    print $result->stdout;
+}
+if (defined $result->stderr && length $result->stderr) {
+    print STDERR $result->stderr;
+}
 exit($result->exit_code);
 ```
 
-The `FindBin` + `lib` approach allows running from the source tree without installing. `Makefile.PL` will also install `bin/ccc` properly.
+**Key details:**
 
-## 5. Prompt Trimming and Empty Rejection
+- `FindBin` + `lib` allows running from source tree without `make install`.
+- `CCC_REAL_OPENCODE` overrides argv[0] before execution, matching all other implementations.
+- Stdout/stderr printed with `print` (no extra newline) — the subprocess output already contains its own line endings. Uses `if defined ... && length` guard to avoid warnings on undef.
 
-Implemented in `build_prompt_spec` (section 2). Uses `s/^\s+//` / `s/\s+$//` for trimming. Dies with `"prompt must not be empty\n"` if the trimmed result has zero length.
+## 5. Prompt Trimming & Empty Rejection
 
-The CLI catches this via `eval { ... }; if ($@) { ... }` and writes `$@` to stderr, exiting 1.
+`build_prompt_spec` trims via `s/^\s+//; s/\s+$//;`, dies with `"prompt must not be empty\n"` on empty/whitespace-only input. The CLI catches via `eval`/`if ($@)`, prints `$@` to stderr, exits 1.
 
-This matches Python's `ValueError`, Rust's `Err`, and TypeScript's `throw`.
+Matches Python's `ValueError`, Rust's `Err`, TypeScript's `throw`.
 
 ## 6. Error Format: `argv[0]` Only
 
-The contract specifies: `"failed to start <argv[0]>: <error>"`.
-
-In the `_default_run` function, on `open3` failure, we format:
-
-```perl
-stderr => "failed to start $argv[0]: $@\n"
-```
-
-Where `$argv[0]` is `$spec->argv->[0]`. This matches Python (`spec.argv[0]`), Rust (`spec.argv.first()`), and TypeScript (`command`).
-
-**Perl nuance:** `$@` from `IPC::Open3` may include a trailing newline or may not. We should chomp it and add our own `\n` for consistency:
+Contract: `"failed to start <argv[0]>: <error>"`.
 
 ```perl
 (my $err = $@) =~ s/\s+$//;
 stderr => "failed to start $argv0: $err\n",
 ```
 
+`$@` from `IPC::Open3` exec failure contains the OS error (e.g., `"No such file or directory"`). We strip trailing whitespace and append our own `\n`.
+
 ## 7. Exit Code Forwarding
 
-The CLI uses `exit($result->exit_code)` which calls the C-level `_exit()` with the code. Perl's `exit()` correctly forwards integer exit codes.
-
-**Edge case:** If the child was killed by a signal, `$? >> 8` gives 0 and the signal is in `$? & 127`. In that case, follow Rust's pattern: `exit_code = WIFEXITED ? WEXITSTATUS : 1`. In Perl:
-
-```perl
-my $exit_code;
-if (WIFEXITED($?)) {
-    $exit_code = WEXITSTATUS($?);
-} else {
-    $exit_code = 1;
-}
-```
-
-Where `POSIX::WIFEXITED` / `POSIX::WEXITSTATUS` are used, or manually: `($? & 127) == 0 ? ($? >> 8) : 1`.
-
-**Decision:** Avoid pulling in `POSIX` (technically core but heavy). Use the manual bitmask approach.
+- Normal exit: `$? >> 8`
+- Killed by signal: exit code `1` (not the signal number)
+- Expression: `($? & 127) == 0 ? ($? >> 8) : 1`
+- Avoids pulling in `POSIX` module.
 
 ## 8. Test Strategy
-
-### Framework: `Test::More` (core)
-
-All tests live in `t/` under the `perl/` directory.
 
 ### `t/01_build_prompt_spec.t`
 
 ```perl
-use Test::More tests => 5;
+use strict;
+use warnings;
+use Test::More tests => 6;
+use lib 'lib';
 use Call::Coding::Clis qw(build_prompt_spec);
 
 ok my $spec = build_prompt_spec("hello"), 'valid prompt';
@@ -293,26 +331,34 @@ like $@, qr/empty/, 'whitespace-only prompt dies';
 
 ok my $trimmed = build_prompt_spec("  foo  ");
 is_deeply $trimmed->argv, ['opencode', 'run', 'foo'], 'whitespace trimmed';
+
+eval { build_prompt_spec(undef) };
+like $@, qr/empty/, 'undef prompt dies';
 ```
+
+Note: test count is 6 (the draft said 5 but had 6 assertions).
 
 ### `t/02_runner.t`
 
-Test with a mock executor (coderef injection):
-
 ```perl
-use Test::More tests => 3;
+use strict;
+use warnings;
+use Test::More tests => 5;
+use lib 'lib';
 use Call::Coding::Clis qw(build_prompt_spec);
 use Call::Coding::Clis::Runner;
+use Call::Coding::Clis::CommandSpec;
+use Call::Coding::Clis::CompletedRun;
 
 my $spec = build_prompt_spec("test");
 
 my $runner = Call::Coding::Clis::Runner->new(
     executor => sub {
-        Call::Coding::Clis::CompletedRun->new(
-            argv => ['echo', 'hello'],
+        return Call::Coding::Clis::CompletedRun->new(
+            argv      => ['echo', 'hello'],
             exit_code => 0,
-            stdout => "hello\n",
-            stderr => '',
+            stdout    => "hello\n",
+            stderr    => '',
         );
     },
 );
@@ -321,56 +367,63 @@ my $result = $runner->run($spec);
 is $result->exit_code, 0, 'mock exit code';
 is $result->stdout, "hello\n", 'mock stdout';
 is $result->stderr, '', 'mock stderr';
-```
 
-Also test startup failure with a nonexistent binary:
-
-```perl
 my $real_runner = Call::Coding::Clis::Runner->new;
-my $bad_spec = Call::Coding::Clis::CommandSpec->new(argv => ['/nonexistent/binary']);
-my $result = $real_runner->run($bad_spec);
-like $result->stderr, qr/failed to start \/nonexistent\/binary/, 'startup failure format';
-is $result->exit_code, 1, 'startup failure exit code';
+my $bad_spec = Call::Coding::Clis::CommandSpec->new(argv => ['/nonexistent_binary_xyz']);
+my $bad_result = $real_runner->run($bad_spec);
+like $bad_result->stderr, qr/^failed to start \/nonexistent_binary_xyz:/, 'startup failure format';
+is $bad_result->exit_code, 1, 'startup failure exit code';
 ```
 
-### `t/03_cli.t`
+### `t/03_ccc_binary.t`
 
-Test argument validation logic without spawning. Extract `main()` to accept `@ARGV` override:
+Integration test using `CCC_REAL_OPENCODE` with a shell stub:
 
 ```perl
-# Test via return value capture (STDOUT/STDERR trapping)
-# Or test build_prompt_spec directly (covered in 01)
+use strict;
+use warnings;
+use Test::More;
+use lib 'lib';
+use File::Temp qw(tempfile);
+use IPC::Open3;
+use Symbol 'gensym';
+
+my ($fh, $stub_path) = tempfile(UNLINK => 1, SUFFIX => '.sh');
+print $fh "#!/bin/sh\n";
+print $fh "if [ \"\$1\" != \"run\" ]; then exit 9; fi\n";
+print $fh "shift\n";
+print $fh "printf 'opencode run %s\\\\n' \"\$1\"\n";
+close $fh;
+chmod 0755, $stub_path;
+
+sub run_ccc {
+    my ($prompt) = @_;
+    my $ccc = 'bin/ccc';
+    my @cmd = ($^X, '-Ilib', $ccc, $prompt);
+    local $ENV{CCC_REAL_OPENCODE} = $stub_path;
+    my ($stdout, $stderr);
+    my $pid = open3(my $in, my $out, gensym, @cmd);
+    close $in;
+    $stdout = do { local $/; <$out> };
+    waitpid($pid, 0);
+    return ($stdout // '', '', $? >> 8);
+}
+
+my ($out, $err, $rc) = run_ccc("Fix the failing tests");
+is $rc, 0, 'happy path exit code';
+is $out, "opencode run Fix the failing tests\n", 'happy path stdout';
+
+($out, $err, $rc) = run_ccc("");
+isnt $rc, 0, 'empty prompt rejected';
+
+done_testing;
 ```
 
-### `t/04_ccc_binary.t`
+Run from `perl/` directory: `prove -v t/`.
 
-Integration test: run `bin/ccc` as a subprocess with `CCC_REAL_OPENCODE` pointing to a stub. This mirrors the cross-language contract tests.
+## 9. CPAN Packaging
 
-### `CCC_REAL_OPENCODE` in CLI
-
-Set in `bin/ccc` before calling the runner. Allows contract tests to override the opencode binary with a shell script that prints `opencode run <prompt>`.
-
-## 9. Perl-Specific Considerations
-
-### TMTOWTDI (There's More Than One Way To Do It)
-
-For this implementation, we pick one canonical approach and stick to it:
-- **OO style:** Blessed hashrefs, not Moose/Moo/Object::Pad. Minimal, core-only.
-- **Subprocess:** `IPC::Open3`, not `system()`, `qx//`, `IPC::Run`, or `Capture::Tiny`.
-- **String trimming:** regex `s/^\s+//; s/\s+$//;`, not `Text::Trim`.
-- **Testing:** `Test::More`, not `Test2` or `Test::Class`.
-- **Exporting:** `Exporter` (core), not `Sub::Exporter`.
-
-### Context Sensitivity
-
-Perl functions are context-sensitive (scalar vs list). Our API must behave correctly in both:
-- `build_prompt_spec()` returns a single object — always called in scalar context.
-- Accessor methods return scalars — always called in scalar context.
-- No list-returning functions in the public API.
-
-### CPAN Packaging
-
-`Makefile.PL`:
+### `Makefile.PL`
 
 ```perl
 use ExtUtils::MakeMaker;
@@ -378,69 +431,107 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME          => 'Call::Coding::Clis',
     VERSION_FROM  => 'lib/Call/Coding/Clis.pm',
-    PREREQ_PM     => {
-        'IPC::Open3' => 0,
-        'Symbol'     => 0,
-        'Test::More' => 0,
-    },
+    PREREQ_PM     => {},
     EXE_FILES     => ['bin/ccc'],
     ABSTRACT      => 'Library and CLI for invoking coding assistants',
     LICENSE       => 'unlicense',
+    MIN_PERL_VERSION => '5.010',
 );
 ```
 
-The `bin/ccc` script gets a `#!/usr/bin/env perl` shebang and is installed by `make install`.
+All dependencies are core modules — `PREREQ_PM` is empty. `IPC::Open3`, `Symbol`, `Exporter`, `FindBin`, and `Test::More` ship with every Perl 5.10+.
 
 ### Perl Version Target
 
-Target Perl 5.10+ (2007) for `//` (defined-or) operator. This covers essentially every installed Perl. The `given`/`when` feature is intentionally avoided (experimental in 5.18+, removed in 5.38).
+5.10+ (2007) for the `//` defined-or operator. Avoids `given`/`when` (experimental in 5.18+, removed in 5.38).
 
-### Strict and Warnings
+## 10. CI Integration
 
-Every `.pm` and `bin/` file starts with:
+Perl needs no special toolchain. Add to CI alongside the other languages:
 
-```perl
-use strict;
-use warnings;
+```yaml
+# GitHub Actions example
+- name: Perl tests
+  run: |
+    cd perl
+    perl Makefile.PL
+    make
+    make test
+  env:
+    PERL5LIB: ${{ github.workspace }}/perl/lib
 ```
 
-## 10. Parity Gaps
+For cross-language contract tests, Perl is invoked directly (no build step needed):
 
-| Feature | Python | Rust | TypeScript | C | **Perl (planned)** |
-|---------|--------|------|------------|---|----|
-| build_prompt_spec | yes | yes | yes | yes | **yes** |
-| Runner.run | yes | yes | yes | yes | **yes** |
-| Runner.stream | yes (real) | yes (fake) | yes (real) | no | **fake (delegates to run)** |
-| ccc CLI | yes | yes | yes | yes | **yes** |
-| Prompt trimming | yes | yes | yes | yes | **yes** |
-| Empty prompt rejection | yes | yes | yes | yes | **yes** |
-| Stdin support | yes | yes | yes | yes | **yes** |
-| CWD support | yes | yes | yes | yes | **yes** |
-| Env support | yes | yes | yes | yes | **yes** |
-| Startup failure reporting | yes | yes | yes | yes | **yes** |
-| Exit code forwarding | yes | yes | yes | yes | **yes** |
-| CCC_REAL_OPENCODE | yes | yes | yes | yes | **yes** |
+```perl
+subprocess.run(
+    ["perl", "perl/bin/ccc", PROMPT],
+    cwd=ROOT,
+    env={**env, "PERL5LIB": str(ROOT / "perl" / "lib")},
+    ...
+)
+```
 
-### Known Gaps vs Other Implementations
+## 11. Cross-Language Test Registration
 
-1. **No real streaming.** The `stream()` method will delegate to `run()` and fire callbacks afterward, matching the Rust implementation's current behavior. True line-by-line streaming in Perl requires `IO::Select` or `IPC::Run` and adds complexity. This can be added later as an enhancement.
+Add Perl to each test method in `tests/test_ccc_contract.py`. Inside the existing `with tempfile.TemporaryDirectory()` block, after the C block:
 
-2. **No Executor injection for stream().** The Runner constructor accepts an `executor` coderef for `run()` testability but does not (yet) expose a `stream_executor` hook. This is acceptable since `stream()` delegates to `run()`.
+```python
+self.assert_equal_output(
+    subprocess.run(
+        ["perl", "perl/bin/ccc", PROMPT],
+        cwd=ROOT,
+        env={**env, "PERL5LIB": str(ROOT / "perl" / "lib")},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+)
+```
 
-3. **`$@` error message formatting.** Perl's `$@` from `IPC::Open3` exec failure includes the full OS error string. We need to strip and normalize to match the cross-language `"failed to start <argv[0]>: <error>"` format. Testing against the contract test suite will validate this.
+Repeat the same pattern (with appropriate assertion helpers) for:
+- `test_cross_language_ccc_rejects_empty_prompt` — use `assert_rejects_empty`
+- `test_cross_language_ccc_requires_one_prompt_argument` — use `assert_rejects_missing_prompt`
+- `test_cross_language_ccc_rejects_whitespace_only_prompt` — use `assert_rejects_empty`
 
-4. **No Makefile/CPAN integration tests.** The cross-language contract tests (`tests/test_ccc_contract.py`) will need a Perl invocation added. The simplest approach: `perl perl/bin/ccc "<prompt>"` with `PERL5LIB=perl/lib`.
+No build step is needed — `PERL5LIB=perl/lib` and `perl/bin/ccc` run directly from the source tree.
+
+## 12. Parity Matrix
+
+| Feature | Python | Rust | TypeScript | C | **Perl** |
+|---------|--------|------|------------|---|----------|
+| build_prompt_spec | yes | yes | yes | yes | yes |
+| Runner.run | yes | yes | yes | yes | yes |
+| Runner.stream | real | fake | real | no | fake |
+| ccc CLI | yes | yes | yes | yes | yes |
+| Prompt trimming | yes | yes | yes | yes | yes |
+| Empty prompt rejection | yes | yes | yes | yes | yes |
+| Stdin support | yes | yes | yes | yes | yes |
+| CWD support | yes | yes | yes | yes | yes |
+| Env support | yes | yes | yes | yes | yes |
+| Startup failure format | yes | yes | yes | yes | yes |
+| Exit code forwarding | yes | yes | yes | yes | yes |
+| Signal-killed child | yes | yes | yes | yes | yes |
+| CCC_REAL_OPENCODE | yes | yes | yes | yes | yes |
+
+### Known Gaps
+
+1. **No real streaming** — `stream()` delegates to `run()` and fires callbacks afterward. Acceptable; matches Rust's current behavior. Real streaming requires `IO::Select` or `IPC::Run`.
+
+2. **`IPC::Open3` deadlock risk** — separate stdout/stderr pipes can deadlock with large output. Acceptable for CLI use case. Noted for future `IPC::Run` upgrade path.
 
 ## Implementation Order
 
-1. `lib/Call/Coding/Clis/CommandSpec.pm`
-2. `lib/Call/Coding/Clis/CompletedRun.pm`
-3. `lib/Call/Coding/Clis/Runner.pm` (with `_default_run` using `IPC::Open3`)
-4. `lib/Call/Coding/Clis.pm` (facade, exports `build_prompt_spec`)
-5. `t/01_build_prompt_spec.t`
-6. `t/02_runner.t`
-7. `bin/ccc`
-8. `t/04_ccc_binary.t`
-9. `Makefile.PL`
-10. Add Perl to cross-language contract tests in `tests/test_ccc_contract.py`
-11. Update `IMPLEMENTATION_REFERENCE.md` and `CCC_BEHAVIOR_CONTRACT.md`
+1. `lib/Call/Coding.pm` (namespace placeholder)
+2. `lib/Call/Coding/Clis/CommandSpec.pm`
+3. `lib/Call/Coding/Clis/CompletedRun.pm`
+4. `lib/Call/Coding/Clis/Runner.pm` (with fixed `_default_run`)
+5. `lib/Call/Coding/Clis.pm` (facade, exports `build_prompt_spec`)
+6. `t/01_build_prompt_spec.t`
+7. `t/02_runner.t`
+8. `bin/ccc`
+9. `t/03_ccc_binary.t`
+10. `Makefile.PL`
+11. `MANIFEST`
+12. Add Perl to `tests/test_ccc_contract.py` (all 4 test methods)
+13. Update `IMPLEMENTATION_REFERENCE.md` and `CCC_BEHAVIOR_CONTRACT.md`

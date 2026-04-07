@@ -214,6 +214,13 @@ TEST_CASES = [
         "mock: unknown prompt 'fix the \"bug\" & edge-case'\n",
         "",
     ),
+    TestCase(
+        "large_output",
+        "large output",
+        0,
+        "A" * 4096 + "\n",
+        "",
+    ),
 ]
 
 

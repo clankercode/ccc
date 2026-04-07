@@ -9,13 +9,19 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
 
-    let spec = match build_prompt_spec(&args[0]) {
+    let mut spec = match build_prompt_spec(&args[0]) {
         Ok(spec) => spec,
         Err(message) => {
             eprintln!("{message}");
             return ExitCode::from(1);
         }
     };
+
+    if let Ok(real_opencode) = env::var("CCC_REAL_OPENCODE") {
+        if !real_opencode.is_empty() {
+            spec.argv[0] = real_opencode;
+        }
+    }
 
     let result = Runner::new().run(spec);
     if !result.stdout.is_empty() {

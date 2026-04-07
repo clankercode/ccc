@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommandSpec {
@@ -49,10 +51,9 @@ pub struct CompletedRun {
     pub stderr: String,
 }
 
-type StreamCallback<'a> = dyn FnMut(&str, &str) + 'a;
+type StreamCallback = Arc<Mutex<dyn FnMut(&str, &str) + Send>>;
 type RunExecutor = dyn Fn(CommandSpec) -> CompletedRun + Send + Sync;
-type StreamExecutor =
-    dyn for<'a> Fn(CommandSpec, Box<StreamCallback<'a>>) -> CompletedRun + Send + Sync;
+type StreamExecutor = dyn Fn(CommandSpec, StreamCallback) -> CompletedRun + Send + Sync;
 
 pub struct Runner {
     executor: Box<RunExecutor>,
@@ -87,9 +88,9 @@ impl Runner {
 
     pub fn stream<F>(&self, spec: CommandSpec, on_event: F) -> CompletedRun
     where
-        F: FnMut(&str, &str),
+        F: FnMut(&str, &str) + Send + 'static,
     {
-        (self.stream_executor)(spec, Box::new(on_event))
+        (self.stream_executor)(spec, Arc::new(Mutex::new(on_event)))
     }
 }
 
@@ -120,10 +121,7 @@ fn default_run_executor(spec: CommandSpec) -> CompletedRun {
     }
 }
 
-fn default_stream_executor<'a>(
-    spec: CommandSpec,
-    mut callback: Box<StreamCallback<'a>>,
-) -> CompletedRun {
+fn default_stream_executor(spec: CommandSpec, callback: StreamCallback) -> CompletedRun {
     let argv = spec.argv.clone();
     let mut command = build_command(&spec);
     command.stdout(Stdio::piped());
@@ -137,7 +135,9 @@ fn default_stream_executor<'a>(
                 spec.argv.first().map(|s| s.as_str()).unwrap_or("(unknown)"),
                 error
             );
-            callback("stderr", &error_msg);
+            if let Ok(mut cb) = callback.lock() {
+                cb("stderr", &error_msg);
+            }
             return CompletedRun {
                 argv,
                 exit_code: 1,
@@ -153,36 +153,55 @@ fn default_stream_executor<'a>(
         }
     }
 
-    let mut stdout_buf = String::new();
-    let mut stderr_buf = String::new();
+    let stdout_pipe = child.stdout.take();
+    let stderr_pipe = child.stderr.take();
 
-    if let Some(stdout) = child.stdout.take() {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            match line {
-                Ok(text) => {
-                    stdout_buf.push_str(&text);
-                    stdout_buf.push('\n');
-                    callback("stdout", &text);
+    let cb_out = Arc::clone(&callback);
+    let stdout_thread = thread::spawn(move || {
+        let mut buf = String::new();
+        if let Some(pipe) = stdout_pipe {
+            use std::io::BufRead;
+            let reader = std::io::BufReader::new(pipe);
+            for line in reader.lines() {
+                match line {
+                    Ok(text) => {
+                        buf.push_str(&text);
+                        buf.push('\n');
+                        if let Ok(mut cb) = cb_out.lock() {
+                            cb("stdout", &text);
+                        }
+                    }
+                    Err(_) => break,
                 }
-                Err(_) => break,
             }
         }
-    }
+        buf
+    });
 
-    if let Some(stderr) = child.stderr.take() {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            match line {
-                Ok(text) => {
-                    stderr_buf.push_str(&text);
-                    stderr_buf.push('\n');
-                    callback("stderr", &text);
+    let cb_err = Arc::clone(&callback);
+    let stderr_thread = thread::spawn(move || {
+        let mut buf = String::new();
+        if let Some(pipe) = stderr_pipe {
+            use std::io::BufRead;
+            let reader = std::io::BufReader::new(pipe);
+            for line in reader.lines() {
+                match line {
+                    Ok(text) => {
+                        buf.push_str(&text);
+                        buf.push('\n');
+                        if let Ok(mut cb) = cb_err.lock() {
+                            cb("stderr", &text);
+                        }
+                    }
+                    Err(_) => break,
                 }
-                Err(_) => break,
             }
         }
-    }
+        buf
+    });
+
+    let stdout_buf = stdout_thread.join().unwrap_or_default();
+    let stderr_buf = stderr_thread.join().unwrap_or_default();
 
     let status = child.wait().unwrap_or_else(|error| {
         std::process::ExitStatus::from_raw(

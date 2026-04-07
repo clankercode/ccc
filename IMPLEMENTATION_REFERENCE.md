@@ -40,15 +40,14 @@ Every language implementation must provide:
 |---------|--------|------|------------|---|-----|------|------|-----|
 | build_prompt_spec | yes | yes | yes | yes | yes | yes | yes | yes |
 | Runner.run | yes | yes | yes | yes | yes | yes | yes | yes |
-| Runner.stream | yes | yes (real streaming) | yes | no | yes | yes | no | yes |
+| Runner.stream | yes | yes (real concurrent) | yes | no | yes (real concurrent) | yes | yes (fake passthrough) | yes (fake passthrough) |
 | ccc CLI | yes | yes | yes | yes | yes | yes | yes | yes |
 | Prompt trimming | yes | yes | yes | yes | yes | yes | yes | yes |
 | Empty prompt rejection | yes | yes | yes | yes | yes | yes | yes | yes |
 | Stdin/CWD/Env support | yes | yes | yes | yes | yes | yes | yes | yes |
 | Startup failure reporting | yes | yes | yes | yes | yes | yes | yes | yes |
 | Exit code forwarding | yes | yes | yes | yes | yes | yes | yes | yes |
-| CCC_REAL_OPENCODE | yes | yes | yes | yes | yes | yes | yes | yes |
-| Cross-language contract tests | yes | yes | yes | yes | yes | yes | yes | yes |
+| CCC_REAL_OPENCODE | yes | yes | CCC_RUNNER_PREFIX_JSON | yes | yes | yes | yes | yes |
 
 ## Licensing
 

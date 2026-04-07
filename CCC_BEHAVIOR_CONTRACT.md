@@ -35,12 +35,14 @@ For every implementation that claims `ccc` support:
 - supports first-pass `ccc "<Prompt>"`
 - exposes `build_prompt_spec`
 - runner supports `run` and `stream`
+- `CCC_REAL_OPENCODE` env var support
 
 ### Rust
 
 - supports first-pass `ccc "<Prompt>"`
 - exposes `build_prompt_spec`
-- runner supports `run` and `stream`
+- runner supports `run` and `stream` (real concurrent streaming via threads)
+- `CCC_REAL_OPENCODE` env var support
 
 ### TypeScript
 

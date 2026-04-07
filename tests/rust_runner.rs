@@ -1,5 +1,6 @@
 use call_coding_clis::{build_prompt_spec, CommandSpec, CompletedRun, Runner};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn run_returns_completed_result() {
@@ -30,9 +31,11 @@ fn run_reports_missing_binary_start_failure() {
 
 #[test]
 fn stream_emits_events_and_exit_code() {
-    let runner = Runner::with_stream_executor(Box::new(|spec, mut callback| {
-        callback("stdout", "hello");
-        callback("stderr", "warn");
+    let runner = Runner::with_stream_executor(Box::new(|spec, callback| {
+        if let Ok(mut cb) = callback.lock() {
+            cb("stdout", "hello");
+            cb("stderr", "warn");
+        }
         CompletedRun {
             argv: spec.argv,
             exit_code: 2,
@@ -41,13 +44,18 @@ fn stream_emits_events_and_exit_code() {
         }
     }));
 
-    let mut events = Vec::new();
-    let result = runner.stream(CommandSpec::new(["fake"]), |channel, chunk| {
-        events.push((channel.to_owned(), chunk.to_owned()));
+    let events: Arc<Mutex<Vec<(String, String)>>> = Arc::new(Mutex::new(Vec::new()));
+    let events_clone = Arc::clone(&events);
+    let result = runner.stream(CommandSpec::new(["fake"]), move |channel, chunk| {
+        events_clone
+            .lock()
+            .unwrap()
+            .push((channel.to_owned(), chunk.to_owned()));
     });
 
+    let events = events.lock().unwrap();
     assert_eq!(
-        events,
+        *events,
         vec![
             ("stdout".to_owned(), "hello".to_owned()),
             ("stderr".to_owned(), "warn".to_owned())
@@ -58,14 +66,19 @@ fn stream_emits_events_and_exit_code() {
 
 #[test]
 fn stream_reports_missing_binary_start_failure_as_stderr_event() {
-    let mut events = Vec::new();
+    let events: Arc<Mutex<Vec<(String, String)>>> = Arc::new(Mutex::new(Vec::new()));
+    let events_clone = Arc::clone(&events);
     let result = Runner::new().stream(
         CommandSpec::new(["/definitely/missing/runner-binary"]),
-        |channel, chunk| {
-            events.push((channel.to_owned(), chunk.to_owned()));
+        move |channel, chunk| {
+            events_clone
+                .lock()
+                .unwrap()
+                .push((channel.to_owned(), chunk.to_owned()));
         },
     );
 
+    let events = events.lock().unwrap();
     assert_ne!(result.exit_code, 0);
     assert_eq!(result.stdout, "");
     assert!(result.stderr.contains("failed to start"));

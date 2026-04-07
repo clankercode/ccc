@@ -1,6 +1,7 @@
 package Call::Coding::Clis::Runner;
 use strict;
 use warnings;
+use Cwd;
 use IPC::Open3;
 use Symbol 'gensym';
 use Call::Coding::Clis::CommandSpec;
@@ -35,9 +36,11 @@ sub _default_run {
 
     my ($child_pid, $stdin_w, $stdout_r, $stderr_r);
     $stderr_r = gensym;
+    my $orig_cwd;
 
     my $result = eval {
         if (defined $spec->cwd) {
+            $orig_cwd = Cwd::getcwd();
             chdir $spec->cwd or die "chdir to $spec->cwd: $!\n";
         }
 
@@ -54,6 +57,10 @@ sub _default_run {
         close $stderr_r;
         waitpid($child_pid, 0);
 
+        if (defined $orig_cwd) {
+            chdir $orig_cwd;
+        }
+
         my $exit_code = ($? & 127) == 0 ? ($? >> 8) : 1;
 
         $stdout //= '';
@@ -67,6 +74,9 @@ sub _default_run {
         );
     };
     if ($@) {
+        if (defined $orig_cwd) {
+            chdir $orig_cwd;
+        }
         (my $err = $@) =~ s/\s+$//;
         return Call::Coding::Clis::CompletedRun->new(
             argv      => \@argv,

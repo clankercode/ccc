@@ -9,21 +9,31 @@ int ccc_build_prompt_command(const char *prompt, char *buffer, size_t buffer_siz
         return 1;
     }
 
-    size_t index = 0;
-    while (prompt[index] != '\0') {
-        if (!isspace((unsigned char)prompt[index])) {
+    size_t start = 0;
+    while (prompt[start] != '\0') {
+        if (!isspace((unsigned char)prompt[start])) {
             break;
         }
-        index += 1;
+        start += 1;
     }
-    if (prompt[index] == '\0') {
+
+    size_t end = strlen(prompt);
+    while (end > start && isspace((unsigned char)prompt[end - 1])) {
+        end -= 1;
+    }
+
+    if (start == end) {
         return 1;
     }
 
-    int written = snprintf(buffer, buffer_size, "opencode run %s", &prompt[index]);
-    if (written < 0 || (size_t)written >= buffer_size) {
+    size_t trimmed_len = end - start;
+    if (trimmed_len + 13 >= buffer_size) {
         return 1;
     }
+
+    memcpy(buffer, "opencode run ", 13);
+    memcpy(buffer + 13, prompt + start, trimmed_len);
+    buffer[13 + trimmed_len] = '\0';
 
     return 0;
 }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 
 try:
@@ -26,6 +27,10 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 1
+
+    real_opencode = os.environ.get("CCC_REAL_OPENCODE", "")
+    if real_opencode:
+        spec.argv[0] = real_opencode
 
     result = Runner().run(spec)
     if result.stdout:

@@ -276,11 +276,13 @@ class CccContractTests(unittest.TestCase):
 
     def assert_rejects_empty(self, result: subprocess.CompletedProcess[str]) -> None:
         self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
 
     def assert_rejects_missing_prompt(
         self, result: subprocess.CompletedProcess[str]
     ) -> None:
         self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
         self.assertIn('ccc "<Prompt>"', result.stderr)
 
     def _write_opencode_stub(self, path: Path) -> None:

@@ -47,10 +47,10 @@ LANGUAGES[ASM]="asm-x86_64/ccc"
 LANGUAGES[OCaml]="ocaml/_build/default/bin/ccc.exe"
 LANGUAGES[Elixir]=""
 LANGUAGES[Nim]=""
-LANGUAGES[Crystal]=""
+LANGUAGES[Crystal]="crystal/ccc"
 LANGUAGES[Haskell]=""
 LANGUAGES[VBScript]=""
-LANGUAGES[PureScript]=""
+LANGUAGES[PureScript]="node purescript/bin/ccc"
 
 declare -A ENV_OVERRIDE
 ENV_OVERRIDE[Python]="PYTHONPATH=$ROOT/python PATH=$BIN_DIR:$(printenv PATH)"
@@ -66,7 +66,7 @@ echo ""
 
 PIDS=()
 NAMES=()
-ORDERED_LANGS="Python Rust TypeScript C Go Ruby Perl C++ Zig D F# PHP ASM OCaml"
+ORDERED_LANGS="Python Rust TypeScript C Go Ruby Perl C++ Zig D F# PHP ASM OCaml Crystal PureScript"
 
 for lang in $ORDERED_LANGS; do
     cmd="${LANGUAGES[$lang]:-}"

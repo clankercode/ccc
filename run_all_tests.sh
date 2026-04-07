@@ -95,7 +95,9 @@ run_test "zig: zig build test" \
     "$TMPDIR/zig_unit.log"
 
 printf "\n${BOLD}[10/22] Crystal — unit tests${RESET}\n"
-skip_test "crystal: stdout/stderr swap bug" "runner.cr channel ordering"
+run_test "crystal: crystal spec" \
+    "(cd crystal && crystal spec 2>&1)" \
+    "$TMPDIR/crystal_unit.log"
 
 printf "\n${BOLD}[11/22] D — unit tests${RESET}\n"
 run_test "d: dub test" \

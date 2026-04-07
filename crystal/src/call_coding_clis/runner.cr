@@ -58,13 +58,18 @@ class Runner
       end
       process.input.close
 
-      ch = Channel(String).new(2)
+      ch = Channel(Tuple(String, String)).new(2)
 
-      spawn { ch.send(process.output.gets_to_end) }
-      spawn { ch.send(process.error.gets_to_end) }
+      spawn { ch.send({"stdout", process.output.gets_to_end}) }
+      spawn { ch.send({"stderr", process.error.gets_to_end}) }
 
-      stdout_data = ch.receive
-      stderr_data = ch.receive
+      results = {} of String => String
+      2.times do
+        label, data = ch.receive
+        results[label] = data
+      end
+      stdout_data = results["stdout"]
+      stderr_data = results["stderr"]
 
       status = process.wait
 

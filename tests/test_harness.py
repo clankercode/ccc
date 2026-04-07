@@ -139,6 +139,10 @@ def _ocaml_invoke(prompt):
     return [str(ROOT / "ocaml" / "_build" / "default" / "bin" / "ccc.exe"), prompt]
 
 
+def _crystal_invoke(prompt):
+    return [str(ROOT / "crystal" / "ccc"), prompt]
+
+
 LANGUAGES = [
     LanguageSpec(
         "Python",
@@ -228,6 +232,20 @@ LANGUAGES = [
         "OCaml",
         invoke_fn=_ocaml_invoke,
         env_extra={"CCC_REAL_OPENCODE": str(MOCK_BIN)},
+    ),
+    LanguageSpec(
+        "Crystal",
+        build_cmds=[
+            [
+                "crystal",
+                "build",
+                "src/call_coding_clis/ccc.cr",
+                "-o",
+                str(ROOT / "crystal" / "ccc"),
+            ]
+        ],
+        build_cwd=ROOT / "crystal",
+        invoke_fn=_crystal_invoke,
     ),
 ]
 

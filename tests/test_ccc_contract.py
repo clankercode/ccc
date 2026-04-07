@@ -74,6 +74,80 @@ class CccContractTests(unittest.TestCase):
                 )
             )
 
+            subprocess.run(
+                ["go", "build", "-o", str(ROOT / "go" / "ccc"), "./cmd/ccc"],
+                cwd=ROOT / "go",
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assert_equal_output(
+                subprocess.run(
+                    [str(ROOT / "go" / "ccc"), PROMPT],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            self.assert_equal_output(
+                subprocess.run(
+                    ["ruby", str(ROOT / "ruby" / "bin" / "ccc"), PROMPT],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            self.assert_equal_output(
+                subprocess.run(
+                    [
+                        "perl",
+                        "-I",
+                        str(ROOT / "perl" / "lib"),
+                        str(ROOT / "perl" / "bin" / "ccc"),
+                        PROMPT,
+                    ],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            subprocess.run(
+                ["cmake", "-B", str(ROOT / "cpp" / "build"), "-S", str(ROOT / "cpp")],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            subprocess.run(
+                ["cmake", "--build", str(ROOT / "cpp" / "build"), "--target", "ccc"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assert_equal_output(
+                subprocess.run(
+                    [str(ROOT / "cpp" / "build" / "ccc"), PROMPT],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
     def test_cross_language_ccc_rejects_empty_prompt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -136,6 +210,80 @@ class CccContractTests(unittest.TestCase):
                 )
             )
 
+            subprocess.run(
+                ["go", "build", "-o", str(ROOT / "go" / "ccc"), "./cmd/ccc"],
+                cwd=ROOT / "go",
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assert_rejects_empty(
+                subprocess.run(
+                    [str(ROOT / "go" / "ccc"), ""],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            self.assert_rejects_empty(
+                subprocess.run(
+                    ["ruby", str(ROOT / "ruby" / "bin" / "ccc"), ""],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            self.assert_rejects_empty(
+                subprocess.run(
+                    [
+                        "perl",
+                        "-I",
+                        str(ROOT / "perl" / "lib"),
+                        str(ROOT / "perl" / "bin" / "ccc"),
+                        "",
+                    ],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            subprocess.run(
+                ["cmake", "-B", str(ROOT / "cpp" / "build"), "-S", str(ROOT / "cpp")],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            subprocess.run(
+                ["cmake", "--build", str(ROOT / "cpp" / "build"), "--target", "ccc"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assert_rejects_empty(
+                subprocess.run(
+                    [str(ROOT / "cpp" / "build" / "ccc"), ""],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
     def test_cross_language_ccc_requires_one_prompt_argument(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -190,6 +338,79 @@ class CccContractTests(unittest.TestCase):
             self.assert_rejects_missing_prompt(
                 subprocess.run(
                     [str(ROOT / "c/build/ccc")],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            subprocess.run(
+                ["go", "build", "-o", str(ROOT / "go" / "ccc"), "./cmd/ccc"],
+                cwd=ROOT / "go",
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assert_rejects_missing_prompt(
+                subprocess.run(
+                    [str(ROOT / "go" / "ccc")],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            self.assert_rejects_missing_prompt(
+                subprocess.run(
+                    ["ruby", str(ROOT / "ruby" / "bin" / "ccc")],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            self.assert_rejects_missing_prompt(
+                subprocess.run(
+                    [
+                        "perl",
+                        "-I",
+                        str(ROOT / "perl" / "lib"),
+                        str(ROOT / "perl" / "bin" / "ccc"),
+                    ],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            subprocess.run(
+                ["cmake", "-B", str(ROOT / "cpp" / "build"), "-S", str(ROOT / "cpp")],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            subprocess.run(
+                ["cmake", "--build", str(ROOT / "cpp" / "build"), "--target", "ccc"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assert_rejects_missing_prompt(
+                subprocess.run(
+                    [str(ROOT / "cpp" / "build" / "ccc")],
                     cwd=ROOT,
                     env=env,
                     capture_output=True,
@@ -261,6 +482,80 @@ class CccContractTests(unittest.TestCase):
             self.assert_rejects_empty(
                 subprocess.run(
                     [str(ROOT / "c/build/ccc"), whitespace_prompt],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            subprocess.run(
+                ["go", "build", "-o", str(ROOT / "go" / "ccc"), "./cmd/ccc"],
+                cwd=ROOT / "go",
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assert_rejects_empty(
+                subprocess.run(
+                    [str(ROOT / "go" / "ccc"), whitespace_prompt],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            self.assert_rejects_empty(
+                subprocess.run(
+                    ["ruby", str(ROOT / "ruby" / "bin" / "ccc"), whitespace_prompt],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            self.assert_rejects_empty(
+                subprocess.run(
+                    [
+                        "perl",
+                        "-I",
+                        str(ROOT / "perl" / "lib"),
+                        str(ROOT / "perl" / "bin" / "ccc"),
+                        whitespace_prompt,
+                    ],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            subprocess.run(
+                ["cmake", "-B", str(ROOT / "cpp" / "build"), "-S", str(ROOT / "cpp")],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            subprocess.run(
+                ["cmake", "--build", str(ROOT / "cpp" / "build"), "--target", "ccc"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assert_rejects_empty(
+                subprocess.run(
+                    [str(ROOT / "cpp" / "build" / "ccc"), whitespace_prompt],
                     cwd=ROOT,
                     env=env,
                     capture_output=True,

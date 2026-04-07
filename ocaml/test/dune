@@ -1,7 +1,14 @@
 (test
  (name test_runner)
+ (modules test_runner)
  (libraries alcotest ccc_lib unix))
 
 (test
  (name test_parser)
+ (modules test_parser)
+ (libraries alcotest ccc_lib))
+
+(test
+ (name test_json_output)
+ (modules test_json_output)
  (libraries alcotest ccc_lib))

@@ -1,4 +1,4 @@
 (library
   (name ccc_lib)
-  (modules command_spec completed_run config error_format parser prompt_spec runner)
+  (modules command_spec completed_run config error_format json_output parser prompt_spec runner)
   (libraries unix))

@@ -11,6 +11,8 @@ add_executable(ccc_tests
   test_runner.cpp
   test_ccc_contract.cpp
   test_parser.cpp
+  test_json_output.cpp
+  ${CMAKE_SOURCE_DIR}/src/json_output.cpp
 )
 target_link_libraries(ccc_tests PRIVATE ccc_lib GTest::gtest_main)
 include(GoogleTest)

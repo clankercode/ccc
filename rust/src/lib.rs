@@ -7,9 +7,11 @@ use std::thread;
 
 mod parser;
 mod config;
+mod json_output;
 
 pub use parser::{ParsedArgs, CccConfig, AliasDef, RunnerInfo, parse_args, resolve_command, RUNNER_REGISTRY};
 pub use config::load_config;
+pub use json_output::{TextContent, ThinkingContent, ToolCall, ToolResult, JsonEvent, ParsedJsonOutput, parse_opencode_json, parse_claude_code_json, parse_kimi_json, parse_json_output, render_parsed};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommandSpec {

@@ -25,5 +25,5 @@ fn main() -> ExitCode {
         eprint!("{}", result.stderr);
     }
 
-    ExitCode::from(result.exit_code as u8)
+    std::process::exit(result.exit_code)
 }

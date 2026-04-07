@@ -150,7 +150,12 @@ fn build_command(spec: &CommandSpec) -> Command {
 }
 
 fn failed_output(spec: &CommandSpec, error: io::Error) -> std::process::Output {
-    let stderr = format!("failed to start {:?}: {}", spec.argv, error).into_bytes();
+    let stderr = format!(
+        "failed to start {}: {}",
+        spec.argv.first().map(|s| s.as_str()).unwrap_or("(unknown)"),
+        error
+    )
+    .into_bytes();
     std::process::Output {
         status: std::process::ExitStatus::from_raw(1 << 8),
         stdout: Vec::new(),

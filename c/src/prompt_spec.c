@@ -20,7 +20,7 @@ int ccc_build_prompt_command(const char *prompt, char *buffer, size_t buffer_siz
         return 1;
     }
 
-    int written = snprintf(buffer, buffer_size, "opencode run %s", prompt);
+    int written = snprintf(buffer, buffer_size, "opencode run %s", &prompt[index]);
     if (written < 0 || (size_t)written >= buffer_size) {
         return 1;
     }

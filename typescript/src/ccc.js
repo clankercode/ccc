@@ -9,11 +9,19 @@ if (args.length !== 1) {
   process.exit(1)
 }
 
-const result = await new Runner().run(buildPromptSpec(args[0]))
-if (result.stdout) {
-  process.stdout.write(result.stdout)
-}
-if (result.stderr) {
-  process.stderr.write(result.stderr)
-}
+const runnerPrefix = process.env.CCC_RUNNER_PREFIX_JSON
+  ? JSON.parse(process.env.CCC_RUNNER_PREFIX_JSON)
+  : ['opencode', 'run']
+
+const result = await new Runner().stream(
+  buildPromptSpec(args[0], { runnerPrefix }),
+  (channel, chunk) => {
+    if (channel === 'stdout') {
+      process.stdout.write(chunk)
+      return
+    }
+    process.stderr.write(chunk)
+  },
+)
+
 process.exit(result.exitCode)

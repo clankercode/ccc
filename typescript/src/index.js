@@ -1,13 +1,15 @@
 import { spawn } from 'node:child_process'
 
-export function buildPromptSpec(prompt) {
+export function buildPromptSpec(prompt, options = {}) {
   const normalizedPrompt = prompt.trim()
   if (!normalizedPrompt) {
     throw new Error('prompt must not be empty')
   }
 
+  const runnerPrefix = options.runnerPrefix ?? ['opencode', 'run']
+
   return {
-    argv: ['opencode', 'run', normalizedPrompt],
+    argv: [...runnerPrefix, normalizedPrompt],
   }
 }
 

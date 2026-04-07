@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { spawn } from 'node:child_process'
 
 import { Runner, buildPromptSpec } from '../src/index.js'
 
@@ -11,6 +12,14 @@ test('buildPromptSpec maps ccc prompt to opencode run', () => {
   const spec = buildPromptSpec('Fix the failing tests')
 
   assert.deepEqual(spec.argv, ['opencode', 'run', 'Fix the failing tests'])
+})
+
+test('buildPromptSpec supports a runner prefix override', () => {
+  const spec = buildPromptSpec('Fix the failing tests', {
+    runnerPrefix: ['node', 'runner.mjs'],
+  })
+
+  assert.deepEqual(spec.argv, ['node', 'runner.mjs', 'Fix the failing tests'])
 })
 
 test('buildPromptSpec rejects empty prompts', () => {
@@ -91,4 +100,35 @@ test('Runner.stream executes a real subprocess and emits output', async () => {
     ['stdout', 'stdout:stdin-value'],
     ['stderr', 'stderr:env-value'],
   ])
+})
+
+test('ccc entrypoint forwards streamed stdout and stderr', async () => {
+  const scriptPath = join(here, '..', 'src', 'ccc.js')
+  const runnerFixture = join(here, 'fixtures', 'ccc-runner.mjs')
+  const child = spawn('node', [scriptPath, 'Fix the failing tests'], {
+    env: {
+      ...process.env,
+      PATH: process.env.PATH,
+      CCC_RUNNER_PREFIX_JSON: JSON.stringify(['node', runnerFixture]),
+    },
+  })
+
+  let stdout = ''
+  let stderr = ''
+
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk.toString()
+  })
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk.toString()
+  })
+
+  const exitCode = await new Promise((resolve, reject) => {
+    child.on('error', reject)
+    child.on('close', resolve)
+  })
+
+  assert.equal(exitCode, 0)
+  assert.equal(stderr.trim(), 'ccc-stderr:Fix the failing tests')
+  assert.equal(stdout.trim(), 'ccc-stdout:Fix the failing tests')
 })

@@ -7,7 +7,7 @@ Current implementation order:
 - Python first: implemented
 - Rust second: implemented
 - TypeScript: implemented with runner and `ccc` coverage
-- C: implemented as a smoke-level `ccc` plus reusable runner library
+- C: implemented with real subprocess execution in `ccc` plus reusable runner library
 - next likely work: cross-language runner robustness and remaining design-first scaffolds
 
 Target CLIs include:
@@ -76,7 +76,8 @@ Planned roadmap:
 - explicit design doc: `CCC_PARSER_CONFIG_DESIGN.md`
 - remaining language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
 - cross-language startup-failure behavior normalization for implemented runners
-- deeper C parity only when it will not destabilize the stable shared `ccc` contract
+- C `ccc` now executes commands through the runner library instead of printing them
+- `CCC_REAL_OPENCODE` environment variable allows overriding the runner binary for testing
 - Elixir design scaffold: `elixir/README.md`
 - OCaml design scaffold: `ocaml/README.md`
 - docs for runner-specific patterns and prompt/output handling
@@ -93,7 +94,7 @@ Missing / possible future features:
 - broader cross-language normalization of process-start failure handling beyond the current Python, Rust, C, and TypeScript coverage
 - startup-failure coverage now exists across Python, Rust, TypeScript, and C, but deeper event-shape parity is still open
 - richer stdin/cwd/env coverage and docs for every implementation
-- more concrete parity for C beyond the current prompt-spec and smoke-level scaffold
+- C `ccc` now executes commands through the runner library, closing the last major scaffold gap
 - Elixir and OCaml implementations once local toolchains are available or design-first scaffolds are written
 - v2 idea: parse structured JSON output from supported runners and render it consistently
 - v2 idea: templated or user-customizable rendering for structured output so humans can choose how `ccc` presents results

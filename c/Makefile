@@ -1,13 +1,13 @@
 CC ?= gcc
 CFLAGS ?= -Wall -Wextra -Werror -std=c11
 
-build/ccc: src/ccc.c src/prompt_spec.c
+build/ccc: src/ccc.c src/runner.c
 	mkdir -p build
-	$(CC) $(CFLAGS) -o build/ccc src/ccc.c src/prompt_spec.c
+	$(CC) $(CFLAGS) -o build/ccc src/ccc.c src/runner.c
 
-build/test_ccc: tests/test_ccc.c build/ccc
+build/test_ccc: tests/test_ccc.c build/ccc src/runner.c src/prompt_spec.c
 	mkdir -p build
-	$(CC) $(CFLAGS) -o build/test_ccc tests/test_ccc.c
+	$(CC) $(CFLAGS) -o build/test_ccc tests/test_ccc.c src/runner.c src/prompt_spec.c
 
 build/test_prompt_spec: tests/test_prompt_spec.c src/prompt_spec.c
 	mkdir -p build

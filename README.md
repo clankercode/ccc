@@ -77,6 +77,8 @@ Planned roadmap:
 - remaining language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
 - TypeScript scaffold with minimal runner and `ccc` entrypoint
 - C scaffold with reusable prompt-spec helper and `ccc` smoke coverage
+- Elixir design scaffold: `elixir/README.md`
+- OCaml design scaffold: `ocaml/README.md`
 - docs for runner-specific patterns and prompt/output handling
 - C bindings or C-facing interface notes
 - TypeScript package

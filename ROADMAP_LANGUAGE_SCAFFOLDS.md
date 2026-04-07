@@ -27,11 +27,13 @@ Each language target should eventually provide:
 
 - likely shape: wrapper around `System.cmd` or ports, with a small `ccc` Mix task or escript
 - initial deliverable: process abstraction notes and `ccc` command contract mapping
+- current scaffold doc: `elixir/README.md`
 
 ## OCaml
 
 - likely shape: library over `Unix` process APIs plus a small `ccc` executable
 - initial deliverable: module-level API sketch and subprocess/streaming notes
+- current scaffold doc: `ocaml/README.md`
 
 ## Ordering Notes
 

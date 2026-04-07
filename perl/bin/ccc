@@ -5,21 +5,53 @@ use FindBin;
 use lib "$FindBin::Bin/../lib";
 
 use Call::Coding::Clis qw(build_prompt_spec);
+use Call::Coding::Clis::Parser qw(parse_args resolve_command);
 use Call::Coding::Clis::Runner;
+use Call::Coding::Clis::CommandSpec;
 
-if (@ARGV != 1) {
+if (!@ARGV) {
     print STDERR 'usage: ccc "<Prompt>"', "\n";
+    print STDERR '       ccc [runner] [+N] [:provider:model] [@alias] <prompt>', "\n";
     exit 1;
 }
 
-my $spec = eval { build_prompt_spec($ARGV[0]) };
-if ($@) {
-    print STDERR $@;
-    exit 1;
-}
+my $spec;
 
-if ($ENV{CCC_REAL_OPENCODE}) {
-    $spec->{argv}[0] = $ENV{CCC_REAL_OPENCODE};
+if (@ARGV > 1) {
+    my $parsed = parse_args(@ARGV);
+    my $cmd    = eval { resolve_command($parsed) };
+    if ($@) {
+        print STDERR $@;
+        exit 1;
+    }
+
+    my @argv = @{$cmd->{argv}};
+    if ($ENV{CCC_REAL_OPENCODE}) {
+        $argv[0] = $ENV{CCC_REAL_OPENCODE};
+    }
+
+    $spec = Call::Coding::Clis::CommandSpec->new(
+        argv => \@argv,
+        env  => $cmd->{env},
+    );
+}
+else {
+    $spec = eval { build_prompt_spec($ARGV[0]) };
+    if ($@) {
+        print STDERR $@;
+        exit 1;
+    }
+
+    if ($ENV{CCC_REAL_OPENCODE}) {
+        my @argv = @{$spec->argv};
+        $argv[0] = $ENV{CCC_REAL_OPENCODE};
+        $spec = Call::Coding::Clis::CommandSpec->new(
+            argv      => \@argv,
+            stdin_text => $spec->stdin_text,
+            cwd       => $spec->cwd,
+            env       => $spec->env,
+        );
+    }
 }
 
 my $runner = Call::Coding::Clis::Runner->new;

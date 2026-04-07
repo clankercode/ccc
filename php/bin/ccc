@@ -4,20 +4,37 @@
 require_once __DIR__ . '/../src/CommandSpec.php';
 require_once __DIR__ . '/../src/CompletedRun.php';
 require_once __DIR__ . '/../src/Runner.php';
+require_once __DIR__ . '/../src/Parser.php';
+require_once __DIR__ . '/../src/Config.php';
 require_once __DIR__ . '/../src/build_prompt_spec.php';
 
 use Call\Coding\Clis\Runner;
+use Call\Coding\Clis\Parser;
+use Call\Coding\Clis\Config;
+use Call\Coding\Clis\CommandSpec;
 use function Call\Coding\Clis\build_prompt_spec;
 
-if ($argc !== 2) {
-    fwrite(STDERR, "usage: ccc \"<Prompt>\"\n");
+if ($argc < 2) {
+    fwrite(STDERR, "usage: ccc \"<prompt>\" | ccc [runner] [+thinking] [:provider:model] [:model] [@alias] <prompt...>\n");
     exit(1);
 }
 
+$config = Config::loadConfig();
+
 try {
-    $spec = build_prompt_spec($argv[1]);
-} catch (\InvalidArgumentException $e) {
-    fwrite(STDERR, $e->getMessage());
+    $parsed = Parser::parseArgs(array_slice($argv, 1));
+
+    if ($parsed->runner !== null || $parsed->thinking !== null
+        || $parsed->provider !== null || $parsed->model !== null
+        || $parsed->alias !== null
+    ) {
+        $resolved = Parser::resolveCommand($parsed, $config);
+        $spec = new CommandSpec($resolved['argv'], null, null, $resolved['env']);
+    } else {
+        $spec = build_prompt_spec($argv[1]);
+    }
+} catch (\Throwable $e) {
+    fwrite(STDERR, $e->getMessage() . "\n");
     exit(1);
 }
 

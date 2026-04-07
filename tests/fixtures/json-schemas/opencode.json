@@ -1,0 +1,47 @@
+{
+  "_meta": {
+    "source": "OpenCode CLI (archived, now Crush)",
+    "invocation": "opencode -p '<prompt>' -f json",
+    "format": "Single JSON object (no streaming mode)",
+    "flags": {
+      "prompt": "-p / --prompt (non-interactive)",
+      "output_format": "-f / --output-format text|json",
+      "quiet": "-q / --quiet (hide spinner)"
+    },
+    "note": "OpenCode is archived and has moved to Crush. JSON output is trivially simple."
+  },
+
+  "json_output": {
+    "response": "The AI's complete text response as a single string"
+  },
+
+  "internal_text_part": {
+    "type": "text",
+    "data": {"text": "content"}
+  },
+
+  "internal_tool_call": {
+    "type": "tool_call",
+    "data": {
+      "id": "call-id",
+      "name": "tool_name",
+      "arguments": "{\"key\":\"value\"}"
+    }
+  },
+
+  "internal_tool_result": {
+    "type": "tool_result",
+    "data": {
+      "tool_call_id": "call-id",
+      "output": "result text",
+      "is_error": false
+    }
+  },
+
+  "internal_reasoning": {
+    "type": "reasoning",
+    "data": {
+      "text": "thinking content..."
+    }
+  }
+}

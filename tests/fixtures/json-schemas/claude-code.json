@@ -1,0 +1,216 @@
+{
+  "_meta": {
+    "source": "Claude Code CLI by Anthropic",
+    "invocation": "claude -p '<prompt>' --output-format stream-json",
+    "format": "NDJSON (newline-delimited JSON)",
+    "flags": {
+      "json": "--output-format json (single object response)",
+      "stream_json": "--output-format stream-json (NDJSON)",
+      "include_partial": "--include-partial-messages (token-level streaming)",
+      "verbose": "--verbose (full turn-by-turn output)"
+    }
+  },
+
+  "system_init": {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "abc123-def456-...",
+    "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    "model": "claude-sonnet-4-6",
+    "permission_mode": "default"
+  },
+
+  "assistant_message": {
+    "type": "assistant",
+    "message": {
+      "id": "msg_01...",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-sonnet-4-6",
+      "content": [
+        {"type": "text", "text": "I'll read the file for you."}
+      ],
+      "stop_reason": "tool_use",
+      "stop_sequence": null,
+      "usage": {"input_tokens": 500, "output_tokens": 50}
+    },
+    "session_id": "abc123-def456-..."
+  },
+
+  "stream_event_content_block_start_text": {
+    "type": "stream_event",
+    "event": {
+      "type": "content_block_start",
+      "index": 0,
+      "content_block": {"type": "text", "text": ""}
+    },
+    "session_id": "abc123-def456-...",
+    "uuid": "unique-event-id",
+    "parent_tool_use_id": null
+  },
+
+  "stream_event_content_block_start_tool_use": {
+    "type": "stream_event",
+    "event": {
+      "type": "content_block_start",
+      "index": 1,
+      "content_block": {"type": "tool_use", "id": "toolu_01...", "name": "Read", "input": {}}
+    },
+    "session_id": "abc123-def456-...",
+    "uuid": "unique-event-id-2",
+    "parent_tool_use_id": null
+  },
+
+  "stream_event_content_block_delta_text": {
+    "type": "stream_event",
+    "event": {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {"type": "text_delta", "text": "Hello"}
+    },
+    "session_id": "abc123-def456-...",
+    "uuid": "unique-event-id-3",
+    "parent_tool_use_id": null
+  },
+
+  "stream_event_content_block_delta_tool_input": {
+    "type": "stream_event",
+    "event": {
+      "type": "content_block_delta",
+      "index": 1,
+      "delta": {"type": "input_json_delta", "partial_json": "{\"file_path\":"}
+    },
+    "session_id": "abc123-def456-...",
+    "uuid": "unique-event-id-4",
+    "parent_tool_use_id": null
+  },
+
+  "stream_event_content_block_delta_thinking": {
+    "type": "stream_event",
+    "event": {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {"type": "thinking_delta", "thinking": "Let me analyze..."}
+    },
+    "session_id": "abc123-def456-...",
+    "uuid": "unique-event-id-5",
+    "parent_tool_use_id": null
+  },
+
+  "stream_event_message_start": {
+    "type": "stream_event",
+    "event": {
+      "type": "message_start",
+      "message": {
+        "id": "msg_01...",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-4-6",
+        "content": [],
+        "stop_reason": null,
+        "stop_sequence": null,
+        "usage": {"input_tokens": 500, "output_tokens": 0}
+      }
+    },
+    "session_id": "abc123-def456-...",
+    "uuid": "unique-event-id-6",
+    "parent_tool_use_id": null
+  },
+
+  "stream_event_message_delta": {
+    "type": "stream_event",
+    "event": {
+      "type": "message_delta",
+      "delta": {"stop_reason": "end_turn", "stop_sequence": null},
+      "usage": {"output_tokens": 150}
+    },
+    "session_id": "abc123-def456-...",
+    "uuid": "unique-event-id-7",
+    "parent_tool_use_id": null
+  },
+
+  "stream_event_message_stop": {
+    "type": "stream_event",
+    "event": {
+      "type": "message_stop"
+    },
+    "session_id": "abc123-def456-...",
+    "uuid": "unique-event-id-8",
+    "parent_tool_use_id": null
+  },
+
+  "stream_event_content_block_stop": {
+    "type": "stream_event",
+    "event": {
+      "type": "content_block_stop",
+      "index": 0
+    },
+    "session_id": "abc123-def456-...",
+    "uuid": "unique-event-id-9",
+    "parent_tool_use_id": null
+  },
+
+  "tool_use": {
+    "type": "tool_use",
+    "tool_name": "Read",
+    "tool_input": {"file_path": "/path/to/file.py"},
+    "session_id": "abc123-def456-..."
+  },
+
+  "tool_result": {
+    "type": "tool_result",
+    "tool_use_id": "toolu_01...",
+    "content": "file contents here...",
+    "is_error": false,
+    "session_id": "abc123-def456-..."
+  },
+
+  "tool_result_error": {
+    "type": "tool_result",
+    "tool_use_id": "toolu_02...",
+    "content": "file not found",
+    "is_error": true,
+    "session_id": "abc123-def456-..."
+  },
+
+  "result_success": {
+    "type": "result",
+    "subtype": "success",
+    "cost_usd": 0.003,
+    "duration_ms": 5230,
+    "duration_api_ms": 4200,
+    "num_turns": 2,
+    "result": "The text response...",
+    "session_id": "abc123-def456-...",
+    "usage": {"input_tokens": 500, "output_tokens": 150}
+  },
+
+  "result_error": {
+    "type": "result",
+    "subtype": "error",
+    "error": "API error: rate limited",
+    "session_id": "abc123-def456-..."
+  },
+
+  "system_api_retry": {
+    "type": "system",
+    "subtype": "api_retry",
+    "attempt": 2,
+    "max_retries": 5,
+    "retry_delay_ms": 1000,
+    "error_status": 429,
+    "error": "rate_limit",
+    "uuid": "...",
+    "session_id": "..."
+  },
+
+  "json_output_format": {
+    "result": "The text response from Claude...",
+    "session_id": "abc123-def456-...",
+    "cost_usd": 0.003,
+    "duration_ms": 5230,
+    "duration_api_ms": 4200,
+    "num_turns": 2,
+    "usage": {"input_tokens": 500, "output_tokens": 150}
+  }
+}

@@ -23,17 +23,15 @@ module CallCodingClis
       ENV.to_h.merge(overrides)
     end
 
+    def command_with_env(spec)
+      spec.env.empty? ? spec.argv : [merged_env(spec.env), *spec.argv]
+    end
+
     def default_run(spec)
       opts = {}
-      env = nil
       opts[:stdin_data] = spec.stdin_text unless spec.stdin_text.nil?
       opts[:chdir] = spec.cwd if spec.cwd
-      env = merged_env(spec.env) unless spec.env.empty?
-      stdout, stderr, status = if env
-        Open3.capture3(env, *spec.argv, **opts)
-      else
-        Open3.capture3(*spec.argv, **opts)
-      end
+      stdout, stderr, status = Open3.capture3(*command_with_env(spec), **opts)
       CompletedRun.new(
         argv: spec.argv.dup,
         exit_code: status.exitstatus || 1,
@@ -50,25 +48,19 @@ module CallCodingClis
     end
 
     def default_stream(spec, block)
+      stdin_w = nil
+      stdout_r = nil
+      stderr_r = nil
+
       opts = {}
-      env = nil
       opts[:chdir] = spec.cwd if spec.cwd
-      env = merged_env(spec.env) unless spec.env.empty?
-      stdin_w, stdout_r, stderr_r, wait_thr = if env
-        Open3.popen3(env, *spec.argv, **opts)
-      else
-        Open3.popen3(*spec.argv, **opts)
-      end
+      stdin_w, stdout_r, stderr_r, wait_thr = Open3.popen3(*command_with_env(spec), **opts)
+
+      stdin_w.write(spec.stdin_text) if spec.stdin_text
       stdin_w.close
 
-      stdout_buf = Thread.new { stdout_r.read }
-      stderr_buf = Thread.new { stderr_r.read }
-
-      stdout_text = stdout_buf.value
-      stderr_text = stderr_buf.value
-
-      stdout_r.close
-      stderr_r.close
+      stdout_text = Thread.new { stdout_r.read }.value
+      stderr_text = Thread.new { stderr_r.read }.value
 
       block&.call("stdout", stdout_text) if stdout_text && !stdout_text.empty?
       block&.call("stderr", stderr_text) if stderr_text && !stderr_text.empty?
@@ -88,7 +80,7 @@ module CallCodingClis
         stderr: "failed to start #{spec.argv[0]}: #{e.message}\n"
       )
     ensure
-      [stdin_w, stdout_r, stderr_r].each { |io| io&.close }
+      [stdin_w, stdout_r, stderr_r].each { |io| io&.close unless io&.closed? }
     end
   end
 end

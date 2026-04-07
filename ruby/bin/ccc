@@ -28,8 +28,10 @@ end
 
 result = CallCodingClis::Runner.new.stream(spec) do |channel, text|
   case channel
-  when "stdout" then $stdout.write(text)
-  when "stderr" then $stderr.write(text)
+  when "stdout"
+    $stdout.write(text)
+  when "stderr"
+    $stderr.write(text)
   end
 end
 

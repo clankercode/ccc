@@ -1,20 +1,19 @@
 # frozen_string_literal: true
 
 require "minitest/autorun"
+require "open3"
 require "tmpdir"
-require "call_coding_clis"
+require "rbconfig"
+require_relative "../lib/call_coding_clis"
 
 class TestCccCli < Minitest::Test
   CCC_BIN = File.expand_path("../bin/ccc", __dir__)
   RUBY_DIR = File.expand_path("..", __dir__)
 
   def run_ccc(*args, env: {})
-    cmd = ["ruby", CCC_BIN, *args]
-    IO.popen(cmd, err: [:child, :out], chdir: RUBY_DIR, env: env) do |io|
-      out = io.read
-      status = $?
-      [out, status.exitstatus || 1]
-    end
+    cmd = [RbConfig.ruby, CCC_BIN, *args]
+    out, status = Open3.capture2e(ENV.to_h.merge(env), *cmd, chdir: RUBY_DIR)
+    [out, status.exitstatus || 1]
   end
 
   def test_usage_with_no_args
@@ -80,7 +79,7 @@ class TestCccCli < Minitest::Test
       real_stub = File.join(tmp, "my_real_opencode")
       File.write(real_stub, <<~SH)
         #!/bin/sh
-        printf 'real: %s\\n' "$*"
+        printf 'real: %s\n' "$*"
       SH
       File.chmod(0o755, real_stub)
 
@@ -98,14 +97,9 @@ class TestCccCli < Minitest::Test
     Dir.mktmpdir do |tmp|
       empty_path = "#{tmp}/empty"
       Dir.mkdir(empty_path)
-      env = { "PATH" => empty_path }
-      cmd = [Gem.ruby, CCC_BIN, "test"]
-      IO.popen(cmd, err: [:child, :out], chdir: RUBY_DIR, env: env) do |io|
-        out = io.read
-        st = $?
-        assert_match(/failed to start/, out)
-        refute_equal 0, st.exitstatus
-      end
+      output, status = run_ccc("test", env: { "PATH" => empty_path })
+      assert_match(/failed to start/, output)
+      refute_equal 0, status
     end
   end
 end

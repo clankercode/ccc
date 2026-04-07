@@ -69,11 +69,32 @@ int main(void) {
         return 1;
     }
 
-    // Test whitespace-only prompt rejection  
+    // Test whitespace-only prompt rejection
     int ws_status = system("./build/ccc '   ' > /dev/null 2>&1");
     int ws_code = WEXITSTATUS(ws_status);
     if (ws_code != 1) {
         fprintf(stderr, "whitespace-only prompt should exit with code 1, got %d\n", ws_code);
+        return 1;
+    }
+
+    // Test prompt trimming: "  hello  " should be sent as "hello"
+    int trim_status = system("CCC_REAL_OPENCODE=./build/fake-opencode ./build/ccc '  hello  ' > ./build/trim_output.txt 2> ./build/trim_stderr.txt");
+    int trim_exit = WEXITSTATUS(trim_status);
+    if (trim_exit != 42) {
+        fprintf(stderr, "trimmed prompt test: unexpected exit code %d (expected 42)\n", trim_exit);
+        return 1;
+    }
+
+    FILE *trim_out = fopen("./build/trim_output.txt", "r");
+    if (trim_out == NULL) {
+        fprintf(stderr, "failed to open trim output file\n");
+        return 1;
+    }
+    char trim_buffer[256] = {0};
+    fgets(trim_buffer, sizeof(trim_buffer), trim_out);
+    fclose(trim_out);
+    if (strstr(trim_buffer, "fake-stdout: hello") == NULL) {
+        fprintf(stderr, "trimmed prompt not sent correctly: %s\n", trim_buffer);
         return 1;
     }
 

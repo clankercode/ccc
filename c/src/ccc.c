@@ -16,19 +16,35 @@ static int is_whitespace_only(const char *str) {
     return 1;
 }
 
+static void trim_in_place(char *str) {
+    char *start = str;
+    while (isspace((unsigned char)*start)) {
+        start++;
+    }
+    if (start != str) {
+        memmove(str, start, strlen(start) + 1);
+    }
+    size_t len = strlen(str);
+    while (len > 0 && isspace((unsigned char)str[len - 1])) {
+        len--;
+    }
+    str[len] = '\0';
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "usage: ccc \"<Prompt>\"\n");
         return 1;
     }
 
+    trim_in_place(argv[1]);
     const char *prompt = argv[1];
+
     if (strlen(prompt) == 0 || is_whitespace_only(prompt)) {
         fprintf(stderr, "prompt must not be empty\n");
         return 1;
     }
 
-    // Allow overriding the runner via environment variable for testing
     const char *runner = getenv("CCC_REAL_OPENCODE");
     if (runner == NULL) {
         runner = "opencode";
@@ -51,6 +67,6 @@ int main(int argc, char **argv) {
 
     int exit_code = result.exit_code;
     ccc_free_completed_run(&result);
-    
+
     return exit_code;
 }

@@ -13,8 +13,16 @@ const runnerPrefix = process.env.CCC_RUNNER_PREFIX_JSON
   ? JSON.parse(process.env.CCC_RUNNER_PREFIX_JSON)
   : ['opencode', 'run']
 
+let spec
+try {
+  spec = buildPromptSpec(args[0], { runnerPrefix })
+} catch (err) {
+  console.error(err.message)
+  process.exit(1)
+}
+
 const result = await new Runner().stream(
-  buildPromptSpec(args[0], { runnerPrefix }),
+  spec,
   (channel, chunk) => {
     if (channel === 'stdout') {
       process.stdout.write(chunk)

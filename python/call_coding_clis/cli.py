@@ -21,7 +21,13 @@ def main(argv: list[str] | None = None) -> int:
         print('usage: ccc "<Prompt>"', file=sys.stderr)
         return 1
 
-    result = Runner().run(build_prompt_spec(args[0]))
+    try:
+        spec = build_prompt_spec(args[0])
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    result = Runner().run(spec)
     if result.stdout:
         print(result.stdout, end="")
     if result.stderr:

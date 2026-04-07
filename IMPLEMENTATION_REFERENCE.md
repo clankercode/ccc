@@ -40,7 +40,7 @@ Every language implementation must provide:
 |---------|--------|------|------------|---|-----|------|------|-----|
 | build_prompt_spec | yes | yes | yes | yes | yes | yes | yes | yes |
 | Runner.run | yes | yes | yes | yes | yes | yes | yes | yes |
-| Runner.stream | yes | yes (non-streaming) | yes | no | yes | yes | no | yes |
+| Runner.stream | yes | yes (real streaming) | yes | no | yes | yes | no | yes |
 | ccc CLI | yes | yes | yes | yes | yes | yes | yes | yes |
 | Prompt trimming | yes | yes | yes | yes | yes | yes | yes | yes |
 | Empty prompt rejection | yes | yes | yes | yes | yes | yes | yes | yes |

@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::io;
+use std::io::{self, BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
@@ -124,14 +124,78 @@ fn default_stream_executor<'a>(
     spec: CommandSpec,
     mut callback: Box<StreamCallback<'a>>,
 ) -> CompletedRun {
-    let result = default_run_executor(spec);
-    if !result.stdout.is_empty() {
-        callback("stdout", &result.stdout);
+    let argv = spec.argv.clone();
+    let mut command = build_command(&spec);
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
+
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            let error_msg = format!(
+                "failed to start {}: {}",
+                spec.argv.first().map(|s| s.as_str()).unwrap_or("(unknown)"),
+                error
+            );
+            callback("stderr", &error_msg);
+            return CompletedRun {
+                argv,
+                exit_code: 1,
+                stdout: String::new(),
+                stderr: error_msg,
+            };
+        }
+    };
+
+    if let Some(stdin_text) = &spec.stdin_text {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(stdin_text.as_bytes());
+        }
     }
-    if !result.stderr.is_empty() {
-        callback("stderr", &result.stderr);
+
+    let mut stdout_buf = String::new();
+    let mut stderr_buf = String::new();
+
+    if let Some(stdout) = child.stdout.take() {
+        let reader = BufReader::new(stdout);
+        for line in reader.lines() {
+            match line {
+                Ok(text) => {
+                    stdout_buf.push_str(&text);
+                    stdout_buf.push('\n');
+                    callback("stdout", &text);
+                }
+                Err(_) => break,
+            }
+        }
     }
-    result
+
+    if let Some(stderr) = child.stderr.take() {
+        let reader = BufReader::new(stderr);
+        for line in reader.lines() {
+            match line {
+                Ok(text) => {
+                    stderr_buf.push_str(&text);
+                    stderr_buf.push('\n');
+                    callback("stderr", &text);
+                }
+                Err(_) => break,
+            }
+        }
+    }
+
+    let status = child.wait().unwrap_or_else(|error| {
+        std::process::ExitStatus::from_raw(
+            failed_output(&spec, error).status.code().unwrap_or(1) as i32
+        )
+    });
+
+    CompletedRun {
+        argv,
+        exit_code: status.code().unwrap_or(1),
+        stdout: stdout_buf,
+        stderr: stderr_buf,
+    }
 }
 
 fn build_command(spec: &CommandSpec) -> Command {

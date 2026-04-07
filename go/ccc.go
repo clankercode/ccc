@@ -2,6 +2,7 @@ package ccc
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -113,15 +114,19 @@ func runCommand(spec CommandSpec) CompletedRun {
 		cmd.Stdin = strings.NewReader(spec.StdinText)
 	}
 
-	stdoutBytes, err := cmd.Output()
+	var stdoutBuf, stderrBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+
+	err := cmd.Run()
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			return CompletedRun{
 				Argv:     spec.Argv,
 				ExitCode: normalizeExitCode(exitErr.ProcessState),
-				Stdout:   string(stdoutBytes),
-				Stderr:   string(exitErr.Stderr),
+				Stdout:   stdoutBuf.String(),
+				Stderr:   stderrBuf.String(),
 			}
 		}
 		prog := spec.Argv[0]
@@ -138,7 +143,8 @@ func runCommand(spec CommandSpec) CompletedRun {
 	return CompletedRun{
 		Argv:     spec.Argv,
 		ExitCode: 0,
-		Stdout:   string(stdoutBytes),
+		Stdout:   stdoutBuf.String(),
+		Stderr:   stderrBuf.String(),
 	}
 }
 

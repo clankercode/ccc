@@ -1,20 +1,33 @@
+import std/options
 import std/os
+import std/strtabs
+import std/tables
 import call_coding_clis/runner
-import call_coding_clis/prompt_spec
+import call_coding_clis/parser
+import call_coding_clis/config
 
 proc main() =
-  if paramCount() != 1:
-    write(stderr, "usage: ccc \"<Prompt>\"\n")
+  if paramCount() == 0:
+    write(stderr, "usage: ccc [runner] [+thinking] [:provider:model] [@alias] <prompt>\n")
     quit(1)
 
-  let prompt = paramStr(1)
+  var argv: seq[string] = @[]
+  for i in 1..paramCount():
+    argv.add(paramStr(i))
 
-  var spec: CommandSpec
-  try:
-    spec = buildPromptSpec(prompt)
-  except ValueError as e:
-    write(stderr, e.msg & "\n")
-    quit(1)
+  let parsed = parseArgs(argv)
+  let cfg = loadConfig(none(string))
+
+  let (finalArgv, env) = resolveCommand(parsed, some(cfg))
+
+  var spec = CommandSpec(
+    argv: finalArgv,
+    stdinText: none(string),
+    cwd: none(string),
+    env: newStringTable()
+  )
+  for k, v in env:
+    spec.env[k] = v
 
   let realOpencode = getEnv("CCC_REAL_OPENCODE")
   if realOpencode.len > 0:

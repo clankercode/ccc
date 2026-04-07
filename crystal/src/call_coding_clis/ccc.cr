@@ -1,20 +1,28 @@
 require "./runner"
 require "./prompt_spec"
+require "./parser"
+require "./config"
 
-if ARGV.size != 1
-  STDERR.puts %(usage: ccc "<Prompt>")
+if ARGV.empty?
+  STDERR.puts %(usage: ccc [<runner>] [+<thinking>] [:<provider>:<model>] [@<alias>] <Prompt>)
   exit 1
 end
 
 begin
-  spec = build_prompt_spec(ARGV[0])
+  if ARGV.size == 1
+    spec = build_prompt_spec(ARGV[0])
+  else
+    config = load_config
+    parsed = parse_args(ARGV.to_a)
+    argv, env_overrides = resolve_command(parsed, config)
+    if override = ENV["CCC_REAL_OPENCODE"]?
+      argv[0] = override
+    end
+    spec = CommandSpec.new(argv, env: env_overrides)
+  end
 rescue ex : ArgumentError
   STDERR.puts ex.message
   exit 1
-end
-
-if override = ENV["CCC_REAL_OPENCODE"]?
-  spec.argv[0] = override
 end
 
 runner = Runner.new

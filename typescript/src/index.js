@@ -12,6 +12,25 @@ export function buildPromptSpec(prompt) {
 }
 
 async function defaultExecutor(spec) {
+  return runChildProcess(spec, () => {})
+}
+
+export class Runner {
+  constructor(options = {}) {
+    this.executor = options.executor ?? defaultExecutor
+    this.streamExecutor = options.streamExecutor ?? runChildProcess
+  }
+
+  async run(spec) {
+    return this.executor(spec)
+  }
+
+  async stream(spec, onEvent) {
+    return this.streamExecutor(spec, onEvent)
+  }
+}
+
+async function runChildProcess(spec, onEvent) {
   return new Promise((resolve, reject) => {
     const [command, ...args] = spec.argv
     const child = spawn(command, args, {
@@ -24,10 +43,14 @@ async function defaultExecutor(spec) {
     let stderr = ''
 
     child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString()
+      const text = chunk.toString()
+      stdout += text
+      onEvent('stdout', text)
     })
     child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString()
+      const text = chunk.toString()
+      stderr += text
+      onEvent('stderr', text)
     })
     child.on('error', reject)
     child.on('close', (code) => {
@@ -44,14 +67,4 @@ async function defaultExecutor(spec) {
     }
     child.stdin.end()
   })
-}
-
-export class Runner {
-  constructor(options = {}) {
-    this.executor = options.executor ?? defaultExecutor
-  }
-
-  async run(spec) {
-    return this.executor(spec)
-  }
 }

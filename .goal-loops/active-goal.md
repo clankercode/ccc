@@ -6,19 +6,21 @@ Improve `call-coding-clis` cross-language runner robustness by normalizing start
 - The repo has an `UNLICENSE` file.
 - Python runner returns a completed failure result when process startup fails.
 - TypeScript runner returns a completed failure result when process startup fails.
+- Rust runner has explicit regression coverage for process-start failure behavior.
 - Existing shared `ccc` behavior stays unchanged.
 - Repo docs are updated to reflect the current implementation state.
 - Milestone commits are created at convenient intervals during development.
 
 ## Current Status
-- Iteration: 9
-- Newly satisfied AC: ["Python runner returns a completed failure result when process startup fails.", "TypeScript runner returns a completed failure result when process startup fails.", "Existing shared `ccc` behavior stays unchanged.", "Repo docs are updated to reflect the current implementation state.", "Milestone commits are created at convenient intervals during development."]
+- Iteration: 10
+- Newly satisfied AC: ["Python runner returns a completed failure result when process startup fails.", "TypeScript runner returns a completed failure result when process startup fails.", "Rust runner has explicit regression coverage for process-start failure behavior.", "Existing shared `ccc` behavior stays unchanged.", "Repo docs are updated to reflect the current implementation state.", "Milestone commits are created at convenient intervals during development."]
 - Remaining AC: []
 
 ## Current Plan
 - Python and TypeScript now normalize missing-binary startup failures to completed results with stderr text.
+- Rust now has explicit tests covering startup-failure behavior for both `run` and `stream`.
 - Shared `ccc` contract checks remain green across Python, Rust, TypeScript, and C.
-- After this checkpoint, the next likely `call-coding-clis` step is choosing between deeper C parity and broader cross-language runner-failure normalization.
+- After this checkpoint, the next likely `call-coding-clis` step is choosing between deeper C parity and broader stream/runtime startup-failure parity in the non-Rust runners.
 
 ## Blockers / Notes
 - Keep the first `ccc` contract intentionally small.

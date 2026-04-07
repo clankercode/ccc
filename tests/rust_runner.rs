@@ -19,6 +19,16 @@ fn run_returns_completed_result() {
 }
 
 #[test]
+fn run_reports_missing_binary_start_failure() {
+    let result = Runner::new().run(CommandSpec::new(["/definitely/missing/runner-binary"]));
+
+    assert_ne!(result.exit_code, 0);
+    assert_eq!(result.stdout, "");
+    assert!(result.stderr.contains("failed to start"));
+    assert!(result.stderr.contains("runner-binary"));
+}
+
+#[test]
 fn stream_emits_events_and_exit_code() {
     let runner = Runner::with_stream_executor(Box::new(|spec, mut callback| {
         callback("stdout", "hello");
@@ -44,6 +54,25 @@ fn stream_emits_events_and_exit_code() {
         ]
     );
     assert_eq!(result.exit_code, 2);
+}
+
+#[test]
+fn stream_reports_missing_binary_start_failure_as_stderr_event() {
+    let mut events = Vec::new();
+    let result = Runner::new().stream(
+        CommandSpec::new(["/definitely/missing/runner-binary"]),
+        |channel, chunk| {
+            events.push((channel.to_owned(), chunk.to_owned()));
+        },
+    );
+
+    assert_ne!(result.exit_code, 0);
+    assert_eq!(result.stdout, "");
+    assert!(result.stderr.contains("failed to start"));
+    assert!(result.stderr.contains("runner-binary"));
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].0, "stderr");
+    assert!(events[0].1.contains("failed to start"));
 }
 
 #[test]

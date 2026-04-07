@@ -28,6 +28,7 @@ Add the next concrete `call-coding-clis` implementation after TypeScript: a C sc
 - Preserve room for provider/model selection without overdesigning the initial CLI.
 - Expanded syntax is now planned but not committed as current behavior: `@alias`, `+0..+4`, `:provider:model` or `:model`, and runner selectors.
 - Do not treat config-backed aliases or default provider/model resolution as accepted behavior until the parser and config design are written down.
+- Keep `CCC_BEHAVIOR_CONTRACT.md` as the source of truth for currently implemented cross-language `ccc` behavior.
 
 ## ON_GOAL_COMPLETE_NEXT_STEPS
 When this goal is satisfied, microplan the next tasks for the remaining `call-coding-clis` deliverables (docs, C, TS, Elixir, OCaml, and any cleanup needed for `precurl` integration), update this file, and continue automatically.

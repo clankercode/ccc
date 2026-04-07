@@ -39,6 +39,7 @@ First-pass `ccc` contract:
 - `ccc "<Prompt>"`
 - initial command shape maps to `opencode run "<Prompt>"`
 - this is intentionally narrow and likely to grow later with explicit runner/model flags
+- explicit shared behavior doc: `CCC_BEHAVIOR_CONTRACT.md`
 
 Planned `ccc` syntax growth (design notes only, not implemented yet):
 
@@ -70,6 +71,7 @@ Rust crate:
 Planned roadmap:
 
 - first-pass `ccc` CLI contract shared across implementations
+- explicit contract doc for currently implemented behavior: `CCC_BEHAVIOR_CONTRACT.md`
 - parser and config design for planned alias, thinking, runner, and provider/model selectors
 - explicit design doc: `CCC_PARSER_CONFIG_DESIGN.md`
 - remaining language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
@@ -80,5 +82,16 @@ Planned roadmap:
 - TypeScript package
 - Elixir package
 - OCaml library
+
+Missing / possible future features:
+
+- expanded `ccc` token parsing for `@alias`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
+- config-backed custom aliases, abbreviations, and default provider/model resolution
+- cross-language normalization of streaming event shapes and exit-code behavior
+- richer stdin/cwd/env coverage and docs for every implementation
+- more concrete parity for C beyond the current smoke-level scaffold
+- Elixir and OCaml implementations once local toolchains are available or design-first scaffolds are written
+- v2 idea: parse structured JSON output from supported runners and render it consistently
+- v2 idea: templated or user-customizable rendering for structured output so humans can choose how `ccc` presents results
 
 This repo is early-stage, but it now contains working Python code and tests instead of notes only.

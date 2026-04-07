@@ -16,5 +16,6 @@ Add the C scaffold as the next concrete `call-coding-clis` implementation.
 
 ## Current Output
 
+- current shared `ccc` behavior doc added at `CCC_BEHAVIOR_CONTRACT.md`
 - planned parser/config design doc added at `CCC_PARSER_CONFIG_DESIGN.md`
 - remaining-language scaffold doc added at `ROADMAP_LANGUAGE_SCAFFOLDS.md`

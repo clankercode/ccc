@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import sys
 
-from .runner import CommandSpec, Runner
+try:
+    from .runner import CommandSpec, Runner
+except ImportError:  # Support direct script execution in contract smoke tests.
+    from runner import CommandSpec, Runner
 
 
 def build_prompt_spec(prompt: str) -> CommandSpec:
@@ -24,3 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     if result.stderr:
         print(result.stderr, end="", file=sys.stderr)
     return result.exit_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

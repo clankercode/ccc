@@ -29,20 +29,26 @@ Every language implementation must provide:
 - Rust: `rust/src/lib.rs`, `rust/src/bin/ccc.rs`
 - TypeScript: `typescript/src/index.js`, `typescript/src/ccc.js`
 - C: `c/src/runner.c`, `c/src/runner.h`, `c/src/prompt_spec.c`, `c/src/ccc.c`
+- Go: `go/ccc.go`, `go/cmd/ccc/main.go`
+- Ruby: `ruby/lib/call_coding_clis/runner.rb`, `ruby/bin/ccc`
+- Perl: `perl/lib/Call/Coding/Clis/Runner.pm`, `perl/bin/ccc`
+- C++: `cpp/src/runner.cpp`, `cpp/src/ccc_cli.cpp`, `cpp/include/ccc/`
 
 ## Feature Parity Matrix
 
-| Feature | Python | Rust | TypeScript | C |
-|---------|--------|------|------------|---|
-| build_prompt_spec | yes | yes | yes | yes |
-| Runner.run | yes | yes | yes | yes |
-| Runner.stream | yes | yes (non-streaming) | yes | no |
-| ccc CLI | yes | yes | yes | yes |
-| Prompt trimming | yes | yes | yes | yes |
-| Empty prompt rejection | yes | yes | yes | yes |
-| Stdin/CWD/Env support | yes | yes | yes | yes |
-| Startup failure reporting | yes | yes | yes | yes |
-| Exit code forwarding | yes | yes | yes | yes |
+| Feature | Python | Rust | TypeScript | C | Go | Ruby | Perl | C++ |
+|---------|--------|------|------------|---|-----|------|------|-----|
+| build_prompt_spec | yes | yes | yes | yes | yes | yes | yes | yes |
+| Runner.run | yes | yes | yes | yes | yes | yes | yes | yes |
+| Runner.stream | yes | yes (non-streaming) | yes | no | yes | yes | no | yes |
+| ccc CLI | yes | yes | yes | yes | yes | yes | yes | yes |
+| Prompt trimming | yes | yes | yes | yes | yes | yes | yes | yes |
+| Empty prompt rejection | yes | yes | yes | yes | yes | yes | yes | yes |
+| Stdin/CWD/Env support | yes | yes | yes | yes | yes | yes | yes | yes |
+| Startup failure reporting | yes | yes | yes | yes | yes | yes | yes | yes |
+| Exit code forwarding | yes | yes | yes | yes | yes | yes | yes | yes |
+| CCC_REAL_OPENCODE | yes | yes | yes | yes | yes | yes | yes | yes |
+| Cross-language contract tests | yes | yes | yes | yes | yes | yes | yes | yes |
 
 ## Licensing
 

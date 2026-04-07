@@ -57,6 +57,35 @@ For every implementation that claims `ccc` support:
 - `CCC_REAL_OPENCODE` environment variable allows overriding the runner binary for testing
 - passes all four cross-language contract tests (happy path, empty prompt, missing prompt, whitespace prompt)
 
+### Go
+
+- supports first-pass `ccc "<Prompt>"`
+- exposes `BuildPromptSpec`
+- runner supports `Run` and `Stream` (real goroutine-based streaming)
+- `CCC_REAL_OPENCODE` env var support
+
+### Ruby
+
+- supports first-pass `ccc "<Prompt>"`
+- exposes `build_prompt_spec` via `CallCodingClis` module
+- runner supports `run` and `stream`
+- `CCC_REAL_OPENCODE` env var support
+
+### Perl
+
+- supports first-pass `ccc "<Prompt>"`
+- exposes `build_prompt_spec` via `Call::Coding::Clis`
+- runner supports `run`
+- `CCC_REAL_OPENCODE` env var support
+
+### C++
+
+- supports first-pass `ccc "<Prompt>"`
+- exposes `build_prompt_spec`
+- runner supports `run` and `stream`
+- `CCC_REAL_OPENCODE` env var support
+- CMake build with GoogleTest
+
 ## Non-Contract Behavior
 
 The following are planned but not yet stable contract:

@@ -2,36 +2,59 @@
 
 Small libraries for calling coding CLIs from normal programs.
 
+## Running All Tests
+
+```bash
+./run_all_tests.sh
+```
+
+This runs all 10 test suites (8 language-specific + 2 cross-language) and prints a color-coded checklist:
+
+```
+  PASS  python: runner + prompt_spec
+  PASS  rust: cargo test
+  PASS  typescript: node --test
+  PASS  c: make test
+  PASS  go: go test
+  PASS  ruby: test suite
+  PASS  perl: prove
+  PASS  cpp: cmake build + gtest
+  PASS  contract: ccc CLI behavior (8 languages)
+  PASS  harness: mock binary behavior (8 langs × 9 cases)
+
+  Total: 10  Passed: 10  Failed: 0  Skipped: 0
+```
+
+### Individual Test Commands
+
+| Language | Command |
+|----------|---------|
+| Python | `PYTHONPATH=python python3 -m unittest tests.test_runner tests.test_ccc_contract` |
+| Rust | `cd rust && cargo test` |
+| TypeScript | `node --test typescript/tests/runner.test.mjs` |
+| C | `cd c && make test` |
+| Go | `cd go && go test ./...` |
+| Ruby | `cd ruby && ruby -Ilib -Itest test/test_*.rb` |
+| Perl | `cd perl && prove -v t/` |
+| C++ | `cmake -B cpp/build -S cpp && cmake --build cpp/build --target ccc_tests && ./cpp/build/tests/ccc_tests` |
+| Cross-language | `PYTHONPATH=python python3 -m unittest tests.test_ccc_contract tests.test_harness` |
+
 ## Implementation Status
 
-### Implemented (full runner + ccc CLI)
+### Implemented (full runner + ccc CLI + cross-language tests)
 
-- **Python**: implemented — `call_coding_clis` package with `CommandSpec`, `Runner`, `ccc` CLI
-- **Rust**: implemented — `call-coding-clis` crate with `CommandSpec`, `Runner`, `ccc` binary
-- **TypeScript**: implemented — runner + `ccc` CLI with streaming support
-- **C**: implemented — reusable runner library (`runner.c`/`runner.h`) plus `ccc` binary
+- **Python** — `call_coding_clis` package, `CCC_REAL_OPENCODE` support
+- **Rust** — `call-coding-clis` crate, concurrent streaming, `CCC_REAL_OPENCODE` support
+- **TypeScript** — runner + `ccc` CLI with streaming, `CCC_REAL_OPENCODE` support
+- **C** — reusable runner library (`runner.c`/`runner.h`) plus `ccc` binary
+- **Go** — `go/ccc.go` library with goroutine-based streaming, `ccc` CLI
+- **Ruby** — `CallCodingClis` module with runner/stream, `ccc` CLI
+- **Perl** — `Call::Coding::Clis` with runner, `ccc` CLI
+- **C++** — C++17 with GoogleTest, cmake build, `ccc` CLI
 
-### Planned — Full Implementation
+### Planned (PLAN.md exists in each directory)
 
-- **C++**: modern C++ (C++17+), leveraging RAII, `std::process` or POSIX APIs, smart pointers, templates
-- **PureScript**: runs on Node.js backend, `purs` compile target, subprocess via Node `child_process`
-- **Zig**: native cross-compilation story, `std.process` for subprocess, comptime for build-time config
-- **D**: system-level access with GC-optional, `std.process` for subprocess execution
-- **F#**: .NET ecosystem, `System.Diagnostics.Process` for subprocess, functional API design
-- **Haskell**: strong type system, `process` package for subprocess, monadic runner abstraction
-- **Nim**: Python-like syntax compiled to C, `osproc` module for subprocess execution
-- **Go**: popular for CLI tools, `os/exec` package, goroutine-based streaming
-- **Crystal**: Ruby-like syntax compiled to native, `Process` stdlib module
-- **Ruby**: `IO.popen` / `Open3` for subprocess, gem packaging
-- **Perl**: `system`, `open3`, or `IPC::Run` for subprocess, CPAN distribution
-- **PHP**: `proc_open` / `symfony/process` for subprocess, Composer package
-- **VBScript**: WScript.Shell `Exec`/`Run` for subprocess, Windows-native
-- **x86-64 ASM**: raw Linux syscalls (`execve`, `write`, `exit`), minimal ELF binary `ccc`
-- **OCaml**: `Unix` module for subprocess, dune build — **goal: prove as much about the system as possible** using OCaml's type system and optionally formal verification tools (Why3/Alt-Ergo)
-
-### Planned — Full Implementation (continued)
-
-- **Elixir**: `System.cmd` or ports-based wrapper, bundled `ccc` escript or Mix task; Erlang fallback if Elixir toolchain issues arise
+PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir, OCaml (with formal verification)
 
 ## Target CLIs
 
@@ -94,34 +117,19 @@ Small libraries for calling coding CLIs from normal programs.
 
 ## Planned Roadmap
 
-- first-pass `ccc` CLI contract shared across implementations
-- explicit contract doc for currently implemented behavior: `CCC_BEHAVIOR_CONTRACT.md`
-- parser and config design for planned alias, thinking, runner, and provider/model selectors
-- explicit design doc: `CCC_PARSER_CONFIG_DESIGN.md`
-- remaining language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
-- cross-language startup-failure behavior normalization for implemented runners
-- C `ccc` now executes commands through the runner library instead of printing them
-- `CCC_REAL_OPENCODE` environment variable allows overriding the runner binary for testing
-- Elixir design scaffold: `elixir/README.md`
-- OCaml design scaffold: `ocaml/README.md`
-- docs for runner-specific patterns and prompt/output handling
-- C bindings or C-facing interface notes
-- TypeScript package
-- Elixir package
-- OCaml library
+- implement remaining 12 languages (see `PLAN.md` in each directory)
+- parser and config design for planned alias, thinking, runner, and provider/model selectors: `CCC_PARSER_CONFIG_DESIGN.md`
+- language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
+- cross-language test harness design: `TEST_HARNESS_PLAN.md`
+- expanded `ccc` token parsing for `@alias`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
 
 ## Missing / Possible Future Features
 
 - expanded `ccc` token parsing for `@alias`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
 - config-backed custom aliases, abbreviations, and default provider/model resolution
-- cross-language normalization of streaming event shapes and exit-code behavior
-- broader cross-language normalization of process-start failure handling beyond the current Python, Rust, C, and TypeScript coverage
-- startup-failure coverage now exists across Python, Rust, TypeScript, and C, but deeper event-shape parity is still open
 - richer stdin/cwd/env coverage and docs for every implementation
-- C `ccc` now executes commands through the runner library, closing the last major scaffold gap
-- Elixir and OCaml implementations once local toolchains are available or design-first scaffolds are written
-- v2 idea: parse structured JSON output from supported runners and render it consistently
-- v2 idea: templated or user-customizable rendering for structured output so humans can choose how `ccc` presents results
+- v2: parse structured JSON output from supported runners and render it consistently
+- v2: templated or user-customizable rendering for structured output
 
 ## Licensing
 

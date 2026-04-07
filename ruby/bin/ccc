@@ -5,13 +5,14 @@ require_relative "../lib/call_coding_clis"
 
 args = ARGV
 
-if args.length != 1
+if args.empty?
   warn 'usage: ccc "<Prompt>"'
   exit 1
 end
 
 begin
-  spec = CallCodingClis.build_prompt_spec(args[0])
+  config = CallCodingClis::Config.load_config
+  spec = CallCodingClis.build_v2_spec(args, config: config)
 rescue ArgumentError => e
   warn e.message
   exit 1

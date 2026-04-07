@@ -1,5 +1,8 @@
 import { spawn } from 'node:child_process'
 
+export { parseArgs, resolveCommand, RUNNER_REGISTRY, RunnerInfo } from './parser.js'
+export { loadConfig } from './config.js'
+
 export function buildPromptSpec(prompt, options = {}) {
   const normalizedPrompt = prompt.trim()
   if (!normalizedPrompt) {

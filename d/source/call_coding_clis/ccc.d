@@ -5,20 +5,33 @@ import std.process;
 import std.string : strip;
 
 import call_coding_clis.runner : Runner, CommandSpec;
-import call_coding_clis.prompt_spec : build_prompt_spec;
+import call_coding_clis.parser : parseArgs, resolveCommand, CccConfig, ResolvedCommand;
+import call_coding_clis.config : loadConfig;
 
 int main(string[] args) {
-    if (args.length != 2) {
-        stderr.writeln(`usage: ccc "<Prompt>"`);
+    if (args.length < 2) {
+        stderr.writeln(`usage: ccc [runner] [+thinking] [:provider:model] [:model] [@alias] "<Prompt>"`);
         return 1;
     }
 
-    CommandSpec spec;
+    CccConfig config;
+    auto configPath = environment.get("CCC_CONFIG");
+    if (configPath !is null && configPath.length > 0) {
+        config = loadConfig(configPath);
+    }
+
+    ResolvedCommand resolved;
     try {
-        spec = build_prompt_spec(args[1]);
+        auto parsed = parseArgs(args[1 .. $]);
+        resolved = resolveCommand(parsed, config);
     } catch (Exception e) {
         stderr.writeln(e.msg);
         return 1;
+    }
+
+    auto spec = CommandSpec(resolved.argv);
+    foreach (k, v; resolved.env) {
+        spec.env[k] = v;
     }
 
     auto realOpencode = environment.get("CCC_REAL_OPENCODE");

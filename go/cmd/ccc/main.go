@@ -9,15 +9,23 @@ import (
 
 func main() {
 	args := os.Args[1:]
-	if len(args) != 1 {
-		fmt.Fprintf(os.Stderr, "usage: ccc \"<Prompt>\"\n")
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "usage: ccc [runner] [+thinking] [:provider:model] [@alias] <prompt>\n")
 		os.Exit(1)
 	}
 
-	spec, err := ccc.BuildPromptSpec(args[0])
+	parsed := ccc.ParseArgs(args)
+	config := ccc.LoadConfig("")
+
+	argv, env, err := ccc.ResolveCommand(parsed, config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
+	}
+
+	spec := ccc.CommandSpec{
+		Argv: argv,
+		Env:  env,
 	}
 
 	if realOpenCode := os.Getenv("CCC_REAL_OPENCODE"); realOpenCode != "" {

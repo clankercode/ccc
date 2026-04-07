@@ -130,7 +130,7 @@ TEST_F(CccContract, EmptyPrompt) {
 TEST_F(CccContract, MissingPrompt) {
     auto result = run_ccc(ccc_bin, {});
     EXPECT_EQ(result.exit_code, 1);
-    EXPECT_NE(result.stderr_text.find("ccc \"<Prompt>\""), std::string::npos);
+    EXPECT_NE(result.stderr_text.find("usage: ccc"), std::string::npos);
 }
 
 TEST_F(CccContract, WhitespacePrompt) {

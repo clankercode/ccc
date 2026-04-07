@@ -10,6 +10,7 @@ add_executable(ccc_tests
   test_prompt_spec.cpp
   test_runner.cpp
   test_ccc_contract.cpp
+  test_parser.cpp
 )
 target_link_libraries(ccc_tests PRIVATE ccc_lib GTest::gtest_main)
 include(GoogleTest)

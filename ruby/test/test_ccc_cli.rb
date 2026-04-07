@@ -22,10 +22,22 @@ class TestCccCli < Minitest::Test
     refute_equal 0, status
   end
 
-  def test_usage_with_two_args
-    output, status = run_ccc("hello", "world")
-    assert_match(/usage: ccc/, output)
-    refute_equal 0, status
+  def test_two_args_joined_as_prompt
+    Dir.mktmpdir do |tmp|
+      stub = File.join(tmp, "opencode")
+      File.write(stub, <<~SH)
+        #!/bin/sh
+        if [ "$1" != "run" ]; then exit 9; fi
+        shift
+        printf 'opencode run %s\n' "$*"
+      SH
+      File.chmod(0o755, stub)
+
+      env = { "PATH" => "#{tmp}:#{ENV['PATH']}" }
+      output, status = run_ccc("hello", "world", env: env)
+      assert_equal "opencode run hello world\n", output
+      assert_equal 0, status
+    end
   end
 
   def test_empty_prompt

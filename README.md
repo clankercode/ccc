@@ -6,7 +6,8 @@ Current implementation order:
 
 - Python first: implemented
 - Rust second: implemented
-- TypeScript scaffold: in progress
+- TypeScript scaffold: implemented
+- C scaffold: implemented
 - then docs, C, TS, Elixir, and OCaml
 
 Target CLIs include:
@@ -73,6 +74,7 @@ Planned roadmap:
 - explicit design doc: `CCC_PARSER_CONFIG_DESIGN.md`
 - remaining language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
 - TypeScript scaffold with minimal runner and `ccc` entrypoint
+- C scaffold with minimal `ccc` smoke coverage
 - docs for runner-specific patterns and prompt/output handling
 - C bindings or C-facing interface notes
 - TypeScript package

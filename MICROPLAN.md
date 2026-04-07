@@ -1,18 +1,18 @@
 # Microplan
 
 ## Current Milestone
-Add the TypeScript scaffold as the next concrete `call-coding-clis` implementation.
+Add the C scaffold as the next concrete `call-coding-clis` implementation.
 
-## Iteration 6
-- Goal: create a minimal TypeScript package with runner abstractions and a first-pass `ccc` entrypoint.
-- Approach: mirror the Python/Rust concepts closely, keep the package tiny, and test the prompt-to-command-spec behavior first.
-- Files to change: TypeScript package files, tests, `README.md`, `MICROPLAN.md`, and goal-loop state.
-- Verification: the TypeScript tests pass locally.
-- Adjacent fixes: keep names and CLI behavior aligned with the shared contract.
+## Iteration 7
+- Goal: create a minimal C scaffold with a first-pass `ccc` entrypoint.
+- Approach: keep the first version extremely small, implement the prompt-to-command-shape behavior, and use smoke-style tests/build checks.
+- Files to change: C scaffold files, tests/build scripts, `README.md`, `MICROPLAN.md`, and goal-loop state.
+- Verification: the C smoke checks pass locally.
+- Adjacent fixes: keep the public contract aligned with the shared `ccc` behavior.
 
 ## Planned Next Iterations
-- Iteration 7: reassess whether to implement Elixir/OCaml/C scaffolds or deepen TypeScript functionality.
-- Iteration 8+: implement expanded `ccc` syntax only after precedence, ambiguity handling, and config shape are explicitly documented.
+- Iteration 8: reassess whether to deepen TypeScript/C or move to design-first Elixir/OCaml scaffolds.
+- Iteration 9+: implement expanded `ccc` syntax only after precedence, ambiguity handling, and config shape are explicitly documented.
 
 ## Current Output
 

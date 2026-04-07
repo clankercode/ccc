@@ -1,25 +1,25 @@
 # Primary Goal
-Add the next concrete `call-coding-clis` implementation after Python and Rust: a TypeScript scaffold with the same minimal runner shape and a first-pass `ccc` entrypoint.
+Add the next concrete `call-coding-clis` implementation after TypeScript: a C scaffold with a minimal runner-facing shape and a first-pass `ccc` entrypoint.
 
 ## Acceptance Criteria
 - A microplan exists in this repo and is kept current.
 - The repo has an `UNLICENSE` file.
-- A TypeScript package scaffold exists.
-- TypeScript exposes the same minimal runner concepts as Python and Rust.
-- TypeScript exposes a first-pass `ccc` entrypoint with `ccc "<Prompt>"` behavior.
-- TypeScript tests cover the new runner and CLI command-shape behavior.
+- A C scaffold exists.
+- The C scaffold documents or exposes the same minimal runner-facing concepts as the other implementations.
+- The C scaffold exposes a first-pass `ccc` entrypoint with `ccc "<Prompt>"` behavior.
+- C tests or smoke checks cover the CLI command-shape behavior.
 - Repo docs are updated to reflect the new implementation state.
 - Milestone commits are created at convenient intervals during development.
 
 ## Current Status
-- Iteration: 5
-- Newly satisfied AC: ["A TypeScript package scaffold exists.", "TypeScript exposes the same minimal runner concepts as Python and Rust.", "TypeScript exposes a first-pass `ccc` entrypoint with `ccc \"<Prompt>\"` behavior.", "TypeScript tests cover the new runner and CLI command-shape behavior.", "Repo docs are updated to reflect the new implementation state."]
+- Iteration: 6
+- Newly satisfied AC: ["A C scaffold exists.", "The C scaffold documents or exposes the same minimal runner-facing concepts as the other implementations.", "The C scaffold exposes a first-pass `ccc` entrypoint with `ccc \"<Prompt>\"` behavior.", "C tests or smoke checks cover the CLI command-shape behavior.", "Repo docs are updated to reflect the new implementation state."]
 - Remaining AC: ["Milestone commits are created at convenient intervals during development."]
 
 ## Current Plan
-- Write the TypeScript microplan.
-- Add tests first for a small runner abstraction and `ccc` prompt-spec behavior.
-- Implement the TypeScript scaffold minimally.
+- Write the C microplan.
+- Add a small smoke-style test first for `ccc "<Prompt>"` behavior.
+- Implement the C scaffold minimally.
 - Commit milestone and reassess.
 
 ## Blockers / Notes

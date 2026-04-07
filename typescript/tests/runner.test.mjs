@@ -53,6 +53,24 @@ test('Runner.run executes a real subprocess by default', async () => {
   assert.equal(result.stdout.trim(), 'fixture-ok')
 })
 
+test('Runner.run preserves stdinText, cwd, and env', async () => {
+  const runner = new Runner()
+  const scriptPath = join(here, 'fixtures', 'run-shape.mjs')
+  const cwdPath = join(here, 'fixtures')
+
+  const result = await runner.run({
+    argv: ['node', scriptPath],
+    stdinText: 'stdin-value',
+    cwd: cwdPath,
+    env: { RUN_SHAPE_ENV: 'env-value' },
+  })
+
+  assert.equal(result.exitCode, 0)
+  assert.match(result.stdout, /stdin:stdin-value/)
+  assert.match(result.stdout, /cwd:fixtures/)
+  assert.match(result.stdout, /env:env-value/)
+})
+
 test('Runner.stream emits injected stdout and stderr events', async () => {
   const events = []
   const runner = new Runner({

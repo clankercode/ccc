@@ -51,6 +51,20 @@ class LanguageSpec:
             check=False,
         )
 
+    def invoke_extra(
+        self, extra_args: List[str], env: Dict[str, str]
+    ) -> subprocess.CompletedProcess:
+        cmd = self.invoke_fn("__placeholder__")
+        cmd = cmd[:-1] + extra_args
+        return subprocess.run(
+            cmd,
+            cwd=ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
 
 def _py_invoke(prompt):
     return ["python3", "python/call_coding_clis/cli.py", prompt]
@@ -285,6 +299,25 @@ class CrossLanguageHarness(unittest.TestCase):
 
                     if details:
                         self.fail(f"[{lang.name}] {tc.name}:\n" + "\n".join(details))
+
+    def test_rejects_extra_arguments(self):
+        for lang in LANGUAGES:
+            env = self._make_env(lang)
+            with self.subTest(language=lang.name):
+                result = lang.invoke_extra(["hello", "world"], env)
+                with self.subTest(language=lang.name):
+                    if result.returncode != 1:
+                        self.fail(
+                            f"[{lang.name}] extra args: exit code {result.returncode}, expected 1"
+                        )
+                    if result.stdout != "":
+                        self.fail(
+                            f"[{lang.name}] extra args: stdout {result.stdout!r}, expected empty"
+                        )
+                    if "ccc" not in result.stderr:
+                        self.fail(
+                            f"[{lang.name}] extra args: stderr {result.stderr!r}, missing 'ccc'"
+                        )
 
 
 if __name__ == "__main__":

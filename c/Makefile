@@ -13,6 +13,11 @@ build/test_prompt_spec: tests/test_prompt_spec.c src/prompt_spec.c
 	mkdir -p build
 	$(CC) $(CFLAGS) -o build/test_prompt_spec tests/test_prompt_spec.c src/prompt_spec.c
 
-test: build/test_ccc build/test_prompt_spec
+build/test_runner: tests/test_runner.c src/runner.c
+	mkdir -p build
+	$(CC) $(CFLAGS) -o build/test_runner tests/test_runner.c src/runner.c
+
+test: build/test_ccc build/test_prompt_spec build/test_runner
 	./build/test_ccc
 	./build/test_prompt_spec
+	./build/test_runner

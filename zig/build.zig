@@ -81,7 +81,19 @@ pub fn build(b: *std.Build) void {
     });
     const run_parser_tests = b.addRunArtifact(parser_tests);
 
+    const json_output_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/json_output.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const json_output_tests = b.addTest(.{
+        .root_module = json_output_test_mod,
+    });
+    const run_json_output_tests = b.addRunArtifact(json_output_tests);
+
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_unit_tests.step);
     test_step.dependOn(&run_parser_tests.step);
+    test_step.dependOn(&run_json_output_tests.step);
 }

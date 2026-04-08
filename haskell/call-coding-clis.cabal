@@ -8,9 +8,18 @@ library
     CallCodingClis.Types
     CallCodingClis.Runner
     CallCodingClis.PromptSpec
+    CallCodingClis.Parser
+    CallCodingClis.Config
+    CallCodingClis.JsonOutput
   build-depends:
     base >= 4.18 && < 5,
-    process >= 1.6
+    process >= 1.6,
+    containers >= 0.6,
+    aeson >= 2.0,
+    scientific >= 0.3,
+    text >= 1.2,
+    bytestring >= 0.10,
+    unordered-containers >= 0.2
   hs-source-dirs: src
   default-language: Haskell2010
 
@@ -19,6 +28,7 @@ executable ccc
   build-depends:
     base >= 4.18 && < 5,
     process >= 1.6,
+    containers >= 0.6,
     call-coding-clis
   hs-source-dirs: app
   default-language: Haskell2010
@@ -26,9 +36,17 @@ executable ccc
 test-suite call-coding-clis-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
+  other-modules:
+    ParserSpec
+    JsonOutputSpec
   build-depends:
     base >= 4.18 && < 5,
     process >= 1.6,
+    containers >= 0.6,
+    aeson >= 2.0,
+    text >= 1.2,
+    bytestring >= 0.10,
+    hspec >= 2.10,
     call-coding-clis
   hs-source-dirs: test
   default-language: Haskell2010

@@ -6,7 +6,10 @@ import CallCodingClis.Types
 import Control.Monad (when)
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
+import ParserSpec (parserSpec)
+import JsonOutputSpec (jsonOutputSpec)
 import System.Exit (exitFailure, exitSuccess)
+import Test.Hspec (hspec)
 
 assertEqual :: (Eq a, Show a) => String -> a -> a -> IO ()
 assertEqual label expected actual =
@@ -26,6 +29,10 @@ assertContains label needle haystack =
 
 main :: IO ()
 main = do
+  hspec $ do
+    parserSpec
+    jsonOutputSpec
+
   putStrLn "=== buildPromptSpec ==="
 
   case buildPromptSpec "hello" of

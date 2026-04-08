@@ -1,1 +1,0 @@
-{application,call_coding_clis,[{modules,['Elixir.CallCodingClis.CLI','Elixir.CallCodingClis.CommandSpec','Elixir.CallCodingClis.CompletedRun','Elixir.CallCodingClis.PromptSpec','Elixir.CallCodingClis.Runner']},{optional_applications,[]},{applications,[kernel,stdlib,elixir]},{description,"call_coding_clis"},{registered,[]},{vsn,"0.1.0"}]}.

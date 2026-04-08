@@ -21,6 +21,8 @@
 
   <ItemGroup>
     <Compile Include="RunnerTests.fs" />
+    <Compile Include="ParserTests.fs" />
+    <Compile Include="JsonOutputTests.fs" />
   </ItemGroup>
 
 </Project>

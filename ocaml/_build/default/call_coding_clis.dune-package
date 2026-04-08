@@ -1,4 +1,0 @@
-(lang dune 3.22)
-(name call_coding_clis)
-(sections (lib .) (bin ../../bin) (doc ../../doc/call_coding_clis))
-(files (lib (META dune-package)) (bin (ccc)) (doc (README.md)))

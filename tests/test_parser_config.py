@@ -38,6 +38,23 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(parsed.thinking, 2)
         self.assertEqual(parsed.prompt, "hello")
 
+    def test_named_thinking_levels(self):
+        cases = {
+            "+none": 0,
+            "+low": 1,
+            "+med": 2,
+            "+mid": 2,
+            "+medium": 2,
+            "+high": 3,
+            "+max": 4,
+            "+xhigh": 4,
+        }
+        for token, expected in cases.items():
+            with self.subTest(token=token):
+                parsed = parse_args([token, "hello"])
+                self.assertEqual(parsed.thinking, expected)
+                self.assertEqual(parsed.prompt, "hello")
+
     def test_provider_model(self):
         parsed = parse_args([":anthropic:claude-4", "hello"])
         self.assertEqual(parsed.provider, "anthropic")
@@ -114,6 +131,18 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(runner="cc", thinking=0, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
         self.assertIn("--no-thinking", argv)
+
+    def test_xhigh_for_claude_uses_max_flag(self):
+        parsed = parse_args(["cc", "+xhigh", "hello"])
+        argv, _env, _warnings = resolve_command(parsed)
+        self.assertIn("--thinking", argv)
+        self.assertIn("max", argv)
+
+    def test_max_for_kimi_uses_max_flag(self):
+        parsed = parse_args(["k", "+max", "hello"])
+        argv, _env, _warnings = resolve_command(parsed)
+        self.assertIn("--think", argv)
+        self.assertIn("max", argv)
 
     def test_model_flag_for_claude(self):
         parsed = ParsedArgs(runner="cc", model="claude-4", prompt="hello")

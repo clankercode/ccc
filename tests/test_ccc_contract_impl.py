@@ -43,6 +43,21 @@ class SingleImplCccContractTests(unittest.TestCase):
         env["PERL_BADLANG"] = "0"
         env.update(lang.env_extra)
         env["PATH"] = f"{opencode_path.parent}:{env.get('PATH', '')}"
+        config_root = opencode_path.parent.parent
+        env["XDG_CONFIG_HOME"] = str(config_root / "xdg")
+        env["XDG_CACHE_HOME"] = str(config_root / "xdg-cache")
+        env["XDG_DATA_HOME"] = str(config_root / "xdg-data")
+        env["XDG_STATE_HOME"] = str(config_root / "xdg-state")
+        env["CCC_CONFIG"] = str(config_root / "missing-config.toml")
+        env["DOTNET_NOLOGO"] = "1"
+        env["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1"
+        env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
+        for key in ("XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"):
+            Path(env[key]).mkdir(parents=True, exist_ok=True)
+        config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        if not config_path.exists():
+            config_path.write_text("", encoding="utf-8")
         if lang.name in {"x86-64 ASM", "OCaml"}:
             env["CCC_REAL_OPENCODE"] = str(opencode_path)
         return env

@@ -113,10 +113,29 @@ _register_defaults()
 RUNNER_SELECTOR_RE = re.compile(
     r"^(?:oc|cc|c|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$", re.IGNORECASE
 )
-THINKING_RE = re.compile(r"^\+([0-4])$")
+THINKING_RE = re.compile(
+    r"^\+(0|1|2|3|4|none|low|med|mid|medium|high|max|xhigh)$",
+    re.IGNORECASE,
+)
 PROVIDER_MODEL_RE = re.compile(r"^:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)$")
 MODEL_RE = re.compile(r"^:([a-zA-Z0-9._-]+)$")
 ALIAS_RE = re.compile(r"^@([a-zA-Z0-9_-]+)$")
+
+THINKING_TOKEN_TO_LEVEL = {
+    "0": 0,
+    "none": 0,
+    "1": 1,
+    "low": 1,
+    "2": 2,
+    "med": 2,
+    "mid": 2,
+    "medium": 2,
+    "3": 3,
+    "high": 3,
+    "4": 4,
+    "max": 4,
+    "xhigh": 4,
+}
 
 
 def parse_args(argv: list[str]) -> ParsedArgs:
@@ -127,7 +146,9 @@ def parse_args(argv: list[str]) -> ParsedArgs:
         if RUNNER_SELECTOR_RE.match(token) and parsed.runner is None and not positional:
             parsed.runner = token.lower()
         elif THINKING_RE.match(token) and not positional:
-            parsed.thinking = int(THINKING_RE.match(token).group(1))
+            parsed.thinking = THINKING_TOKEN_TO_LEVEL[
+                THINKING_RE.match(token).group(1).lower()
+            ]
         elif PROVIDER_MODEL_RE.match(token) and not positional:
             m = PROVIDER_MODEL_RE.match(token)
             parsed.provider = m.group(1)

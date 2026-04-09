@@ -132,7 +132,6 @@ Python and Rust now support:
 Config support matches the flag:
 
 - `[defaults].sanitize_osc = true|false`
-- legacy `default_sanitize_osc = true|false`
 - `[aliases.<name>].sanitize_osc = true|false`
 
 Default behavior:

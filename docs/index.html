@@ -197,13 +197,16 @@ ccc --show-thinking "Fix the failing tests"
 # Kimi with max thinking
 ccc k +4 "Debug the parser"
 
+# Print the canonical example config
+ccc --print-config
+
 # Codex
 ccc codex "Write a unit test"</code></pre>
 </section>
 
 <section id="config">
   <h2>Config</h2>
-  <p>Python and Rust load configuration from a project-local <code>.ccc.toml</code> searched upward from the current directory, then <code>XDG_CONFIG_HOME/ccc/config.toml</code>, then <code>~/.config/ccc/config.toml</code>. Supports:</p>
+  <p>Python and Rust load configuration from a project-local <code>.ccc.toml</code> searched upward from the current directory, then <code>XDG_CONFIG_HOME/ccc/config.toml</code>, then <code>~/.config/ccc/config.toml</code>. Run <code>ccc --print-config</code> to print the canonical example config with the current supported keys.</p>
   <table>
     <thead><tr><th>Setting</th><th>Description</th></tr></thead>
     <tbody>
@@ -212,6 +215,7 @@ ccc codex "Write a unit test"</code></pre>
       <tr><td>Custom abbreviations</td><td>User-defined runner shorthand names</td></tr>
       <tr><td>Default provider/model</td><td>Fallback provider and model selection</td></tr>
       <tr><td>Visible thinking</td><td><code>show_thinking</code> defaults to off and enables runner-specific visible-thinking flags when supported</td></tr>
+      <tr><td>Canonical sections</td><td><code>[defaults]</code>, <code>[abbreviations]</code>, and <code>[aliases.&lt;name&gt;]</code></td></tr>
     </tbody>
   </table>
 </section>

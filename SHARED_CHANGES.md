@@ -22,6 +22,15 @@ Entry format:
 
 ## 2026-04-10
 
+### Canonical `--print-config` added in Python and Rust
+- Change: Python and Rust now support `ccc --print-config`, which prints a stable generated example `config.toml`; the canonical config schema is now `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`, and the old legacy root-key fallbacks were removed from both implementations
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `tests/test_runner.py`, `tests/test_ccc_contract_impl.py`, `rust/tests/parser_tests.rs`, `rust/tests/config_tests.rs`, `rust/tests/help_tests.rs`
+- Notes: updated `README.md`, `docs/llms.txt`, `docs/index.html`, `docs/clis/output-mode-porting.md`, `docs/clis/README.md`, the Python/Rust help text, and removed the backlog item from `TASKS.md`; the exact generated output is pinned by `tests/fixtures/config-example.toml`
+
+## 2026-04-10
+
 ### Project-local config files are now discovered in Python and Rust
 - Change: Python and Rust now search upward from the current directory for a project-local `.ccc.toml` and merge it with the global config chain, with local values overriding XDG and home defaults
 - Required implementations: Python and Rust

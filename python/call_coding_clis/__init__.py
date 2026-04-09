@@ -1,7 +1,7 @@
 from .runner import CommandSpec, CompletedRun, Runner
 from .cli import build_prompt_spec
 from .parser import ParsedArgs, CccConfig, parse_args, resolve_command
-from .config import load_config
+from .config import load_config, render_example_config
 
 __all__ = [
     "CommandSpec",
@@ -13,4 +13,5 @@ __all__ = [
     "parse_args",
     "resolve_command",
     "load_config",
+    "render_example_config",
 ]

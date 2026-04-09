@@ -26,6 +26,7 @@ class ParsedArgs:
     runner: str | None = None
     thinking: int | None = None
     show_thinking: bool | None = None
+    print_config: bool = False
     sanitize_osc: bool | None = None
     output_mode: str | None = None
     forward_unknown_json: bool = False
@@ -217,6 +218,8 @@ def parse_args(argv: list[str]) -> ParsedArgs:
             ]
         elif token in {"--show-thinking", "--no-show-thinking"}:
             parsed.show_thinking = token == "--show-thinking"
+        elif token == "--print-config":
+            parsed.print_config = True
         elif token in {"--sanitize-osc", "--no-sanitize-osc"}:
             parsed.sanitize_osc = token == "--sanitize-osc"
         elif token in {"--output-mode", "-o"}:

@@ -3,6 +3,7 @@
 > One command to run any coding CLI. A unified interface implemented in 20 programming languages.
 
 ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Claude Code, Codex, Kimi, Crush) behind a single consistent interface. Each of the 20 language implementations bundles an identical `ccc` CLI binary and a reusable library with `CommandSpec`, `CompletedRun`, and `Runner` types.
+Python and Rust also expose `ccc --print-config`, which prints the canonical example config with the current supported keys.
 
 ## Usage
 
@@ -19,6 +20,7 @@ Slots are positional and parsed in order before the prompt:
 - :provider:model: Override provider and model
 - @name: Use a named preset from the loaded config layers, or treat it as an agent when no preset exists; in Python and Rust, presets can also provide a default prompt when the user leaves prompt text blank
 - Config: in Python and Rust, project-local `.ccc.toml` files are searched upward from the current directory, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`
+- Generated config: `ccc --print-config` prints the canonical schema using `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 
 Examples:
 - ccc "Fix the failing tests"
@@ -27,6 +29,7 @@ Examples:
 - ccc .json oc "Reply with exactly ok"
 - ccc cc +2 :anthropic:claude-sonnet-4-20250514 "Add tests"
 - ccc k +4 "Debug the parser"
+- ccc --print-config
 
 ## Languages
 

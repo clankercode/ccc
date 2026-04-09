@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 import subprocess
 import unittest
 from unittest import mock
@@ -7,6 +9,13 @@ from call_coding_clis.cli import (
     _sanitize_human_output,
     _sanitize_raw_output,
 )
+
+
+FIXTURE_CONFIG_PATH = Path(__file__).parent / "fixtures" / "config-example.toml"
+
+
+def read_example_config_fixture() -> str:
+    return FIXTURE_CONFIG_PATH.read_text(encoding="utf-8")
 
 
 class RunnerTests(unittest.TestCase):
@@ -169,9 +178,42 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_prompt_spec("   ")
 
+    def test_print_config_cli_outputs_example_config(self) -> None:
+        env = os.environ.copy()
+        env["PYTHONPATH"] = "python"
+        result = subprocess.run(
+            ["python3", "python/call_coding_clis/cli.py", "--print-config"],
+            cwd=Path(__file__).resolve().parent.parent,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, read_example_config_fixture())
+        self.assertEqual(result.stderr, "")
+
+    def test_print_config_cli_rejects_mixed_usage(self) -> None:
+        env = os.environ.copy()
+        env["PYTHONPATH"] = "python"
+        result = subprocess.run(
+            ["python3", "python/call_coding_clis/cli.py", "--print-config", "cc"],
+            cwd=Path(__file__).resolve().parent.parent,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("--print-config", result.stderr)
+
     def test_ccc_help_mentions_show_thinking(self) -> None:
         from call_coding_clis.help import HELP_TEXT
 
+        self.assertIn("--print-config", HELP_TEXT)
         self.assertIn("--show-thinking", HELP_TEXT)
         self.assertIn("--sanitize-osc", HELP_TEXT)
         self.assertIn("--output-mode", HELP_TEXT)

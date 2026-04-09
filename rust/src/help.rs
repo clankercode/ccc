@@ -24,6 +24,7 @@ const HELP_TEXT: &str = r#"ccc — call coding CLIs
 Usage:
   ccc [controls...] "<Prompt>"
   ccc [controls...] -- "<Prompt starting with control-like tokens>"
+  ccc --print-config
   ccc --help
   ccc -h
 
@@ -44,14 +45,15 @@ Controls (free order before the prompt):
   --yolo / -y   Request the runner's lowest-friction auto-approval mode when supported
 
 Flags:
+  --print-config                         Print the canonical example config.toml and exit
   --show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it
                                         (default: off; config key: show_thinking)
   --sanitize-osc / --no-sanitize-osc    Strip disruptive OSC control output in human-facing modes
                                         while preserving OSC 8 hyperlinks
-                                        (config key: defaults.sanitize_osc / default_sanitize_osc)
+                                        (config key: defaults.sanitize_osc)
   --output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>
                                         Select raw, streamed, or formatted output handling
-                                        (config key: defaults.output_mode / default_output_mode)
+                                        (config key: defaults.output_mode)
   --forward-unknown-json                In formatted modes, forward unhandled JSON objects to stderr
   --            Treat all remaining args as prompt text, even if they look like controls
 
@@ -67,8 +69,10 @@ Examples:
   ccc @reviewer "Audit the API boundary"
   ccc codex "Write a unit test"
   ccc -y -- +1 @agent :model
+  ccc --print-config
 
 Config:
+  ccc --print-config                    — print the canonical example config.toml
   .ccc.toml (searched upward from CWD)  — project-local presets and defaults
   XDG_CONFIG_HOME/ccc/config.toml       — global defaults when XDG is set
   ~/.config/ccc/config.toml             — legacy global fallback

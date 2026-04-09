@@ -115,11 +115,13 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - `:provider:model` and `:model`
   - `@name` for preset lookup with agent fallback; presets can also define a default prompt
   - Python and Rust search project-local `.ccc.toml` files upward from the current directory and override the global config chain
+  - `--print-config` to print the canonical example `config.toml`
   - `--permission-mode safe|auto|yolo|plan`
   - `--show-thinking` / `--no-show-thinking`
   - `--yolo` / `-y`
 - `--` forces the rest of argv to be treated as prompt text, even if it starts with control-like tokens
 - Python and Rust currently use `claude -p`, `codex exec`, and `crush run` for non-interactive invocation
+- `ccc --print-config` is the source of truth for the current canonical config schema: `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 
 ## Planned `ccc` Syntax Growth (design notes only, not fully rolled out yet)
 
@@ -133,13 +135,13 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 ## Python Package
 
 - import path: `call_coding_clis`
-- current API: `CommandSpec`, `CompletedRun`, `Runner`
+- current API: `CommandSpec`, `CompletedRun`, `Runner`, `render_example_config`
 
 ## Rust Crate
 
 - crate name: `call-coding-clis`
 - library name: `call_coding_clis`
-- current API: `CommandSpec`, `CompletedRun`, `Runner`
+- current API: `CommandSpec`, `CompletedRun`, `Runner`, `render_example_config`
 
 ## Planned Roadmap
 
@@ -149,8 +151,8 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
 - cross-language test harness design: `TEST_HARNESS_PLAN.md`
 - expanded `ccc` token parsing for `@name`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
-- future advanced tool allow/deny design note: [docs/clis/allow-deny-tool-plan.md](/home/xertrov/src/call-coding-clis/docs/clis/allow-deny-tool-plan.md)
-- shared model-thinking capability source of truth and refresh instructions: [docs/clis/model-capabilities.json](/home/xertrov/src/call-coding-clis/docs/clis/model-capabilities.json) and [docs/clis/updating-model-capabilities.md](/home/xertrov/src/call-coding-clis/docs/clis/updating-model-capabilities.md)
+- future advanced tool allow/deny design note: [docs/clis/allow-deny-tool-plan.md](docs/clis/allow-deny-tool-plan.md)
+- shared model-thinking capability source of truth and refresh instructions: [docs/clis/model-capabilities.json](docs/clis/model-capabilities.json) and [docs/clis/updating-model-capabilities.md](docs/clis/updating-model-capabilities.md)
 
 ## Missing / Possible Future Features
 

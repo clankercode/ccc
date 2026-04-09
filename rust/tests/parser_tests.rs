@@ -12,6 +12,15 @@ fn test_parse_prompt_only() {
     assert!(!parsed.yolo);
     assert!(parsed.permission_mode.is_none());
     assert!(parsed.alias.is_none());
+    assert!(!parsed.print_config);
+}
+
+#[test]
+fn test_parse_print_config_flag() {
+    let args: Vec<String> = vec!["--print-config".into()];
+    let parsed = parse_args(&args);
+    assert!(parsed.print_config);
+    assert!(parsed.prompt.is_empty());
 }
 
 #[test]
@@ -263,6 +272,14 @@ fn test_parse_double_dash_forces_literal_prompt() {
     let parsed = parse_args(&args);
     assert!(parsed.yolo);
     assert_eq!(parsed.prompt, "+1 @agent :model");
+}
+
+#[test]
+fn test_parse_double_dash_treats_print_config_as_prompt_text() {
+    let args: Vec<String> = vec!["--".into(), "--print-config".into()];
+    let parsed = parse_args(&args);
+    assert!(!parsed.print_config);
+    assert_eq!(parsed.prompt, "--print-config");
 }
 
 #[test]

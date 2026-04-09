@@ -1,6 +1,7 @@
 use call_coding_clis::{
     load_config, parse_args, parse_json_output, print_help, print_usage, render_parsed,
-    resolve_command, resolve_output_plan, resolve_sanitize_osc, resolve_show_thinking,
+    render_example_config, resolve_command, resolve_output_plan, resolve_sanitize_osc,
+    resolve_show_thinking,
     FormattedRenderer, Runner, StructuredStreamProcessor,
 };
 use std::env;
@@ -207,6 +208,15 @@ fn main() -> ExitCode {
     }
 
     let parsed = parse_args(&args);
+    if parsed.print_config {
+        if args != ["--print-config"] {
+            eprintln!("--print-config must be used on its own");
+            return ExitCode::from(1);
+        }
+        print!("{}", render_example_config());
+        return ExitCode::from(0);
+    }
+
     let config = load_config(None);
     let output_plan = match resolve_output_plan(&parsed, Some(&config)) {
         Ok(plan) => plan,

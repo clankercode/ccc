@@ -28,6 +28,7 @@ HELP_USAGE_LINE = 'ccc [controls...] "<Prompt>"'
 HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
 )
+HELP_PRINT_CONFIG_SNIPPET = "--print-config"
 HELP_PRESET_PROMPT_LINE = "Presets can also define a default prompt"
 HELP_PROJECT_LOCAL_CONFIG_LINE = ".ccc.toml (searched upward from CWD)"
 HELP_GLOBAL_CONFIG_LINE = "XDG_CONFIG_HOME/ccc/config.toml"
@@ -42,6 +43,10 @@ HELP_DELIMITER_SNIPPET = "Treat all remaining args as prompt text"
 SHOW_THINKING_IMPLEMENTATIONS = {"Python", "Rust"}
 YOLO_IMPLEMENTATIONS = {"Python", "Rust"}
 PROMPT_PRESET_IMPLEMENTATIONS = {"Python", "Rust"}
+PRINT_CONFIG_IMPLEMENTATIONS = {"Python", "Rust"}
+EXAMPLE_CONFIG_EXPECTED = (
+    ROOT / "tests" / "fixtures" / "config-example.toml"
+).read_text(encoding="utf-8")
 PROJECT_LOCAL_CONFIG_IMPLEMENTATIONS = {"Python", "Rust"}
 
 
@@ -333,6 +338,23 @@ class SingleImplCccContractTests(unittest.TestCase):
                     )
                     self.assert_help_mentions_show_thinking_flag(result)
 
+    def test_help_surface_mentions_print_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in PRINT_CONFIG_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assert_help_mentions_print_config(result)
+
     def test_help_surface_mentions_sanitize_osc_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -400,6 +422,23 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["--help"], self._make_env(opencode_path, lang)
                     )
                     self.assert_help_mentions_preset_prompt(result)
+
+    def test_print_config_outputs_example_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in PRINT_CONFIG_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--print-config"]):
+                    result = lang.invoke_extra(
+                        ["--print-config"], self._make_env(opencode_path, lang)
+                    )
+                    self.assert_print_config_output(result)
 
     def test_help_surface_mentions_project_local_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -904,6 +943,10 @@ class SingleImplCccContractTests(unittest.TestCase):
             self.assertIn(HELP_SHOW_THINKING_SNIPPET, result.stdout)
             self.assertIn("show_thinking", result.stdout)
 
+    def assert_help_mentions_print_config(self, result) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(HELP_PRINT_CONFIG_SNIPPET, result.stdout)
+
     def assert_help_mentions_sanitize_osc_flag(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(HELP_SANITIZE_OSC_SNIPPET, result.stdout)
@@ -923,6 +966,11 @@ class SingleImplCccContractTests(unittest.TestCase):
     def assert_help_mentions_preset_prompt(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(HELP_PRESET_PROMPT_LINE, result.stdout)
+
+    def assert_print_config_output(self, result) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, EXAMPLE_CONFIG_EXPECTED)
+        self.assertEqual(result.stderr, "")
 
     def assert_uses_codex_exec_runner(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)

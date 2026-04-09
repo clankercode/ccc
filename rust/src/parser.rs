@@ -30,6 +30,7 @@ pub struct ParsedArgs {
     pub runner: Option<String>,
     pub thinking: Option<i32>,
     pub show_thinking: Option<bool>,
+    pub print_config: bool,
     pub sanitize_osc: Option<bool>,
     pub output_mode: Option<String>,
     pub forward_unknown_json: bool,
@@ -367,6 +368,8 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
             parsed.thinking = Some(level);
         } else if token == "--show-thinking" || token == "--no-show-thinking" {
             parsed.show_thinking = Some(token == "--show-thinking");
+        } else if token == "--print-config" {
+            parsed.print_config = true;
         } else if token == "--sanitize-osc" || token == "--no-sanitize-osc" {
             parsed.sanitize_osc = Some(token == "--sanitize-osc");
         } else if token == "--output-mode" || token == "-o" {

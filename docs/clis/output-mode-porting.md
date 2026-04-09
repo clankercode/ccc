@@ -20,10 +20,8 @@ Required public surface:
 Support these config keys:
 
 - `[defaults].output_mode = "formatted"`
-- legacy `default_output_mode = "formatted"`
 - `[aliases.<name>].output_mode = "stream-formatted"`
 - `[defaults].sanitize_osc = true`
-- legacy `default_sanitize_osc = true`
 - `[aliases.<name>].sanitize_osc = false`
 
 Config precedence:
@@ -37,7 +35,7 @@ OSC sanitization precedence:
 
 1. explicit `--sanitize-osc` / `--no-sanitize-osc`
 2. alias `sanitize_osc`
-3. config `default_sanitize_osc`
+3. config `defaults.sanitize_osc`
 4. built-in default: `true` for `formatted` and `stream-formatted`, otherwise `false`
 
 ## Runner Capability Resolution

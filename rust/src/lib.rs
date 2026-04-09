@@ -10,7 +10,7 @@ mod help;
 mod json_output;
 mod parser;
 
-pub use config::load_config;
+pub use config::{load_config, render_example_config};
 pub use help::{print_help, print_usage};
 pub use json_output::{
     parse_claude_code_json, parse_json_output, parse_kimi_json, parse_opencode_json, render_parsed,

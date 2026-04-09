@@ -14,7 +14,7 @@ try:
         resolve_sanitize_osc,
         resolve_show_thinking,
     )
-    from .config import load_config
+    from .config import load_config, render_example_config
     from .help import print_help, print_usage
 except ImportError:
     from json_output import FormattedRenderer, StructuredStreamProcessor, parse_json_output, render_parsed
@@ -26,7 +26,7 @@ except ImportError:
         resolve_sanitize_osc,
         resolve_show_thinking,
     )
-    from config import load_config
+    from config import load_config, render_example_config
     from help import print_help, print_usage
 
 
@@ -64,6 +64,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     parsed = parse_args(args)
+    if parsed.print_config:
+        if args != ["--print-config"]:
+            print("--print-config must be used on its own", file=sys.stderr)
+            return 1
+        print(render_example_config(), end="")
+        return 0
+
     config = load_config()
     try:
         argv_list, env_overrides, warnings = resolve_command(parsed, config)

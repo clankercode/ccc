@@ -16,7 +16,14 @@ from call_coding_clis.parser import (
     AliasDef,
     RUNNER_REGISTRY,
 )
-from call_coding_clis.config import load_config
+from call_coding_clis.config import load_config, render_example_config
+
+
+FIXTURE_CONFIG_PATH = Path(__file__).parent / "fixtures" / "config-example.toml"
+
+
+def read_example_config_fixture() -> str:
+    return FIXTURE_CONFIG_PATH.read_text(encoding="utf-8")
 
 
 class ParseArgsTests(unittest.TestCase):
@@ -32,6 +39,12 @@ class ParseArgsTests(unittest.TestCase):
         self.assertIsNone(parsed.provider)
         self.assertIsNone(parsed.model)
         self.assertIsNone(parsed.alias)
+        self.assertFalse(parsed.print_config)
+
+    def test_print_config_flag(self):
+        parsed = parse_args(["--print-config"])
+        self.assertTrue(parsed.print_config)
+        self.assertEqual(parsed.prompt, "")
 
     def test_runner_selector_cc(self):
         parsed = parse_args(["cc", "fix bug"])
@@ -210,6 +223,11 @@ class ParseArgsTests(unittest.TestCase):
         parsed = parse_args(["-y", "--", "+1", "@agent", ":model"])
         self.assertTrue(parsed.yolo)
         self.assertEqual(parsed.prompt, "+1 @agent :model")
+
+    def test_double_dash_treats_print_config_as_prompt_text(self):
+        parsed = parse_args(["--", "--print-config"])
+        self.assertFalse(parsed.print_config)
+        self.assertEqual(parsed.prompt, "--print-config")
 
     def test_permission_mode_missing_value_errors_in_resolve(self):
         parsed = parse_args(["--permission-mode"])
@@ -716,19 +734,29 @@ prompt = "Commit all changes"
         self.assertEqual(config.aliases["quick"].runner, "oc")
         self.assertEqual(config.aliases["commit"].prompt, "Commit all changes")
 
-    def test_legacy_default_output_mode(self):
+    def test_render_example_config_matches_fixture(self):
+        self.assertEqual(render_example_config(), read_example_config_fixture())
+
+    def test_legacy_default_output_mode_is_ignored(self):
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".toml", delete=False) as f:
             f.write(b'default_output_mode = "json"\n')
             f.flush()
             config = load_config(f.name)
-        self.assertEqual(config.default_output_mode, "json")
+        self.assertEqual(config.default_output_mode, "text")
 
-    def test_legacy_default_sanitize_osc(self):
+    def test_legacy_default_show_thinking_is_ignored(self):
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".toml", delete=False) as f:
+            f.write(b"default_show_thinking = true\n")
+            f.flush()
+            config = load_config(f.name)
+        self.assertFalse(config.default_show_thinking)
+
+    def test_legacy_default_sanitize_osc_is_ignored(self):
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".toml", delete=False) as f:
             f.write(b"default_sanitize_osc = false\n")
             f.flush()
             config = load_config(f.name)
-        self.assertFalse(config.default_sanitize_osc)
+        self.assertIsNone(config.default_sanitize_osc)
 
     def test_project_local_config_layers_over_global_configs(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -777,6 +805,77 @@ prompt = "Commit all changes"
             self.assertEqual(config.aliases["review"].model, "xdg-model")
             self.assertTrue(config.aliases["review"].show_thinking)
             self.assertIsNone(config.aliases["review"].agent)
+
+    def test_project_local_config_merges_abbreviations_by_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            home_root = tmp_path / "home"
+            xdg_root = tmp_path / "xdg"
+            repo_root = tmp_path / "repo"
+            nested_cwd = repo_root / "nested"
+            nested_cwd.mkdir(parents=True)
+
+            (repo_root / ".ccc.toml").write_text('[abbreviations]\nteam = "k"\n')
+
+            home_config_dir = home_root / ".config" / "ccc"
+            xdg_config_dir = xdg_root / "ccc"
+            home_config_dir.mkdir(parents=True)
+            xdg_config_dir.mkdir(parents=True)
+            (home_config_dir / "config.toml").write_text('[abbreviations]\nlegacy = "cc"\n')
+            (xdg_config_dir / "config.toml").write_text('[abbreviations]\nmodern = "oc"\n')
+
+            old_cwd = Path.cwd()
+            try:
+                os.chdir(nested_cwd)
+                with mock.patch.dict(
+                    os.environ,
+                    {"HOME": str(home_root), "XDG_CONFIG_HOME": str(xdg_root)},
+                    clear=False,
+                ):
+                    config = load_config()
+            finally:
+                os.chdir(old_cwd)
+
+            self.assertEqual(
+                config.abbreviations,
+                {"legacy": "cc", "modern": "oc", "team": "k"},
+            )
+
+    def test_explicit_config_path_ignores_ambient_project_local_and_global_configs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            home_root = tmp_path / "home"
+            xdg_root = tmp_path / "xdg"
+            repo_root = tmp_path / "repo"
+            nested_cwd = repo_root / "nested"
+            nested_cwd.mkdir(parents=True)
+
+            explicit_config = tmp_path / "explicit.toml"
+            explicit_config.write_text('[defaults]\nrunner = "cc"\n')
+            (repo_root / ".ccc.toml").write_text('[defaults]\nrunner = "k"\n')
+
+            home_config_dir = home_root / ".config" / "ccc"
+            xdg_config_dir = xdg_root / "ccc"
+            home_config_dir.mkdir(parents=True)
+            xdg_config_dir.mkdir(parents=True)
+            (home_config_dir / "config.toml").write_text('[defaults]\nrunner = "oc"\n')
+            (xdg_config_dir / "config.toml").write_text('[defaults]\nrunner = "c"\n')
+
+            old_cwd = Path.cwd()
+            try:
+                os.chdir(nested_cwd)
+                with mock.patch.dict(
+                    os.environ,
+                    {"HOME": str(home_root), "XDG_CONFIG_HOME": str(xdg_root)},
+                    clear=False,
+                ):
+                    config = load_config(explicit_config)
+            finally:
+                os.chdir(old_cwd)
+
+            self.assertEqual(config.default_runner, "cc")
+            self.assertEqual(config.aliases, {})
+            self.assertEqual(config.abbreviations, {})
 
     def test_empty_toml_returns_defaults(self):
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".toml", delete=False) as f:

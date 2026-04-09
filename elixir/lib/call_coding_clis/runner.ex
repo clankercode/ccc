@@ -33,7 +33,7 @@ defmodule CallCodingClis.Runner do
         "#{stdin_prefix}#{escaped} 2>#{shell_escape(stderr_path)}"
 
       opts =
-        [into: ""]
+        [into: "", stdin: ""]
         |> maybe_put(:cd, spec.cwd)
         |> add_env_opt(spec.env)
 

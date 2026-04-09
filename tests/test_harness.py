@@ -257,7 +257,7 @@ LANGUAGES = [
         ],
         build_cwd=ROOT / "crystal",
         invoke_fn=_crystal_invoke,
-        env_extra={"CRYSTAL_CC": "/usr/bin/gcc"},
+        env_extra={"PATH": f"/usr/bin:{os.environ.get('PATH', '')}"},
     ),
     LanguageSpec(
         "Haskell",

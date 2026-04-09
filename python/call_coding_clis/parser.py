@@ -13,6 +13,7 @@ class RunnerInfo:
     extra_args: list[str] = field(default_factory=list)
     thinking_flags: dict[int, list[str]] = field(default_factory=dict)
     show_thinking_flags: dict[bool, list[str]] = field(default_factory=dict)
+    yolo_flags: list[str] = field(default_factory=list)
     provider_flag: str = ""
     model_flag: str = ""
     agent_flag: str = ""
@@ -24,6 +25,7 @@ class ParsedArgs:
     runner: str | None = None
     thinking: int | None = None
     show_thinking: bool | None = None
+    yolo: bool = False
     provider: str | None = None
     model: str | None = None
     alias: str | None = None
@@ -59,6 +61,7 @@ def _register_defaults() -> None:
         extra_args=["run"],
         thinking_flags={},
         show_thinking_flags={True: ["--thinking"]},
+        yolo_flags=[],
         provider_flag="",
         model_flag="",
         agent_flag="--agent",
@@ -66,7 +69,7 @@ def _register_defaults() -> None:
     )
     RUNNER_REGISTRY["claude"] = RunnerInfo(
         binary="claude",
-        extra_args=[],
+        extra_args=["-p"],
         thinking_flags={
             0: ["--thinking", "disabled"],
             1: ["--thinking", "enabled", "--effort", "low"],
@@ -75,6 +78,7 @@ def _register_defaults() -> None:
             4: ["--thinking", "enabled", "--effort", "max"],
         },
         show_thinking_flags={True: ["--thinking", "enabled", "--effort", "low"]},
+        yolo_flags=["--dangerously-skip-permissions"],
         provider_flag="",
         model_flag="--model",
         agent_flag="--agent",
@@ -91,6 +95,7 @@ def _register_defaults() -> None:
             4: ["--thinking"],
         },
         show_thinking_flags={True: ["--thinking"]},
+        yolo_flags=["--yolo"],
         provider_flag="",
         model_flag="--model",
         agent_flag="--agent",
@@ -101,6 +106,7 @@ def _register_defaults() -> None:
         extra_args=["exec"],
         thinking_flags={},
         show_thinking_flags={},
+        yolo_flags=["--dangerously-bypass-approvals-and-sandbox"],
         provider_flag="",
         model_flag="--model",
         prompt_flag="",
@@ -116,9 +122,10 @@ def _register_defaults() -> None:
     )
     RUNNER_REGISTRY["crush"] = RunnerInfo(
         binary="crush",
-        extra_args=[],
+        extra_args=["run"],
         thinking_flags={},
         show_thinking_flags={},
+        yolo_flags=[],
         provider_flag="",
         model_flag="",
         prompt_flag="",
@@ -166,24 +173,33 @@ THINKING_TOKEN_TO_LEVEL = {
 def parse_args(argv: list[str]) -> ParsedArgs:
     parsed = ParsedArgs()
     positional: list[str] = []
+    force_prompt = False
 
     for token in argv:
-        if RUNNER_SELECTOR_RE.match(token) and parsed.runner is None and not positional:
+        if force_prompt or positional:
+            positional.append(token)
+            continue
+        if token == "--":
+            force_prompt = True
+            continue
+        if RUNNER_SELECTOR_RE.match(token):
             parsed.runner = token.lower()
-        elif THINKING_RE.match(token) and not positional:
+        elif THINKING_RE.match(token):
             parsed.thinking = THINKING_TOKEN_TO_LEVEL[
                 THINKING_RE.match(token).group(1).lower()
             ]
-        elif token in {"--show-thinking", "--no-show-thinking"} and not positional:
+        elif token in {"--show-thinking", "--no-show-thinking"}:
             parsed.show_thinking = token == "--show-thinking"
-        elif PROVIDER_MODEL_RE.match(token) and not positional:
+        elif token in {"--yolo", "-y"}:
+            parsed.yolo = True
+        elif PROVIDER_MODEL_RE.match(token):
             m = PROVIDER_MODEL_RE.match(token)
             parsed.provider = m.group(1)
             parsed.model = m.group(2)
-        elif MODEL_RE.match(token) and not positional:
+        elif MODEL_RE.match(token):
             m = MODEL_RE.match(token)
             parsed.model = m.group(1)
-        elif ALIAS_RE.match(token) and parsed.alias is None and not positional:
+        elif ALIAS_RE.match(token):
             parsed.alias = ALIAS_RE.match(token).group(1)
         else:
             positional.append(token)
@@ -256,6 +272,10 @@ def resolve_command(
     if effective_model is None:
         effective_model = config.default_model
 
+    env_overrides: dict[str, str] = {}
+    if effective_provider:
+        env_overrides["CCC_PROVIDER"] = effective_provider
+
     if effective_model and info.model_flag:
         argv.extend([info.model_flag, effective_model])
 
@@ -271,9 +291,19 @@ def resolve_command(
                 f'ignoring @{effective_agent}'
             )
 
-    env_overrides: dict[str, str] = {}
-    if effective_provider:
-        env_overrides["CCC_PROVIDER"] = effective_provider
+    if parsed.yolo:
+        if info.yolo_flags:
+            argv.extend(info.yolo_flags)
+        elif effective_runner_name in {"oc", "opencode"}:
+            env_overrides["OPENCODE_CONFIG_CONTENT"] = '{"permission":"allow"}'
+        elif effective_runner_name in {"cr", "crush"}:
+            warnings.append(
+                'warning: runner "crush" does not support yolo mode in non-interactive run mode; ignoring --yolo'
+            )
+        elif effective_runner_name in {"rc", "roocode"}:
+            warnings.append(
+                'warning: runner "roocode" yolo mode is unverified; ignoring --yolo'
+            )
 
     prompt = parsed.prompt.strip()
     if not prompt:

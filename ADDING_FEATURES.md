@@ -14,6 +14,8 @@ These are not optional for shared CLI/library changes:
 6. Run the targeted Python and Rust tests.
 7. Run `just install-rs` after the Rust update so the installed local `ccc` matches the tested Rust implementation.
 
+If step 5 is missing, the feature is not ready to land.
+
 Updating the other language implementations is encouraged, but optional unless the task explicitly calls for a broader rollout.
 
 ## Default Flow
@@ -44,8 +46,9 @@ When a change is intended to roll out beyond Python and Rust:
 Every shared feature or fix must include:
 - doc updates for the user-facing or maintainer-facing behavior that changed
 - cross-implementation test updates
+- a `SHARED_CHANGES.md` entry written before finalizing the work
 
-Do not land a shared semantic change without adjusting the docs and the contract or harness coverage that should detect it.
+Do not land a shared semantic change without adjusting the docs, updating the contract or harness coverage that should detect it, and recording the semantic change in `SHARED_CHANGES.md`.
 
 For Python changes:
 
@@ -112,12 +115,15 @@ If the change affects subprocess execution behavior, stdin behavior, env behavio
 ## Shared Change Log
 
 - `SHARED_CHANGES.md` is the required ledger for shared features, fixes, and semantic changes
+- updating `SHARED_CHANGES.md` is a release-blocking requirement for any shared semantic change
 - every shared change must add a short dated entry with:
   - what changed
   - which docs were updated
   - whether the change is Python+Rust only or rolled out further
   - which shared tests were updated
 - this file is the source of truth for what has landed semantically, even when some implementations are still catching up
+
+Before sending a final "implemented" response for a shared feature, explicitly verify that `SHARED_CHANGES.md` is in the modified file set.
 
 ## Practical Rule
 

@@ -8,6 +8,7 @@ pub struct RunnerInfo {
     pub extra_args: Vec<String>,
     pub thinking_flags: BTreeMap<i32, Vec<String>>,
     pub show_thinking_flags: BTreeMap<bool, Vec<String>>,
+    pub yolo_flags: Vec<String>,
     pub provider_flag: String,
     pub model_flag: String,
     pub agent_flag: String,
@@ -19,6 +20,7 @@ pub struct ParsedArgs {
     pub runner: Option<String>,
     pub thinking: Option<i32>,
     pub show_thinking: Option<bool>,
+    pub yolo: bool,
     pub provider: Option<String>,
     pub model: Option<String>,
     pub alias: Option<String>,
@@ -84,6 +86,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
             tf.insert(true, vec!["--thinking".into()]);
             tf
         },
+        yolo_flags: vec![],
         provider_flag: String::new(),
         model_flag: String::new(),
         agent_flag: "--agent".into(),
@@ -91,7 +94,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let claude = RunnerInfo {
         binary: "claude".into(),
-        extra_args: vec![],
+        extra_args: vec!["-p".into()],
         thinking_flags: {
             let mut tf = BTreeMap::new();
             tf.insert(0, vec!["--thinking".into(), "disabled".into()]);
@@ -146,6 +149,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
             );
             tf
         },
+        yolo_flags: vec!["--dangerously-skip-permissions".into()],
         provider_flag: String::new(),
         model_flag: "--model".into(),
         agent_flag: "--agent".into(),
@@ -168,6 +172,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
             tf.insert(true, vec!["--thinking".into()]);
             tf
         },
+        yolo_flags: vec!["--yolo".into()],
         provider_flag: String::new(),
         model_flag: "--model".into(),
         agent_flag: "--agent".into(),
@@ -178,6 +183,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         extra_args: vec!["exec".into()],
         thinking_flags: BTreeMap::new(),
         show_thinking_flags: BTreeMap::new(),
+        yolo_flags: vec!["--dangerously-bypass-approvals-and-sandbox".into()],
         provider_flag: String::new(),
         model_flag: "--model".into(),
         agent_flag: String::new(),
@@ -188,6 +194,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         extra_args: vec![],
         thinking_flags: BTreeMap::new(),
         show_thinking_flags: BTreeMap::new(),
+        yolo_flags: vec![],
         provider_flag: String::new(),
         model_flag: String::new(),
         agent_flag: String::new(),
@@ -195,9 +202,10 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let crush = RunnerInfo {
         binary: "crush".into(),
-        extra_args: vec![],
+        extra_args: vec!["run".into()],
         thinking_flags: BTreeMap::new(),
         show_thinking_flags: BTreeMap::new(),
+        yolo_flags: vec![],
         provider_flag: String::new(),
         model_flag: String::new(),
         agent_flag: String::new(),
@@ -285,39 +293,29 @@ fn parse_alias(s: &str) -> Option<&str> {
 pub fn parse_args(argv: &[String]) -> ParsedArgs {
     let mut parsed = ParsedArgs::default();
     let mut positional: Vec<String> = Vec::new();
+    let mut force_prompt = false;
 
     for token in argv {
-        if is_runner_selector(token) && parsed.runner.is_none() && positional.is_empty() {
+        if force_prompt || !positional.is_empty() {
+            positional.push(token.clone());
+        } else if token == "--" {
+            force_prompt = true;
+            continue;
+        } else if is_runner_selector(token) {
             parsed.runner = Some(token.to_lowercase());
         } else if let Some(level) = parse_thinking(token) {
-            if positional.is_empty() {
-                parsed.thinking = Some(level);
-            } else {
-                positional.push(token.clone());
-            }
-        } else if (token == "--show-thinking" || token == "--no-show-thinking")
-            && positional.is_empty()
-        {
+            parsed.thinking = Some(level);
+        } else if token == "--show-thinking" || token == "--no-show-thinking" {
             parsed.show_thinking = Some(token == "--show-thinking");
+        } else if token == "--yolo" || token == "-y" {
+            parsed.yolo = true;
         } else if let Some((provider, model)) = parse_provider_model(token) {
-            if positional.is_empty() {
-                parsed.provider = Some(provider.to_string());
-                parsed.model = Some(model.to_string());
-            } else {
-                positional.push(token.clone());
-            }
+            parsed.provider = Some(provider.to_string());
+            parsed.model = Some(model.to_string());
         } else if let Some(model) = parse_model_only(token) {
-            if positional.is_empty() {
-                parsed.model = Some(model.to_string());
-            } else {
-                positional.push(token.clone());
-            }
+            parsed.model = Some(model.to_string());
         } else if let Some(alias_name) = parse_alias(token) {
-            if parsed.alias.is_none() && positional.is_empty() {
-                parsed.alias = Some(alias_name.to_string());
-            } else {
-                positional.push(token.clone());
-            }
+            parsed.alias = Some(alias_name.to_string());
         } else {
             positional.push(token.clone());
         }
@@ -447,6 +445,23 @@ pub fn resolve_command(
         } else {
             argv.push(effective_runner.agent_flag.clone());
             argv.push(agent);
+        }
+    }
+
+    if parsed.yolo {
+        if !effective_runner.yolo_flags.is_empty() {
+            argv.extend(effective_runner.yolo_flags.iter().cloned());
+        } else if matches!(effective_runner_name.as_str(), "oc" | "opencode") {
+            env_overrides.insert(
+                "OPENCODE_CONFIG_CONTENT".to_string(),
+                "{\"permission\":\"allow\"}".to_string(),
+            );
+        } else if matches!(effective_runner_name.as_str(), "cr" | "crush") {
+            warnings.push(
+                "warning: runner \"crush\" does not support yolo mode in non-interactive run mode; ignoring --yolo".to_string(),
+            );
+        } else if matches!(effective_runner_name.as_str(), "rc" | "roocode") {
+            warnings.push("warning: runner \"roocode\" yolo mode is unverified; ignoring --yolo".to_string());
         }
     }
 

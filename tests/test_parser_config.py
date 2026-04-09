@@ -20,6 +20,7 @@ class ParseArgsTests(unittest.TestCase):
         self.assertIsNone(parsed.runner)
         self.assertIsNone(parsed.thinking)
         self.assertIsNone(parsed.show_thinking)
+        self.assertFalse(parsed.yolo)
         self.assertIsNone(parsed.provider)
         self.assertIsNone(parsed.model)
         self.assertIsNone(parsed.alias)
@@ -84,9 +85,12 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(parsed.prompt, "hello")
 
     def test_full_combo(self):
-        parsed = parse_args(["cc", "+3", ":anthropic:claude-4", "@fast", "fix tests"])
+        parsed = parse_args(
+            ["cc", "--yolo", "+3", ":anthropic:claude-4", "@fast", "fix tests"]
+        )
         self.assertEqual(parsed.runner, "cc")
         self.assertEqual(parsed.thinking, 3)
+        self.assertTrue(parsed.yolo)
         self.assertEqual(parsed.provider, "anthropic")
         self.assertEqual(parsed.model, "claude-4")
         self.assertEqual(parsed.alias, "fast")
@@ -109,6 +113,39 @@ class ParseArgsTests(unittest.TestCase):
         parsed = parse_args(["--no-show-thinking", "hello"])
         self.assertFalse(parsed.show_thinking)
         self.assertEqual(parsed.prompt, "hello")
+
+    def test_yolo_flags(self):
+        for token in ("--yolo", "-y"):
+            with self.subTest(token=token):
+                parsed = parse_args([token, "hello"])
+                self.assertTrue(parsed.yolo)
+                self.assertEqual(parsed.prompt, "hello")
+
+    def test_control_tokens_can_appear_in_any_order(self):
+        parsed = parse_args(
+            ["@fast", ":anthropic:claude-4", "--yolo", "cc", "+3", "fix tests"]
+        )
+        self.assertEqual(parsed.runner, "cc")
+        self.assertEqual(parsed.thinking, 3)
+        self.assertTrue(parsed.yolo)
+        self.assertEqual(parsed.provider, "anthropic")
+        self.assertEqual(parsed.model, "claude-4")
+        self.assertEqual(parsed.alias, "fast")
+        self.assertEqual(parsed.prompt, "fix tests")
+
+    def test_duplicate_pre_prompt_controls_use_last_value(self):
+        parsed = parse_args(
+            ["cc", "k", "--show-thinking", "--no-show-thinking", "@fast", "@slow", "hello"]
+        )
+        self.assertEqual(parsed.runner, "k")
+        self.assertFalse(parsed.show_thinking)
+        self.assertEqual(parsed.alias, "slow")
+        self.assertEqual(parsed.prompt, "hello")
+
+    def test_double_dash_forces_literal_prompt(self):
+        parsed = parse_args(["-y", "--", "+1", "@agent", ":model"])
+        self.assertTrue(parsed.yolo)
+        self.assertEqual(parsed.prompt, "+1 @agent :model")
 
     def test_thinking_out_of_range_not_matched(self):
         parsed = parse_args(["+5", "hello"])
@@ -137,7 +174,7 @@ class ResolveCommandTests(unittest.TestCase):
     def test_claude_runner(self):
         parsed = ParsedArgs(runner="cc", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
-        self.assertEqual(argv[0], "claude")
+        self.assertEqual(argv[:2], ["claude", "-p"])
         self.assertNotIn("run", argv)
         self.assertIn("hello", argv)
         self.assertEqual(warnings, [])
@@ -167,8 +204,8 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(runner="cc", thinking=2, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
         self.assertEqual(
-            argv[:5],
-            ["claude", "--thinking", "enabled", "--effort", "medium"],
+            argv[:6],
+            ["claude", "-p", "--thinking", "enabled", "--effort", "medium"],
         )
 
     def test_show_thinking_for_opencode(self):
@@ -180,8 +217,8 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(runner="cc", show_thinking=True, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
         self.assertEqual(
-            argv[:5],
-            ["claude", "--thinking", "enabled", "--effort", "low"],
+            argv[:6],
+            ["claude", "-p", "--thinking", "enabled", "--effort", "low"],
         )
 
     def test_show_thinking_for_kimi(self):
@@ -194,22 +231,22 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(runner="cc", show_thinking=True, thinking=3, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
         self.assertEqual(
-            argv[:5],
-            ["claude", "--thinking", "enabled", "--effort", "high"],
+            argv[:6],
+            ["claude", "-p", "--thinking", "enabled", "--effort", "high"],
         )
 
     def test_thinking_zero_for_claude(self):
         parsed = ParsedArgs(runner="cc", thinking=0, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
-        self.assertEqual(argv[:3], ["claude", "--thinking", "disabled"])
+        self.assertEqual(argv[:4], ["claude", "-p", "--thinking", "disabled"])
         self.assertNotIn("--effort", argv)
 
     def test_xhigh_for_claude_uses_max_flag(self):
         parsed = parse_args(["cc", "+xhigh", "hello"])
         argv, _env, _warnings = resolve_command(parsed)
         self.assertEqual(
-            argv[:5],
-            ["claude", "--thinking", "enabled", "--effort", "max"],
+            argv[:6],
+            ["claude", "-p", "--thinking", "enabled", "--effort", "max"],
         )
 
     def test_max_for_kimi_uses_max_flag(self):
@@ -240,15 +277,15 @@ class ResolveCommandTests(unittest.TestCase):
         config = CccConfig(default_runner="cc")
         parsed = ParsedArgs(prompt="hello")
         argv, env, _warnings = resolve_command(parsed, config)
-        self.assertEqual(argv[0], "claude")
+        self.assertEqual(argv[:2], ["claude", "-p"])
 
     def test_config_default_thinking(self):
         config = CccConfig(default_runner="cc", default_thinking=1)
         parsed = ParsedArgs(prompt="hello")
         argv, env, _warnings = resolve_command(parsed, config)
         self.assertEqual(
-            argv[:5],
-            ["claude", "--thinking", "enabled", "--effort", "low"],
+            argv[:6],
+            ["claude", "-p", "--thinking", "enabled", "--effort", "low"],
         )
 
     def test_config_default_show_thinking(self):
@@ -256,8 +293,8 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(prompt="hello")
         argv, env, _warnings = resolve_command(parsed, config)
         self.assertEqual(
-            argv[:5],
-            ["claude", "--thinking", "enabled", "--effort", "low"],
+            argv[:6],
+            ["claude", "-p", "--thinking", "enabled", "--effort", "low"],
         )
 
     def test_config_default_model(self):
@@ -279,10 +316,10 @@ class ResolveCommandTests(unittest.TestCase):
         )
         parsed = ParsedArgs(alias="work", prompt="hello")
         argv, env, warnings = resolve_command(parsed, config)
-        self.assertEqual(argv[0], "claude")
+        self.assertEqual(argv[:2], ["claude", "-p"])
         self.assertEqual(
-            argv[:5],
-            ["claude", "--thinking", "enabled", "--effort", "high"],
+            argv[:6],
+            ["claude", "-p", "--thinking", "enabled", "--effort", "high"],
         )
         self.assertIn("--model", argv)
         self.assertIn("claude-4", argv)
@@ -328,7 +365,7 @@ class ResolveCommandTests(unittest.TestCase):
     def test_alias_falls_back_to_agent_for_claude(self):
         parsed = ParsedArgs(runner="cc", alias="reviewer", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
-        self.assertEqual(argv[:3], ["claude", "--agent", "reviewer"])
+        self.assertEqual(argv[:4], ["claude", "-p", "--agent", "reviewer"])
         self.assertEqual(warnings, [])
 
     def test_alias_falls_back_to_agent_for_kimi(self):
@@ -354,6 +391,53 @@ class ResolveCommandTests(unittest.TestCase):
         argv, env, warnings = resolve_command(parsed, config)
         self.assertEqual(argv[:4], ["opencode", "run", "--agent", "reviewer"])
         self.assertEqual(warnings, [])
+
+    def test_yolo_for_claude(self):
+        parsed = ParsedArgs(runner="cc", yolo=True, prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[:3], ["claude", "-p", "--dangerously-skip-permissions"])
+        self.assertEqual(warnings, [])
+
+    def test_yolo_for_codex(self):
+        parsed = ParsedArgs(runner="c", yolo=True, prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(
+            argv[:3],
+            ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox"],
+        )
+        self.assertEqual(warnings, [])
+
+    def test_yolo_for_kimi(self):
+        parsed = ParsedArgs(runner="k", yolo=True, prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[:2], ["kimi", "--yolo"])
+        self.assertEqual(argv[-2:], ["--prompt", "hello"])
+        self.assertEqual(warnings, [])
+
+    def test_yolo_for_crush(self):
+        parsed = ParsedArgs(runner="cr", yolo=True, prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[:2], ["crush", "run"])
+        self.assertEqual(
+            warnings,
+            ['warning: runner "crush" does not support yolo mode in non-interactive run mode; ignoring --yolo'],
+        )
+
+    def test_yolo_for_opencode_uses_env_override(self):
+        parsed = ParsedArgs(runner="oc", yolo=True, prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(argv, ["opencode", "run", "hello"])
+        self.assertEqual(env["OPENCODE_CONFIG_CONTENT"], '{"permission":"allow"}')
+        self.assertEqual(warnings, [])
+
+    def test_yolo_for_roocode_warns(self):
+        parsed = ParsedArgs(runner="rc", yolo=True, prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(argv, ["roocode", "hello"])
+        self.assertEqual(
+            warnings,
+            ['warning: runner "roocode" yolo mode is unverified; ignoring --yolo'],
+        )
 
 
 class LoadConfigTests(unittest.TestCase):

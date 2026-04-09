@@ -58,6 +58,8 @@
 | F20 | Config file loading | Read config for defaults, aliases, abbreviations |
 | F21 | Custom abbreviations | User-defined runner abbreviations in config |
 | F22 | Default provider/model | Config-backed default resolution |
+| F32 | Yolo mode | `--yolo` / `-y` selects the runner's lowest-friction auto-approval mode |
+| F33 | Order-independent controls | Pre-prompt control tokens may appear in any order; `--` forces literal prompt text |
 
 ### v3 JSON Output Features
 
@@ -130,6 +132,7 @@
 ### Current Focus
 - All phases complete. Full test suite: 17 PASS, 0 FAIL, 5 SKIP
 - Comparison runner (`compare_ccc.sh`) validates all 14 active languages produce identical output
+- Python and Rust now define the reference semantics for `--yolo` and order-independent pre-prompt control tokens
 
 ### Completed Milestones
 - Phase 1: Foundation — FEATURES.md, JSON fixtures, mock plan, all 8 original languages verified

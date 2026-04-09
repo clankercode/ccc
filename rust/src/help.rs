@@ -22,11 +22,12 @@ const CANONICAL_RUNNERS: &[(&str, &str)] = &[
 const HELP_TEXT: &str = r#"ccc — call coding CLIs
 
 Usage:
-  ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@name] "<Prompt>"
+  ccc [controls...] "<Prompt>"
+  ccc [controls...] -- "<Prompt starting with control-like tokens>"
   ccc --help
   ccc -h
 
-Slots (in order):
+Controls (free order before the prompt):
   runner        Select which coding CLI to use (default: oc)
                 opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)
   +thinking     Set thinking level: +0 (off) through +4 (max)
@@ -34,18 +35,21 @@ Slots (in order):
                 Kimi maps +0 to --no-thinking and +1..+4 to --thinking
   :provider:model  Override provider and model
   @name         Use a named preset from config; if no preset exists, treat it as an agent
+  --yolo / -y   Request the runner's lowest-friction auto-approval mode when supported
 
 Flags:
   --show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it
                                         (default: off; config key: show_thinking)
+  --            Treat all remaining args as prompt text, even if they look like controls
 
 Examples:
   ccc "Fix the failing tests"
   ccc oc "Refactor auth module"
-  ccc cc +2 :anthropic:claude-sonnet-4-20250514 "Add tests"
-  ccc k +4 "Debug the parser"
+  ccc --yolo cc +2 :anthropic:claude-sonnet-4-20250514 "Add tests"
+  ccc @reviewer k +4 "Debug the parser"
   ccc @reviewer "Audit the API boundary"
   ccc codex "Write a unit test"
+  ccc -y -- +1 @agent :model
 
 Config:
   ~/.config/ccc/config.toml  — default runner, presets, abbreviations, show_thinking
@@ -128,7 +132,7 @@ pub fn print_help() {
 
 pub fn print_usage() {
     eprintln!(
-        "usage: ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
+        "usage: ccc [controls...] \"<Prompt>\""
     );
     eprint!("{}", format_runner_checklist());
 }

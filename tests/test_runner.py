@@ -117,6 +117,8 @@ class RunnerTests(unittest.TestCase):
         from call_coding_clis.help import HELP_TEXT
 
         self.assertIn("--show-thinking", HELP_TEXT)
+        self.assertIn("--yolo / -y", HELP_TEXT)
+        self.assertIn("Treat all remaining args as prompt text", HELP_TEXT)
         self.assertIn("show_thinking", HELP_TEXT)
 
 

@@ -15,19 +15,19 @@ from tests.test_harness import LanguageSpec, _resolve_selected_languages
 
 PROMPT = "Fix the failing tests"
 EXPECTED = f"opencode run {PROMPT}\n"
-CONFIG_DEFAULT_RUNNER_EXPECTED = f"claude {PROMPT}\n"
+CONFIG_DEFAULT_RUNNER_EXPECTED = f"claude -p {PROMPT}\n"
 AGENT_FALLBACK_EXPECTED = f"opencode run --agent reviewer {PROMPT}\n"
 PRESET_AGENT_EXPECTED = f"opencode run --agent specialist {PROMPT}\n"
 CODEX_RUNNER_EXPECTED = f"codex exec {PROMPT}\n"
-HELP_USAGE_LINE = 'ccc [runner] [+thinking] [:provider:model] [@name] "<Prompt>"'
-HELP_USAGE_LINE_WITH_SHOW_THINKING = (
-    'ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@name] "<Prompt>"'
-)
+HELP_USAGE_LINE = 'ccc [controls...] "<Prompt>"'
 HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
 )
 HELP_SHOW_THINKING_SNIPPET = "--show-thinking"
+HELP_YOLO_SNIPPET = "--yolo / -y"
+HELP_DELIMITER_SNIPPET = "Treat all remaining args as prompt text"
 SHOW_THINKING_IMPLEMENTATIONS = {"Python", "Rust"}
+YOLO_IMPLEMENTATIONS = {"Python", "Rust"}
 
 
 class SingleImplCccContractTests(unittest.TestCase):
@@ -198,14 +198,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     result = lang.invoke_extra(
                         ["--help"], self._make_env(opencode_path, lang)
                     )
-                    expected_usage = (
-                        HELP_USAGE_LINE_WITH_SHOW_THINKING
-                        if lang.name in SHOW_THINKING_IMPLEMENTATIONS
-                        else HELP_USAGE_LINE
-                    )
-                    self.assert_help_mentions_standard_name_slot(
-                        result, expected_usage
-                    )
+                    self.assert_help_mentions_standard_name_slot(result, HELP_USAGE_LINE)
 
     def test_help_surface_mentions_show_thinking_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -223,6 +216,23 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["--help"], self._make_env(opencode_path, lang)
                     )
                     self.assert_help_mentions_show_thinking_flag(result)
+
+    def test_help_surface_mentions_yolo_and_delimiter(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in YOLO_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assert_help_mentions_yolo_and_delimiter(result)
 
     def test_codex_runner_uses_exec_subcommand(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -261,7 +271,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     (["--show-thinking"], "opencode run --thinking Fix the failing tests\n"),
                     (
                         ["cc", "--show-thinking"],
-                        "claude --thinking enabled --effort low Fix the failing tests\n",
+                        "claude -p --thinking enabled --effort low Fix the failing tests\n",
                     ),
                     (
                         ["k", "--show-thinking"],
@@ -272,7 +282,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     (["--show-thinking"], "opencode run --thinking Fix the failing tests\n"),
                     (
                         ["cc", "--show-thinking"],
-                        "claude --thinking enabled --effort low Fix the failing tests\n",
+                        "claude -p --thinking enabled --effort low Fix the failing tests\n",
                     ),
                     (
                         ["k", "--show-thinking"],
@@ -297,6 +307,108 @@ class SingleImplCccContractTests(unittest.TestCase):
                             self.assertEqual(result.returncode, 0, result.stderr)
                             self.assertEqual(result.stdout, expected_stdout)
                             self.assertEqual(result.stderr, "")
+
+    def test_control_tokens_are_order_independent_before_prompt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            kimi_path = bin_dir / "kimi"
+            self._write_argv_echo_stub(kimi_path, "kimi")
+
+            for lang in self.selected_languages:
+                if lang.name not in YOLO_IMPLEMENTATIONS:
+                    continue
+                env = self._make_env(bin_dir / "opencode", lang)
+                with self.subTest(language=lang.name):
+                    result = lang.invoke_with_args(
+                        ["@reviewer", "--yolo", ":moonshot:k2", "k", "+4"],
+                        PROMPT,
+                        env,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(
+                        result.stdout,
+                        "kimi --thinking --model k2 --agent reviewer --yolo --prompt Fix the failing tests\n",
+                    )
+                    self.assertEqual(result.stderr, "")
+
+    def test_double_dash_forces_literal_prompt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_argv_echo_stub(opencode_path, "opencode")
+
+            for lang in self.selected_languages:
+                if lang.name not in YOLO_IMPLEMENTATIONS:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                with self.subTest(language=lang.name):
+                    result = lang.invoke_extra(
+                        ["-y", "--", "+1", "@agent", ":model"],
+                        env,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(
+                        result.stdout,
+                        "opencode run +1 @agent :model\n",
+                    )
+                    self.assertEqual(result.stderr, "")
+
+    def test_yolo_maps_to_runner_specific_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            claude_path = bin_dir / "claude"
+            codex_path = bin_dir / "codex"
+            kimi_path = bin_dir / "kimi"
+            crush_path = bin_dir / "crush"
+            opencode_path = bin_dir / "opencode"
+            self._write_argv_echo_stub(claude_path, "claude")
+            self._write_argv_echo_stub(codex_path, "codex")
+            self._write_argv_echo_stub(kimi_path, "kimi")
+            self._write_argv_echo_stub(crush_path, "crush")
+            self._write_opencode_yolo_stub(opencode_path)
+
+            cases = {
+                "Python": [
+                    (["cc", "--yolo"], "claude -p --dangerously-skip-permissions Fix the failing tests\n", ""),
+                    (["c", "--yolo"], "codex exec --dangerously-bypass-approvals-and-sandbox Fix the failing tests\n", ""),
+                    (["k", "-y"], "kimi --yolo --prompt Fix the failing tests\n", ""),
+                    (
+                        ["cr", "--yolo"],
+                        "crush run Fix the failing tests\n",
+                        'warning: runner "crush" does not support yolo mode in non-interactive run mode; ignoring --yolo\n',
+                    ),
+                    (["oc", "--yolo"], "opencode run Fix the failing tests\n", '{"permission":"allow"}'),
+                ],
+                "Rust": [
+                    (["cc", "--yolo"], "claude -p --dangerously-skip-permissions Fix the failing tests\n", ""),
+                    (["c", "--yolo"], "codex exec --dangerously-bypass-approvals-and-sandbox Fix the failing tests\n", ""),
+                    (["k", "-y"], "kimi --yolo --prompt Fix the failing tests\n", ""),
+                    (
+                        ["cr", "--yolo"],
+                        "crush run Fix the failing tests\n",
+                        'warning: runner "crush" does not support yolo mode in non-interactive run mode; ignoring --yolo\n',
+                    ),
+                    (["oc", "--yolo"], "opencode run Fix the failing tests\n", '{"permission":"allow"}'),
+                ],
+            }
+
+            for lang in self.selected_languages:
+                if lang.name not in cases:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                with self.subTest(language=lang.name, capability="yolo"):
+                    for extra_args, expected_stdout, expected_stderr in cases[lang.name]:
+                        with self.subTest(language=lang.name, args=extra_args):
+                            result = lang.invoke_with_args(extra_args, PROMPT, env)
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            self.assertEqual(result.stdout, expected_stdout)
+                            self.assertEqual(result.stderr, expected_stderr)
 
     def assert_equal_output(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -345,6 +457,11 @@ class SingleImplCccContractTests(unittest.TestCase):
             self.assertIn(HELP_SHOW_THINKING_SNIPPET, result.stdout)
             self.assertIn("show_thinking", result.stdout)
 
+    def assert_help_mentions_yolo_and_delimiter(self, result) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(HELP_YOLO_SNIPPET, result.stdout)
+        self.assertIn(HELP_DELIMITER_SNIPPET, result.stdout)
+
     def assert_uses_codex_exec_runner(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, CODEX_RUNNER_EXPECTED)
@@ -362,7 +479,7 @@ class SingleImplCccContractTests(unittest.TestCase):
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def _write_runner_stub(self, path: Path, runner_name: str) -> None:
-        path.write_text(f"#!/bin/sh\nprintf '{runner_name} %s\\n' \"$1\"\n")
+        path.write_text(f"#!/bin/sh\nprintf '{runner_name} %s\\n' \"$*\"\n")
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def _write_argv_echo_stub(self, path: Path, runner_name: str) -> None:
@@ -377,6 +494,20 @@ class SingleImplCccContractTests(unittest.TestCase):
             "fi\n"
             "shift\n"
             "printf 'codex exec %s\\n' \"$1\"\n"
+        )
+        path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    def _write_opencode_yolo_stub(self, path: Path) -> None:
+        path.write_text(
+            "#!/bin/sh\n"
+            'if [ "$1" != "run" ]; then\n'
+            "  exit 9\n"
+            "fi\n"
+            "shift\n"
+            "printf 'opencode run %s\\n' \"$*\"\n"
+            'if [ -n "$OPENCODE_CONFIG_CONTENT" ]; then\n'
+            "  printf '%s' \"$OPENCODE_CONFIG_CONTENT\" >&2\n"
+            "fi\n"
         )
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 

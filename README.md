@@ -98,7 +98,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - the interface is not fully designed yet, but `ccc "<Prompt>"` must work
 - library and CLI design should stay aligned so `precurl` can use the library layer while humans can use the same runner shape directly
 - `precurl` uses the Rust library layer for delegated LLM analysis — see the [precurl SECURITY.md](../precurl/SECURITY.md) for threat model and prompt-injection mitigation details
-- Python and Rust also support `--show-thinking` / `--no-show-thinking` with config-backed `show_thinking`, defaulting off for now
+- Python and Rust also support free-order control tokens before the prompt, `--` to force literal prompt text, `--show-thinking` / `--no-show-thinking`, and `--yolo` / `-y`
 
 ## First-Pass `ccc` Contract
 
@@ -107,21 +107,26 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - this is intentionally narrow and likely to grow later with explicit runner/model flags
 - explicit shared behavior doc: `CCC_BEHAVIOR_CONTRACT.md`
 
-## Planned `ccc` Syntax Growth (design notes only, not implemented yet)
+## Current Python/Rust Extended `ccc` Syntax
 
-- the only implemented cross-language contract today is still `ccc "<Prompt>"`
-- the next syntax shapes under consideration are:
-  - `ccc @foo-bar "<Prompt>"` to use a named preset, or fall back to agent selection when no preset exists
-  - `ccc +0 "<Prompt>"` through `ccc +4 "<Prompt>"` for thinking level selection
-  - `ccc :provider:model "<Prompt>"` and `ccc :model "<Prompt>"` for explicit provider/model selection
+- Python and Rust currently accept control tokens in any order before the prompt:
   - runner selectors such as `c`, `cx`, `cc`, `oc`, `k`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `roocode`, `crush`, and `pi`
+  - `+0..+4` thinking levels
+  - `:provider:model` and `:model`
+  - `@name` for preset lookup with agent fallback
+  - `--show-thinking` / `--no-show-thinking`
+  - `--yolo` / `-y`
+- `--` forces the rest of argv to be treated as prompt text, even if it starts with control-like tokens
+- Python and Rust currently use `claude -p`, `codex exec`, and `crush run` for non-interactive invocation
+
+## Planned `ccc` Syntax Growth (design notes only, not fully rolled out yet)
+
 - planned config support should eventually allow:
   - custom alias definitions and abbreviations
   - default provider selection
   - default model selection
   - bundled-runner defaults plus custom-name defaults
-- combination rules, precedence, and final parsing order are intentionally still undecided
-- until that design is locked, these forms are planned syntax only, not stable or implemented CLI behavior
+- broader multi-language rollout is still pending for the extended control-token surface
 
 ## Python Package
 

@@ -15,6 +15,20 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
 - [ ] Add a repo-root `VERSION` file and pull it into implementations at build time
   - Use it as the single source of truth for reported package/CLI version strings where feasible.
   - Keep the language-specific build/release flow honest about when the baked-in version is refreshed.
+- [ ] Add a canonical controls section under the usage line and reuse it across all implementations
+  - The usage line should be followed by a shared controls explanation section with examples.
+  - Keep one canonical copy of that section and copy it into every implementation so the usage output stays consistent.
+- [ ] Speed up runner version discovery by reading versions from install files when possible
+  - Prefer direct inspection of expected metadata locations such as `package.json` instead of spawning `<runner> --version`.
+  - Fall back to the current version command when direct discovery fails.
 - [ ] Decide whether structured output rendering needs templating or user customization
   - This is the `v2` rendering direction currently noted in `README.md`.
   - Keep the scope narrow unless there is a concrete user-facing need.
+- [ ] Add multi-provider / multi-preset / multi-alias routing based on capacity, usage, and round-robin policy
+  - Allow a single logical route to fan out across multiple providers, presets, aliases, or equivalent backends.
+  - Detect `429` rate-limit responses and other retryable provider errors, then fail over or rotate according to policy.
+  - Track enough usage/capacity state to avoid hammering an exhausted route and to make round-robin selection stable.
+- [ ] Capture real Kimi rate-limit and provider-error samples across every surface `ccc` reads
+  - Collect representative `429` and nearby failure cases from plain stdout/stderr, `json`, and `stream-json` modes.
+  - Save the observed payloads and transcripts in the same fixture style used for other real runner captures so parser and retry logic can target actual shapes.
+  - Note which signals are stable enough for automated detection versus human-facing text that should stay best-effort only.

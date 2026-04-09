@@ -1,0 +1,37 @@
+# ccc — call coding CLIs
+
+> One command to run any coding CLI. A unified interface implemented in 20 programming languages.
+
+ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Claude Code, Codex, Kimi, Crush) behind a single consistent interface. Each of the 20 language implementations bundles an identical `ccc` CLI binary and a reusable library with `CommandSpec`, `CompletedRun`, and `Runner` types.
+
+## Usage
+
+ccc [runner] [+thinking] [:provider:model] [@alias] "<Prompt>"
+
+Slots are positional and parsed in order before the prompt:
+- runner: Select which coding CLI (default: oc). Options: opencode (oc), claude (cc), kimi (k), codex (rc), crush (cr)
+- +thinking: Set thinking level from +0 (off) to +4 (max)
+- :provider:model: Override provider and model
+- @alias: Use a named preset from ~/.config/ccc/config.toml
+
+Examples:
+- ccc "Fix the failing tests"
+- ccc cc +2 :anthropic:claude-sonnet-4-20250514 "Add tests"
+- ccc k +4 "Debug the parser"
+
+## Languages
+
+Implemented in: Python, Rust, TypeScript, C, Go, Ruby, Perl, C++, Zig, D, F#, Haskell, Nim, Crystal, PHP, PureScript, Elixir, OCaml, VBScript, x86-64 ASM.
+
+All implementations share: build_prompt_spec, CommandSpec, CompletedRun, Runner.run, ccc CLI, prompt trimming, empty prompt rejection, usage on bad args, CCC_REAL_OPENCODE env var, exit code forwarding, and startup failure reporting.
+
+18 of 20 languages also implement: v2 parser/config (runner selector, thinking levels, provider/model override, alias presets, config loading) and v3 JSON output parsing (OpenCode, Claude Code, Kimi schemas).
+
+## Docs
+
+- [CLI Reference](https://xertrov.github.io/call-coding-clis/): Full usage, slots, examples, feature matrix, build and test instructions
+
+## Optional
+
+- [GitHub Repository](https://github.com/xertrov/call-coding-clis): Source code, all 20 language implementations
+- [UNLICENSE](https://github.com/xertrov/call-coding-clis/blob/main/UNLICENSE): Public domain license

@@ -59,3 +59,4 @@ elixir/deps/
 .subagent-logs/
 .headless-*
 .worktrees/
+haskell/ccc

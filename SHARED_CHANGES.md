@@ -12,6 +12,7 @@ Entry format:
 ```md
 ## YYYY-MM-DD
 
+### Short change title
 - Change: short description of the semantic change
 - Required implementations: Python and Rust
 - Additional rollout: deferred | rolled out to <languages>
@@ -21,12 +22,21 @@ Entry format:
 
 ## 2026-04-09
 
+### Yolo mode and free-order controls added to Python and Rust
+- Change: Python and Rust now support `--yolo` / `-y`, free-order pre-prompt control tokens, and `--` to force literal prompt text
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/test_parser_config.py`, `tests/test_runner.py`, `rust/tests/parser_tests.rs`, `rust/tests/help_tests.rs`
+- Notes: bare `!!` was rejected because shell history expansion makes it unsafe; Claude now uses `claude -p`, Crush uses `crush run`, OpenCode yolo is env-config based, and RooCode yolo remains unverified
+
+### Codex runner now uses `codex exec`
 - Change: Codex runner now uses `codex exec` for non-interactive execution instead of bare `codex`
 - Required implementations: Python and Rust
 - Additional rollout: rolled out to C, C++, Go, TypeScript, Perl, PHP, Ruby, Crystal, D, Elixir, F#, Haskell, Nim, OCaml parser/tests, PureScript, Zig
 - Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/test_harness.py`
 - Notes: ASM remains on the first-pass prompt-only contract path
 
+### Visible-thinking flag added to Python and Rust
 - Change: `--show-thinking` / `--no-show-thinking` added to Python and Rust with config-backed `show_thinking` defaulting off
 - Required implementations: Python and Rust
 - Additional rollout: deferred

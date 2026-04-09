@@ -46,6 +46,42 @@ fn test_parse_thinking_level() {
 }
 
 #[test]
+fn test_parse_thinking_level_three() {
+    let args: Vec<String> = vec!["+3".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.thinking, Some(3));
+    assert_eq!(parsed.prompt, "hello");
+}
+
+#[test]
+fn test_parse_thinking_level_four() {
+    let args: Vec<String> = vec!["+4".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.thinking, Some(4));
+    assert_eq!(parsed.prompt, "hello");
+}
+
+#[test]
+fn test_parse_named_thinking_levels() {
+    let cases = [
+        ("+none", 0),
+        ("+low", 1),
+        ("+med", 2),
+        ("+mid", 2),
+        ("+medium", 2),
+        ("+high", 3),
+        ("+max", 4),
+        ("+xhigh", 4),
+    ];
+    for (token, expected) in cases {
+        let args: Vec<String> = vec![token.into(), "hello".into()];
+        let parsed = parse_args(&args);
+        assert_eq!(parsed.thinking, Some(expected));
+        assert_eq!(parsed.prompt, "hello");
+    }
+}
+
+#[test]
 fn test_parse_show_thinking_flag() {
     let args: Vec<String> = vec!["--show-thinking".into(), "hello".into()];
     let parsed = parse_args(&args);
@@ -59,6 +95,37 @@ fn test_parse_no_show_thinking_flag() {
     let parsed = parse_args(&args);
     assert_eq!(parsed.show_thinking, Some(false));
     assert_eq!(parsed.prompt, "hello");
+}
+
+#[test]
+fn test_parse_output_mode_flag() {
+    let args: Vec<String> = vec!["-o".into(), "stream-formatted".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.output_mode.as_deref(), Some("stream-formatted"));
+}
+
+#[test]
+fn test_parse_output_mode_sugar() {
+    let cases = [
+        (".text", "text"),
+        ("..text", "stream-text"),
+        (".json", "json"),
+        ("..json", "stream-json"),
+        (".fmt", "formatted"),
+        ("..fmt", "stream-formatted"),
+    ];
+    for (token, expected) in cases {
+        let args: Vec<String> = vec![token.into(), "hello".into()];
+        let parsed = parse_args(&args);
+        assert_eq!(parsed.output_mode.as_deref(), Some(expected));
+    }
+}
+
+#[test]
+fn test_parse_forward_unknown_json_flag() {
+    let args: Vec<String> = vec!["--forward-unknown-json".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert!(parsed.forward_unknown_json);
 }
 
 #[test]
@@ -283,6 +350,38 @@ fn test_resolve_thinking_flags() {
 }
 
 #[test]
+fn test_resolve_thinking_level_three_for_claude() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        thinking: Some(3),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert!(argv.contains(&"--thinking".to_string()));
+    assert!(argv.contains(&"enabled".to_string()));
+    assert!(argv.contains(&"--effort".to_string()));
+    assert!(argv.contains(&"high".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_thinking_level_four_for_claude() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        thinking: Some(4),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert!(argv.contains(&"--thinking".to_string()));
+    assert!(argv.contains(&"enabled".to_string()));
+    assert!(argv.contains(&"--effort".to_string()));
+    assert!(argv.contains(&"max".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
 fn test_resolve_show_thinking_for_opencode() {
     let parsed = ParsedArgs {
         show_thinking: Some(true),
@@ -469,6 +568,22 @@ fn test_resolve_provider_sets_env() {
     assert_eq!(
         env.get("CCC_PROVIDER").map(|s| s.as_str()),
         Some("anthropic")
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_opencode_sets_terminal_title_env() {
+    let parsed = ParsedArgs {
+        runner: Some("oc".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (_, env, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        env.get("OPENCODE_DISABLE_TERMINAL_TITLE")
+            .map(|s| s.as_str()),
+        Some("true")
     );
     assert!(warnings.is_empty());
 }
@@ -840,6 +955,80 @@ fn test_resolve_permission_mode_auto_warns_for_kimi() {
         warnings,
         vec!["warning: runner \"k\" does not support permission mode \"auto\"; ignoring it".to_string()]
     );
+}
+
+#[test]
+fn test_resolve_output_mode_defaults_to_text() {
+    let parsed = ParsedArgs {
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    assert_eq!(resolve_output_mode(&parsed, None).unwrap(), "text");
+}
+
+#[test]
+fn test_resolve_output_mode_uses_alias_default() {
+    let mut config = CccConfig::default();
+    config.aliases.insert(
+        "review".into(),
+        AliasDef {
+            output_mode: Some("formatted".into()),
+            ..Default::default()
+        },
+    );
+    let parsed = ParsedArgs {
+        alias: Some("review".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    assert_eq!(resolve_output_mode(&parsed, Some(&config)).unwrap(), "formatted");
+}
+
+#[test]
+fn test_resolve_claude_stream_formatted_output_plan() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        output_mode: Some("stream-formatted".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let plan = resolve_output_plan(&parsed, None).unwrap();
+    assert!(plan.stream);
+    assert!(plan.formatted);
+    assert_eq!(plan.schema.as_deref(), Some("claude-code"));
+    assert_eq!(
+        plan.argv_flags,
+        vec![
+            "--verbose",
+            "--output-format",
+            "stream-json",
+            "--include-partial-messages"
+        ]
+    );
+}
+
+#[test]
+fn test_resolve_opencode_json_output_plan() {
+    let parsed = ParsedArgs {
+        runner: Some("oc".into()),
+        output_mode: Some("json".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let plan = resolve_output_plan(&parsed, None).unwrap();
+    assert_eq!(plan.schema.as_deref(), Some("opencode"));
+    assert_eq!(plan.argv_flags, vec!["--format", "json"]);
+}
+
+#[test]
+fn test_resolve_unsupported_output_mode_errors() {
+    let parsed = ParsedArgs {
+        runner: Some("oc".into()),
+        output_mode: Some("stream-json".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    assert!(resolve_output_plan(&parsed, None).is_err());
 }
 
 #[test]

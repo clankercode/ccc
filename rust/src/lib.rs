@@ -14,10 +14,12 @@ pub use config::load_config;
 pub use help::{print_help, print_usage};
 pub use json_output::{
     parse_claude_code_json, parse_json_output, parse_kimi_json, parse_opencode_json, render_parsed,
-    JsonEvent, ParsedJsonOutput, TextContent, ThinkingContent, ToolCall, ToolResult,
+    FormattedRenderer, JsonEvent, ParsedJsonOutput, StructuredStreamProcessor, TextContent,
+    ThinkingContent, ToolCall, ToolResult,
 };
 pub use parser::{
-    parse_args, resolve_command, AliasDef, CccConfig, ParsedArgs, RunnerInfo, RUNNER_REGISTRY,
+    parse_args, resolve_command, resolve_output_mode, resolve_output_plan, resolve_show_thinking,
+    AliasDef, CccConfig, OutputPlan, ParsedArgs, RunnerInfo, RUNNER_REGISTRY,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -182,8 +184,9 @@ fn default_stream_executor(spec: CommandSpec, callback: StreamCallback) -> Compl
                     Ok(text) => {
                         buf.push_str(&text);
                         buf.push('\n');
+                        let chunk = format!("{text}\n");
                         if let Ok(mut cb) = cb_out.lock() {
-                            cb("stdout", &text);
+                            cb("stdout", &chunk);
                         }
                     }
                     Err(_) => break,
@@ -204,8 +207,9 @@ fn default_stream_executor(spec: CommandSpec, callback: StreamCallback) -> Compl
                     Ok(text) => {
                         buf.push_str(&text);
                         buf.push('\n');
+                        let chunk = format!("{text}\n");
                         if let Ok(mut cb) = cb_err.lock() {
-                            cb("stderr", &text);
+                            cb("stderr", &chunk);
                         }
                     }
                     Err(_) => break,

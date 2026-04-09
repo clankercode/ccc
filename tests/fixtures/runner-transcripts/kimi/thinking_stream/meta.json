@@ -1,0 +1,19 @@
+{
+  "runner": "kimi",
+  "cli_version": "kimi, version 1.30.0",
+  "argv": [
+    "kimi",
+    "--print",
+    "--output-format",
+    "stream-json",
+    "--prompt",
+    "What is 37*43? Reply with just the integer."
+  ],
+  "output_mode": "stream-json",
+  "capture_date": "2026-04-09",
+  "workspace": "repo-root",
+  "excerpted": false,
+  "redactions": [
+    "resume session id"
+  ]
+}

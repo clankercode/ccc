@@ -2,6 +2,7 @@
 
 require "minitest/autorun"
 require "call_coding_clis/json_output"
+require "pathname"
 
 OPENCODE_STDOUT = '{"response":"Hello from OpenCode"}'
 
@@ -29,6 +30,8 @@ LINES
 KIMI_THINKING = <<~LINES
   {"role":"assistant","content":[{"type":"think","think":"I need to analyze this...","encrypted":null},{"type":"text","text":"Here is my answer"}]}
 LINES
+
+FIXTURES = Pathname.new(__dir__).join("..", "..", "tests", "fixtures", "runner-transcripts")
 
 class TestParseOpenCodeJson < Minitest::Test
   def test_simple_response
@@ -166,5 +169,18 @@ class TestRenderParsed < Minitest::Test
     stdout = "not json\n#{OPENCODE_STDOUT}"
     result = CallCodingClis::JsonOutput.parse_opencode_json(stdout)
     assert_equal "Hello from OpenCode", result.final_text
+  end
+
+  def test_fixture_claude_stream_unknown_events
+    raw = FIXTURES.join("claude", "stream_unknown_events", "stdout.ndjson").read
+    result = CallCodingClis::JsonOutput.parse_claude_code_json(raw)
+    rendered = CallCodingClis::JsonOutput.render_parsed(result)
+    assert_includes rendered, "Computing the first multiplication."
+    assert_operator result.raw_lines.length, :>=, 10
+    assert result.raw_lines.any? { |obj| obj["type"] == "rate_limit_event" }
+    assert result.raw_lines.any? { |obj| obj["type"] == "stream_event" && obj.dig("event", "type") == "message_start" }
+    assert result.raw_lines.any? { |obj| obj["type"] == "stream_event" && obj.dig("event", "type") == "message_delta" }
+    assert result.raw_lines.any? { |obj| obj["type"] == "stream_event" && obj.dig("event", "type") == "message_stop" }
+    assert result.raw_lines.any? { |obj| obj["type"] == "stream_event" && obj.dig("event", "delta", "type") == "signature_delta" }
   end
 end

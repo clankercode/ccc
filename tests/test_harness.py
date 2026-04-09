@@ -510,6 +510,7 @@ TEST_CASES = [
 
 class CrossLanguageHarness(unittest.TestCase):
     selected_languages = LANGUAGES
+    formatted_languages = {"Python", "Rust"}
 
     @classmethod
     def setUpClass(cls):
@@ -524,6 +525,10 @@ class CrossLanguageHarness(unittest.TestCase):
         cls.bin_dir.mkdir()
         opencode_link = cls.bin_dir / "opencode"
         opencode_link.symlink_to(MOCK_BIN)
+        claude_link = cls.bin_dir / "claude"
+        claude_link.symlink_to(MOCK_BIN)
+        kimi_link = cls.bin_dir / "kimi"
+        kimi_link.symlink_to(MOCK_BIN)
 
         cls.base_env = os.environ.copy()
         cls.base_env["PATH"] = f"{cls.bin_dir}:{cls.base_env.get('PATH', '')}"
@@ -587,6 +592,50 @@ class CrossLanguageHarness(unittest.TestCase):
                         self.fail(
                             f"[{lang.name}] extra args: exit code {result.returncode}, expected 0 or 1"
                         )
+
+    def test_formatted_output_mode_sugar_for_supported_languages(self):
+        cases = [
+            (
+                ["cc", ".fmt"],
+                "tool call",
+                "claude-code",
+                ["[tool:start] read_file", "[tool:result] read_file (ok)", "[assistant] mock: tool call executed"],
+            ),
+            (
+                ["cc", "..fmt", "--show-thinking"],
+                "thinking",
+                "claude-code",
+                ["[thinking] Let me think about this...", "[assistant] mock: thinking done"],
+            ),
+            (
+                ["k", ".fmt"],
+                "tool call",
+                "kimi-code",
+                ["[tool:result] file contents here", "[assistant] mock: tool call executed"],
+            ),
+            (
+                ["k", "..fmt", "--show-thinking"],
+                "thinking",
+                "kimi-code",
+                ["[thinking] Let me think about this...", "[assistant] mock: thinking done"],
+            ),
+        ]
+
+        for lang in self.selected_languages:
+            if lang.name not in self.formatted_languages:
+                continue
+            if not lang.build_ok:
+                self.skipTest(lang.build_error)
+
+            for extra_args, prompt, schema, expected_fragments in cases:
+                env = self._make_env(lang)
+                env["MOCK_JSON_SCHEMA"] = schema
+                with self.subTest(language=lang.name, args=extra_args):
+                    result = lang.invoke_with_args(extra_args, prompt, env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    for fragment in expected_fragments:
+                        self.assertIn(fragment, result.stdout)
+                    self.assertEqual(result.stderr, "")
 
 
 def _usage_language_names() -> List[str]:

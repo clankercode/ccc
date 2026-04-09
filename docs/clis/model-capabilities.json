@@ -1,0 +1,530 @@
+{
+  "schema_version": 2,
+  "last_reviewed": "2026-04-09",
+  "purpose": "Shared source of truth for model-level thinking capability notes that inform ccc docs and future runner/model mapping work.",
+  "schema_notes": [
+    "Entries may describe provider-wide families, runner-specific families, or narrower provider-plus-runner combinations when capability behavior differs by surface.",
+    "Use family-level entries when behavior is uniform. Split into narrower entries when the same underlying model family behaves differently through different CLIs or providers.",
+    "runner_discoveries captures auth-scoped snapshots such as `opencode models`, while models captures normalized capability rules inferred from those snapshots and verification."
+  ],
+  "update_policy": {
+    "review_when": [
+      "a new model family becomes a realistic ccc target",
+      "a runner exposes a new model-listing command or changes auth-scoped availability",
+      "a supported CLI changes its thinking or reasoning flags",
+      "a provider introduces or retires a reasoning tier",
+      "a docs refresh touches docs/clis/README.md or model thinking notes"
+    ],
+    "verification_rule": "Prefer real CLI help and direct smoke checks. Use upstream docs when the CLI surface alone is not enough."
+  },
+  "thinking_scale": {
+    "external_contract": {
+      "0": "off",
+      "1": "low",
+      "2": "medium",
+      "3": "high",
+      "4": "top"
+    },
+    "notes": [
+      "ccc keeps the public contract numeric even when vendor labels differ.",
+      "Top tier is provider-labeled: Anthropic says max, OpenAI-style labels say xhigh."
+    ]
+  },
+  "runner_discoveries": [
+    {
+      "runner": "oc",
+      "command": "opencode models",
+      "scope": "auth_scoped",
+      "executed_at": "2026-04-09",
+      "sandbox": "outside",
+      "status": "ok",
+      "notes": "Local sandboxed runs failed with an OpenCode DB error, but the same command succeeded outside the sandbox. Treat availability as auth-scoped and environment-sensitive.",
+      "models": [
+        "opencode/big-pickle",
+        "opencode/gpt-5-nano",
+        "opencode/minimax-m2.5-free",
+        "opencode/nemotron-3-super-free",
+        "github-copilot/claude-haiku-4.5",
+        "github-copilot/claude-opus-4.5",
+        "github-copilot/claude-opus-4.6",
+        "github-copilot/claude-sonnet-4",
+        "github-copilot/claude-sonnet-4.5",
+        "github-copilot/claude-sonnet-4.6",
+        "github-copilot/gemini-2.5-pro",
+        "github-copilot/gemini-3-flash-preview",
+        "github-copilot/gemini-3.1-pro-preview",
+        "github-copilot/gpt-4.1",
+        "github-copilot/gpt-4o",
+        "github-copilot/gpt-5-mini",
+        "github-copilot/gpt-5.1",
+        "github-copilot/gpt-5.2",
+        "github-copilot/gpt-5.2-codex",
+        "github-copilot/gpt-5.3-codex",
+        "github-copilot/gpt-5.4",
+        "github-copilot/grok-code-fast-1",
+        "kimi-for-coding/k2p5",
+        "kimi-for-coding/kimi-k2-thinking",
+        "zai-coding-plan/glm-4.5",
+        "zai-coding-plan/glm-4.5-air",
+        "zai-coding-plan/glm-4.5-flash",
+        "zai-coding-plan/glm-4.5v",
+        "zai-coding-plan/glm-4.6",
+        "zai-coding-plan/glm-4.6v",
+        "zai-coding-plan/glm-4.7",
+        "zai-coding-plan/glm-4.7-flash",
+        "zai-coding-plan/glm-4.7-flashx",
+        "zai-coding-plan/glm-5",
+        "zai-coding-plan/glm-5-turbo",
+        "zai-coding-plan/glm-5.1",
+        "zai-coding-plan/glm-5v-turbo"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "provider": "anthropic",
+      "family": "claude-4",
+      "provider_route": "direct",
+      "match": [
+        "claude-sonnet-4",
+        "claude-opus-4"
+      ],
+      "runner": "cc",
+      "auth_scoped": false,
+      "discovered_via": [
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "ladder",
+      "supported_levels": [0, 1, 2, 3, 4],
+      "level_labels": {
+        "0": "disabled",
+        "1": "low",
+        "2": "medium",
+        "3": "high",
+        "4": "max"
+      },
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_help",
+        "real_cli_smoke",
+        "upstream_docs"
+      ],
+      "notes": "Maps cleanly onto ccc +0..+4."
+    },
+    {
+      "provider": "openai",
+      "family": "gpt-5",
+      "provider_route": "direct",
+      "match": [
+        "gpt-5",
+        "gpt-5-mini",
+        "gpt-5.1",
+        "gpt-5.1-mini",
+        "gpt-5.2",
+        "gpt-5.4"
+      ],
+      "runner": "c",
+      "auth_scoped": false,
+      "discovered_via": [
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "ladder",
+      "supported_levels": [0, 1, 2, 3, 4],
+      "level_labels": {
+        "0": "disabled",
+        "1": "low",
+        "2": "medium",
+        "3": "high",
+        "4": "xhigh"
+      },
+      "visible_thinking": "unknown",
+      "source_priority": [
+        "real_cli_help",
+        "real_cli_smoke",
+        "upstream_docs"
+      ],
+      "notes": "OpenAI-style reasoning labels use xhigh at the top tier."
+    },
+    {
+      "provider": "openai",
+      "family": "codex",
+      "provider_route": "direct",
+      "match": [
+        "codex",
+        "codex-cli"
+      ],
+      "runner": "c",
+      "auth_scoped": false,
+      "discovered_via": [
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "unknown",
+      "supported_levels": [],
+      "level_labels": {},
+      "visible_thinking": "unknown",
+      "source_priority": [
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "notes": "Codex is primarily an approval and sandbox control surface rather than a verified multi-tier thinking ladder."
+    },
+    {
+      "provider": "moonshot",
+      "family": "kimi-k2",
+      "provider_route": "direct",
+      "match": [
+        "k2",
+        "kimi-k2"
+      ],
+      "runner": "k",
+      "auth_scoped": false,
+      "discovered_via": [
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "binary",
+      "supported_levels": [0, 1, 2, 3, 4],
+      "level_labels": {
+        "0": "no-thinking",
+        "1": "thinking",
+        "2": "thinking",
+        "3": "thinking",
+        "4": "thinking"
+      },
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_help",
+        "real_cli_smoke",
+        "upstream_docs"
+      ],
+      "notes": "ccc currently collapses +1..+4 to on because Kimi exposes binary thinking control."
+    },
+    {
+      "provider": "zai",
+      "family": "glm-5.1-coding",
+      "provider_route": "zai-coding-plan",
+      "match": [
+        "zai-coding-plan/glm-5.1",
+        "zai-coding-plan/glm-5",
+        "zai-coding-plan/glm-5-turbo",
+        "zai-coding-plan/glm-5v-turbo"
+      ],
+      "runner": "oc",
+      "auth_scoped": true,
+      "discovered_via": [
+        "real_cli_model_listing",
+        "real_cli_help"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "unknown",
+      "supported_levels": [],
+      "level_labels": {},
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke",
+        "upstream_docs"
+      ],
+      "notes": "Runner-specific OpenCode provider-route entry seeded from `opencode models`. Exact thinking-tier mapping still needs verification."
+    },
+    {
+      "provider": "moonshot",
+      "family": "kimi-for-coding",
+      "provider_route": "kimi-for-coding",
+      "match": [
+        "kimi-for-coding/k2p5",
+        "kimi-for-coding/kimi-k2-thinking"
+      ],
+      "runner": "oc",
+      "auth_scoped": true,
+      "discovered_via": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "binary",
+      "supported_levels": [0, 1, 2, 3, 4],
+      "level_labels": {
+        "0": "no-thinking",
+        "1": "thinking",
+        "2": "thinking",
+        "3": "thinking",
+        "4": "thinking"
+      },
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke",
+        "upstream_docs"
+      ],
+      "notes": "Provisional runner-specific Kimi family mapping for OpenCode; route smoke-checked with `opencode run -m kimi-for-coding/kimi-k2-thinking --thinking`, but the exact route-level thinking semantics still need deeper verification."
+    },
+    {
+      "provider": "opencode",
+      "family": "opencode-builtins",
+      "provider_route": "opencode",
+      "match": [
+        "opencode/big-pickle",
+        "opencode/gpt-5-nano"
+      ],
+      "runner": "oc",
+      "auth_scoped": true,
+      "discovered_via": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "unknown",
+      "supported_levels": [],
+      "level_labels": {},
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "notes": "OpenCode-authored built-ins surfaced by `opencode models`; route smoke-checked with `opencode run -m opencode/gpt-5-nano --thinking`, but thinking semantics remain unverified."
+    },
+    {
+      "provider": "github-copilot",
+      "family": "claude",
+      "provider_route": "github-copilot",
+      "match": [
+        "github-copilot/claude-haiku-4.5",
+        "github-copilot/claude-opus-4.5",
+        "github-copilot/claude-opus-4.6",
+        "github-copilot/claude-sonnet-4",
+        "github-copilot/claude-sonnet-4.5",
+        "github-copilot/claude-sonnet-4.6"
+      ],
+      "runner": "oc",
+      "auth_scoped": true,
+      "discovered_via": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "unknown",
+      "supported_levels": [],
+      "level_labels": {},
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "notes": "GitHub Copilot-hosted Claude variants listed by OpenCode; smoke-checked with the cheaper `opencode run -m github-copilot/claude-haiku-4.5 --thinking`, but thinking semantics remain unverified."
+    },
+    {
+      "provider": "github-copilot",
+      "family": "gpt",
+      "provider_route": "github-copilot",
+      "match": [
+        "github-copilot/gpt-4.1",
+        "github-copilot/gpt-4o",
+        "github-copilot/gpt-5-mini",
+        "github-copilot/gpt-5.1",
+        "github-copilot/gpt-5.2",
+        "github-copilot/gpt-5.2-codex",
+        "github-copilot/gpt-5.3-codex",
+        "github-copilot/gpt-5.4"
+      ],
+      "runner": "oc",
+      "auth_scoped": true,
+      "discovered_via": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "unknown",
+      "supported_levels": [],
+      "level_labels": {},
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "notes": "Discovery-only OpenCode inventory; smoke-checked with the cheaper `opencode run -m github-copilot/gpt-4.1 --thinking` and `opencode run -m github-copilot/gpt-5-mini --thinking`, but do not assume these all share one exact reasoning surface."
+    },
+    {
+      "provider": "github-copilot",
+      "family": "gemini",
+      "provider_route": "github-copilot",
+      "match": [
+        "github-copilot/gemini-2.5-pro",
+        "github-copilot/gemini-3-flash-preview",
+        "github-copilot/gemini-3.1-pro-preview"
+      ],
+      "runner": "oc",
+      "auth_scoped": true,
+      "discovered_via": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "unknown",
+      "supported_levels": [],
+      "level_labels": {},
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "notes": "Route smoke-checked with the cheaper `opencode run -m github-copilot/gemini-3-flash-preview --thinking`; keep semantics unknown until route-specific reasoning behavior is verified more deeply."
+    },
+    {
+      "provider": "github-copilot",
+      "family": "grok",
+      "provider_route": "github-copilot",
+      "match": [
+        "github-copilot/grok-code-fast-1"
+      ],
+      "runner": "oc",
+      "auth_scoped": true,
+      "discovered_via": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "unknown",
+      "supported_levels": [],
+      "level_labels": {},
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "notes": "Route smoke-checked with `opencode run -m github-copilot/grok-code-fast-1 --thinking`; semantics remain unverified."
+    },
+    {
+      "provider": "minimax",
+      "family": "minimax-m2.5",
+      "provider_route": "minimax",
+      "match": [
+        "opencode/minimax-m2.5-free"
+      ],
+      "runner": "oc",
+      "auth_scoped": true,
+      "discovered_via": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "unknown",
+      "supported_levels": [],
+      "level_labels": {},
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "notes": "Route smoke-checked with `opencode run -m opencode/minimax-m2.5-free --thinking`; availability is confirmed, semantics remain unknown."
+    },
+    {
+      "provider": "nemotron",
+      "family": "nemotron-3-super",
+      "provider_route": "nemotron",
+      "match": [
+        "opencode/nemotron-3-super-free"
+      ],
+      "runner": "oc",
+      "auth_scoped": true,
+      "discovered_via": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "unknown",
+      "supported_levels": [],
+      "level_labels": {},
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "notes": "Route smoke-checked with `opencode run -m opencode/nemotron-3-super-free --thinking`; semantics remain unknown."
+    },
+    {
+      "provider": "zai",
+      "family": "glm",
+      "provider_route": "zai-coding-plan",
+      "match": [
+        "zai-coding-plan/glm-4.5",
+        "zai-coding-plan/glm-4.5-air",
+        "zai-coding-plan/glm-4.5-flash",
+        "zai-coding-plan/glm-4.5v",
+        "zai-coding-plan/glm-4.6",
+        "zai-coding-plan/glm-4.6v",
+        "zai-coding-plan/glm-4.7",
+        "zai-coding-plan/glm-4.7-flash",
+        "zai-coding-plan/glm-4.7-flashx",
+        "zai-coding-plan/glm-5",
+        "zai-coding-plan/glm-5-turbo",
+        "zai-coding-plan/glm-5.1",
+        "zai-coding-plan/glm-5v-turbo"
+      ],
+      "runner": "oc",
+      "auth_scoped": true,
+      "discovered_via": [
+        "real_cli_model_listing",
+        "real_cli_help"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "unknown",
+      "supported_levels": [],
+      "level_labels": {},
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "notes": "Route-specific entry from `opencode models`; route smoke-checked with `opencode run -m zai-coding-plan/glm-5.1 --thinking`, and provider routing is part of the semantics."
+    },
+    {
+      "provider": "unknown",
+      "family": "unverified",
+      "provider_route": "mixed",
+      "match": [],
+      "runner": "oc",
+      "auth_scoped": true,
+      "discovered_via": [
+        "real_cli_model_listing",
+        "real_cli_help"
+      ],
+      "last_verified": "2026-04-09",
+      "thinking_mode": "unknown",
+      "supported_levels": [],
+      "level_labels": {},
+      "visible_thinking": "supported",
+      "source_priority": [
+        "real_cli_model_listing",
+        "real_cli_help",
+        "real_cli_smoke"
+      ],
+      "notes": "OpenCode currently has a visible-thinking flag, but model-level tier mapping is not yet verified in shared docs."
+    }
+  ]
+}

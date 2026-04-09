@@ -1,11 +1,19 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import {
   JsonEvent, ParsedJsonOutput, ToolCall, ToolResult,
   parseOpenCodeJson, parseClaudeCodeJson, parseKimiJson,
   parseJsonOutput, renderParsed,
 } from '../src/json_output.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const fixture = (...parts) =>
+  fs.readFileSync(path.join(__dirname, '../../tests/fixtures/runner-transcripts', ...parts), 'utf8')
 
 test('parseOpenCodeJson: single response line', () => {
   const input = JSON.stringify({ response: 'hello world' })
@@ -215,4 +223,17 @@ test('renderParsed: falls back to final_text when no renderable events', () => {
   const output = new ParsedJsonOutput('test')
   output.final_text = 'fallback'
   assert.equal(renderParsed(output), 'fallback')
+})
+
+test('parseClaudeCodeJson: fixture keeps unknown stream event shapes in raw_lines', () => {
+  const input = fixture('claude', 'stream_unknown_events', 'stdout.ndjson')
+  const result = parseClaudeCodeJson(input)
+  const rendered = renderParsed(result)
+  assert.match(rendered, /Computing the first multiplication\./)
+  assert.ok(result.raw_lines.length >= 10)
+  assert.ok(result.raw_lines.some(obj => obj.type === 'rate_limit_event'))
+  assert.ok(result.raw_lines.some(obj => obj.type === 'stream_event' && obj.event?.type === 'message_start'))
+  assert.ok(result.raw_lines.some(obj => obj.type === 'stream_event' && obj.event?.type === 'message_delta'))
+  assert.ok(result.raw_lines.some(obj => obj.type === 'stream_event' && obj.event?.type === 'message_stop'))
+  assert.ok(result.raw_lines.some(obj => obj.type === 'stream_event' && obj.event?.delta?.type === 'signature_delta'))
 })

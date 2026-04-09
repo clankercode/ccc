@@ -1,0 +1,20 @@
+{
+  "runner": "kimi",
+  "cli_version": "kimi, version 1.30.0",
+  "argv": [
+    "kimi",
+    "--print",
+    "--output-format",
+    "stream-json",
+    "--prompt",
+    "Run a bash command that prints two short lines, then reply with exactly done."
+  ],
+  "output_mode": "stream-json",
+  "capture_date": "2026-04-09",
+  "workspace": "temp-dir",
+  "excerpted": false,
+  "redactions": [
+    "resume session id",
+    "tool ids"
+  ]
+}

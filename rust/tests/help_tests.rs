@@ -16,6 +16,11 @@ fn test_help_mentions_name_slot() {
     assert!(stdout.contains(
         "--show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it"
     ));
+    assert!(stdout.contains(
+        "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>"
+    ));
+    assert!(stdout.contains("--forward-unknown-json"));
+    assert!(stdout.contains(".text / ..text, .json / ..json, .fmt / ..fmt"));
     assert!(stdout.contains("--permission-mode <safe|auto|yolo|plan>"));
     assert!(stdout.contains("--yolo / -y"));
     assert!(stdout.contains("Treat all remaining args as prompt text"));

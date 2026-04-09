@@ -37,7 +37,7 @@ This order is not yet committed as final behavior.
   - `+1`: low
   - `+2`: medium
   - `+3`: high
-  - `+4`: xhigh/max
+  - `+4`: top tier (`max` / `xhigh`, depending on vendor label)
 - The external contract should stay numeric even if internal runners use different labels.
 
 ## `:provider:model` And `:model` Design Notes

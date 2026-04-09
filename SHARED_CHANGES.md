@@ -22,6 +22,45 @@ Entry format:
 
 ## 2026-04-09
 
+### Output modes and formatted streaming added to Python and Rust
+- Change: Python and Rust now support `--output-mode`, dot-sugar output selectors, raw streaming, and formatted transcript rendering with shared output-mode semantics
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/test_harness.py`, `tests/test_parser_config.py`, `tests/test_runner.py`, `tests/test_json_output.py`, `rust/tests/parser_tests.rs`, `rust/tests/help_tests.rs`, `rust/tests/json_output_tests.rs`, `rust/tests/config_tests.rs`
+- Notes: default output mode is now configurable in TOML; real sanitized runner transcript fixtures were added under `tests/fixtures/runner-transcripts/`; local smoke verification confirmed Claude `stream-json` needs `--verbose` and OpenCode uses `--format json`; Python and Rust now add Claude `--verbose` automatically for `stream-json` and `stream-formatted`; `.fmt` and `..fmt` now have explicit contract/runtime coverage; follow-up work in progress adds `--forward-unknown-json` so formatted modes can surface unhandled structured events during integration/debugging; Python and Rust also suppress duplicate final assistant/result renders when Claude streams `text_delta` chunks and then repeats the same full text in later `assistant`/`result` events; the manual visual smoke script lives under `scripts/smoke-output-modes.sh`, now defaults Claude smoke runs to `:anthropic:claude-haiku-4-5`, and no longer enables unknown-JSON forwarding by default
+
+### Claude unknown stream-event fixture added for cross-language parsers
+- Change: a real Claude `stream_unknown_events` fixture now captures unhandled stream-event shapes like `message_start`, `message_delta`, `message_stop`, `signature_delta`, and `rate_limit_event`
+- Required implementations: Python and Rust
+- Additional rollout: test-only parser fixture coverage added in TypeScript, Ruby, Perl, Crystal, and Elixir
+- Shared tests updated: `tests/test_json_output.py`, `rust/tests/json_output_tests.rs`, `typescript/tests/json_output.test.mjs`, `ruby/test/test_json_output.rb`, `perl/t/06_json_output.t`, `crystal/spec/json_output_spec.cr`, `elixir/test/call_coding_clis/json_output_test.exs`
+- Notes: this was a test rollout, not a feature rollout for those extra languages; they currently pin the fixture through `raw_lines` rather than `unknown_json_lines`; languages without raw/unknown line retention still need follow-up work if we want the same regression signal there
+
+### Kimi human-mode stderr filtering and current OpenCode JSON event shape
+- Change: Python and Rust now strip Kimi's `To resume this session: kimi -r ...` stderr hint in human-facing formatted modes, and the OpenCode JSON parser now understands the current event-stream style `step_start` / `text` / `step_finish` output instead of assuming only a legacy one-shot `response` object
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_runner.py`, `tests/test_json_output.py`, `rust/tests/json_output_tests.rs`
+- Notes: this follow-up came from real smoke runs; OpenCode `--format json` currently emits event objects rather than the older one-shot response shape, and Python/Rust now also strip OpenCode OSC terminal-title sequences from buffered raw output so `oc json` stays machine-clean in local verification
+
+### Model thinking capability data is now structured
+- Change: model-level thinking capability notes now live in `docs/clis/model-capabilities.json`, with refresh instructions in `docs/clis/updating-model-capabilities.md`
+- Required implementations: none
+- Additional rollout: docs-only
+- Shared tests updated: none
+- Notes: `docs/clis/README.md` now treats the markdown thinking matrix as a human summary rather than the source of truth; the JSON now distinguishes raw auth-scoped `runner_discoveries` from normalized `models`, and the OpenCode inventory was seeded from a successful outside-sandbox `opencode models` run
+
+## 2026-04-09
+
+### Thinking-level mapping clarified
+- Change: `+3` resolves to `high` and `+4` resolves to the vendor top tier; Anthropic uses `max` and OpenAI-style labels use `xhigh`
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/test_parser_config.py`, `rust/tests/parser_tests.rs`
+- Notes: added a thinking matrix under `docs/clis/README.md` and corrected the stale mapping note in `CCC_PARSER_CONFIG_DESIGN.md`
+
+## 2026-04-09
+
 ### Permission mode added to Python and Rust
 - Change: Python and Rust now support `--permission-mode <safe|auto|yolo|plan>` with runner-specific mappings where the semantics are honest
 - Required implementations: Python and Rust

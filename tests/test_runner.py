@@ -1,9 +1,32 @@
 import subprocess
 import unittest
 from unittest import mock
+from call_coding_clis.cli import _filtered_human_stderr, _sanitize_raw_output
 
 
 class RunnerTests(unittest.TestCase):
+    def test_filtered_human_stderr_strips_kimi_resume_hint(self) -> None:
+        stderr = "\nTo resume this session: kimi -r 123e4567-e89b-12d3-a456-426614174000\n"
+        self.assertEqual(_filtered_human_stderr(stderr, "k"), "")
+
+    def test_filtered_human_stderr_keeps_other_runners(self) -> None:
+        stderr = "warning: something else\n"
+        self.assertEqual(_filtered_human_stderr(stderr, "cc"), stderr)
+
+    def test_sanitize_raw_output_strips_opencode_osc_title(self) -> None:
+        stdout = (
+            '{"type":"text","part":{"text":"alpha"}}\n'
+            "\x1b]9;OC | call-coding-clis: Agent finished: alpha\x07"
+        )
+        self.assertEqual(
+            _sanitize_raw_output(stdout, "oc"),
+            '{"type":"text","part":{"text":"alpha"}}\n',
+        )
+
+    def test_sanitize_raw_output_keeps_other_runners(self) -> None:
+        stdout = "plain output\n"
+        self.assertEqual(_sanitize_raw_output(stdout, "cc"), stdout)
+
     def test_imports_public_api(self) -> None:
         from call_coding_clis import CommandSpec, CompletedRun, Runner
 
@@ -117,6 +140,9 @@ class RunnerTests(unittest.TestCase):
         from call_coding_clis.help import HELP_TEXT
 
         self.assertIn("--show-thinking", HELP_TEXT)
+        self.assertIn("--output-mode", HELP_TEXT)
+        self.assertIn("--forward-unknown-json", HELP_TEXT)
+        self.assertIn(".json / ..json", HELP_TEXT)
         self.assertIn("--permission-mode <safe|auto|yolo|plan>", HELP_TEXT)
         self.assertIn("--yolo / -y", HELP_TEXT)
         self.assertIn("Treat all remaining args as prompt text", HELP_TEXT)

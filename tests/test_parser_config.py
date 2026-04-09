@@ -5,6 +5,9 @@ from pathlib import Path
 from call_coding_clis.parser import (
     parse_args,
     resolve_command,
+    resolve_output_mode,
+    resolve_output_plan,
+    resolve_show_thinking,
     ParsedArgs,
     CccConfig,
     AliasDef,
@@ -58,7 +61,9 @@ class ParseArgsTests(unittest.TestCase):
             "+med": 2,
             "+mid": 2,
             "+medium": 2,
+            "+3": 3,
             "+high": 3,
+            "+4": 4,
             "+max": 4,
             "+xhigh": 4,
         }
@@ -84,6 +89,30 @@ class ParseArgsTests(unittest.TestCase):
         parsed = parse_args(["@work", "hello"])
         self.assertEqual(parsed.alias, "work")
         self.assertEqual(parsed.prompt, "hello")
+
+    def test_output_mode_flag(self):
+        parsed = parse_args(["-o", "stream-formatted", "hello"])
+        self.assertEqual(parsed.output_mode, "stream-formatted")
+        self.assertEqual(parsed.prompt, "hello")
+
+    def test_output_mode_sugar(self):
+        cases = {
+            ".text": "text",
+            "..text": "stream-text",
+            ".json": "json",
+            "..json": "stream-json",
+            ".fmt": "formatted",
+            "..fmt": "stream-formatted",
+        }
+        for token, expected in cases.items():
+            with self.subTest(token=token):
+                parsed = parse_args([token, "hello"])
+                self.assertEqual(parsed.output_mode, expected)
+                self.assertEqual(parsed.prompt, "hello")
+
+    def test_forward_unknown_json_flag(self):
+        parsed = parse_args(["--forward-unknown-json", "hello"])
+        self.assertTrue(parsed.forward_unknown_json)
 
     def test_full_combo(self):
         parsed = parse_args(
@@ -235,6 +264,22 @@ class ResolveCommandTests(unittest.TestCase):
             ["claude", "-p", "--thinking", "enabled", "--effort", "medium"],
         )
 
+    def test_plus_three_for_claude_uses_high_flag(self):
+        parsed = parse_args(["cc", "+3", "hello"])
+        argv, _env, _warnings = resolve_command(parsed)
+        self.assertEqual(
+            argv[:6],
+            ["claude", "-p", "--thinking", "enabled", "--effort", "high"],
+        )
+
+    def test_plus_four_for_claude_uses_max_flag(self):
+        parsed = parse_args(["cc", "+4", "hello"])
+        argv, _env, _warnings = resolve_command(parsed)
+        self.assertEqual(
+            argv[:6],
+            ["claude", "-p", "--thinking", "enabled", "--effort", "max"],
+        )
+
     def test_show_thinking_for_opencode(self):
         parsed = ParsedArgs(show_thinking=True, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
@@ -294,6 +339,11 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(provider="anthropic", prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
         self.assertEqual(env.get("CCC_PROVIDER"), "anthropic")
+
+    def test_opencode_sets_terminal_title_env(self):
+        parsed = ParsedArgs(runner="oc", prompt="hello")
+        argv, env, _warnings = resolve_command(parsed)
+        self.assertEqual(env.get("OPENCODE_DISABLE_TERMINAL_TITLE"), "true")
 
     def test_empty_prompt_raises(self):
         parsed = ParsedArgs(prompt="   ")
@@ -386,7 +436,7 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(alias="reviewer", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
         self.assertEqual(argv[:4], ["opencode", "run", "--agent", "reviewer"])
-        self.assertEqual(env, {})
+        self.assertEqual(env, {"OPENCODE_DISABLE_TERMINAL_TITLE": "true"})
         self.assertEqual(warnings, [])
 
     def test_alias_falls_back_to_agent_for_claude(self):
@@ -511,6 +561,55 @@ class ResolveCommandTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             resolve_command(parsed)
 
+    def test_output_mode_defaults_to_text(self):
+        parsed = ParsedArgs(prompt="hello")
+        self.assertEqual(resolve_output_mode(parsed), "text")
+
+    def test_output_mode_uses_alias_default(self):
+        config = CccConfig(aliases={"review": AliasDef(output_mode="formatted")})
+        parsed = ParsedArgs(alias="review", prompt="hello")
+        self.assertEqual(resolve_output_mode(parsed, config), "formatted")
+
+    def test_config_default_output_mode(self):
+        config = CccConfig(default_output_mode="stream-formatted")
+        parsed = ParsedArgs(prompt="hello")
+        self.assertEqual(resolve_output_mode(parsed, config), "stream-formatted")
+
+    def test_unsupported_output_mode_raises(self):
+        parsed = ParsedArgs(runner="oc", output_mode="stream-json", prompt="hello")
+        with self.assertRaises(ValueError):
+            resolve_output_plan(parsed)
+
+    def test_claude_stream_formatted_output_plan(self):
+        parsed = ParsedArgs(runner="cc", output_mode="stream-formatted", prompt="hello")
+        plan = resolve_output_plan(parsed)
+        self.assertTrue(plan.stream)
+        self.assertTrue(plan.formatted)
+        self.assertEqual(plan.schema, "claude-code")
+        self.assertEqual(
+            plan.argv_flags,
+            ["--verbose", "--output-format", "stream-json", "--include-partial-messages"],
+        )
+
+    def test_kimi_stream_json_output_plan(self):
+        parsed = ParsedArgs(runner="k", output_mode="stream-json", prompt="hello")
+        plan = resolve_output_plan(parsed)
+        self.assertTrue(plan.stream)
+        self.assertFalse(plan.formatted)
+        self.assertEqual(plan.schema, "kimi")
+        self.assertEqual(plan.argv_flags, ["--print", "--output-format", "stream-json"])
+
+    def test_opencode_json_output_plan(self):
+        parsed = ParsedArgs(runner="oc", output_mode="json", prompt="hello")
+        plan = resolve_output_plan(parsed)
+        self.assertEqual(plan.schema, "opencode")
+        self.assertEqual(plan.argv_flags, ["--format", "json"])
+
+    def test_show_thinking_resolution_uses_alias(self):
+        config = CccConfig(aliases={"review": AliasDef(show_thinking=True)})
+        parsed = ParsedArgs(alias="review", prompt="hello")
+        self.assertTrue(resolve_show_thinking(parsed, config))
+
 
 class LoadConfigTests(unittest.TestCase):
     def test_missing_file_returns_defaults(self):
@@ -525,6 +624,7 @@ class LoadConfigTests(unittest.TestCase):
 runner = "cc"
 provider = "anthropic"
 model = "claude-4"
+output_mode = "stream-formatted"
 thinking = 2
 show_thinking = true
 
@@ -535,6 +635,7 @@ mycc = "cc"
 runner = "cc"
 thinking = 3
 show_thinking = true
+output_mode = "formatted"
 model = "claude-4"
 agent = "reviewer"
 
@@ -547,6 +648,7 @@ runner = "oc"
         self.assertEqual(config.default_runner, "cc")
         self.assertEqual(config.default_provider, "anthropic")
         self.assertEqual(config.default_model, "claude-4")
+        self.assertEqual(config.default_output_mode, "stream-formatted")
         self.assertEqual(config.default_thinking, 2)
         self.assertTrue(config.default_show_thinking)
         self.assertEqual(config.abbreviations, {"mycc": "cc"})
@@ -556,8 +658,16 @@ runner = "oc"
         self.assertEqual(config.aliases["work"].model, "claude-4")
         self.assertEqual(config.aliases["work"].agent, "reviewer")
         self.assertTrue(config.aliases["work"].show_thinking)
+        self.assertEqual(config.aliases["work"].output_mode, "formatted")
         self.assertIn("quick", config.aliases)
         self.assertEqual(config.aliases["quick"].runner, "oc")
+
+    def test_legacy_default_output_mode(self):
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".toml", delete=False) as f:
+            f.write(b'default_output_mode = "json"\n')
+            f.flush()
+            config = load_config(f.name)
+        self.assertEqual(config.default_output_mode, "json")
 
     def test_empty_toml_returns_defaults(self):
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".toml", delete=False) as f:

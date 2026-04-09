@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import os
+import queue
+import threading
 import subprocess
 from typing import Callable
 
@@ -92,11 +94,54 @@ class Runner:
             stderr = f"failed to start {spec.argv[0]}: {error}\n"
             on_event("stderr", stderr)
             return subprocess.CompletedProcess(spec.argv, 1, "", stderr)
-        stdout, stderr = process.communicate(input=spec.stdin_text)
-        if stdout:
-            on_event("stdout", stdout)
-        if stderr:
-            on_event("stderr", stderr)
+
+        if spec.stdin_text is not None and process.stdin is not None:
+            process.stdin.write(spec.stdin_text)
+            process.stdin.close()
+
+        event_queue: queue.Queue[tuple[str, str] | tuple[str, None]] = queue.Queue()
+        stdout_chunks: list[str] = []
+        stderr_chunks: list[str] = []
+
+        def pump(channel: str, stream) -> None:
+            try:
+                while True:
+                    chunk = stream.read(1)
+                    if not chunk:
+                        break
+                    event_queue.put((channel, chunk))
+            finally:
+                stream.close()
+                event_queue.put((channel, None))
+
+        stdout_thread = threading.Thread(
+            target=pump,
+            args=("stdout", process.stdout),
+            daemon=True,
+        )
+        stderr_thread = threading.Thread(
+            target=pump,
+            args=("stderr", process.stderr),
+            daemon=True,
+        )
+        stdout_thread.start()
+        stderr_thread.start()
+
+        closed = 0
+        while closed < 2:
+            channel, chunk = event_queue.get()
+            if chunk is None:
+                closed += 1
+                continue
+            if channel == "stdout":
+                stdout_chunks.append(chunk)
+            else:
+                stderr_chunks.append(chunk)
+            on_event(channel, chunk)
+
+        process.wait()
+        stdout = "".join(stdout_chunks)
+        stderr = "".join(stderr_chunks)
         return subprocess.CompletedProcess(
             spec.argv, process.returncode, stdout, stderr
         )

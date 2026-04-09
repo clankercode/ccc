@@ -1,0 +1,24 @@
+{
+  "runner": "claude",
+  "cli_version": "2.1.97 (Claude Code)",
+  "argv": [
+    "claude",
+    "-p",
+    "--verbose",
+    "--output-format",
+    "stream-json",
+    "--include-partial-messages",
+    "Run a bash command that prints two short lines, then reply with exactly done."
+  ],
+  "output_mode": "stream-json",
+  "capture_date": "2026-04-09",
+  "workspace": "temp-dir",
+  "excerpted": true,
+  "redactions": [
+    "session_id",
+    "uuid",
+    "message ids",
+    "tool ids",
+    "hook bootstrap payload"
+  ]
+}

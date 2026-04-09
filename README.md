@@ -142,12 +142,14 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 
 ## Planned Roadmap
 
+- living backlog of unfinished work: [TASKS.md](TASKS.md)
 - implement remaining 12 languages (see `PLAN.md` in each directory)
 - parser and config design for planned alias, thinking, runner, and provider/model selectors: `CCC_PARSER_CONFIG_DESIGN.md`
 - language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
 - cross-language test harness design: `TEST_HARNESS_PLAN.md`
 - expanded `ccc` token parsing for `@name`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
 - future advanced tool allow/deny design note: [docs/clis/allow-deny-tool-plan.md](/home/xertrov/src/call-coding-clis/docs/clis/allow-deny-tool-plan.md)
+- shared model-thinking capability source of truth and refresh instructions: [docs/clis/model-capabilities.json](/home/xertrov/src/call-coding-clis/docs/clis/model-capabilities.json) and [docs/clis/updating-model-capabilities.md](/home/xertrov/src/call-coding-clis/docs/clis/updating-model-capabilities.md)
 
 ## Missing / Possible Future Features
 

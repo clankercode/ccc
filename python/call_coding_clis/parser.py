@@ -26,6 +26,8 @@ class ParsedArgs:
     runner: str | None = None
     thinking: int | None = None
     show_thinking: bool | None = None
+    output_mode: str | None = None
+    forward_unknown_json: bool = False
     yolo: bool = False
     permission_mode: str | None = None
     provider: str | None = None
@@ -39,6 +41,7 @@ class AliasDef:
     runner: str | None = None
     thinking: int | None = None
     show_thinking: bool | None = None
+    output_mode: str | None = None
     provider: str | None = None
     model: str | None = None
     agent: str | None = None
@@ -51,6 +54,7 @@ class CccConfig:
     default_model: str = ""
     default_thinking: int | None = None
     default_show_thinking: bool = False
+    default_output_mode: str = "text"
     aliases: dict[str, AliasDef] = field(default_factory=dict)
     abbreviations: dict[str, str] = field(default_factory=dict)
 
@@ -154,6 +158,19 @@ THINKING_RE = re.compile(
 PROVIDER_MODEL_RE = re.compile(r"^:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)$")
 MODEL_RE = re.compile(r"^:([a-zA-Z0-9._-]+)$")
 ALIAS_RE = re.compile(r"^@([a-zA-Z0-9_-]+)$")
+OUTPUT_MODE_RE = re.compile(
+    r"^(text|stream-text|json|stream-json|formatted|stream-formatted)$",
+    re.IGNORECASE,
+)
+
+OUTPUT_MODE_SUGAR = {
+    ".text": "text",
+    "..text": "stream-text",
+    ".json": "json",
+    "..json": "stream-json",
+    ".fmt": "formatted",
+    "..fmt": "stream-formatted",
+}
 
 THINKING_TOKEN_TO_LEVEL = {
     "0": 0,
@@ -196,6 +213,16 @@ def parse_args(argv: list[str]) -> ParsedArgs:
             ]
         elif token in {"--show-thinking", "--no-show-thinking"}:
             parsed.show_thinking = token == "--show-thinking"
+        elif token in {"--output-mode", "-o"}:
+            if index + 1 >= len(argv):
+                parsed.output_mode = ""
+            else:
+                parsed.output_mode = argv[index + 1].lower()
+                index += 1
+        elif token == "--forward-unknown-json":
+            parsed.forward_unknown_json = True
+        elif token.lower() in OUTPUT_MODE_SUGAR:
+            parsed.output_mode = OUTPUT_MODE_SUGAR[token.lower()]
         elif token in {"--yolo", "-y"}:
             parsed.yolo = True
             parsed.permission_mode = "yolo"
@@ -232,6 +259,155 @@ def resolve_runner_name(name: str | None, config: CccConfig) -> str:
     return name
 
 
+def _resolve_alias_def(parsed: ParsedArgs, config: CccConfig) -> AliasDef | None:
+    if parsed.alias and parsed.alias in config.aliases:
+        return config.aliases[parsed.alias]
+    return None
+
+
+def resolve_effective_runner(
+    parsed: ParsedArgs, config: CccConfig
+) -> tuple[str, RunnerInfo, AliasDef | None]:
+    runner_name = resolve_runner_name(parsed.runner, config)
+    info = RUNNER_REGISTRY.get(
+        runner_name,
+        RUNNER_REGISTRY.get(config.default_runner, RUNNER_REGISTRY["opencode"]),
+    )
+    alias_def = _resolve_alias_def(parsed, config)
+
+    effective_runner_name = runner_name
+    if alias_def and alias_def.runner and parsed.runner is None:
+        effective_runner_name = resolve_runner_name(alias_def.runner, config)
+        info = RUNNER_REGISTRY.get(effective_runner_name, info)
+    return effective_runner_name, info, alias_def
+
+
+def _supported_output_modes(effective_runner_name: str) -> set[str]:
+    key = effective_runner_name.lower()
+    if key in {"cc", "claude"}:
+        return {
+            "text",
+            "stream-text",
+            "json",
+            "stream-json",
+            "formatted",
+            "stream-formatted",
+        }
+    if key in {"k", "kimi"}:
+        return {"text", "stream-text", "stream-json", "formatted", "stream-formatted"}
+    if key in {"oc", "opencode"}:
+        return {"text", "stream-text", "json", "formatted"}
+    return {"text", "stream-text"}
+
+
+def resolve_output_mode(parsed: ParsedArgs, config: CccConfig | None = None) -> str:
+    if config is None:
+        config = CccConfig()
+    _, _, alias_def = resolve_effective_runner(parsed, config)
+    mode = parsed.output_mode
+    if mode is None and alias_def and alias_def.output_mode:
+        mode = alias_def.output_mode
+    if mode is None:
+        mode = config.default_output_mode
+    if mode == "":
+        raise ValueError(
+            "output mode requires one of: text, stream-text, json, stream-json, formatted, stream-formatted"
+        )
+    mode = mode.lower()
+    if not OUTPUT_MODE_RE.match(mode):
+        raise ValueError(
+            "output mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted"
+        )
+    return mode
+
+
+def resolve_show_thinking(parsed: ParsedArgs, config: CccConfig | None = None) -> bool:
+    if config is None:
+        config = CccConfig()
+    _, _, alias_def = resolve_effective_runner(parsed, config)
+    value = parsed.show_thinking
+    if value is None and alias_def and alias_def.show_thinking is not None:
+        value = alias_def.show_thinking
+    if value is None:
+        value = config.default_show_thinking
+    return bool(value)
+
+
+@dataclass(slots=True)
+class OutputPlan:
+    runner_name: str
+    mode: str
+    stream: bool
+    formatted: bool
+    schema: str | None
+    argv_flags: list[str]
+
+
+def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> OutputPlan:
+    if config is None:
+        config = CccConfig()
+    effective_runner_name, _, _ = resolve_effective_runner(parsed, config)
+    mode = resolve_output_mode(parsed, config)
+    supported = _supported_output_modes(effective_runner_name)
+    if mode not in supported:
+        raise ValueError(
+            f'runner "{effective_runner_name}" does not support output mode "{mode}"'
+        )
+
+    key = effective_runner_name.lower()
+    if mode in {"text", "stream-text"}:
+        return OutputPlan(
+            runner_name=effective_runner_name,
+            mode=mode,
+            stream=mode.startswith("stream-"),
+            formatted=False,
+            schema=None,
+            argv_flags=[],
+        )
+    if key in {"cc", "claude"}:
+        flags = (
+            ["--output-format", "json"]
+            if mode == "json"
+            else ["--verbose", "--output-format", "stream-json"]
+        )
+        if mode == "stream-formatted":
+            flags.append("--include-partial-messages")
+        return OutputPlan(
+            runner_name=effective_runner_name,
+            mode=mode,
+            stream=mode.startswith("stream-"),
+            formatted="formatted" in mode,
+            schema="claude-code",
+            argv_flags=flags,
+        )
+    if key in {"k", "kimi"}:
+        return OutputPlan(
+            runner_name=effective_runner_name,
+            mode=mode,
+            stream=mode.startswith("stream-"),
+            formatted="formatted" in mode,
+            schema="kimi",
+            argv_flags=["--print", "--output-format", "stream-json"],
+        )
+    if key in {"oc", "opencode"}:
+        return OutputPlan(
+            runner_name=effective_runner_name,
+            mode=mode,
+            stream=False,
+            formatted=mode == "formatted",
+            schema="opencode",
+            argv_flags=["--format", "json"],
+        )
+    return OutputPlan(
+        runner_name=effective_runner_name,
+        mode=mode,
+        stream=mode.startswith("stream-"),
+        formatted=False,
+        schema=None,
+        argv_flags=[],
+    )
+
+
 def resolve_command(
     parsed: ParsedArgs,
     config: CccConfig | None = None,
@@ -239,24 +415,14 @@ def resolve_command(
     if config is None:
         config = CccConfig()
 
-    runner_name = resolve_runner_name(parsed.runner, config)
-    info = RUNNER_REGISTRY.get(
-        runner_name,
-        RUNNER_REGISTRY.get(config.default_runner, RUNNER_REGISTRY["opencode"]),
-    )
+    effective_runner_name, info, alias_def = resolve_effective_runner(parsed, config)
 
     warnings: list[str] = []
-    alias_def = None
-    if parsed.alias and parsed.alias in config.aliases:
-        alias_def = config.aliases[parsed.alias]
     requested_agent = parsed.alias if parsed.alias and alias_def is None else None
 
-    effective_runner_name = runner_name
-    if alias_def and alias_def.runner and parsed.runner is None:
-        effective_runner_name = resolve_runner_name(alias_def.runner, config)
-        info = RUNNER_REGISTRY.get(effective_runner_name, info)
-
     argv = [info.binary] + list(info.extra_args)
+    output_plan = resolve_output_plan(parsed, config)
+    argv.extend(output_plan.argv_flags)
 
     effective_thinking = parsed.thinking
     if effective_thinking is None and alias_def and alias_def.thinking is not None:
@@ -290,6 +456,8 @@ def resolve_command(
     env_overrides: dict[str, str] = {}
     if effective_provider:
         env_overrides["CCC_PROVIDER"] = effective_provider
+    if effective_runner_name in {"oc", "opencode"}:
+        env_overrides["OPENCODE_DISABLE_TERMINAL_TITLE"] = "true"
 
     if effective_model and info.model_flag:
         argv.extend([info.model_flag, effective_model])

@@ -1,4 +1,14 @@
 use call_coding_clis::*;
+use std::fs;
+use std::path::PathBuf;
+
+fn fixture(path: &str) -> String {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("tests/fixtures/runner-transcripts");
+    fs::read_to_string(root.join(path)).unwrap()
+}
 
 #[test]
 fn test_opencode_simple_response() {
@@ -20,6 +30,21 @@ fn test_opencode_error_response() {
     assert_eq!(parsed.events[0].event_type, "error");
     assert_eq!(parsed.events[0].text, "something broke");
     assert_eq!(parsed.final_text, "");
+}
+
+#[test]
+fn test_opencode_event_stream_response() {
+    let raw = concat!(
+        "{\"type\":\"step_start\",\"timestamp\":1,\"sessionID\":\"ses_1\",\"part\":{\"type\":\"step-start\"}}\n",
+        "{\"type\":\"text\",\"timestamp\":2,\"sessionID\":\"ses_1\",\"part\":{\"type\":\"text\",\"text\":\"alpha\\nbeta\\ngamma\"}}\n",
+        "{\"type\":\"step_finish\",\"timestamp\":3,\"sessionID\":\"ses_1\",\"part\":{\"type\":\"step-finish\",\"tokens\":{\"total\":10,\"input\":2,\"output\":3,\"reasoning\":5,\"cache\":{\"write\":0,\"read\":7}},\"cost\":0}}\n"
+    );
+    let parsed = parse_opencode_json(raw);
+    assert_eq!(parsed.session_id, "ses_1");
+    assert_eq!(parsed.final_text, "alpha\nbeta\ngamma");
+    assert_eq!(parsed.events.last().unwrap().event_type, "text");
+    assert_eq!(parsed.usage.get("total").copied(), Some(10));
+    assert_eq!(parsed.usage.get("cache_read").copied(), Some(7));
 }
 
 #[test]
@@ -140,23 +165,23 @@ fn test_kimi_passthrough_events() {
 fn test_render_opencode() {
     let raw = "{\"response\":\"hello\"}\n";
     let parsed = parse_opencode_json(raw);
-    let rendered = render_parsed(&parsed);
-    assert_eq!(rendered, "hello");
+    let rendered = render_parsed(&parsed, true, false);
+    assert_eq!(rendered, "[assistant] hello");
 }
 
 #[test]
 fn test_render_claude_code_tool_use() {
     let raw = "{\"type\":\"tool_use\",\"tool_name\":\"Bash\",\"tool_input\":{\"cmd\":\"ls\"}}\n";
     let parsed = parse_claude_code_json(raw);
-    let rendered = render_parsed(&parsed);
-    assert_eq!(rendered, "[tool] Bash");
+    let rendered = render_parsed(&parsed, true, false);
+    assert_eq!(rendered, "[tool:start] Bash: ls");
 }
 
 #[test]
 fn test_render_kimi_thinking() {
     let raw = "{\"role\":\"assistant\",\"content\":[{\"type\":\"think\",\"think\":\"hmm\"},{\"type\":\"text\",\"text\":\"ok\"}]}\n";
     let parsed = parse_kimi_json(raw);
-    let rendered = render_parsed(&parsed);
+    let rendered = render_parsed(&parsed, true, false);
     assert!(rendered.contains("[thinking] hmm"));
     assert!(rendered.contains("ok"));
 }
@@ -164,7 +189,7 @@ fn test_render_kimi_thinking() {
 #[test]
 fn test_render_unknown_schema() {
     let parsed = parse_json_output("", "nonexistent");
-    let rendered = render_parsed(&parsed);
+    let rendered = render_parsed(&parsed, true, false);
     assert_eq!(rendered, "");
     assert_eq!(parsed.error, "unknown schema: nonexistent");
 }
@@ -174,7 +199,7 @@ fn test_empty_input() {
     let parsed = parse_json_output("", "opencode");
     assert_eq!(parsed.events.len(), 0);
     assert_eq!(parsed.final_text, "");
-    let rendered = render_parsed(&parsed);
+    let rendered = render_parsed(&parsed, true, false);
     assert_eq!(rendered, "");
 }
 
@@ -190,8 +215,109 @@ fn test_malformed_json_skipped() {
 fn test_render_error_event() {
     let raw = "{\"error\":\"bad\"}\n";
     let parsed = parse_opencode_json(raw);
-    let rendered = render_parsed(&parsed);
+    let rendered = render_parsed(&parsed, true, false);
     assert_eq!(rendered, "[error] bad");
+}
+
+#[test]
+fn test_stream_processor_renders_incrementally() {
+    let raw = concat!(
+        "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_1\",\"name\":\"Bash\"}}}\n",
+        "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"command\\\":\\\"printf hi\\\"}\"}}}\n",
+        "{\"type\":\"tool_result\",\"tool_use_id\":\"toolu_1\",\"content\":\"hi\",\"is_error\":false}\n",
+        "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"checking\"}}}\n",
+        "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"done\"}}}\n"
+    );
+    let mut processor = StructuredStreamProcessor::new(
+        "claude-code",
+        FormattedRenderer::new(true, false),
+    );
+    let mut chunks = Vec::new();
+    for line in raw.lines() {
+        let rendered = processor.feed(&(line.to_string() + "\n"));
+        if !rendered.is_empty() {
+            chunks.push(rendered);
+        }
+    }
+    assert!(chunks.iter().any(|chunk| chunk.contains("[tool:start] Bash")));
+    assert!(chunks.iter().any(|chunk| chunk.contains("[tool:result] Bash (ok): printf hi")));
+    assert!(chunks.iter().any(|chunk| chunk.contains("[thinking] checking")));
+    assert!(chunks.iter().any(|chunk| chunk.contains("[assistant] done")));
+}
+
+#[test]
+fn test_stream_processor_dedupes_final_assistant_and_result_after_text_deltas() {
+    let raw = concat!(
+        "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"DONE\"}}}\n",
+        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"DONE\"}]}}\n",
+        "{\"type\":\"result\",\"subtype\":\"success\",\"result\":\"DONE\"}\n"
+    );
+    let mut processor = StructuredStreamProcessor::new(
+        "claude-code",
+        FormattedRenderer::new(false, false),
+    );
+    let mut chunks = Vec::new();
+    for line in raw.lines() {
+        let rendered = processor.feed(&(line.to_string() + "\n"));
+        if !rendered.is_empty() {
+            chunks.push(rendered);
+        }
+    }
+    assert_eq!(chunks, vec!["[assistant] DONE"]);
+}
+
+#[test]
+fn test_fixture_claude_tool_bash() {
+    let raw = fixture("claude/tool_bash/stdout.ndjson");
+    let parsed = parse_claude_code_json(&raw);
+    let rendered = render_parsed(&parsed, true, false);
+    assert!(rendered.contains("[tool:start] Bash"));
+    assert!(rendered.contains("[tool:result] Bash (ok): echo"));
+    assert!(rendered.contains("[assistant] done."));
+}
+
+#[test]
+fn test_fixture_claude_stream_unknown_events() {
+    let raw = fixture("claude/stream_unknown_events/stdout.ndjson");
+    let parsed = parse_claude_code_json(&raw);
+    let rendered = render_parsed(&parsed, true, false);
+    assert!(rendered.contains("[thinking] The user wants a staged tool-using response."));
+    assert!(rendered.contains("[assistant] Computing the first multiplication."));
+    assert!(parsed.unknown_json_lines.len() >= 6);
+    assert!(parsed
+        .unknown_json_lines
+        .iter()
+        .any(|line| line.contains("\"type\":\"message_start\"")));
+    assert!(parsed
+        .unknown_json_lines
+        .iter()
+        .any(|line| line.contains("\"type\":\"signature_delta\"")));
+    assert!(parsed
+        .unknown_json_lines
+        .iter()
+        .any(|line| line.contains("\"type\":\"content_block_stop\"")));
+    assert!(parsed
+        .unknown_json_lines
+        .iter()
+        .any(|line| line.contains("\"type\":\"message_delta\"")));
+    assert!(parsed
+        .unknown_json_lines
+        .iter()
+        .any(|line| line.contains("\"type\":\"message_stop\"")));
+    assert!(parsed
+        .unknown_json_lines
+        .iter()
+        .any(|line| line.contains("\"type\":\"rate_limit_event\"")));
+}
+
+#[test]
+fn test_fixture_kimi_tool_bash() {
+    let raw = fixture("kimi/tool_bash/stdout.ndjson");
+    let parsed = parse_kimi_json(&raw);
+    let rendered = render_parsed(&parsed, true, false);
+    assert!(rendered.contains("[tool:start] Shell"));
+    assert!(rendered.contains("[tool:result] Shell (ok): echo"));
+    assert!(rendered.contains("[assistant] done"));
 }
 
 #[test]
@@ -205,4 +331,16 @@ fn test_claude_code_streaming_thinking() {
     assert_eq!(parsed.events[0].event_type, "thinking_start");
     assert_eq!(parsed.events[1].event_type, "thinking_delta");
     assert_eq!(parsed.events[1].thinking, "let me think");
+}
+
+#[test]
+fn test_unknown_json_is_captured_but_not_rendered_by_default() {
+    let raw = concat!(
+        "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"sess-1\"}\n",
+        "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed\"}}\n"
+    );
+    let parsed = parse_claude_code_json(raw);
+    assert_eq!(render_parsed(&parsed, true, false), "");
+    assert_eq!(parsed.unknown_json_lines.len(), 1);
+    assert!(parsed.unknown_json_lines[0].contains("\"type\":\"rate_limit_event\""));
 }

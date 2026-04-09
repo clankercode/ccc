@@ -17,6 +17,12 @@ Current files:
 - [crush.md](/home/xertrov/src/call-coding-clis/docs/clis/crush.md)
 - [roocode.md](/home/xertrov/src/call-coding-clis/docs/clis/roocode.md)
 - [allow-deny-tool-plan.md](/home/xertrov/src/call-coding-clis/docs/clis/allow-deny-tool-plan.md)
+- [output-mode-compatibility.md](/home/xertrov/src/call-coding-clis/docs/clis/output-mode-compatibility.md)
+- [stream-output-visual-systems.md](/home/xertrov/src/call-coding-clis/docs/clis/stream-output-visual-systems.md)
+- [output-mode-porting.md](/home/xertrov/src/call-coding-clis/docs/clis/output-mode-porting.md)
+- [json-event-references.md](/home/xertrov/src/call-coding-clis/docs/clis/json-event-references.md)
+- [model-capabilities.json](/home/xertrov/src/call-coding-clis/docs/clis/model-capabilities.json)
+- [updating-model-capabilities.md](/home/xertrov/src/call-coding-clis/docs/clis/updating-model-capabilities.md)
 
 ## Permission Matrix
 
@@ -30,6 +36,44 @@ This table describes the current `ccc` mapping and the likely future shape for f
 | Kimi | `--yolo` | Not much beyond yolo/plan | maybe `--plan` |
 | Crush | warn and ignore | Not reliable for non-interactive run mode | none until upstream CLI is clearer |
 | RooCode | warn and ignore | Unverified | none until upstream CLI is verified |
+
+## Thinking Matrix
+
+`ccc` keeps the external thinking contract numeric. The top tier is vendor labeled: Anthropic says `max`, OpenAI-style labels say `xhigh`.
+
+| `ccc` token | Anthropic / Claude | OpenAI-style | Notes |
+|---|---|---|---|
+| `+0` | `disabled` | `disabled` | off |
+| `+1` | `low` | `low` | first non-off tier |
+| `+2` | `medium` | `medium` | middle tier |
+| `+3` | `high` | `high` | explicit high tier |
+| `+4` | `max` | `xhigh` | same semantic top tier; label differs |
+
+Kimi does not expose the same numeric ladder; `ccc` currently maps `+0` to `--no-thinking` and `+1..+4` to `--thinking`.
+
+## Model Thinking Capability Source Of Truth
+
+The shared source of truth is [model-capabilities.json](/home/xertrov/src/call-coding-clis/docs/clis/model-capabilities.json), not this markdown file.
+
+Use it for:
+
+- auth-scoped model inventory snapshots
+- model-family thinking ladder notes
+- runner-specific provider/model-family notes
+- visible-thinking support notes
+- provider-label differences such as `max` vs `xhigh`
+- periodic refresh work when new models drop
+
+Current structured coverage summary:
+
+| Provider | Family | Runner | Thinking mode | Visible thinking | Notes |
+|---|---|---|---|---|---|
+| Anthropic | `claude-4` | `cc` | ladder | yes | maps cleanly to `+0..+4` |
+| OpenAI-style | `gpt-5` | `c` | ladder | unknown | top label is `xhigh` |
+| Moonshot | `kimi-k2` | `k` | binary | yes | `+1..+4` collapse to `--thinking` |
+| OpenCode | unverified | `oc` | unknown | yes | visible-thinking support known, tier mapping not yet verified |
+
+If you update thinking-capability notes, follow [updating-model-capabilities.md](/home/xertrov/src/call-coding-clis/docs/clis/updating-model-capabilities.md) and update the JSON first.
 
 ## Current Cross-Runner Permission Modes
 
@@ -57,3 +101,28 @@ If a CLI changes upstream, the fastest refresh path is:
 ```
 
 Then update the corresponding file here before changing `ccc` runner assembly.
+
+## Output Modes
+
+Python and Rust now share these output modes:
+
+| Mode | Sugar | Meaning |
+|---|---|---|
+| `text` | `.text` | buffered raw output |
+| `stream-text` | `..text` | live raw output |
+| `json` | `.json` | buffered raw JSON |
+| `stream-json` | `..json` | live NDJSON |
+| `formatted` | `.fmt` | buffered human transcript |
+| `stream-formatted` | `..fmt` | live human transcript |
+
+See [output-mode-compatibility.md](/home/xertrov/src/call-coding-clis/docs/clis/output-mode-compatibility.md) for the runner matrix and [stream-output-visual-systems.md](/home/xertrov/src/call-coding-clis/docs/clis/stream-output-visual-systems.md) for the current TTY rendering design.
+
+Implementation notes for future language ports live in [output-mode-porting.md](/home/xertrov/src/call-coding-clis/docs/clis/output-mode-porting.md).
+
+Upstream structured-output references live in [json-event-references.md](/home/xertrov/src/call-coding-clis/docs/clis/json-event-references.md).
+
+Manual smoke checks:
+
+- `scripts/smoke-output-modes.sh python cc stream-formatted`
+- `scripts/smoke-output-modes.sh rust cc stream-formatted`
+- swap `cc` for `k` or `oc`, and swap `stream-formatted` for `formatted`, `json`, or `stream-json` to inspect the other paths

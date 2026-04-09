@@ -58,7 +58,7 @@ json_kimi_assistant_with_tool_calls() {
     _tool_id="$2"
     _tool_name="$3"
     _tool_args="$4"
-    printf '{"role":"assistant","content":[{"type":"text","text":"%s"}],"tool_calls":[{"type":"function","id":"%s","function":{"name":"%s","arguments":"%s"}}]}\n' "$_text" "$_tool_id" "$_tool_name" "$_tool_args"
+    printf '{"role":"assistant","content":"%s","tool_calls":[{"type":"function","id":"%s","function":{"name":"%s","arguments":"%s"}}]}\n' "$_text" "$_tool_id" "$_tool_name" "$_tool_args"
 }
 
 json_kimi_tool_result() {
@@ -296,7 +296,38 @@ if [ "$1" = "run" ]; then
     shift
 fi
 
-prompt="$*"
+prompt=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -p|--print|--verbose|--include-partial-messages|--no-thinking|--yolo|--plan|--full-auto|--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox)
+            shift
+            ;;
+        --thinking)
+            if [ "${2:-}" = "enabled" ] || [ "${2:-}" = "disabled" ]; then
+                shift 2
+            else
+                shift
+            fi
+            ;;
+        --output-format|--format|--model|--permission-mode|--agent|--effort)
+            shift 2
+            ;;
+        --prompt)
+            shift
+            prompt="$1"
+            shift
+            ;;
+        --)
+            shift
+            prompt="$*"
+            break
+            ;;
+        *)
+            prompt="$*"
+            break
+            ;;
+    esac
+done
 
 # --- prompt table ---
 case "$prompt" in

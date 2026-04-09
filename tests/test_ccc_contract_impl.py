@@ -24,6 +24,8 @@ HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
 )
 HELP_SHOW_THINKING_SNIPPET = "--show-thinking"
+HELP_OUTPUT_MODE_SNIPPET = "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>"
+HELP_OUTPUT_SUGAR_SNIPPET = ".text / ..text, .json / ..json, .fmt / ..fmt"
 HELP_PERMISSION_MODE_SNIPPET = "--permission-mode <safe|auto|yolo|plan>"
 HELP_YOLO_SNIPPET = "--yolo / -y"
 HELP_DELIMITER_SNIPPET = "Treat all remaining args as prompt text"
@@ -218,6 +220,23 @@ class SingleImplCccContractTests(unittest.TestCase):
                     )
                     self.assert_help_mentions_show_thinking_flag(result)
 
+    def test_help_surface_mentions_output_modes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in SHOW_THINKING_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assert_help_mentions_output_modes(result)
+
     def test_help_surface_mentions_yolo_and_delimiter(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -361,6 +380,185 @@ class SingleImplCccContractTests(unittest.TestCase):
                             self.assertEqual(result.returncode, 0, result.stderr)
                             self.assertEqual(result.stdout, expected_stdout)
                             self.assertEqual(result.stderr, "")
+
+    def test_thinking_levels_map_to_claude_effort_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            claude_path = bin_dir / "claude"
+            opencode_path = bin_dir / "opencode"
+            self._write_argv_echo_stub(claude_path, "claude")
+            self._write_opencode_stub(opencode_path)
+
+            cases = {
+                "Python": [
+                    (
+                        ["cc", "+3"],
+                        "claude -p --thinking enabled --effort high Fix the failing tests\n",
+                    ),
+                    (
+                        ["cc", "+4"],
+                        "claude -p --thinking enabled --effort max Fix the failing tests\n",
+                    ),
+                ],
+                "Rust": [
+                    (
+                        ["cc", "+3"],
+                        "claude -p --thinking enabled --effort high Fix the failing tests\n",
+                    ),
+                    (
+                        ["cc", "+4"],
+                        "claude -p --thinking enabled --effort max Fix the failing tests\n",
+                    ),
+                ],
+            }
+
+            for lang in self.selected_languages:
+                if lang.name not in cases:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                with self.subTest(language=lang.name, capability="thinking-levels"):
+                    for extra_args, expected_stdout in cases[lang.name]:
+                        with self.subTest(language=lang.name, args=extra_args):
+                            result = lang.invoke_with_args(
+                                extra_args, PROMPT, env
+                            )
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            self.assertEqual(result.stdout, expected_stdout)
+                            self.assertEqual(result.stderr, "")
+
+    def test_output_mode_maps_to_runner_specific_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            claude_path = bin_dir / "claude"
+            kimi_path = bin_dir / "kimi"
+            opencode_path = bin_dir / "opencode"
+            self._write_argv_echo_stub(claude_path, "claude")
+            self._write_argv_echo_stub(kimi_path, "kimi")
+            self._write_argv_echo_stub(opencode_path, "opencode")
+
+            cases = {
+                "Python": [
+                    (["cc", ".json"], "claude -p --output-format json Fix the failing tests\n"),
+                    (
+                        ["cc", "..json"],
+                        "claude -p --verbose --output-format stream-json Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", "..json"],
+                        "kimi --print --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
+                    (["oc", ".json"], "opencode run --format json Fix the failing tests\n"),
+                ],
+                "Rust": [
+                    (["cc", ".json"], "claude -p --output-format json Fix the failing tests\n"),
+                    (
+                        ["cc", "..json"],
+                        "claude -p --verbose --output-format stream-json Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", "..json"],
+                        "kimi --print --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
+                    (["oc", ".json"], "opencode run --format json Fix the failing tests\n"),
+                ],
+            }
+
+            for lang in self.selected_languages:
+                if lang.name not in cases:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                with self.subTest(language=lang.name, capability="output-mode"):
+                    for extra_args, expected_stdout in cases[lang.name]:
+                        with self.subTest(language=lang.name, args=extra_args):
+                            result = lang.invoke_with_args(extra_args, PROMPT, env)
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            self.assertEqual(result.stdout, expected_stdout)
+                            self.assertEqual(result.stderr, "")
+
+    def test_formatted_output_mode_sugar_renders_structured_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            claude_path = bin_dir / "claude"
+            kimi_path = bin_dir / "kimi"
+            opencode_path = bin_dir / "opencode"
+            self._write_structured_argv_echo_stub(claude_path, "claude", "claude-code")
+            self._write_structured_argv_echo_stub(kimi_path, "kimi", "kimi")
+            self._write_structured_argv_echo_stub(opencode_path, "opencode", "opencode")
+
+            cases = {
+                "Python": [
+                    (["cc", ".fmt"], "[assistant] claude -p --verbose --output-format stream-json Fix the failing tests\n"),
+                    (
+                        ["cc", "..fmt"],
+                        "[assistant] claude -p --verbose --output-format stream-json --include-partial-messages Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", ".fmt"],
+                        "[assistant] kimi --print --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", "..fmt"],
+                        "[assistant] kimi --print --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
+                    (["oc", ".fmt"], "[assistant] opencode run --format json Fix the failing tests\n"),
+                ],
+                "Rust": [
+                    (["cc", ".fmt"], "[assistant] claude -p --verbose --output-format stream-json Fix the failing tests\n"),
+                    (
+                        ["cc", "..fmt"],
+                        "[assistant] claude -p --verbose --output-format stream-json --include-partial-messages Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", ".fmt"],
+                        "[assistant] kimi --print --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", "..fmt"],
+                        "[assistant] kimi --print --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
+                    (["oc", ".fmt"], "[assistant] opencode run --format json Fix the failing tests\n"),
+                ],
+            }
+
+            for lang in self.selected_languages:
+                if lang.name not in cases:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                with self.subTest(language=lang.name, capability="formatted-output-mode"):
+                    for extra_args, expected_stdout in cases[lang.name]:
+                        with self.subTest(language=lang.name, args=extra_args):
+                            result = lang.invoke_with_args(extra_args, PROMPT, env)
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            self.assertEqual(result.stdout, expected_stdout)
+                            self.assertEqual(result.stderr, "")
+
+    def test_unsupported_output_mode_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_argv_echo_stub(opencode_path, "opencode")
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                with self.subTest(language=lang.name):
+                    result = lang.invoke_with_args(["oc", "..json"], PROMPT, env)
+                    self.assertEqual(result.returncode, 1)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn("output mode", result.stderr)
+                    result = lang.invoke_with_args(["oc", "..fmt"], PROMPT, env)
+                    self.assertEqual(result.returncode, 1)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn("output mode", result.stderr)
 
     def test_control_tokens_are_order_independent_before_prompt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -511,6 +709,11 @@ class SingleImplCccContractTests(unittest.TestCase):
             self.assertIn(HELP_SHOW_THINKING_SNIPPET, result.stdout)
             self.assertIn("show_thinking", result.stdout)
 
+    def assert_help_mentions_output_modes(self, result) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(HELP_OUTPUT_MODE_SNIPPET, result.stdout)
+        self.assertIn(HELP_OUTPUT_SUGAR_SNIPPET, result.stdout)
+
     def assert_help_mentions_yolo_and_delimiter(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(HELP_PERMISSION_MODE_SNIPPET, result.stdout)
@@ -539,6 +742,28 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def _write_argv_echo_stub(self, path: Path, runner_name: str) -> None:
         path.write_text(f"#!/bin/sh\nprintf '{runner_name} %s\\n' \"$*\"\n")
+        path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    def _write_structured_argv_echo_stub(
+        self, path: Path, runner_name: str, schema_name: str
+    ) -> None:
+        if schema_name == "claude-code":
+            body = (
+                "#!/bin/sh\n"
+                f'printf \'{{"type":"assistant","message":{{"content":[{{"type":"text","text":"{runner_name} %s"}}]}}}}\\n\' \"$*\"\n'
+                f'printf \'{{"type":"result","subtype":"success","result":"{runner_name} %s"}}\\n\' \"$*\"\n'
+            )
+        elif schema_name == "kimi":
+            body = (
+                "#!/bin/sh\n"
+                f'printf \'{{"role":"assistant","content":"{runner_name} %s"}}\\n\' \"$*\"\n'
+            )
+        else:
+            body = (
+                "#!/bin/sh\n"
+                f'printf \'{{"response":"{runner_name} %s"}}\\n\' \"$*\"\n'
+            )
+        path.write_text(body)
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def _write_codex_stub(self, path: Path) -> None:

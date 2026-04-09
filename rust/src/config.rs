@@ -94,6 +94,7 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                 ("defaults", "runner") => config.default_runner = value.to_string(),
                 ("defaults", "provider") => config.default_provider = value.to_string(),
                 ("defaults", "model") => config.default_model = value.to_string(),
+                ("defaults", "output_mode") => config.default_output_mode = value.to_string(),
                 ("defaults", "thinking") => {
                     if let Ok(n) = value.parse::<i32>() {
                         config.default_thinking = Some(n);
@@ -112,6 +113,7 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                 ("", "default_runner") => config.default_runner = value.to_string(),
                 ("", "default_provider") => config.default_provider = value.to_string(),
                 ("", "default_model") => config.default_model = value.to_string(),
+                ("", "default_output_mode") => config.default_output_mode = value.to_string(),
                 ("", "default_thinking") => {
                     if let Ok(n) = value.parse::<i32>() {
                         config.default_thinking = Some(n);
@@ -131,6 +133,7 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                 ("alias", "show_thinking") => {
                     current_alias.show_thinking = parse_bool(value);
                 }
+                ("alias", "output_mode") => current_alias.output_mode = Some(value.to_string()),
                 ("alias", "provider") => current_alias.provider = Some(value.to_string()),
                 ("alias", "model") => current_alias.model = Some(value.to_string()),
                 ("alias", "agent") => current_alias.agent = Some(value.to_string()),

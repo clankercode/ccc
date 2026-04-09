@@ -47,7 +47,7 @@ run_unit_tests() {
             return 0
             ;;
         python)
-            PYTHONPATH=python python3 -m unittest tests.test_runner tests.test_json_output tests.test_parser_config tests.test_ccc_contract -v
+            PYTHONPATH=python python3 -m unittest tests.test_runner tests.test_json_output tests.test_parser_config -v
             ;;
         rust)
             (cd rust && cargo test)

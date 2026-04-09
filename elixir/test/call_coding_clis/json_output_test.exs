@@ -10,6 +10,8 @@ defmodule CallCodingClis.JsonOutputTest do
     ParsedJsonOutput
   }
 
+  @fixtures Path.expand("../../../tests/fixtures/runner-transcripts", __DIR__)
+
   describe "parse_opencode_json/1" do
     test "parses a response line" do
       result = JsonOutput.parse_opencode_json(~s({"response": "hello world"}))
@@ -268,6 +270,23 @@ defmodule CallCodingClis.JsonOutputTest do
       }
 
       assert JsonOutput.render_parsed(output) == "[tool_result] file data"
+    end
+
+    test "keeps raw Claude stream unknown events from fixture" do
+      raw =
+        Path.join([@fixtures, "claude", "stream_unknown_events", "stdout.ndjson"])
+        |> File.read!()
+
+      result = JsonOutput.parse_claude_code_json(raw)
+      rendered = JsonOutput.render_parsed(result)
+
+      assert rendered =~ "Computing the first multiplication."
+      assert length(result.raw_lines) >= 10
+      assert Enum.any?(result.raw_lines, &(&1["type"] == "rate_limit_event"))
+      assert Enum.any?(result.raw_lines, &(&1["type"] == "stream_event" && get_in(&1, ["event", "type"]) == "message_start"))
+      assert Enum.any?(result.raw_lines, &(&1["type"] == "stream_event" && get_in(&1, ["event", "type"]) == "message_delta"))
+      assert Enum.any?(result.raw_lines, &(&1["type"] == "stream_event" && get_in(&1, ["event", "type"]) == "message_stop"))
+      assert Enum.any?(result.raw_lines, &(&1["type"] == "stream_event" && get_in(&1, ["event", "delta", "type"]) == "signature_delta"))
     end
   end
 end

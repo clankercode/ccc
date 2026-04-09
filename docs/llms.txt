@@ -6,7 +6,7 @@ ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Cl
 
 ## Usage
 
-ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@name] "<Prompt>"
+ccc [--show-thinking] [--output-mode <mode>] [runner] [+thinking] [:provider:model] [@name] "<Prompt>"
 
 Slots are positional and parsed in order before the prompt:
 - runner: Select which coding CLI (default: oc). Options: opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)
@@ -14,12 +14,16 @@ Slots are positional and parsed in order before the prompt:
   Claude keeps the same `ccc` scale: `+0` becomes `--thinking disabled`, and `+1..+4` become `--thinking enabled` with matching `--effort`.
   Kimi keeps the same `ccc` scale: `+0` becomes `--no-thinking`, and `+1..+4` become `--thinking`.
 - --show-thinking: Request visible thinking output when supported; default off. Implemented in Python and Rust for now.
+- --output-mode: Choose `text`, `stream-text`, `json`, `stream-json`, `formatted`, or `stream-formatted`
+  Dot-sugar aliases are available before the prompt: `.text` / `..text`, `.json` / `..json`, `.fmt` / `..fmt`.
 - :provider:model: Override provider and model
 - @name: Use a named preset from ~/.config/ccc/config.toml, or treat it as an agent when no preset exists
 
 Examples:
 - ccc "Fix the failing tests"
 - ccc --show-thinking "Fix the failing tests"
+- ccc ..fmt cc +3 "Investigate the failing test"
+- ccc .json oc "Reply with exactly ok"
 - ccc cc +2 :anthropic:claude-sonnet-4-20250514 "Add tests"
 - ccc k +4 "Debug the parser"
 
@@ -34,6 +38,7 @@ All implementations share: build_prompt_spec, CommandSpec, CompletedRun, Runner.
 ## Docs
 
 - [CLI Reference](https://xertrov.github.io/call-coding-clis/): Full usage, slots, examples, feature matrix, build and test instructions
+- [JSON Event References](/home/xertrov/src/call-coding-clis/docs/clis/json-event-references.md): upstream structured-output references for Claude, Kimi, and OpenCode
 
 ## Optional
 

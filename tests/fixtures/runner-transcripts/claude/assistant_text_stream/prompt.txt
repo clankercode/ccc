@@ -1,0 +1,1 @@
+Reply in exactly three short lines: alpha, beta, gamma. Do not use tools.

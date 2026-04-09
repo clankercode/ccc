@@ -1,25 +1,30 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet};
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextContent {
     pub text: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ThinkingContent {
     pub thinking: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ToolCall {
     pub id: String,
     pub name: String,
     pub arguments: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ToolResult {
     pub tool_call_id: String,
     pub content: String,
     pub is_error: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JsonEvent {
     pub event_type: String,
     pub text: String,
@@ -28,320 +33,370 @@ pub struct JsonEvent {
     pub tool_result: Option<ToolResult>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct ParsedJsonOutput {
     pub schema_name: String,
     pub events: Vec<JsonEvent>,
     pub final_text: String,
     pub session_id: String,
     pub error: String,
-    pub usage: HashMap<String, i64>,
+    pub usage: BTreeMap<String, i64>,
     pub cost_usd: f64,
     pub duration_ms: i64,
+    pub unknown_json_lines: Vec<String>,
 }
 
-pub fn parse_opencode_json(raw: &str) -> ParsedJsonOutput {
-    let mut result = ParsedJsonOutput {
-        schema_name: "opencode".into(),
+fn new_output(schema_name: &str) -> ParsedJsonOutput {
+    ParsedJsonOutput {
+        schema_name: schema_name.into(),
         events: Vec::new(),
         final_text: String::new(),
         session_id: String::new(),
         error: String::new(),
-        usage: HashMap::new(),
+        usage: BTreeMap::new(),
         cost_usd: 0.0,
         duration_ms: 0,
-    };
-    for line in raw.trim().lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
+        unknown_json_lines: Vec::new(),
+    }
+}
+
+fn parse_json_line(line: &str) -> Option<serde_json::Value> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let value: serde_json::Value = serde_json::from_str(trimmed).ok()?;
+    if value.is_object() {
+        Some(value)
+    } else {
+        None
+    }
+}
+
+fn apply_opencode_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
+    if let Some(text) = obj.get("response").and_then(|value| value.as_str()) {
+        result.final_text = text.to_string();
+        result.events.push(JsonEvent {
+            event_type: "text".into(),
+            text: text.into(),
+            thinking: String::new(),
+            tool_call: None,
+            tool_result: None,
+        });
+    } else if let Some(err) = obj.get("error").and_then(|value| value.as_str()) {
+        result.error = err.to_string();
+        result.events.push(JsonEvent {
+            event_type: "error".into(),
+            text: err.into(),
+            thinking: String::new(),
+            tool_call: None,
+            tool_result: None,
+        });
+    } else if obj.get("type").and_then(|value| value.as_str()) == Some("step_start") {
+        result.session_id = obj
+            .get("sessionID")
+            .and_then(|value| value.as_str())
+            .unwrap_or(&result.session_id)
+            .to_string();
+    } else if obj.get("type").and_then(|value| value.as_str()) == Some("text") {
+        if let Some(part) = obj.get("part").and_then(|value| value.as_object()) {
+            if let Some(text) = part.get("text").and_then(|value| value.as_str()) {
+                if !text.is_empty() {
+                    result.final_text = text.to_string();
+                    result.events.push(JsonEvent {
+                        event_type: "text".into(),
+                        text: text.into(),
+                        thinking: String::new(),
+                        tool_call: None,
+                        tool_result: None,
+                    });
+                }
+            }
         }
-        let obj: serde_json::Value = match serde_json::from_str(line) {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-        if let Some(text) = obj.get("response").and_then(|v| v.as_str()) {
-            let text = text.to_string();
-            result.final_text = text.clone();
-            result.events.push(JsonEvent {
-                event_type: "text".into(),
-                text,
-                thinking: String::new(),
-                tool_call: None,
-                tool_result: None,
-            });
-        } else if let Some(err) = obj.get("error").and_then(|v| v.as_str()) {
-            result.error = err.to_string();
-            result.events.push(JsonEvent {
-                event_type: "error".into(),
-                text: err.to_string(),
-                thinking: String::new(),
-                tool_call: None,
-                tool_result: None,
-            });
+    } else if obj.get("type").and_then(|value| value.as_str()) == Some("step_finish") {
+        if let Some(part) = obj.get("part").and_then(|value| value.as_object()) {
+            if let Some(tokens) = part.get("tokens").and_then(|value| value.as_object()) {
+                let mut usage = BTreeMap::new();
+                for key in ["total", "input", "output", "reasoning"] {
+                    if let Some(value) = tokens.get(key).and_then(|value| value.as_i64()) {
+                        usage.insert(key.to_string(), value);
+                    }
+                }
+                if let Some(cache) = tokens.get("cache").and_then(|value| value.as_object()) {
+                    for key in ["write", "read"] {
+                        if let Some(value) = cache.get(key).and_then(|value| value.as_i64()) {
+                            usage.insert(format!("cache_{key}"), value);
+                        }
+                    }
+                }
+                if !usage.is_empty() {
+                    result.usage = usage;
+                }
+            }
+            if let Some(cost) = part.get("cost").and_then(|value| value.as_f64()) {
+                result.cost_usd = cost;
+            }
         }
     }
-    result
 }
 
-pub fn parse_claude_code_json(raw: &str) -> ParsedJsonOutput {
-    let mut result = ParsedJsonOutput {
-        schema_name: "claude-code".into(),
-        events: Vec::new(),
-        final_text: String::new(),
-        session_id: String::new(),
-        error: String::new(),
-        usage: HashMap::new(),
-        cost_usd: 0.0,
-        duration_ms: 0,
-    };
-    for line in raw.trim().lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
+fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
+    let msg_type = obj.get("type").and_then(|value| value.as_str()).unwrap_or("");
+    match msg_type {
+        "system" => {
+            let subtype = obj.get("subtype").and_then(|value| value.as_str()).unwrap_or("");
+            if subtype == "init" {
+                result.session_id = obj
+                    .get("session_id")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("")
+                    .to_string();
+            } else if subtype == "api_retry" {
+                result.events.push(JsonEvent {
+                    event_type: "system_retry".into(),
+                    text: String::new(),
+                    thinking: String::new(),
+                    tool_call: None,
+                    tool_result: None,
+                });
+            }
         }
-        let obj: serde_json::Value = match serde_json::from_str(line) {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-        let msg_type = obj.get("type").and_then(|v| v.as_str()).unwrap_or("");
-
-        match msg_type {
-            "system" => {
-                let sub = obj.get("subtype").and_then(|v| v.as_str()).unwrap_or("");
-                if sub == "init" {
-                    result.session_id = obj
-                        .get("session_id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                } else if sub == "api_retry" {
-                    result.events.push(JsonEvent {
-                        event_type: "system_retry".into(),
-                        text: String::new(),
-                        thinking: String::new(),
-                        tool_call: None,
-                        tool_result: None,
-                    });
-                }
-            }
-            "assistant" => {
-                let message = obj
-                    .get("message")
-                    .cloned()
-                    .unwrap_or(serde_json::Value::Null);
-                let content = message.get("content").and_then(|v| v.as_array());
-                let mut texts: Vec<String> = Vec::new();
-                if let Some(blocks) = content {
-                    for block in blocks {
-                        if block.get("type").and_then(|v| v.as_str()) == Some("text") {
-                            if let Some(t) = block.get("text").and_then(|v| v.as_str()) {
-                                texts.push(t.to_string());
-                            }
-                        }
-                    }
-                }
-                if !texts.is_empty() {
-                    let text = texts.join("\n");
-                    result.final_text = text.clone();
-                    result.events.push(JsonEvent {
-                        event_type: "assistant".into(),
-                        text,
-                        thinking: String::new(),
-                        tool_call: None,
-                        tool_result: None,
-                    });
-                }
-                if let Some(usage) = message.get("usage").and_then(|v| v.as_object()) {
-                    result.usage = usage
+        "assistant" => {
+            if let Some(message) = obj.get("message").and_then(|value| value.as_object()) {
+                if let Some(content) = message.get("content").and_then(|value| value.as_array()) {
+                    let texts: Vec<String> = content
                         .iter()
-                        .filter_map(|(k, v)| v.as_i64().map(|i| (k.clone(), i)))
+                        .filter(|block| block.get("type").and_then(|value| value.as_str()) == Some("text"))
+                        .filter_map(|block| block.get("text").and_then(|value| value.as_str()))
+                        .map(|text| text.to_string())
                         .collect();
-                }
-            }
-            "stream_event" => {
-                let event = obj.get("event").cloned().unwrap_or(serde_json::Value::Null);
-                let event_type = event.get("type").and_then(|v| v.as_str()).unwrap_or("");
-                if event_type == "content_block_delta" {
-                    let delta = event
-                        .get("delta")
-                        .cloned()
-                        .unwrap_or(serde_json::Value::Null);
-                    let delta_type = delta.get("type").and_then(|v| v.as_str()).unwrap_or("");
-                    match delta_type {
-                        "text_delta" => {
-                            result.events.push(JsonEvent {
-                                event_type: "text_delta".into(),
-                                text: delta
-                                    .get("text")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                                thinking: String::new(),
-                                tool_call: None,
-                                tool_result: None,
-                            });
-                        }
-                        "thinking_delta" => {
-                            result.events.push(JsonEvent {
-                                event_type: "thinking_delta".into(),
-                                text: String::new(),
-                                thinking: delta
-                                    .get("thinking")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                                tool_call: None,
-                                tool_result: None,
-                            });
-                        }
-                        "input_json_delta" => {
-                            result.events.push(JsonEvent {
-                                event_type: "tool_input_delta".into(),
-                                text: delta
-                                    .get("partial_json")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                                thinking: String::new(),
-                                tool_call: None,
-                                tool_result: None,
-                            });
-                        }
-                        _ => {}
-                    }
-                } else if event_type == "content_block_start" {
-                    let cb = event
-                        .get("content_block")
-                        .cloned()
-                        .unwrap_or(serde_json::Value::Null);
-                    let cb_type = cb.get("type").and_then(|v| v.as_str()).unwrap_or("");
-                    if cb_type == "thinking" {
+                    if !texts.is_empty() {
+                        result.final_text = texts.join("\n");
                         result.events.push(JsonEvent {
-                            event_type: "thinking_start".into(),
-                            text: String::new(),
+                            event_type: "assistant".into(),
+                            text: result.final_text.clone(),
                             thinking: String::new(),
                             tool_call: None,
                             tool_result: None,
                         });
-                    } else if cb_type == "tool_use" {
-                        result.events.push(JsonEvent {
-                            event_type: "tool_use_start".into(),
-                            text: String::new(),
-                            thinking: String::new(),
-                            tool_call: Some(ToolCall {
-                                id: cb
-                                    .get("id")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                                name: cb
-                                    .get("name")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                                arguments: String::new(),
-                            }),
-                            tool_result: None,
-                        });
+                    }
+                }
+                if let Some(usage) = message.get("usage").and_then(|value| value.as_object()) {
+                    result.usage = usage
+                        .iter()
+                        .filter_map(|(key, value)| value.as_i64().map(|count| (key.clone(), count)))
+                        .collect();
+                }
+            }
+        }
+        "user" => {
+            if let Some(message) = obj.get("message").and_then(|value| value.as_object()) {
+                if let Some(content) = message.get("content").and_then(|value| value.as_array()) {
+                    for block in content {
+                        if block.get("type").and_then(|value| value.as_str()) == Some("tool_result") {
+                            result.events.push(JsonEvent {
+                                event_type: "tool_result".into(),
+                                text: String::new(),
+                                thinking: String::new(),
+                                tool_call: None,
+                                tool_result: Some(ToolResult {
+                                    tool_call_id: block
+                                        .get("tool_use_id")
+                                        .and_then(|value| value.as_str())
+                                        .unwrap_or("")
+                                        .to_string(),
+                                    content: block
+                                        .get("content")
+                                        .and_then(|value| value.as_str())
+                                        .unwrap_or("")
+                                        .to_string(),
+                                    is_error: block
+                                        .get("is_error")
+                                        .and_then(|value| value.as_bool())
+                                        .unwrap_or(false),
+                                }),
+                            });
+                        }
                     }
                 }
             }
-            "tool_use" => {
-                let tc = ToolCall {
+        }
+        "stream_event" => {
+            if let Some(event) = obj.get("event").and_then(|value| value.as_object()) {
+                let event_type = event.get("type").and_then(|value| value.as_str()).unwrap_or("");
+                if event_type == "content_block_delta" {
+                    if let Some(delta) = event.get("delta").and_then(|value| value.as_object()) {
+                        let delta_type =
+                            delta.get("type").and_then(|value| value.as_str()).unwrap_or("");
+                        match delta_type {
+                            "text_delta" => result.events.push(JsonEvent {
+                                event_type: "text_delta".into(),
+                                text: delta
+                                    .get("text")
+                                    .and_then(|value| value.as_str())
+                                    .unwrap_or("")
+                                    .to_string(),
+                                thinking: String::new(),
+                                tool_call: None,
+                                tool_result: None,
+                            }),
+                            "thinking_delta" => result.events.push(JsonEvent {
+                                event_type: "thinking_delta".into(),
+                                text: String::new(),
+                                thinking: delta
+                                    .get("thinking")
+                                    .and_then(|value| value.as_str())
+                                    .unwrap_or("")
+                                    .to_string(),
+                                tool_call: None,
+                                tool_result: None,
+                            }),
+                            "input_json_delta" => result.events.push(JsonEvent {
+                                event_type: "tool_input_delta".into(),
+                                text: delta
+                                    .get("partial_json")
+                                    .and_then(|value| value.as_str())
+                                    .unwrap_or("")
+                                    .to_string(),
+                                thinking: String::new(),
+                                tool_call: None,
+                                tool_result: None,
+                            }),
+                            _ => {}
+                        }
+                    }
+                } else if event_type == "content_block_start" {
+                    if let Some(content_block) =
+                        event.get("content_block").and_then(|value| value.as_object())
+                    {
+                        let block_type = content_block
+                            .get("type")
+                            .and_then(|value| value.as_str())
+                            .unwrap_or("");
+                        if block_type == "thinking" {
+                            result.events.push(JsonEvent {
+                                event_type: "thinking_start".into(),
+                                text: String::new(),
+                                thinking: String::new(),
+                                tool_call: None,
+                                tool_result: None,
+                            });
+                        } else if block_type == "tool_use" {
+                            result.events.push(JsonEvent {
+                                event_type: "tool_use_start".into(),
+                                text: String::new(),
+                                thinking: String::new(),
+                                tool_call: Some(ToolCall {
+                                    id: content_block
+                                        .get("id")
+                                        .and_then(|value| value.as_str())
+                                        .unwrap_or("")
+                                        .to_string(),
+                                    name: content_block
+                                        .get("name")
+                                        .and_then(|value| value.as_str())
+                                        .unwrap_or("")
+                                        .to_string(),
+                                    arguments: String::new(),
+                                }),
+                                tool_result: None,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        "tool_use" => {
+            let tool_input = obj.get("tool_input").cloned().unwrap_or(serde_json::Value::Null);
+            result.events.push(JsonEvent {
+                event_type: "tool_use".into(),
+                text: String::new(),
+                thinking: String::new(),
+                tool_call: Some(ToolCall {
                     id: String::new(),
                     name: obj
                         .get("tool_name")
-                        .and_then(|v| v.as_str())
+                        .and_then(|value| value.as_str())
                         .unwrap_or("")
                         .to_string(),
-                    arguments: serde_json::to_string(
-                        &obj.get("tool_input")
-                            .cloned()
-                            .unwrap_or(serde_json::Value::Null),
-                    )
-                    .unwrap_or_default(),
-                };
-                result.events.push(JsonEvent {
-                    event_type: "tool_use".into(),
-                    text: String::new(),
-                    thinking: String::new(),
-                    tool_call: Some(tc),
-                    tool_result: None,
-                });
-            }
-            "tool_result" => {
-                let tr = ToolResult {
+                    arguments: serde_json::to_string(&tool_input).unwrap_or_default(),
+                }),
+                tool_result: None,
+            });
+        }
+        "tool_result" => {
+            result.events.push(JsonEvent {
+                event_type: "tool_result".into(),
+                text: String::new(),
+                thinking: String::new(),
+                tool_call: None,
+                tool_result: Some(ToolResult {
                     tool_call_id: obj
                         .get("tool_use_id")
-                        .and_then(|v| v.as_str())
+                        .and_then(|value| value.as_str())
                         .unwrap_or("")
                         .to_string(),
                     content: obj
                         .get("content")
-                        .and_then(|v| v.as_str())
+                        .and_then(|value| value.as_str())
                         .unwrap_or("")
                         .to_string(),
                     is_error: obj
                         .get("is_error")
-                        .and_then(|v| v.as_bool())
+                        .and_then(|value| value.as_bool())
                         .unwrap_or(false),
-                };
+                }),
+            });
+        }
+        "result" => {
+            let subtype = obj.get("subtype").and_then(|value| value.as_str()).unwrap_or("");
+            if subtype == "success" {
+                result.final_text = obj
+                    .get("result")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or(&result.final_text)
+                    .to_string();
+                result.cost_usd = obj
+                    .get("cost_usd")
+                    .and_then(|value| value.as_f64())
+                    .unwrap_or(0.0);
+                result.duration_ms = obj
+                    .get("duration_ms")
+                    .and_then(|value| value.as_i64())
+                    .unwrap_or(0);
+                if let Some(usage) = obj.get("usage").and_then(|value| value.as_object()) {
+                    result.usage = usage
+                        .iter()
+                        .filter_map(|(key, value)| value.as_i64().map(|count| (key.clone(), count)))
+                        .collect();
+                }
                 result.events.push(JsonEvent {
-                    event_type: "tool_result".into(),
-                    text: String::new(),
+                    event_type: "result".into(),
+                    text: result.final_text.clone(),
                     thinking: String::new(),
                     tool_call: None,
-                    tool_result: Some(tr),
+                    tool_result: None,
+                });
+            } else if subtype == "error" {
+                result.error = obj
+                    .get("error")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                result.events.push(JsonEvent {
+                    event_type: "error".into(),
+                    text: result.error.clone(),
+                    thinking: String::new(),
+                    tool_call: None,
+                    tool_result: None,
                 });
             }
-            "result" => {
-                let sub = obj.get("subtype").and_then(|v| v.as_str()).unwrap_or("");
-                if sub == "success" {
-                    let text = obj
-                        .get("result")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or(&result.final_text)
-                        .to_string();
-                    result.final_text = text.clone();
-                    result.cost_usd = obj.get("cost_usd").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                    result.duration_ms =
-                        obj.get("duration_ms").and_then(|v| v.as_i64()).unwrap_or(0);
-                    if let Some(usage) = obj.get("usage").and_then(|v| v.as_object()) {
-                        result.usage = usage
-                            .iter()
-                            .filter_map(|(k, v)| v.as_i64().map(|i| (k.clone(), i)))
-                            .collect();
-                    }
-                    result.events.push(JsonEvent {
-                        event_type: "result".into(),
-                        text,
-                        thinking: String::new(),
-                        tool_call: None,
-                        tool_result: None,
-                    });
-                } else if sub == "error" {
-                    let err = obj
-                        .get("error")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    result.error = err.clone();
-                    result.events.push(JsonEvent {
-                        event_type: "error".into(),
-                        text: err,
-                        thinking: String::new(),
-                        tool_call: None,
-                        tool_result: None,
-                    });
-                }
-            }
-            _ => {}
         }
+        _ => {}
     }
-    result
 }
 
-pub fn parse_kimi_json(raw: &str) -> ParsedJsonOutput {
+fn apply_kimi_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
     let passthrough_events = [
         "TurnBegin",
         "StepBegin",
@@ -354,155 +409,191 @@ pub fn parse_kimi_json(raw: &str) -> ParsedJsonOutput {
         "SubagentEvent",
         "ToolCallRequest",
     ];
-    let mut result = ParsedJsonOutput {
-        schema_name: "kimi".into(),
-        events: Vec::new(),
-        final_text: String::new(),
-        session_id: String::new(),
-        error: String::new(),
-        usage: HashMap::new(),
-        cost_usd: 0.0,
-        duration_ms: 0,
-    };
-    for line in raw.trim().lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-        let obj: serde_json::Value = match serde_json::from_str(line) {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
+    let wire_type = obj.get("type").and_then(|value| value.as_str()).unwrap_or("");
+    if passthrough_events.contains(&wire_type) {
+        result.events.push(JsonEvent {
+            event_type: wire_type.to_ascii_lowercase(),
+            text: String::new(),
+            thinking: String::new(),
+            tool_call: None,
+            tool_result: None,
+        });
+        return;
+    }
 
-        let wire_type = obj.get("type").and_then(|v| v.as_str()).unwrap_or("");
-        if passthrough_events.contains(&wire_type) {
+    let role = obj.get("role").and_then(|value| value.as_str()).unwrap_or("");
+    if role == "assistant" {
+        if let Some(text) = obj.get("content").and_then(|value| value.as_str()) {
+            result.final_text = text.to_string();
             result.events.push(JsonEvent {
-                event_type: wire_type.to_lowercase(),
-                text: String::new(),
+                event_type: "assistant".into(),
+                text: text.to_string(),
                 thinking: String::new(),
                 tool_call: None,
                 tool_result: None,
             });
-            continue;
-        }
-
-        let role = obj.get("role").and_then(|v| v.as_str()).unwrap_or("");
-        if role == "assistant" {
-            let content_val = obj
-                .get("content")
-                .cloned()
-                .unwrap_or(serde_json::Value::Null);
-            let tool_calls = obj.get("tool_calls").and_then(|v| v.as_array());
-
-            if let Some(text) = content_val.as_str() {
-                result.final_text = text.to_string();
-                result.events.push(JsonEvent {
-                    event_type: "assistant".into(),
-                    text: text.to_string(),
-                    thinking: String::new(),
-                    tool_call: None,
-                    tool_result: None,
-                });
-            } else if let Some(parts) = content_val.as_array() {
-                let mut texts: Vec<String> = Vec::new();
-                for part in parts {
-                    let part_type = part.get("type").and_then(|v| v.as_str()).unwrap_or("");
-                    if part_type == "text" {
-                        if let Some(t) = part.get("text").and_then(|v| v.as_str()) {
-                            texts.push(t.to_string());
-                        }
-                    } else if part_type == "think" {
-                        result.events.push(JsonEvent {
-                            event_type: "thinking".into(),
-                            text: String::new(),
-                            thinking: part
-                                .get("think")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string(),
-                            tool_call: None,
-                            tool_result: None,
-                        });
+        } else if let Some(parts) = obj.get("content").and_then(|value| value.as_array()) {
+            let mut texts = Vec::new();
+            for part in parts {
+                let part_type = part.get("type").and_then(|value| value.as_str()).unwrap_or("");
+                if part_type == "text" {
+                    if let Some(text) = part.get("text").and_then(|value| value.as_str()) {
+                        texts.push(text.to_string());
                     }
-                }
-                if !texts.is_empty() {
-                    let text = texts.join("\n");
-                    result.final_text = text.clone();
+                } else if part_type == "think" {
                     result.events.push(JsonEvent {
-                        event_type: "assistant".into(),
-                        text,
-                        thinking: String::new(),
+                        event_type: "thinking".into(),
+                        text: String::new(),
+                        thinking: part
+                            .get("think")
+                            .and_then(|value| value.as_str())
+                            .unwrap_or("")
+                            .to_string(),
                         tool_call: None,
                         tool_result: None,
                     });
                 }
             }
-
-            if let Some(tc_list) = tool_calls {
-                for tc_data in tc_list {
-                    let fn_obj = tc_data
-                        .get("function")
-                        .cloned()
-                        .unwrap_or(serde_json::Value::Null);
-                    let tc = ToolCall {
-                        id: tc_data
-                            .get("id")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string(),
-                        name: fn_obj
-                            .get("name")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string(),
-                        arguments: fn_obj
-                            .get("arguments")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string(),
-                    };
-                    result.events.push(JsonEvent {
-                        event_type: "tool_call".into(),
-                        text: String::new(),
-                        thinking: String::new(),
-                        tool_call: Some(tc),
-                        tool_result: None,
-                    });
-                }
+            if !texts.is_empty() {
+                result.final_text = texts.join("\n");
+                result.events.push(JsonEvent {
+                    event_type: "assistant".into(),
+                    text: result.final_text.clone(),
+                    thinking: String::new(),
+                    tool_call: None,
+                    tool_result: None,
+                });
             }
-        } else if role == "tool" {
-            let content_val = obj
-                .get("content")
-                .cloned()
-                .unwrap_or(serde_json::Value::Null);
-            let mut texts: Vec<String> = Vec::new();
-            if let Some(parts) = content_val.as_array() {
-                for part in parts {
-                    if part.get("type").and_then(|v| v.as_str()) == Some("text") {
-                        if let Some(t) = part.get("text").and_then(|v| v.as_str()) {
-                            if !t.starts_with("<system>") {
-                                texts.push(t.to_string());
-                            }
+        }
+        if let Some(tool_calls) = obj.get("tool_calls").and_then(|value| value.as_array()) {
+            for tool_call in tool_calls {
+                let function = tool_call.get("function").and_then(|value| value.as_object());
+                result.events.push(JsonEvent {
+                    event_type: "tool_call".into(),
+                    text: String::new(),
+                    thinking: String::new(),
+                    tool_call: Some(ToolCall {
+                        id: tool_call
+                            .get("id")
+                            .and_then(|value| value.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                        name: function
+                            .and_then(|f| f.get("name"))
+                            .and_then(|value| value.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                        arguments: function
+                            .and_then(|f| f.get("arguments"))
+                            .and_then(|value| value.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                    }),
+                    tool_result: None,
+                });
+            }
+        }
+    } else if role == "tool" {
+        let mut texts = Vec::new();
+        if let Some(parts) = obj.get("content").and_then(|value| value.as_array()) {
+            for part in parts {
+                if part.get("type").and_then(|value| value.as_str()) == Some("text") {
+                    if let Some(text) = part.get("text").and_then(|value| value.as_str()) {
+                        if !text.starts_with("<system>") {
+                            texts.push(text.to_string());
                         }
                     }
                 }
             }
-            let tr = ToolResult {
+        }
+        result.events.push(JsonEvent {
+            event_type: "tool_result".into(),
+            text: String::new(),
+            thinking: String::new(),
+            tool_call: None,
+            tool_result: Some(ToolResult {
                 tool_call_id: obj
                     .get("tool_call_id")
-                    .and_then(|v| v.as_str())
+                    .and_then(|value| value.as_str())
                     .unwrap_or("")
                     .to_string(),
                 content: texts.join("\n"),
                 is_error: false,
-            };
-            result.events.push(JsonEvent {
-                event_type: "tool_result".into(),
-                text: String::new(),
-                thinking: String::new(),
-                tool_call: None,
-                tool_result: Some(tr),
-            });
+            }),
+        });
+    }
+}
+
+pub fn parse_opencode_json(raw: &str) -> ParsedJsonOutput {
+    let mut result = new_output("opencode");
+    for line in raw.lines() {
+        if let Some(obj) = parse_json_line(line) {
+            let before = (
+                result.events.len(),
+                result.final_text.clone(),
+                result.error.clone(),
+                result.session_id.clone(),
+            );
+            apply_opencode_obj(&mut result, &obj);
+            let after = (
+                result.events.len(),
+                result.final_text.clone(),
+                result.error.clone(),
+                result.session_id.clone(),
+            );
+            if before == after {
+                result.unknown_json_lines.push(line.trim().to_string());
+            }
+        }
+    }
+    result
+}
+
+pub fn parse_claude_code_json(raw: &str) -> ParsedJsonOutput {
+    let mut result = new_output("claude-code");
+    for line in raw.lines() {
+        if let Some(obj) = parse_json_line(line) {
+            let before = (
+                result.events.len(),
+                result.final_text.clone(),
+                result.error.clone(),
+                result.session_id.clone(),
+            );
+            apply_claude_obj(&mut result, &obj);
+            let after = (
+                result.events.len(),
+                result.final_text.clone(),
+                result.error.clone(),
+                result.session_id.clone(),
+            );
+            if before == after {
+                result.unknown_json_lines.push(line.trim().to_string());
+            }
+        }
+    }
+    result
+}
+
+pub fn parse_kimi_json(raw: &str) -> ParsedJsonOutput {
+    let mut result = new_output("kimi");
+    for line in raw.lines() {
+        if let Some(obj) = parse_json_line(line) {
+            let before = (
+                result.events.len(),
+                result.final_text.clone(),
+                result.error.clone(),
+                result.session_id.clone(),
+            );
+            apply_kimi_obj(&mut result, &obj);
+            let after = (
+                result.events.len(),
+                result.final_text.clone(),
+                result.error.clone(),
+                result.session_id.clone(),
+            );
+            if before == after {
+                result.unknown_json_lines.push(line.trim().to_string());
+            }
         }
     }
     result
@@ -518,49 +609,351 @@ pub fn parse_json_output(raw: &str, schema: &str) -> ParsedJsonOutput {
             events: Vec::new(),
             final_text: String::new(),
             session_id: String::new(),
-            error: format!("unknown schema: {}", schema),
-            usage: HashMap::new(),
+            error: format!("unknown schema: {schema}"),
+            usage: BTreeMap::new(),
             cost_usd: 0.0,
             duration_ms: 0,
+            unknown_json_lines: Vec::new(),
         },
     }
 }
 
-pub fn render_parsed(output: &ParsedJsonOutput) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    for event in &output.events {
+fn summarize_text(text: &str, max_lines: usize, max_chars: usize) -> String {
+    let lines: Vec<&str> = text.trim().lines().collect();
+    if lines.is_empty() {
+        return String::new();
+    }
+    let mut clipped = lines.into_iter().take(max_lines).collect::<Vec<_>>().join("\n");
+    let truncated = clipped.len() > max_chars || text.trim().lines().count() > max_lines;
+    if clipped.len() > max_chars {
+        clipped.truncate(max_chars);
+        clipped = clipped.trim_end().to_string();
+    }
+    if truncated {
+        clipped.push_str(" …");
+    }
+    clipped
+}
+
+fn parse_tool_arguments(arguments: &str) -> Option<serde_json::Map<String, serde_json::Value>> {
+    let value: serde_json::Value = serde_json::from_str(arguments).ok()?;
+    value.as_object().cloned()
+}
+
+fn bash_command_preview(tool_call: &ToolCall) -> Option<String> {
+    let args = parse_tool_arguments(&tool_call.arguments)?;
+    for key in ["command", "cmd", "bash_command", "script"] {
+        if let Some(value) = args.get(key).and_then(|value| value.as_str()) {
+            let mut preview = value.trim().to_string();
+            if preview.is_empty() {
+                continue;
+            }
+            if preview.len() > 400 {
+                preview.truncate(400);
+                preview = preview.trim_end().to_string();
+                preview.push_str(" …");
+            }
+            return Some(preview);
+        }
+    }
+    None
+}
+
+fn tool_preview(tool_name: &str, text: &str) -> String {
+    match tool_name.to_ascii_lowercase().as_str() {
+        "read" | "write" | "edit" | "multiedit" | "read_file" | "write_file" | "edit_file" => {
+            String::new()
+        }
+        _ => summarize_text(text, 8, 400),
+    }
+}
+
+fn style(text: &str, code: &str, tty: bool) -> String {
+    if tty {
+        format!("\x1b[{code}m{text}\x1b[0m")
+    } else {
+        text.to_string()
+    }
+}
+
+pub struct FormattedRenderer {
+    show_thinking: bool,
+    tty: bool,
+    seen_final_texts: BTreeSet<String>,
+    tool_calls_by_id: BTreeMap<String, ToolCall>,
+    pending_tool_call: Option<ToolCall>,
+    streamed_assistant_buffer: String,
+}
+
+impl FormattedRenderer {
+    pub fn new(show_thinking: bool, tty: bool) -> Self {
+        Self {
+            show_thinking,
+            tty,
+            seen_final_texts: BTreeSet::new(),
+            tool_calls_by_id: BTreeMap::new(),
+            pending_tool_call: None,
+            streamed_assistant_buffer: String::new(),
+        }
+    }
+
+    pub fn render_output(&mut self, output: &ParsedJsonOutput) -> String {
+        output
+            .events
+            .iter()
+            .filter_map(|event| self.render_event(event))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    pub fn render_event(&mut self, event: &JsonEvent) -> Option<String> {
         match event.event_type.as_str() {
-            "text" | "assistant" | "result" => {
-                if !event.text.is_empty() {
-                    parts.push(event.text.clone());
+            "text_delta" if !event.text.is_empty() => {
+                self.streamed_assistant_buffer.push_str(&event.text);
+                Some(self.render_message("assistant", &event.text))
+            }
+            "text" | "assistant" if !event.text.is_empty() => {
+                if !self.streamed_assistant_buffer.is_empty()
+                    && event.text == self.streamed_assistant_buffer
+                {
+                    self.seen_final_texts.insert(event.text.clone());
+                    self.streamed_assistant_buffer.clear();
+                    None
+                } else {
+                    self.streamed_assistant_buffer.clear();
+                    Some(self.render_message("assistant", &event.text))
                 }
             }
-            "thinking_delta" | "thinking" => {
-                if !event.thinking.is_empty() {
-                    parts.push(format!("[thinking] {}", event.thinking));
+            "result" if !event.text.is_empty() => {
+                if !self.streamed_assistant_buffer.is_empty()
+                    && event.text == self.streamed_assistant_buffer
+                {
+                    self.seen_final_texts.insert(event.text.clone());
+                    self.streamed_assistant_buffer.clear();
+                    None
+                } else if self.seen_final_texts.contains(&event.text) {
+                    None
+                } else {
+                    self.streamed_assistant_buffer.clear();
+                    Some(self.render_message("success", &event.text))
                 }
             }
-            "tool_use" => {
-                if let Some(tc) = &event.tool_call {
-                    parts.push(format!("[tool] {}", tc.name));
+            "thinking" | "thinking_delta" if !event.thinking.is_empty() && self.show_thinking => {
+                Some(self.render_message("thinking", &event.thinking))
+            }
+            "tool_use" | "tool_use_start" | "tool_call" => {
+                if let Some(tool_call) = &event.tool_call {
+                    self.streamed_assistant_buffer.clear();
+                    if !tool_call.id.is_empty() {
+                        self.tool_calls_by_id.insert(tool_call.id.clone(), tool_call.clone());
+                    }
+                    self.pending_tool_call = Some(tool_call.clone());
+                    Some(self.render_tool_start(tool_call))
+                } else {
+                    None
                 }
             }
-            "tool_result" => {
-                if let Some(tr) = &event.tool_result {
-                    parts.push(format!("[tool_result] {}", tr.content));
+            "tool_input_delta" if !event.text.is_empty() => {
+                if let Some(tool_call) = &mut self.pending_tool_call {
+                    tool_call.arguments.push_str(&event.text);
+                    if !tool_call.id.is_empty() {
+                        self.tool_calls_by_id
+                            .insert(tool_call.id.clone(), tool_call.clone());
+                    }
+                }
+                None
+            }
+            "tool_result" => event
+                .tool_result
+                .as_ref()
+                .map(|tool_result| {
+                    self.streamed_assistant_buffer.clear();
+                    self.render_tool_result(tool_result)
+                }),
+            "error" if !event.text.is_empty() => {
+                self.streamed_assistant_buffer.clear();
+                Some(self.render_message("error", &event.text))
+            }
+            _ => None,
+        }
+    }
+
+    fn render_message(&mut self, kind: &str, text: &str) -> String {
+        if matches!(kind, "assistant" | "success") {
+            self.seen_final_texts.insert(text.to_string());
+        }
+        let prefix = match kind {
+            "assistant" => prefix("💬", "[assistant]", "96", self.tty),
+            "thinking" => prefix("🧠", "[thinking]", "2;35", self.tty),
+            "success" => prefix("✅", "[ok]", "92", self.tty),
+            _ => prefix("❌", "[error]", "91", self.tty),
+        };
+        with_prefix(&prefix, text)
+    }
+
+    fn render_tool_start(&self, tool_call: &ToolCall) -> String {
+        let prefix = prefix("🛠️", "[tool:start]", "94", self.tty);
+        let mut detail = tool_call.name.clone();
+        if let Some(preview) = bash_command_preview(tool_call) {
+            detail.push_str(": ");
+            detail.push_str(&preview);
+        }
+        with_prefix(&prefix, &detail)
+    }
+
+    fn render_tool_result(&self, tool_result: &ToolResult) -> String {
+        let prefix = prefix("📎", "[tool:result]", "36", self.tty);
+        let tool_call = self
+            .tool_calls_by_id
+            .get(&tool_result.tool_call_id)
+            .or(self.pending_tool_call.as_ref());
+        let tool_name = tool_call
+            .map(|tool_call| tool_call.name.clone())
+            .unwrap_or_else(|| "tool".into());
+        let mut summary = format!(
+            "{} ({})",
+            tool_name,
+            if tool_result.is_error { "error" } else { "ok" }
+        );
+        if let Some(tool_call) = tool_call {
+            if let Some(preview) = bash_command_preview(tool_call) {
+                summary.push_str(": ");
+                summary.push_str(&preview);
+            }
+        }
+        let preview = tool_preview(&tool_name, &tool_result.content);
+        if !preview.is_empty() {
+            summary.push('\n');
+            summary.push_str(&preview);
+        }
+        with_prefix(&prefix, &summary)
+    }
+}
+
+fn prefix(emoji: &str, plain: &str, color_code: &str, tty: bool) -> String {
+    if tty {
+        style(emoji, color_code, true)
+    } else {
+        plain.to_string()
+    }
+}
+
+fn with_prefix(prefix: &str, text: &str) -> String {
+    text.lines()
+        .map(|line| {
+            if line.is_empty() {
+                prefix.to_string()
+            } else {
+                format!("{prefix} {line}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub struct StructuredStreamProcessor {
+    schema: String,
+    renderer: FormattedRenderer,
+    output: ParsedJsonOutput,
+    buffer: String,
+    unknown_json_lines: Vec<String>,
+}
+
+impl StructuredStreamProcessor {
+    pub fn new(schema: &str, renderer: FormattedRenderer) -> Self {
+        Self {
+            schema: schema.into(),
+            renderer,
+            output: new_output(schema),
+            buffer: String::new(),
+            unknown_json_lines: Vec::new(),
+        }
+    }
+
+    pub fn feed(&mut self, chunk: &str) -> String {
+        self.buffer.push_str(chunk);
+        let mut rendered = Vec::new();
+        while let Some(index) = self.buffer.find('\n') {
+            let line = self.buffer[..index].to_string();
+            self.buffer = self.buffer[index + 1..].to_string();
+            if let Some(obj) = parse_json_line(&line) {
+                let before = (
+                    self.output.events.len(),
+                    self.output.final_text.clone(),
+                    self.output.error.clone(),
+                    self.output.session_id.clone(),
+                );
+                self.apply(&obj);
+                let after = (
+                    self.output.events.len(),
+                    self.output.final_text.clone(),
+                    self.output.error.clone(),
+                    self.output.session_id.clone(),
+                );
+                if before == after {
+                    self.unknown_json_lines.push(line.trim().to_string());
+                }
+                for event in &self.output.events[before.0..] {
+                    if let Some(text) = self.renderer.render_event(event) {
+                        rendered.push(text);
+                    }
                 }
             }
-            "error" => {
-                if !event.text.is_empty() {
-                    parts.push(format!("[error] {}", event.text));
-                }
+        }
+        rendered.join("\n")
+    }
+
+    pub fn finish(&mut self) -> String {
+        if self.buffer.trim().is_empty() {
+            return String::new();
+        }
+        let line = std::mem::take(&mut self.buffer);
+        if let Some(obj) = parse_json_line(&line) {
+            let before = (
+                self.output.events.len(),
+                self.output.final_text.clone(),
+                self.output.error.clone(),
+                self.output.session_id.clone(),
+            );
+            self.apply(&obj);
+            let after = (
+                self.output.events.len(),
+                self.output.final_text.clone(),
+                self.output.error.clone(),
+                self.output.session_id.clone(),
+            );
+            if before == after {
+                self.unknown_json_lines.push(line.trim().to_string());
             }
+            return self.output.events[before.0..]
+                .iter()
+                .filter_map(|event| self.renderer.render_event(event))
+                .collect::<Vec<_>>()
+                .join("\n");
+        }
+        String::new()
+    }
+
+    pub fn take_unknown_json_lines(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.unknown_json_lines)
+    }
+
+    fn apply(&mut self, obj: &serde_json::Value) {
+        match self.schema.as_str() {
+            "opencode" => apply_opencode_obj(&mut self.output, obj),
+            "claude-code" => apply_claude_obj(&mut self.output, obj),
+            "kimi" => apply_kimi_obj(&mut self.output, obj),
             _ => {}
         }
     }
-    if parts.is_empty() {
+}
+
+pub fn render_parsed(output: &ParsedJsonOutput, show_thinking: bool, tty: bool) -> String {
+    let mut renderer = FormattedRenderer::new(show_thinking, tty);
+    let rendered = renderer.render_output(output);
+    if rendered.is_empty() {
         output.final_text.clone()
     } else {
-        parts.join("\n")
+        rendered
     }
 }

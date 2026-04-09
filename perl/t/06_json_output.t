@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use Test::More;
+use File::Spec;
 use lib 'lib';
 use Call::Coding::Clis::JsonOutput qw(
     parse_opencode_json parse_claude_code_json parse_kimi_json
@@ -33,6 +34,13 @@ LINES
 my $KIMI_THINKING = <<'LINES';
 {"role":"assistant","content":[{"type":"think","think":"I need to analyze this...","encrypted":null},{"type":"text","text":"Here is my answer"}]}
 LINES
+
+my $CLAUDE_STREAM_UNKNOWN_FIXTURE = do {
+    my $path = File::Spec->catfile('tests', 'fixtures', 'runner-transcripts', 'claude', 'stream_unknown_events', 'stdout.ndjson');
+    open my $fh, '<', $path or die "open $path: $!";
+    local $/;
+    <$fh>;
+};
 
 # OpenCode tests
 {
@@ -157,6 +165,18 @@ LINES
 {
     my $r = parse_opencode_json("not json\n$OPENCODE_STDOUT");
     is $r->{final_text}, 'Hello from OpenCode', 'render: malformed skipped';
+}
+
+{
+    my $r = parse_claude_code_json($CLAUDE_STREAM_UNKNOWN_FIXTURE);
+    my $rendered = render_parsed($r);
+    like $rendered, qr/Computing the first multiplication\./, 'fixture: rendered known assistant text';
+    cmp_ok scalar(@{$r->{raw_lines}}), '>=', 10, 'fixture: keeps many raw lines';
+    ok scalar(grep { ($_->{type} // '') eq 'rate_limit_event' } @{$r->{raw_lines}}), 'fixture: keeps rate_limit_event raw line';
+    ok scalar(grep { ($_->{type} // '') eq 'stream_event' && (($_->{event} || {})->{type} // '') eq 'message_start' } @{$r->{raw_lines}}), 'fixture: keeps message_start raw line';
+    ok scalar(grep { ($_->{type} // '') eq 'stream_event' && (($_->{event} || {})->{type} // '') eq 'message_delta' } @{$r->{raw_lines}}), 'fixture: keeps message_delta raw line';
+    ok scalar(grep { ($_->{type} // '') eq 'stream_event' && (($_->{event} || {})->{type} // '') eq 'message_stop' } @{$r->{raw_lines}}), 'fixture: keeps message_stop raw line';
+    ok scalar(grep { ($_->{type} // '') eq 'stream_event' && (((($_->{event} || {})->{delta}) || {})->{type} // '') eq 'signature_delta' } @{$r->{raw_lines}}), 'fixture: keeps signature_delta raw line';
 }
 
 done_testing;

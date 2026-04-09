@@ -1,0 +1,7 @@
+{"type":"system","subtype":"init","session_id":"<session-id>","model":"claude-haiku-4-5-20251001","permissionMode":"bypassPermissions","uuid":"<uuid>"}
+{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}},"session_id":"<session-id>","uuid":"<uuid>"}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"The user wants exactly three short lines and no tools."}},"session_id":"<session-id>","uuid":"<uuid>"}
+{"type":"stream_event","event":{"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}},"session_id":"<session-id>","uuid":"<uuid>"}
+{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"alpha\nbeta\ngamma"}},"session_id":"<session-id>","uuid":"<uuid>"}
+{"type":"assistant","message":{"model":"claude-haiku-4-5-20251001","id":"<message-id>","type":"message","role":"assistant","content":[{"type":"text","text":"alpha\nbeta\ngamma"}],"usage":{"input_tokens":10,"output_tokens":690}},"session_id":"<session-id>","uuid":"<uuid>"}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":8679,"result":"alpha\nbeta\ngamma","stop_reason":"end_turn","session_id":"<session-id>","uuid":"<uuid>"}

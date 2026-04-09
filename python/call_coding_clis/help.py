@@ -37,6 +37,9 @@ Controls (free order before the prompt):
                 Kimi maps +0 to --no-thinking and +1..+4 to --thinking
   :provider:model  Override provider and model
   @name         Use a named preset from config; if no preset exists, treat it as an agent
+  .mode / ..mode
+                Output-mode sugar with a shared dot identity:
+                  .text / ..text, .json / ..json, .fmt / ..fmt
   --permission-mode <safe|auto|yolo|plan>
                 Request a higher-level permission profile when the selected runner supports it
   --yolo / -y   Request the runner's lowest-friction auto-approval mode when supported
@@ -44,6 +47,10 @@ Controls (free order before the prompt):
 Flags:
   --show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it
                                         (default: off; config key: show_thinking)
+  --output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>
+                                        Select raw, streamed, or formatted output handling
+                                        (config key: defaults.output_mode / default_output_mode)
+  --forward-unknown-json                In formatted modes, forward unhandled JSON objects to stderr
   --            Treat all remaining args as prompt text, even if they look like controls
 
 Examples:
@@ -52,13 +59,15 @@ Examples:
   ccc --permission-mode auto c "Add tests"
   ccc --yolo cc +2 :anthropic:claude-sonnet-4-20250514 "Add tests"
   ccc --permission-mode plan k "Think before editing"
+  ccc ..fmt cc +3 "Investigate the failing test"
+  ccc -o stream-json k "Reply with exactly pong"
   ccc @reviewer k +4 "Debug the parser"
   ccc @reviewer "Audit the API boundary"
   ccc codex "Write a unit test"
   ccc -y -- +1 @agent :model
 
 Config:
-  ~/.config/ccc/config.toml  — default runner, presets, abbreviations, show_thinking
+  ~/.config/ccc/config.toml  — default runner, output mode, presets, abbreviations, show_thinking
 """
 
 

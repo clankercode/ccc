@@ -1,0 +1,23 @@
+{
+  "runner": "claude",
+  "cli_version": "2.1.97 (Claude Code)",
+  "argv": [
+    "claude",
+    "-p",
+    "--verbose",
+    "--output-format",
+    "stream-json",
+    "--include-partial-messages",
+    "What is 37*43? Reply with just the integer."
+  ],
+  "output_mode": "stream-json",
+  "capture_date": "2026-04-09",
+  "workspace": "repo-root",
+  "excerpted": true,
+  "redactions": [
+    "session_id",
+    "uuid",
+    "message ids",
+    "hook bootstrap payload"
+  ]
+}

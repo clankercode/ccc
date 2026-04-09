@@ -68,12 +68,19 @@ def _load_from_file(path: Path) -> CccConfig:
         config.default_runner = defaults.get("runner", config.default_runner)
         config.default_provider = defaults.get("provider", config.default_provider)
         config.default_model = defaults.get("model", config.default_model)
+        output_mode = defaults.get("output_mode")
+        if output_mode is not None:
+            config.default_output_mode = str(output_mode)
         thinking = defaults.get("thinking")
         if thinking is not None:
             config.default_thinking = int(thinking)
         show_thinking = defaults.get("show_thinking")
         if show_thinking is not None:
             config.default_show_thinking = _coerce_bool(show_thinking)
+
+    default_output_mode = data.get("default_output_mode")
+    if default_output_mode is not None:
+        config.default_output_mode = str(default_output_mode)
 
     default_show_thinking = data.get("default_show_thinking")
     if default_show_thinking is not None:
@@ -91,6 +98,7 @@ def _load_from_file(path: Path) -> CccConfig:
                     runner=defn.get("runner"),
                     thinking=defn.get("thinking"),
                     show_thinking=defn.get("show_thinking"),
+                    output_mode=defn.get("output_mode"),
                     provider=defn.get("provider"),
                     model=defn.get("model"),
                     agent=defn.get("agent"),

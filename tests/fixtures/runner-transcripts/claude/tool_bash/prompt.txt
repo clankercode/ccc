@@ -1,0 +1,1 @@
+Run a bash command that prints two short lines, then reply with exactly done.

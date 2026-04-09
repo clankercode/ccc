@@ -1,6 +1,8 @@
 require "spec"
 require "../src/call_coding_clis/json_output"
 
+FIXTURES = File.expand_path("../../tests/fixtures/runner-transcripts", __DIR__)
+
 describe "parse_opencode_json" do
   it "parses a response line" do
     result = parse_opencode_json(%q({"response": "hello world"}))
@@ -206,5 +208,20 @@ describe "render_parsed" do
       events: [JsonEvent.new(event_type: "tool_result", tool_result: ToolResult.new(content: "file data"))]
     )
     render_parsed(output).should eq("[tool_result] file data")
+  end
+
+  it "keeps raw Claude stream unknown events from fixture" do
+    raw = File.read(File.join(FIXTURES, "claude", "stream_unknown_events", "stdout.ndjson"))
+    result = parse_claude_code_json(raw)
+    render_parsed(result).should contain("Computing the first multiplication.")
+    result.raw_lines.size.should be >= 10
+    result.raw_lines.any? { |obj| obj["type"].as_s == "rate_limit_event" }.should be_true
+    result.raw_lines.any? { |obj| obj["type"].as_s == "stream_event" && obj["event"].as_h["type"].as_s == "message_start" }.should be_true
+    result.raw_lines.any? { |obj| obj["type"].as_s == "stream_event" && obj["event"].as_h["type"].as_s == "message_delta" }.should be_true
+    result.raw_lines.any? { |obj| obj["type"].as_s == "stream_event" && obj["event"].as_h["type"].as_s == "message_stop" }.should be_true
+    result.raw_lines.any? do |obj|
+      obj["type"].as_s == "stream_event" &&
+        obj["event"].as_h["delta"]?.try(&.as_h["type"].as_s) == "signature_delta"
+    end.should be_true
   end
 end

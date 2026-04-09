@@ -1,0 +1,1 @@
+Use tools. First state in one short sentence what you are doing. Then use Bash to compute 987654321987654321 * 123456789123456789. Then use Bash to run `sleep 3`. Then state one short progress sentence. Then use Bash to compute 111111111111111111 * 999999999999999937. Then use Bash to run `sleep 2`. End with exactly DONE on the final line.

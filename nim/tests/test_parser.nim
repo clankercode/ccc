@@ -111,14 +111,14 @@ suite "resolveCommand":
   test "codex runner via c":
     let p = parseArgs(@["c", "hello"])
     let res = resolveCommand(p, none(CccConfig))
-    check res.argv == @["codex", "hello"]
+    check res.argv == @["codex", "exec", "hello"]
     check res.env.len == 0
     check res.warnings.len == 0
 
   test "codex runner via cx":
     let p = parseArgs(@["cx", "hello"])
     let res = resolveCommand(p, none(CccConfig))
-    check res.argv == @["codex", "hello"]
+    check res.argv == @["codex", "exec", "hello"]
     check res.env.len == 0
     check res.warnings.len == 0
 
@@ -135,7 +135,7 @@ suite "resolveCommand":
   test "codex model flag":
     let p = parseArgs(@["codex", ":gpt-4", "hello"])
     let res = resolveCommand(p, none(CccConfig))
-    check res.argv == @["codex", "--model", "gpt-4", "hello"]
+    check res.argv == @["codex", "exec", "--model", "gpt-4", "hello"]
 
   test "roocode runner via rc":
     let p = parseArgs(@["rc", "hello"])
@@ -254,4 +254,4 @@ suite "resolveCommand":
     cfg.defaultModel = "gpt-4"
     let p = parseArgs(@["codex", "hello"])
     let res = resolveCommand(p, some(cfg))
-    check res.argv == @["codex", "--model", "gpt-4", "hello"]
+    check res.argv == @["codex", "exec", "--model", "gpt-4", "hello"]

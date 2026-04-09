@@ -91,6 +91,7 @@ unittest {
     auto parsed = parseArgs(["c", "use codex"]);
     auto r = resolveCommand(parsed, defaultConfig());
     assert(r.argv[0] == "codex");
+    assert(r.argv[1] == "exec");
     assert(r.argv[$ - 1] == "use codex");
 }
 
@@ -98,6 +99,7 @@ unittest {
     auto parsed = parseArgs(["cx", "use codex"]);
     auto r = resolveCommand(parsed, defaultConfig());
     assert(r.argv[0] == "codex");
+    assert(r.argv[1] == "exec");
     assert(r.argv[$ - 1] == "use codex");
 }
 
@@ -205,8 +207,9 @@ unittest {
     auto config = defaultConfig();
     auto r = resolveCommand(parsed, config);
     assert(r.argv[0] == "codex");
-    assert(r.argv[1] == "--model");
-    assert(r.argv[2] == "gpt-4o");
+    assert(r.argv[1] == "exec");
+    assert(r.argv[2] == "--model");
+    assert(r.argv[3] == "gpt-4o");
     assert("CCC_PROVIDER" in r.env);
     assert(r.env["CCC_PROVIDER"] == "openai");
 }

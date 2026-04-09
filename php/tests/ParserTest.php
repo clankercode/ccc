@@ -91,10 +91,10 @@ $r = Parser::resolveCommand(Parser::parseArgs(['cc', 'fix']));
 assert_test('claude selector cc: argv', $r['argv'] === ['claude', 'fix']);
 
 $r = Parser::resolveCommand(Parser::parseArgs(['c', ':my-model', 'go']));
-assert_test('codex selector c: argv', $r['argv'] === ['codex', '--model', 'my-model', 'go']);
+assert_test('codex selector c: argv', $r['argv'] === ['codex', 'exec', '--model', 'my-model', 'go']);
 
 $r = Parser::resolveCommand(Parser::parseArgs(['cx', 'fix']));
-assert_test('codex selector cx: argv', $r['argv'] === ['codex', 'fix']);
+assert_test('codex selector cx: argv', $r['argv'] === ['codex', 'exec', 'fix']);
 
 $r = Parser::resolveCommand(Parser::parseArgs(['rc', 'fix']));
 assert_test('roocode selector rc: argv', $r['argv'] === ['roocode', 'fix']);
@@ -148,7 +148,7 @@ $r = Parser::resolveCommand(Parser::parseArgs(['claude', 'hello']), $cfg);
 assert_test('config default model', in_array('sonnet-4', $r['argv']));
 
 $r = Parser::resolveCommand(Parser::parseArgs(['codex', ':my-model', 'go']));
-assert_test('codex model flag', $r['argv'] === ['codex', '--model', 'my-model', 'go']);
+assert_test('codex model flag', $r['argv'] === ['codex', 'exec', '--model', 'my-model', 'go']);
 
 $r = Parser::resolveCommand(Parser::parseArgs(['crush', 'hello']));
 assert_test('crush no model flag', $r['argv'] === ['crush', 'hello']);

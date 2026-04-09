@@ -126,12 +126,17 @@ test('resolveCommand: claude runner', () => {
 
 test('resolveCommand: codex runner via c', () => {
   const result = resolveCommand({ runner: 'c', thinking: null, provider: null, model: null, alias: null, prompt: 'prompt' })
-  assert.equal(result.argv[0], 'codex')
+  assert.deepEqual(result.argv.slice(0, 2), ['codex', 'exec'])
 })
 
 test('resolveCommand: codex runner via cx', () => {
   const result = resolveCommand({ runner: 'cx', thinking: null, provider: null, model: null, alias: null, prompt: 'prompt' })
-  assert.equal(result.argv[0], 'codex')
+  assert.deepEqual(result.argv.slice(0, 2), ['codex', 'exec'])
+})
+
+test('resolveCommand: codex runner with model uses exec', () => {
+  const result = resolveCommand({ runner: 'c', thinking: null, provider: null, model: 'gpt-5.4-mini', alias: null, prompt: 'prompt' })
+  assert.deepEqual(result.argv, ['codex', 'exec', '--model', 'gpt-5.4-mini', 'prompt'])
 })
 
 test('resolveCommand: thinking flags for claude +2', () => {

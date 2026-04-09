@@ -98,12 +98,17 @@ parserSpec = do
     it "uses codex runner for c selector" $ do
       let parsed = ParsedArgs (Just "c") Nothing Nothing Nothing Nothing "hello"
           result = resolveCommand parsed Nothing
-      result `shouldBe` Right (["codex", "hello"], Map.empty, [])
+      result `shouldBe` Right (["codex", "exec", "hello"], Map.empty, [])
 
     it "uses codex runner for cx selector" $ do
       let parsed = ParsedArgs (Just "cx") Nothing Nothing Nothing Nothing "hello"
           result = resolveCommand parsed Nothing
-      result `shouldBe` Right (["codex", "hello"], Map.empty, [])
+      result `shouldBe` Right (["codex", "exec", "hello"], Map.empty, [])
+
+    it "uses codex exec with model flag" $ do
+      let parsed = ParsedArgs (Just "c") Nothing Nothing (Just "gpt-5.4-mini") Nothing "hello"
+          result = resolveCommand parsed Nothing
+      result `shouldBe` Right (["codex", "exec", "--model", "gpt-5.4-mini", "hello"], Map.empty, [])
 
     it "uses roocode runner for rc selector" $ do
       let parsed = ParsedArgs (Just "rc") Nothing Nothing Nothing Nothing "hello"

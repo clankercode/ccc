@@ -69,7 +69,7 @@ runnerRegistry = Map.fromList $ baseRunners ++ abbrevs
       , (3, ["--thinking"])
       , (4, ["--thinking"])
       ]) "" "--model" "--agent"
-    codex = RunnerInfo "codex" [] Map.empty "" "--model" ""
+    codex = RunnerInfo "codex" ["exec"] Map.empty "" "--model" ""
     roocode = RunnerInfo "roocode" [] Map.empty "" "--model" ""
     crush = RunnerInfo "crush" [] Map.empty "" "" ""
 

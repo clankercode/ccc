@@ -113,7 +113,7 @@ describe "resolve_command" do
     ["c", "cx"].each do |selector|
       parsed = parse_args([selector, "hello"])
       argv, env = resolve_command(parsed)
-      argv[0].should eq("codex")
+      argv.should eq(["codex", "exec", "hello"])
       env.should be_empty
     end
   end
@@ -141,6 +141,12 @@ describe "resolve_command" do
     parsed = parse_args(["claude", ":my-model", "hello"])
     argv, env = resolve_command(parsed)
     argv.should eq(["claude", "--model", "my-model", "hello"])
+  end
+
+  it "applies model flag for codex with exec" do
+    parsed = parse_args(["codex", ":gpt-5.4-mini", "hello"])
+    argv, env = resolve_command(parsed)
+    argv.should eq(["codex", "exec", "--model", "gpt-5.4-mini", "hello"])
   end
 
   it "sets provider env var" do

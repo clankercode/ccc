@@ -124,18 +124,18 @@ let () =
       test_case "codex model flag" `Quick (fun () ->
         let parsed = Parser.parse_args ["codex"; ":gpt-4"; "hello"] in
         let argv, _, _warnings = Parser.resolve_command parsed None in
-        check (list string) "argv" ["codex"; "--model"; "gpt-4"; "hello"] argv);
+        check (list string) "argv" ["codex"; "exec"; "--model"; "gpt-4"; "hello"] argv);
 
       test_case "codex runner via selector c" `Quick (fun () ->
         let parsed = Parser.parse_args ["c"; "hello"] in
         let argv, env, _warnings = Parser.resolve_command parsed None in
-        check (list string) "argv" ["codex"; "hello"] argv;
+        check (list string) "argv" ["codex"; "exec"; "hello"] argv;
         check (list (pair string string)) "env" [] env);
 
       test_case "codex runner via selector cx" `Quick (fun () ->
         let parsed = Parser.parse_args ["cx"; "hello"] in
         let argv, env, _warnings = Parser.resolve_command parsed None in
-        check (list string) "argv" ["codex"; "hello"] argv;
+        check (list string) "argv" ["codex"; "exec"; "hello"] argv;
         check (list (pair string string)) "env" [] env);
 
       test_case "provider env override" `Quick (fun () ->
@@ -275,7 +275,7 @@ let () =
           Parser.abbreviations = [("cc", "codex")];
         } in
         let argv, _, _warnings = Parser.resolve_command parsed (Some config) in
-        check (list string) "argv" ["codex"; "hello"] argv
+        check (list string) "argv" ["codex"; "exec"; "hello"] argv
       );
 
       test_case "abbrev to claude with thinking" `Quick (fun () ->

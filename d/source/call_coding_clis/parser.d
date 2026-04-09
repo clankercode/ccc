@@ -63,7 +63,7 @@ private void ensureRegistry() {
         3: ["--think", "high"],
         4: ["--think", "max"],
     ], "", "--model", "--agent");
-    auto codex = RunnerInfo("codex", null, null, "", "--model", "");
+    auto codex = RunnerInfo("codex", ["exec"], null, "", "--model", "");
     auto roocode = RunnerInfo("roocode", null, null, "", "--model", "");
     auto crush = RunnerInfo("crush", null, null, "", "", "");
 

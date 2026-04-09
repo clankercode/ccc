@@ -179,7 +179,8 @@ test "resolveCommand c runner maps to codex" {
     defer resolved.deinit(allocator);
 
     try std.testing.expectEqualStrings("codex", resolved.argv[0]);
-    try std.testing.expectEqualStrings("prompt", resolved.argv[1]);
+    try std.testing.expectEqualStrings("exec", resolved.argv[1]);
+    try std.testing.expectEqualStrings("prompt", resolved.argv[2]);
 }
 
 test "resolveCommand cx runner maps to codex" {
@@ -194,7 +195,8 @@ test "resolveCommand cx runner maps to codex" {
     defer resolved.deinit(allocator);
 
     try std.testing.expectEqualStrings("codex", resolved.argv[0]);
-    try std.testing.expectEqualStrings("prompt", resolved.argv[1]);
+    try std.testing.expectEqualStrings("exec", resolved.argv[1]);
+    try std.testing.expectEqualStrings("prompt", resolved.argv[2]);
 }
 
 test "resolveCommand thinking flags claude" {
@@ -429,9 +431,10 @@ test "resolveCommand codex with model" {
     defer resolved.deinit(allocator);
 
     try std.testing.expectEqualStrings("codex", resolved.argv[0]);
-    try std.testing.expectEqualStrings("--model", resolved.argv[1]);
-    try std.testing.expectEqualStrings("gpt-4", resolved.argv[2]);
-    try std.testing.expectEqualStrings("prompt", resolved.argv[3]);
+    try std.testing.expectEqualStrings("exec", resolved.argv[1]);
+    try std.testing.expectEqualStrings("--model", resolved.argv[2]);
+    try std.testing.expectEqualStrings("gpt-4", resolved.argv[3]);
+    try std.testing.expectEqualStrings("prompt", resolved.argv[4]);
 }
 
 test "resolveCommand crush no model flag" {

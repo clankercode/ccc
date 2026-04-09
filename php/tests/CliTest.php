@@ -117,7 +117,11 @@ SH
         $binDir . '/codex',
         <<<'SH'
 #!/bin/sh
-printf 'codex %s\n' "$*"
+if [ "$1" != "exec" ]; then
+  exit 9
+fi
+shift
+printf 'codex exec %s\n' "$*"
 SH
     );
     write_executable(
@@ -132,12 +136,12 @@ SH
 
     [$stdout, $stderr, $rc] = run_ccc(['c', 'Fix the failing tests'], $pathEnv);
     assert_test('selector c exit code', $rc === 0);
-    assert_test('selector c stdout', $stdout === "codex Fix the failing tests\n");
+    assert_test('selector c stdout', $stdout === "codex exec Fix the failing tests\n");
     assert_test('selector c stderr empty', $stderr === '');
 
     [$stdout, $stderr, $rc] = run_ccc(['cx', 'Fix the failing tests'], $pathEnv);
     assert_test('selector cx exit code', $rc === 0);
-    assert_test('selector cx stdout', $stdout === "codex Fix the failing tests\n");
+    assert_test('selector cx stdout', $stdout === "codex exec Fix the failing tests\n");
     assert_test('selector cx stderr empty', $stderr === '');
 
     [$stdout, $stderr, $rc] = run_ccc(['cc', 'Fix the failing tests'], $pathEnv);
@@ -171,7 +175,7 @@ SH
         );
         assert_test('unsupported agent exit code', $rc === 0);
         assert_test('unsupported agent warning', str_contains($stderr, 'warning: runner "codex" does not support agents; ignoring @reviewer'));
-        assert_test('unsupported agent stdout', $stdout === "codex Fix the failing tests\n");
+        assert_test('unsupported agent stdout', $stdout === "codex exec Fix the failing tests\n");
     } finally {
         restore_env('CCC_CONFIG', $testOldCcc);
         restore_env('XDG_CONFIG_HOME', $testOldXdg);

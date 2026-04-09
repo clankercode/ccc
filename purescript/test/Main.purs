@@ -62,7 +62,7 @@ main = do
         resolved = resolveCommand parsed (defaultConfig { defaultRunner = "oc" })
     in parsed.runner == Just "cx"
       && parsed.prompt == "Fix the failing tests"
-      && resolved.argv == ["codex", "Fix the failing tests"]
+      && resolved.argv == ["codex", "exec", "Fix the failing tests"]
 
   r9 <- check "resolveRunnerName remaps c/cx/cc/rc" $
     resolveRunnerName "c" defaultConfig == "codex"

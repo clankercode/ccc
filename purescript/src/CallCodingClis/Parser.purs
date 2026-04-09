@@ -175,7 +175,7 @@ runnerSpec runnerName = case runnerName of
     }
   "codex" ->
     { binary: "codex"
-    , extraArgs: []
+    , extraArgs: ["exec"]
     , modelFlag: "--model"
     , agentFlag: ""
     }

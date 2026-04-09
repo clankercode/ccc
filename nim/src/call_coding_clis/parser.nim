@@ -143,7 +143,7 @@ proc runnerRegistry*(): Table[string, RunnerInfo] =
   )
   let codexInfo = RunnerInfo(
     binary: "codex",
-    extraArgs: @[],
+    extraArgs: @["exec"],
     thinkingFlags: emptyThinking,
     providerFlag: "",
     modelFlag: "--model",

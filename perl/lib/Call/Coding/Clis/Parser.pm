@@ -49,7 +49,7 @@ sub _register_defaults {
         },
         codex => {
             binary         => 'codex',
-            extra_args     => [],
+            extra_args     => ['exec'],
             thinking_flags => {},
             provider_flag  => '',
             model_flag     => '--model',

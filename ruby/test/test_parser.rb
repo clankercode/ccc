@@ -127,19 +127,19 @@ class TestParser < Minitest::Test
   def test_resolve_model_flag_codex
     parsed = CallCodingClis::Parser.parse_args(["codex", ":gpt-4o", "hello"])
     argv, env = CallCodingClis::Parser.resolve_command(parsed)
-    assert_equal ["codex", "--model", "gpt-4o", "hello"], argv
+    assert_equal ["codex", "exec", "--model", "gpt-4o", "hello"], argv
   end
 
   def test_resolve_model_flag_codex_via_c
     parsed = CallCodingClis::Parser.parse_args(["c", ":gpt-4o", "hello"])
     argv, env = CallCodingClis::Parser.resolve_command(parsed)
-    assert_equal ["codex", "--model", "gpt-4o", "hello"], argv
+    assert_equal ["codex", "exec", "--model", "gpt-4o", "hello"], argv
   end
 
   def test_resolve_model_flag_codex_via_cx
     parsed = CallCodingClis::Parser.parse_args(["cx", ":gpt-4o", "hello"])
     argv, env = CallCodingClis::Parser.resolve_command(parsed)
-    assert_equal ["codex", "--model", "gpt-4o", "hello"], argv
+    assert_equal ["codex", "exec", "--model", "gpt-4o", "hello"], argv
   end
 
   def test_resolve_no_model_flag_opencode
@@ -290,7 +290,7 @@ class TestParser < Minitest::Test
     parsed = CallCodingClis::Parser.parse_args(["c", "@reviewer", "hello"])
     warnings = []
     argv, env = CallCodingClis::Parser.resolve_command(parsed, nil, warnings: warnings)
-    assert_equal ["codex", "hello"], argv
+    assert_equal ["codex", "exec", "hello"], argv
     assert_equal({}, env)
     assert_equal ['warning: runner "c" does not support agents; ignoring @reviewer'], warnings
   end

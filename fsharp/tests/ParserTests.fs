@@ -123,7 +123,14 @@ let ``resolveCommand claude runner`` () =
 let ``resolveCommand codex runner`` () =
     let parsed = { Runner = Some "c"; Thinking = None; Provider = None; Model = None; Alias = None; Prompt = "hello" }
     let argv, env, warnings = Parser.resolveCommand parsed None
-    Assert.Equal("codex", List.head argv)
+    Assert.Equal<string list>(["codex"; "exec"; "hello"], argv)
+    Assert.Empty(warnings)
+
+[<Fact>]
+let ``resolveCommand codex model uses exec`` () =
+    let parsed = { Runner = Some "c"; Thinking = None; Provider = None; Model = Some "gpt-5.4-mini"; Alias = None; Prompt = "hello" }
+    let argv, env, warnings = Parser.resolveCommand parsed None
+    Assert.Equal<string list>(["codex"; "exec"; "--model"; "gpt-5.4-mini"; "hello"], argv)
     Assert.Empty(warnings)
 
 [<Fact>]

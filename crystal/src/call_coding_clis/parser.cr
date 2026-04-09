@@ -116,7 +116,7 @@ module RunnerRegistry
     )
     codex = RunnerInfo.new(
       binary: "codex",
-      extra_args: [] of String,
+      extra_args: ["exec"],
       thinking_flags: Hash(Int32, Array(String)).new,
       provider_flag: "",
       model_flag: "--model",

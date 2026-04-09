@@ -116,7 +116,7 @@ class Parser
 
         self::$runnerRegistry['codex'] = new RunnerInfo(
             'codex',
-            [],
+            ['exec'],
             [],
             '',
             '--model'

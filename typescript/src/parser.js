@@ -52,7 +52,7 @@ function registerDefaults() {
   })
   RUNNER_REGISTRY.codex = new RunnerInfo({
     binary: 'codex',
-    extraArgs: [],
+    extraArgs: ['exec'],
     thinkingFlags: {},
     providerFlag: '',
     modelFlag: '--model',

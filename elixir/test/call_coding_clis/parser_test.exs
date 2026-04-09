@@ -132,16 +132,21 @@ defmodule CallCodingClis.ParserTest do
     test "codex runner via c" do
       parsed = %ParsedArgs{runner: "c", prompt: "hello"}
       assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
-      assert List.first(argv) == "codex"
-      assert "hello" in argv
+      assert argv == ["codex", "exec", "hello"]
       assert warnings == []
     end
 
     test "codex runner via cx" do
       parsed = %ParsedArgs{runner: "cx", prompt: "hello"}
       assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
-      assert List.first(argv) == "codex"
-      assert "hello" in argv
+      assert argv == ["codex", "exec", "hello"]
+      assert warnings == []
+    end
+
+    test "codex runner with model uses exec" do
+      parsed = %ParsedArgs{runner: "c", model: "gpt-5.4-mini", prompt: "hello"}
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
+      assert argv == ["codex", "exec", "--model", "gpt-5.4-mini", "hello"]
       assert warnings == []
     end
 

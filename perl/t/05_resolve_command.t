@@ -22,13 +22,19 @@ use Call::Coding::Clis::Parser qw(parse_args resolve_command);
 {
     my $p   = parse_args("c", "hello");
     my $cmd = resolve_command($p);
-    is_deeply $cmd->{argv}, ['codex', 'hello'], 'c runner: argv';
+    is_deeply $cmd->{argv}, ['codex', 'exec', 'hello'], 'c runner: argv';
 }
 
 {
     my $p   = parse_args("cx", "hello");
     my $cmd = resolve_command($p);
-    is_deeply $cmd->{argv}, ['codex', 'hello'], 'cx runner: argv';
+    is_deeply $cmd->{argv}, ['codex', 'exec', 'hello'], 'cx runner: argv';
+}
+
+{
+    my $p   = parse_args("codex", ":gpt-4o", "test");
+    my $cmd = resolve_command($p);
+    is_deeply $cmd->{argv}, ['codex', 'exec', '--model', 'gpt-4o', 'test'], 'codex model flag';
 }
 
 {
@@ -71,12 +77,6 @@ use Call::Coding::Clis::Parser qw(parse_args resolve_command);
     my $p   = parse_args("k", "+0", "hello");
     my $cmd = resolve_command($p);
     is_deeply $cmd->{argv}, ['kimi', '--no-thinking', 'hello'], 'k abbreviation resolves to kimi';
-}
-
-{
-    my $p   = parse_args("codex", ":gpt-4o", "test");
-    my $cmd = resolve_command($p);
-    is_deeply $cmd->{argv}, ['codex', '--model', 'gpt-4o', 'test'], 'codex model flag';
 }
 
 {
@@ -138,7 +138,7 @@ use Call::Coding::Clis::Parser qw(parse_args resolve_command);
 {
     my $p   = parse_args('codex', '@reviewer', "hello");
     my $cmd = resolve_command($p);
-    is_deeply $cmd->{argv}, ['codex', 'hello'], 'unsupported agent is ignored';
+    is_deeply $cmd->{argv}, ['codex', 'exec', 'hello'], 'unsupported agent is ignored';
     is_deeply $cmd->{warnings}, ['warning: runner "codex" does not support agents; ignoring @reviewer'], 'unsupported agent warns';
 }
 

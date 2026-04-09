@@ -78,7 +78,7 @@ module Parser =
         }
         let codexInfo = {
             Binary = "codex"
-            ExtraArgs = []
+            ExtraArgs = ["exec"]
             ThinkingFlags = Map.empty
             ProviderFlag = ""
             ModelFlag = "--model"

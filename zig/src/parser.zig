@@ -132,7 +132,7 @@ const kimi_info = RunnerInfo{
 
 const codex_info = RunnerInfo{
     .binary = "codex",
-    .extra_args = &.{},
+    .extra_args = &.{ "exec" },
     .thinking_flags = .{ null, null, null, null, null },
     .provider_flag = "",
     .model_flag = "--model",

@@ -58,3 +58,4 @@ MICROPLAN.md
 elixir/deps/
 .subagent-logs/
 .headless-*
+.worktrees/

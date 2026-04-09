@@ -241,9 +241,11 @@ fn build_command(spec: &CommandSpec) -> Command {
         command.current_dir(cwd);
     }
     command.envs(&spec.env);
-    if spec.stdin_text.is_some() {
-        command.stdin(Stdio::piped());
-    }
+    command.stdin(if spec.stdin_text.is_some() {
+        Stdio::piped()
+    } else {
+        Stdio::null()
+    });
     command
 }
 

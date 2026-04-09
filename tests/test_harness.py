@@ -514,6 +514,15 @@ class CrossLanguageHarness(unittest.TestCase):
         cls.base_env = os.environ.copy()
         cls.base_env["PATH"] = f"{cls.bin_dir}:{cls.base_env.get('PATH', '')}"
         cls.base_env["PERL_BADLANG"] = "0"
+        cls.base_env["HOME"] = str(Path(cls.tmp_dir) / "home")
+        cls.base_env["XDG_CONFIG_HOME"] = str(Path(cls.tmp_dir) / "xdg-config")
+        cls.base_env["XDG_DATA_HOME"] = str(Path(cls.tmp_dir) / "xdg-data")
+        cls.base_env["XDG_CACHE_HOME"] = str(Path(cls.tmp_dir) / "xdg-cache")
+        cls.base_env["XDG_STATE_HOME"] = str(Path(cls.tmp_dir) / "xdg-state")
+        cls.base_env["CCC_CONFIG"] = str(Path(cls.tmp_dir) / "missing-config.toml")
+        cls.base_env["CARGO_HOME"] = os.environ.get(
+            "CARGO_HOME", str(Path.home() / ".cargo")
+        )
 
         for lang in cls.selected_languages:
             lang.build(cls.base_env)

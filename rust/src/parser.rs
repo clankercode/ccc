@@ -146,7 +146,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let codex = RunnerInfo {
         binary: "codex".into(),
-        extra_args: vec![],
+        extra_args: vec!["exec".into()],
         thinking_flags: BTreeMap::new(),
         provider_flag: String::new(),
         model_flag: "--model".into(),

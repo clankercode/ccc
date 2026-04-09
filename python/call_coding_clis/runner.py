@@ -43,6 +43,7 @@ class Runner:
             completed = self._executor(
                 spec.argv,
                 input=spec.stdin_text,
+                stdin=subprocess.DEVNULL if spec.stdin_text is None else subprocess.PIPE,
                 cwd=spec.cwd,
                 env=self._merged_env(spec.env),
                 capture_output=True,
@@ -78,7 +79,9 @@ class Runner:
         try:
             process = subprocess.Popen(
                 spec.argv,
-                stdin=subprocess.PIPE if spec.stdin_text is not None else None,
+                stdin=subprocess.PIPE
+                if spec.stdin_text is not None
+                else subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=spec.cwd,

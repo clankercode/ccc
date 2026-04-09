@@ -134,13 +134,22 @@ class ResolveCommandTests(unittest.TestCase):
     def test_codex_runner_via_c(self):
         parsed = ParsedArgs(runner="c", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
-        self.assertEqual(argv[0], "codex")
+        self.assertEqual(argv[:2], ["codex", "exec"])
         self.assertEqual(warnings, [])
 
     def test_codex_runner_via_cx(self):
         parsed = ParsedArgs(runner="cx", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
-        self.assertEqual(argv[0], "codex")
+        self.assertEqual(argv[:2], ["codex", "exec"])
+        self.assertEqual(warnings, [])
+
+    def test_codex_runner_with_model_uses_exec(self):
+        parsed = ParsedArgs(runner="c", model="gpt-5.4-mini", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(
+            argv,
+            ["codex", "exec", "--model", "gpt-5.4-mini", "hello"],
+        )
         self.assertEqual(warnings, [])
 
     def test_thinking_flags_for_claude(self):

@@ -1,3 +1,4 @@
+import subprocess
 import unittest
 from unittest import mock
 
@@ -41,8 +42,20 @@ class RunnerTests(unittest.TestCase):
 
         _, kwargs = executor.call_args
         self.assertEqual(kwargs["input"], "hello")
+        self.assertIs(kwargs["stdin"], subprocess.PIPE)
         self.assertEqual(kwargs["env"]["MODEL"], "glm-5.1")
         self.assertEqual(kwargs["cwd"], "/tmp/work")
+
+    def test_run_uses_devnull_when_stdin_is_absent(self) -> None:
+        from call_coding_clis import CommandSpec, Runner
+
+        process_result = mock.Mock(returncode=0, stdout="", stderr="")
+        executor = mock.Mock(return_value=process_result)
+
+        Runner(executor=executor).run(CommandSpec(argv=["fake"]))
+
+        _, kwargs = executor.call_args
+        self.assertIs(kwargs["stdin"], subprocess.DEVNULL)
 
     def test_stream_emits_stdout_and_stderr_events(self) -> None:
         from call_coding_clis import CommandSpec, Runner

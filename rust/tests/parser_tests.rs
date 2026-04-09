@@ -108,7 +108,7 @@ fn test_resolve_codex_runner_via_c() {
         ..Default::default()
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
-    assert_eq!(argv[0], "codex");
+    assert_eq!(argv[..2], ["codex", "exec"]);
     assert!(warnings.is_empty());
 }
 
@@ -120,7 +120,23 @@ fn test_resolve_codex_runner_via_cx() {
         ..Default::default()
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
-    assert_eq!(argv[0], "codex");
+    assert_eq!(argv[..2], ["codex", "exec"]);
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_codex_runner_with_model_uses_exec() {
+    let parsed = ParsedArgs {
+        runner: Some("c".into()),
+        model: Some("gpt-5.4-mini".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv,
+        vec!["codex", "exec", "--model", "gpt-5.4-mini", "hello"]
+    );
     assert!(warnings.is_empty());
 }
 

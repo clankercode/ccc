@@ -98,6 +98,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - the interface is not fully designed yet, but `ccc "<Prompt>"` must work
 - library and CLI design should stay aligned so `precurl` can use the library layer while humans can use the same runner shape directly
 - `precurl` uses the Rust library layer for delegated LLM analysis — see the [precurl SECURITY.md](../precurl/SECURITY.md) for threat model and prompt-injection mitigation details
+- Python and Rust also support `--show-thinking` / `--no-show-thinking` with config-backed `show_thinking`, defaulting off for now
 
 ## First-Pass `ccc` Contract
 

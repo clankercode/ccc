@@ -19,6 +19,7 @@ runner = "cc"
 provider = "anthropic"
 model = "claude-4"
 thinking = 2
+show_thinking = true
 
 [abbreviations]
 mycc = "cc"
@@ -26,6 +27,7 @@ mycc = "cc"
 [aliases.work]
 runner = "cc"
 thinking = 3
+show_thinking = true
 model = "claude-4"
 agent = "reviewer"
 
@@ -41,10 +43,15 @@ runner = "oc"
     assert_eq!(config.default_provider, "anthropic");
     assert_eq!(config.default_model, "claude-4");
     assert_eq!(config.default_thinking, Some(2));
-    assert_eq!(config.abbreviations.get("mycc").map(|s| s.as_str()), Some("cc"));
+    assert!(config.default_show_thinking);
+    assert_eq!(
+        config.abbreviations.get("mycc").map(|s| s.as_str()),
+        Some("cc")
+    );
     let work = config.aliases.get("work").unwrap();
     assert_eq!(work.runner.as_deref(), Some("cc"));
     assert_eq!(work.thinking, Some(3));
+    assert_eq!(work.show_thinking, Some(true));
     assert_eq!(work.model.as_deref(), Some("claude-4"));
     assert_eq!(work.agent.as_deref(), Some("reviewer"));
     let quick = config.aliases.get("quick").unwrap();

@@ -19,6 +19,7 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(parsed.prompt, "hello world")
         self.assertIsNone(parsed.runner)
         self.assertIsNone(parsed.thinking)
+        self.assertIsNone(parsed.show_thinking)
         self.assertIsNone(parsed.provider)
         self.assertIsNone(parsed.model)
         self.assertIsNone(parsed.alias)
@@ -99,6 +100,16 @@ class ParseArgsTests(unittest.TestCase):
         parsed = parse_args(["+0", "hello"])
         self.assertEqual(parsed.thinking, 0)
 
+    def test_show_thinking_flag(self):
+        parsed = parse_args(["--show-thinking", "hello"])
+        self.assertTrue(parsed.show_thinking)
+        self.assertEqual(parsed.prompt, "hello")
+
+    def test_no_show_thinking_flag(self):
+        parsed = parse_args(["--no-show-thinking", "hello"])
+        self.assertFalse(parsed.show_thinking)
+        self.assertEqual(parsed.prompt, "hello")
+
     def test_thinking_out_of_range_not_matched(self):
         parsed = parse_args(["+5", "hello"])
         self.assertIsNone(parsed.thinking)
@@ -160,6 +171,33 @@ class ResolveCommandTests(unittest.TestCase):
             ["claude", "--thinking", "enabled", "--effort", "medium"],
         )
 
+    def test_show_thinking_for_opencode(self):
+        parsed = ParsedArgs(show_thinking=True, prompt="hello")
+        argv, env, _warnings = resolve_command(parsed)
+        self.assertEqual(argv[:3], ["opencode", "run", "--thinking"])
+
+    def test_show_thinking_for_claude(self):
+        parsed = ParsedArgs(runner="cc", show_thinking=True, prompt="hello")
+        argv, env, _warnings = resolve_command(parsed)
+        self.assertEqual(
+            argv[:5],
+            ["claude", "--thinking", "enabled", "--effort", "low"],
+        )
+
+    def test_show_thinking_for_kimi(self):
+        parsed = ParsedArgs(runner="k", show_thinking=True, prompt="hello")
+        argv, env, _warnings = resolve_command(parsed)
+        self.assertEqual(argv[:2], ["kimi", "--thinking"])
+        self.assertEqual(argv[-2:], ["--prompt", "hello"])
+
+    def test_show_thinking_does_not_override_explicit_thinking(self):
+        parsed = ParsedArgs(runner="cc", show_thinking=True, thinking=3, prompt="hello")
+        argv, env, _warnings = resolve_command(parsed)
+        self.assertEqual(
+            argv[:5],
+            ["claude", "--thinking", "enabled", "--effort", "high"],
+        )
+
     def test_thinking_zero_for_claude(self):
         parsed = ParsedArgs(runner="cc", thinking=0, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
@@ -206,6 +244,15 @@ class ResolveCommandTests(unittest.TestCase):
 
     def test_config_default_thinking(self):
         config = CccConfig(default_runner="cc", default_thinking=1)
+        parsed = ParsedArgs(prompt="hello")
+        argv, env, _warnings = resolve_command(parsed, config)
+        self.assertEqual(
+            argv[:5],
+            ["claude", "--thinking", "enabled", "--effort", "low"],
+        )
+
+    def test_config_default_show_thinking(self):
+        config = CccConfig(default_runner="cc", default_show_thinking=True)
         parsed = ParsedArgs(prompt="hello")
         argv, env, _warnings = resolve_command(parsed, config)
         self.assertEqual(
@@ -323,6 +370,7 @@ runner = "cc"
 provider = "anthropic"
 model = "claude-4"
 thinking = 2
+show_thinking = true
 
 [abbreviations]
 mycc = "cc"
@@ -330,6 +378,7 @@ mycc = "cc"
 [aliases.work]
 runner = "cc"
 thinking = 3
+show_thinking = true
 model = "claude-4"
 agent = "reviewer"
 
@@ -343,12 +392,14 @@ runner = "oc"
         self.assertEqual(config.default_provider, "anthropic")
         self.assertEqual(config.default_model, "claude-4")
         self.assertEqual(config.default_thinking, 2)
+        self.assertTrue(config.default_show_thinking)
         self.assertEqual(config.abbreviations, {"mycc": "cc"})
         self.assertIn("work", config.aliases)
         self.assertEqual(config.aliases["work"].runner, "cc")
         self.assertEqual(config.aliases["work"].thinking, 3)
         self.assertEqual(config.aliases["work"].model, "claude-4")
         self.assertEqual(config.aliases["work"].agent, "reviewer")
+        self.assertTrue(config.aliases["work"].show_thinking)
         self.assertIn("quick", config.aliases)
         self.assertEqual(config.aliases["quick"].runner, "oc")
 

@@ -33,6 +33,7 @@ For every implementation that claims `ccc` support:
 ### Python
 
 - supports first-pass `ccc "<Prompt>"`
+- supports `--show-thinking` / `--no-show-thinking` with config-backed `show_thinking` (default off)
 - exposes `build_prompt_spec`
 - runner supports `run` and `stream`
 - `CCC_REAL_OPENCODE` env var support
@@ -40,6 +41,7 @@ For every implementation that claims `ccc` support:
 ### Rust
 
 - supports first-pass `ccc "<Prompt>"`
+- supports `--show-thinking` / `--no-show-thinking` with config-backed `show_thinking` (default off)
 - exposes `build_prompt_spec`
 - runner supports `run` and `stream` (real concurrent streaming via threads)
 - `CCC_REAL_OPENCODE` env var support

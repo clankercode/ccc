@@ -157,7 +157,7 @@ footer {
 
 <section id="usage">
   <h2>Usage</h2>
-  <pre><code>ccc [runner] [+thinking] [:provider:model] [@alias] "&lt;Prompt&gt;"
+  <pre><code>ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@alias] "&lt;Prompt&gt;"
 ccc --help
 ccc -h</code></pre>
   <p>At its simplest:</p>
@@ -171,8 +171,9 @@ ccc -h</code></pre>
     <thead><tr><th>Slot</th><th>Description</th></tr></thead>
     <tbody>
       <tr><td>runner</td><td>Select which coding CLI to use (default: <code>oc</code>)<br>
-        <code>opencode</code> (<code>oc</code>), <code>claude</code> (<code>cc</code>), <code>kimi</code> (<code>k</code>), <code>codex</code> (<code>rc</code>), <code>crush</code> (<code>cr</code>)</td></tr>
+        <code>opencode</code> (<code>oc</code>), <code>claude</code> (<code>cc</code>), <code>kimi</code> (<code>k</code>), <code>codex</code> (<code>c/cx</code>), <code>roocode</code> (<code>rc</code>), <code>crush</code> (<code>cr</code>)</td></tr>
       <tr><td>+thinking</td><td>Set thinking level: <code>+0</code> (off) through <code>+4</code> (max)</td></tr>
+      <tr><td>--show-thinking</td><td>Request visible thinking output when supported; default off</td></tr>
       <tr><td>:provider:model</td><td>Override provider and model</td></tr>
       <tr><td>@alias</td><td>Use a named preset from config</td></tr>
     </tbody>
@@ -189,6 +190,9 @@ ccc oc "Refactor auth module"
 
 # Claude with thinking level and model override
 ccc cc +2 :anthropic:claude-sonnet-4-20250514 "Add tests"
+
+# Visible thinking on supported implementations
+ccc --show-thinking "Fix the failing tests"
 
 # Kimi with max thinking
 ccc k +4 "Debug the parser"
@@ -207,6 +211,7 @@ ccc codex "Write a unit test"</code></pre>
       <tr><td>Aliases</td><td>Named presets referenced with <code>@alias</code></td></tr>
       <tr><td>Custom abbreviations</td><td>User-defined runner shorthand names</td></tr>
       <tr><td>Default provider/model</td><td>Fallback provider and model selection</td></tr>
+      <tr><td>Visible thinking</td><td><code>show_thinking</code> defaults to off and enables runner-specific visible-thinking flags when supported</td></tr>
     </tbody>
   </table>
 </section>

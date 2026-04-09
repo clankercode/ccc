@@ -24,7 +24,7 @@ HELP_TEXT = """\
 ccc — call coding CLIs
 
 Usage:
-  ccc [runner] [+thinking] [:provider:model] [@name] "<Prompt>"
+  ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@name] "<Prompt>"
   ccc --help
   ccc -h
 
@@ -37,6 +37,10 @@ Slots (in order):
   :provider:model  Override provider and model
   @name         Use a named preset from config; if no preset exists, treat it as an agent
 
+Flags:
+  --show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it
+                                        (default: off; config key: show_thinking)
+
 Examples:
   ccc "Fix the failing tests"
   ccc oc "Refactor auth module"
@@ -46,7 +50,7 @@ Examples:
   ccc codex "Write a unit test"
 
 Config:
-  ~/.config/ccc/config.toml  — default runner, presets, abbreviations
+  ~/.config/ccc/config.toml  — default runner, presets, abbreviations, show_thinking
 """
 
 
@@ -86,7 +90,7 @@ def print_help() -> None:
 
 def print_usage() -> None:
     print(
-        'usage: ccc [runner] [+thinking] [:provider:model] [@name] "<Prompt>"',
+        'usage: ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@name] "<Prompt>"',
         file=sys.stderr,
     )
     print(runner_checklist(), file=sys.stderr)

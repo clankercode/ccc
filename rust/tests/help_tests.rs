@@ -10,14 +10,17 @@ fn test_help_mentions_name_slot() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(
-        "Usage:\n  ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
+        "Usage:\n  ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
     ));
     assert!(stdout.contains(
         "@name         Use a named preset from config; if no preset exists, treat it as an agent"
     ));
     assert!(stdout.contains(
-        "opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)"
+        "--show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it"
     ));
+    assert!(stdout.contains("show_thinking"));
+    assert!(stdout
+        .contains("opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)"));
 }
 
 #[test]
@@ -26,6 +29,6 @@ fn test_usage_mentions_name_slot() {
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains(
-        "usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
+        "usage: ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
     ));
 }

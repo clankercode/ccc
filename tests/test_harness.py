@@ -99,6 +99,20 @@ class LanguageSpec:
             check=False,
         )
 
+    def invoke_with_args(
+        self, extra_args: List[str], prompt: str, env: Dict[str, str]
+    ) -> subprocess.CompletedProcess:
+        cmd = self.invoke_fn(prompt)
+        cmd = cmd[:-1] + extra_args + [prompt]
+        return subprocess.run(
+            cmd,
+            cwd=ROOT,
+            env=self.prepared_env(env),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
 
 def _py_invoke(prompt):
     return ["python3", "python/call_coding_clis/cli.py", prompt]

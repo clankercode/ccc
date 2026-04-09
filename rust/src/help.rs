@@ -22,7 +22,7 @@ const CANONICAL_RUNNERS: &[(&str, &str)] = &[
 const HELP_TEXT: &str = r#"ccc — call coding CLIs
 
 Usage:
-  ccc [runner] [+thinking] [:provider:model] [@name] "<Prompt>"
+  ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@name] "<Prompt>"
   ccc --help
   ccc -h
 
@@ -35,6 +35,10 @@ Slots (in order):
   :provider:model  Override provider and model
   @name         Use a named preset from config; if no preset exists, treat it as an agent
 
+Flags:
+  --show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it
+                                        (default: off; config key: show_thinking)
+
 Examples:
   ccc "Fix the failing tests"
   ccc oc "Refactor auth module"
@@ -44,7 +48,7 @@ Examples:
   ccc codex "Write a unit test"
 
 Config:
-  ~/.config/ccc/config.toml  — default runner, presets, abbreviations
+  ~/.config/ccc/config.toml  — default runner, presets, abbreviations, show_thinking
 "#;
 
 fn get_version(binary: &str) -> String {
@@ -123,6 +127,8 @@ pub fn print_help() {
 }
 
 pub fn print_usage() {
-    eprintln!("usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"");
+    eprintln!(
+        "usage: ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
+    );
     eprint!("{}", format_runner_checklist());
 }

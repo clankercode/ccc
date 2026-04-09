@@ -7,6 +7,7 @@ pub struct RunnerInfo {
     pub binary: String,
     pub extra_args: Vec<String>,
     pub thinking_flags: BTreeMap<i32, Vec<String>>,
+    pub show_thinking_flags: BTreeMap<bool, Vec<String>>,
     pub provider_flag: String,
     pub model_flag: String,
     pub agent_flag: String,
@@ -17,6 +18,7 @@ pub struct RunnerInfo {
 pub struct ParsedArgs {
     pub runner: Option<String>,
     pub thinking: Option<i32>,
+    pub show_thinking: Option<bool>,
     pub provider: Option<String>,
     pub model: Option<String>,
     pub alias: Option<String>,
@@ -27,6 +29,7 @@ pub struct ParsedArgs {
 pub struct AliasDef {
     pub runner: Option<String>,
     pub thinking: Option<i32>,
+    pub show_thinking: Option<bool>,
     pub provider: Option<String>,
     pub model: Option<String>,
     pub agent: Option<String>,
@@ -37,6 +40,7 @@ impl Default for AliasDef {
         Self {
             runner: None,
             thinking: None,
+            show_thinking: None,
             provider: None,
             model: None,
             agent: None,
@@ -50,6 +54,7 @@ pub struct CccConfig {
     pub default_provider: String,
     pub default_model: String,
     pub default_thinking: Option<i32>,
+    pub default_show_thinking: bool,
     pub aliases: BTreeMap<String, AliasDef>,
     pub abbreviations: BTreeMap<String, String>,
 }
@@ -61,6 +66,7 @@ impl Default for CccConfig {
             default_provider: String::new(),
             default_model: String::new(),
             default_thinking: None,
+            default_show_thinking: false,
             aliases: BTreeMap::new(),
             abbreviations: BTreeMap::new(),
         }
@@ -73,6 +79,11 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         binary: "opencode".into(),
         extra_args: vec!["run".into()],
         thinking_flags: BTreeMap::new(),
+        show_thinking_flags: {
+            let mut tf = BTreeMap::new();
+            tf.insert(true, vec!["--thinking".into()]);
+            tf
+        },
         provider_flag: String::new(),
         model_flag: String::new(),
         agent_flag: "--agent".into(),
@@ -122,6 +133,19 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
             );
             tf
         },
+        show_thinking_flags: {
+            let mut tf = BTreeMap::new();
+            tf.insert(
+                true,
+                vec![
+                    "--thinking".into(),
+                    "enabled".into(),
+                    "--effort".into(),
+                    "low".into(),
+                ],
+            );
+            tf
+        },
         provider_flag: String::new(),
         model_flag: "--model".into(),
         agent_flag: "--agent".into(),
@@ -139,6 +163,11 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
             tf.insert(4, vec!["--thinking".into()]);
             tf
         },
+        show_thinking_flags: {
+            let mut tf = BTreeMap::new();
+            tf.insert(true, vec!["--thinking".into()]);
+            tf
+        },
         provider_flag: String::new(),
         model_flag: "--model".into(),
         agent_flag: "--agent".into(),
@@ -148,6 +177,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         binary: "codex".into(),
         extra_args: vec!["exec".into()],
         thinking_flags: BTreeMap::new(),
+        show_thinking_flags: BTreeMap::new(),
         provider_flag: String::new(),
         model_flag: "--model".into(),
         agent_flag: String::new(),
@@ -157,6 +187,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         binary: "roocode".into(),
         extra_args: vec![],
         thinking_flags: BTreeMap::new(),
+        show_thinking_flags: BTreeMap::new(),
         provider_flag: String::new(),
         model_flag: String::new(),
         agent_flag: String::new(),
@@ -166,6 +197,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         binary: "crush".into(),
         extra_args: vec![],
         thinking_flags: BTreeMap::new(),
+        show_thinking_flags: BTreeMap::new(),
         provider_flag: String::new(),
         model_flag: String::new(),
         agent_flag: String::new(),
@@ -263,6 +295,10 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
             } else {
                 positional.push(token.clone());
             }
+        } else if (token == "--show-thinking" || token == "--no-show-thinking")
+            && positional.is_empty()
+        {
+            parsed.show_thinking = Some(token == "--show-thinking");
         } else if let Some((provider, model)) = parse_provider_model(token) {
             if positional.is_empty() {
                 parsed.provider = Some(provider.to_string());
@@ -345,6 +381,17 @@ pub fn resolve_command(
 
     if let Some(level) = effective_thinking {
         if let Some(flags) = effective_runner.thinking_flags.get(&level) {
+            argv.extend(flags.iter().cloned());
+        }
+    }
+
+    let effective_show_thinking = parsed
+        .show_thinking
+        .or_else(|| alias_def.and_then(|a| a.show_thinking))
+        .unwrap_or(config.default_show_thinking);
+
+    if effective_thinking.is_none() && effective_show_thinking {
+        if let Some(flags) = effective_runner.show_thinking_flags.get(&true) {
             argv.extend(flags.iter().cloned());
         }
     }

@@ -21,6 +21,16 @@ CONFIG_DIR_NAME = "ccc"
 CONFIG_FILE_NAME = "config.toml"
 
 
+def _coerce_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
 def _default_config_paths() -> list[Path]:
     paths: list[Path] = []
     xdg = os.environ.get("XDG_CONFIG_HOME", "")
@@ -61,6 +71,13 @@ def _load_from_file(path: Path) -> CccConfig:
         thinking = defaults.get("thinking")
         if thinking is not None:
             config.default_thinking = int(thinking)
+        show_thinking = defaults.get("show_thinking")
+        if show_thinking is not None:
+            config.default_show_thinking = _coerce_bool(show_thinking)
+
+    default_show_thinking = data.get("default_show_thinking")
+    if default_show_thinking is not None:
+        config.default_show_thinking = _coerce_bool(default_show_thinking)
 
     abbreviations = data.get("abbreviations", {})
     if isinstance(abbreviations, dict):
@@ -73,12 +90,15 @@ def _load_from_file(path: Path) -> CccConfig:
                 alias = AliasDef(
                     runner=defn.get("runner"),
                     thinking=defn.get("thinking"),
+                    show_thinking=defn.get("show_thinking"),
                     provider=defn.get("provider"),
                     model=defn.get("model"),
                     agent=defn.get("agent"),
                 )
                 if alias.thinking is not None:
                     alias.thinking = int(alias.thinking)
+                if alias.show_thinking is not None:
+                    alias.show_thinking = _coerce_bool(alias.show_thinking)
                 config.aliases[str(name)] = alias
 
     return config

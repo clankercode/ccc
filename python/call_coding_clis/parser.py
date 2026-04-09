@@ -12,6 +12,7 @@ class RunnerInfo:
     binary: str
     extra_args: list[str] = field(default_factory=list)
     thinking_flags: dict[int, list[str]] = field(default_factory=dict)
+    show_thinking_flags: dict[bool, list[str]] = field(default_factory=dict)
     provider_flag: str = ""
     model_flag: str = ""
     agent_flag: str = ""
@@ -22,6 +23,7 @@ class RunnerInfo:
 class ParsedArgs:
     runner: str | None = None
     thinking: int | None = None
+    show_thinking: bool | None = None
     provider: str | None = None
     model: str | None = None
     alias: str | None = None
@@ -32,6 +34,7 @@ class ParsedArgs:
 class AliasDef:
     runner: str | None = None
     thinking: int | None = None
+    show_thinking: bool | None = None
     provider: str | None = None
     model: str | None = None
     agent: str | None = None
@@ -43,6 +46,7 @@ class CccConfig:
     default_provider: str = ""
     default_model: str = ""
     default_thinking: int | None = None
+    default_show_thinking: bool = False
     aliases: dict[str, AliasDef] = field(default_factory=dict)
     abbreviations: dict[str, str] = field(default_factory=dict)
 
@@ -54,6 +58,7 @@ def _register_defaults() -> None:
         binary="opencode",
         extra_args=["run"],
         thinking_flags={},
+        show_thinking_flags={True: ["--thinking"]},
         provider_flag="",
         model_flag="",
         agent_flag="--agent",
@@ -69,6 +74,7 @@ def _register_defaults() -> None:
             3: ["--thinking", "enabled", "--effort", "high"],
             4: ["--thinking", "enabled", "--effort", "max"],
         },
+        show_thinking_flags={True: ["--thinking", "enabled", "--effort", "low"]},
         provider_flag="",
         model_flag="--model",
         agent_flag="--agent",
@@ -84,6 +90,7 @@ def _register_defaults() -> None:
             3: ["--thinking"],
             4: ["--thinking"],
         },
+        show_thinking_flags={True: ["--thinking"]},
         provider_flag="",
         model_flag="--model",
         agent_flag="--agent",
@@ -93,6 +100,7 @@ def _register_defaults() -> None:
         binary="codex",
         extra_args=["exec"],
         thinking_flags={},
+        show_thinking_flags={},
         provider_flag="",
         model_flag="--model",
         prompt_flag="",
@@ -101,6 +109,7 @@ def _register_defaults() -> None:
         binary="roocode",
         extra_args=[],
         thinking_flags={},
+        show_thinking_flags={},
         provider_flag="",
         model_flag="",
         prompt_flag="",
@@ -109,6 +118,7 @@ def _register_defaults() -> None:
         binary="crush",
         extra_args=[],
         thinking_flags={},
+        show_thinking_flags={},
         provider_flag="",
         model_flag="",
         prompt_flag="",
@@ -164,6 +174,8 @@ def parse_args(argv: list[str]) -> ParsedArgs:
             parsed.thinking = THINKING_TOKEN_TO_LEVEL[
                 THINKING_RE.match(token).group(1).lower()
             ]
+        elif token in {"--show-thinking", "--no-show-thinking"} and not positional:
+            parsed.show_thinking = token == "--show-thinking"
         elif PROVIDER_MODEL_RE.match(token) and not positional:
             m = PROVIDER_MODEL_RE.match(token)
             parsed.provider = m.group(1)
@@ -222,6 +234,15 @@ def resolve_command(
         effective_thinking = config.default_thinking
     if effective_thinking is not None and effective_thinking in info.thinking_flags:
         argv.extend(info.thinking_flags[effective_thinking])
+
+    effective_show_thinking = parsed.show_thinking
+    if effective_show_thinking is None and alias_def and alias_def.show_thinking is not None:
+        effective_show_thinking = alias_def.show_thinking
+    if effective_show_thinking is None:
+        effective_show_thinking = config.default_show_thinking
+    if effective_thinking is None and effective_show_thinking:
+        if True in info.show_thinking_flags:
+            argv.extend(info.show_thinking_flags[True])
 
     effective_provider = parsed.provider
     if effective_provider is None and alias_def and alias_def.provider:

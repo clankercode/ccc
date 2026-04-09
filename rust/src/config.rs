@@ -24,6 +24,14 @@ pub fn load_config(path: Option<&Path>) -> CccConfig {
     config
 }
 
+fn parse_bool(value: &str) -> Option<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "on" => Some(true),
+        "false" | "0" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
 fn default_config_path() -> Option<std::path::PathBuf> {
     if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
         if !xdg.is_empty() {
@@ -40,12 +48,10 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
     let mut current_alias = crate::parser::AliasDef::default();
 
     let flush_alias = |config: &mut CccConfig,
-                        current_alias_name: &mut Option<String>,
-                        current_alias: &mut crate::parser::AliasDef| {
+                       current_alias_name: &mut Option<String>,
+                       current_alias: &mut crate::parser::AliasDef| {
         if let Some(name) = current_alias_name.take() {
-            config
-                .aliases
-                .insert(name, std::mem::take(current_alias));
+            config.aliases.insert(name, std::mem::take(current_alias));
         }
     };
 
@@ -93,6 +99,11 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                         config.default_thinking = Some(n);
                     }
                 }
+                ("defaults", "show_thinking") => {
+                    if let Some(flag) = parse_bool(value) {
+                        config.default_show_thinking = flag;
+                    }
+                }
                 ("abbreviations", _) => {
                     config
                         .abbreviations
@@ -106,11 +117,19 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                         config.default_thinking = Some(n);
                     }
                 }
+                ("", "default_show_thinking") => {
+                    if let Some(flag) = parse_bool(value) {
+                        config.default_show_thinking = flag;
+                    }
+                }
                 ("alias", "runner") => current_alias.runner = Some(value.to_string()),
                 ("alias", "thinking") => {
                     if let Ok(n) = value.parse::<i32>() {
                         current_alias.thinking = Some(n);
                     }
+                }
+                ("alias", "show_thinking") => {
+                    current_alias.show_thinking = parse_bool(value);
                 }
                 ("alias", "provider") => current_alias.provider = Some(value.to_string()),
                 ("alias", "model") => current_alias.model = Some(value.to_string()),

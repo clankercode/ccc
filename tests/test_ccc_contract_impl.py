@@ -20,9 +20,14 @@ AGENT_FALLBACK_EXPECTED = f"opencode run --agent reviewer {PROMPT}\n"
 PRESET_AGENT_EXPECTED = f"opencode run --agent specialist {PROMPT}\n"
 CODEX_RUNNER_EXPECTED = f"codex exec {PROMPT}\n"
 HELP_USAGE_LINE = 'ccc [runner] [+thinking] [:provider:model] [@name] "<Prompt>"'
+HELP_USAGE_LINE_WITH_SHOW_THINKING = (
+    'ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@name] "<Prompt>"'
+)
 HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
 )
+HELP_SHOW_THINKING_SNIPPET = "--show-thinking"
+SHOW_THINKING_IMPLEMENTATIONS = {"Python", "Rust"}
 
 
 class SingleImplCccContractTests(unittest.TestCase):
@@ -181,9 +186,43 @@ class SingleImplCccContractTests(unittest.TestCase):
         self._run_with_agent_preset_assertion(self.assert_uses_preset_agent)
 
     def test_help_surface_mentions_standard_name_slot(self) -> None:
-        self._run_with_extra_args_assertion(
-            ["--help"], self.assert_help_mentions_standard_name_slot
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    expected_usage = (
+                        HELP_USAGE_LINE_WITH_SHOW_THINKING
+                        if lang.name in SHOW_THINKING_IMPLEMENTATIONS
+                        else HELP_USAGE_LINE
+                    )
+                    self.assert_help_mentions_standard_name_slot(
+                        result, expected_usage
+                    )
+
+    def test_help_surface_mentions_show_thinking_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in SHOW_THINKING_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assert_help_mentions_show_thinking_flag(result)
 
     def test_codex_runner_uses_exec_subcommand(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -198,12 +237,66 @@ class SingleImplCccContractTests(unittest.TestCase):
             for lang in self.selected_languages:
                 with self.subTest(language=lang.name, runner="codex"):
                     if lang.name in {"x86-64 ASM", "OCaml"}:
-                        self.skipTest(f"{lang.name} does not expose the full codex selector contract in this test path")
+                        continue
                     env = self._make_env(opencode_path, lang)
                     result = lang.invoke_extra(
                         ["c", PROMPT], env
                     )
                     self.assert_uses_codex_exec_runner(result)
+
+    def test_show_thinking_flag_sets_runner_capability(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            claude_path = bin_dir / "claude"
+            kimi_path = bin_dir / "kimi"
+            opencode_path = bin_dir / "opencode"
+            self._write_argv_echo_stub(opencode_path, "opencode")
+            self._write_argv_echo_stub(claude_path, "claude")
+            self._write_argv_echo_stub(kimi_path, "kimi")
+
+            cases = {
+                "Python": [
+                    (["--show-thinking"], "opencode run --thinking Fix the failing tests\n"),
+                    (
+                        ["cc", "--show-thinking"],
+                        "claude --thinking enabled --effort low Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", "--show-thinking"],
+                        "kimi --thinking --prompt Fix the failing tests\n",
+                    ),
+                ],
+                "Rust": [
+                    (["--show-thinking"], "opencode run --thinking Fix the failing tests\n"),
+                    (
+                        ["cc", "--show-thinking"],
+                        "claude --thinking enabled --effort low Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", "--show-thinking"],
+                        "kimi --thinking --prompt Fix the failing tests\n",
+                    ),
+                ],
+            }
+
+            for lang in self.selected_languages:
+                if lang.name not in cases:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                env["HOME"] = str(tmp_path)
+                env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+                env["CCC_CONFIG"] = str(tmp_path / "config.toml")
+                with self.subTest(language=lang.name, capability="show-thinking"):
+                    for extra_args, expected_stdout in cases[lang.name]:
+                        with self.subTest(language=lang.name, args=extra_args):
+                            result = lang.invoke_with_args(
+                                extra_args, PROMPT, env
+                            )
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            self.assertEqual(result.stdout, expected_stdout)
+                            self.assertEqual(result.stderr, "")
 
     def assert_equal_output(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -239,10 +332,18 @@ class SingleImplCccContractTests(unittest.TestCase):
         self.assertEqual(result.stdout, PRESET_AGENT_EXPECTED)
         self.assertEqual(result.stderr, "")
 
-    def assert_help_mentions_standard_name_slot(self, result) -> None:
+    def assert_help_mentions_standard_name_slot(
+        self, result, expected_usage_line
+    ) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(HELP_USAGE_LINE, result.stdout)
+        self.assertIn(expected_usage_line, result.stdout)
         self.assertIn(HELP_SLOT_LINE, result.stdout)
+
+    def assert_help_mentions_show_thinking_flag(self, result) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        if any(lang.name in {"Python", "Rust"} for lang in self.selected_languages):
+            self.assertIn(HELP_SHOW_THINKING_SNIPPET, result.stdout)
+            self.assertIn("show_thinking", result.stdout)
 
     def assert_uses_codex_exec_runner(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -262,6 +363,10 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def _write_runner_stub(self, path: Path, runner_name: str) -> None:
         path.write_text(f"#!/bin/sh\nprintf '{runner_name} %s\\n' \"$1\"\n")
+        path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    def _write_argv_echo_stub(self, path: Path, runner_name: str) -> None:
+        path.write_text(f"#!/bin/sh\nprintf '{runner_name} %s\\n' \"$*\"\n")
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def _write_codex_stub(self, path: Path) -> None:

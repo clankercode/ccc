@@ -32,6 +32,13 @@ def main(argv: list[str] | None = None) -> int:
         print_help()
         return 0
 
+    if not args or args == ["--help"] or args == ["-h"]:
+        if not args:
+            print_usage()
+            return 1
+        print_help()
+        return 0
+
     parsed = parse_args(args)
     if not parsed.prompt.strip():
         print("prompt must not be empty", file=sys.stderr)

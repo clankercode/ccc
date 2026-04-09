@@ -6,18 +6,20 @@ ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Cl
 
 ## Usage
 
-ccc [runner] [+thinking] [:provider:model] [@name] "<Prompt>"
+ccc [--show-thinking] [runner] [+thinking] [:provider:model] [@name] "<Prompt>"
 
 Slots are positional and parsed in order before the prompt:
 - runner: Select which coding CLI (default: oc). Options: opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)
 - +thinking: Set thinking level from +0 (off) to +4 (max)
   Claude keeps the same `ccc` scale: `+0` becomes `--thinking disabled`, and `+1..+4` become `--thinking enabled` with matching `--effort`.
   Kimi keeps the same `ccc` scale: `+0` becomes `--no-thinking`, and `+1..+4` become `--thinking`.
+- --show-thinking: Request visible thinking output when supported; default off. Implemented in Python and Rust for now.
 - :provider:model: Override provider and model
 - @name: Use a named preset from ~/.config/ccc/config.toml, or treat it as an agent when no preset exists
 
 Examples:
 - ccc "Fix the failing tests"
+- ccc --show-thinking "Fix the failing tests"
 - ccc cc +2 :anthropic:claude-sonnet-4-20250514 "Add tests"
 - ccc k +4 "Debug the parser"
 

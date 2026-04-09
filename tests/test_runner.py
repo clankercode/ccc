@@ -113,6 +113,12 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_prompt_spec("   ")
 
+    def test_ccc_help_mentions_show_thinking(self) -> None:
+        from call_coding_clis.help import HELP_TEXT
+
+        self.assertIn("--show-thinking", HELP_TEXT)
+        self.assertIn("show_thinking", HELP_TEXT)
+
 
 if __name__ == "__main__":
     unittest.main()

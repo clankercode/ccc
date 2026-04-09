@@ -7,6 +7,7 @@ fn test_parse_prompt_only() {
     assert_eq!(parsed.prompt, "hello world");
     assert!(parsed.runner.is_none());
     assert!(parsed.thinking.is_none());
+    assert!(parsed.show_thinking.is_none());
     assert!(parsed.alias.is_none());
 }
 
@@ -39,6 +40,22 @@ fn test_parse_thinking_level() {
     let args: Vec<String> = vec!["+2".into(), "hello".into()];
     let parsed = parse_args(&args);
     assert_eq!(parsed.thinking, Some(2));
+    assert_eq!(parsed.prompt, "hello");
+}
+
+#[test]
+fn test_parse_show_thinking_flag() {
+    let args: Vec<String> = vec!["--show-thinking".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.show_thinking, Some(true));
+    assert_eq!(parsed.prompt, "hello");
+}
+
+#[test]
+fn test_parse_no_show_thinking_flag() {
+    let args: Vec<String> = vec!["--no-show-thinking".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.show_thinking, Some(false));
     assert_eq!(parsed.prompt, "hello");
 }
 
@@ -165,6 +182,88 @@ fn test_resolve_thinking_flags() {
     assert!(argv.contains(&"enabled".to_string()));
     assert!(argv.contains(&"--effort".to_string()));
     assert!(argv.contains(&"medium".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_show_thinking_for_opencode() {
+    let parsed = ParsedArgs {
+        show_thinking: Some(true),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv[..3],
+        [
+            "opencode".to_string(),
+            "run".to_string(),
+            "--thinking".to_string()
+        ]
+    );
+    assert_eq!(argv.last().map(|s| s.as_str()), Some("hello"));
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_show_thinking_for_claude() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        show_thinking: Some(true),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv[..5],
+        [
+            "claude".to_string(),
+            "--thinking".to_string(),
+            "enabled".to_string(),
+            "--effort".to_string(),
+            "low".to_string()
+        ]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_show_thinking_for_kimi() {
+    let parsed = ParsedArgs {
+        runner: Some("k".into()),
+        show_thinking: Some(true),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[..2], ["kimi".to_string(), "--thinking".to_string()]);
+    assert_eq!(
+        argv[argv.len() - 2..],
+        ["--prompt".to_string(), "hello".to_string()]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_show_thinking_does_not_override_explicit_thinking() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        thinking: Some(3),
+        show_thinking: Some(true),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv[..5],
+        [
+            "claude".to_string(),
+            "--thinking".to_string(),
+            "enabled".to_string(),
+            "--effort".to_string(),
+            "high".to_string()
+        ]
+    );
     assert!(warnings.is_empty());
 }
 
@@ -324,6 +423,31 @@ fn test_resolve_config_default_thinking_for_claude() {
 }
 
 #[test]
+fn test_resolve_config_default_show_thinking_for_claude() {
+    let config = CccConfig {
+        default_runner: "cc".into(),
+        default_show_thinking: true,
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(
+        argv[..5],
+        [
+            "claude".to_string(),
+            "--thinking".to_string(),
+            "enabled".to_string(),
+            "--effort".to_string(),
+            "low".to_string()
+        ]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
 fn test_resolve_alias_preset_agent() {
     let config = CccConfig {
         aliases: {
@@ -384,8 +508,6 @@ fn test_resolve_agent_warning_when_runner_lacks_support() {
     assert_eq!(argv[0], "roocode");
     assert_eq!(
         warnings,
-        vec![
-            "warning: runner \"rc\" does not support agents; ignoring @reviewer".to_string()
-        ]
+        vec!["warning: runner \"rc\" does not support agents; ignoring @reviewer".to_string()]
     );
 }

@@ -37,6 +37,9 @@ agent = "reviewer"
 
 [aliases.quick]
 runner = "oc"
+
+[aliases.commit]
+prompt = "Commit all changes"
 "#,
     )
     .unwrap();
@@ -64,4 +67,6 @@ runner = "oc"
     assert_eq!(work.agent.as_deref(), Some("reviewer"));
     let quick = config.aliases.get("quick").unwrap();
     assert_eq!(quick.runner.as_deref(), Some("oc"));
+    let commit = config.aliases.get("commit").unwrap();
+    assert_eq!(commit.prompt.as_deref(), Some("Commit all changes"));
 }

@@ -51,6 +51,7 @@ pub struct AliasDef {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub agent: Option<String>,
+    pub prompt: Option<String>,
 }
 
 impl Default for AliasDef {
@@ -64,6 +65,7 @@ impl Default for AliasDef {
             provider: None,
             model: None,
             agent: None,
+            prompt: None,
         }
     }
 }
@@ -564,15 +566,20 @@ pub fn resolve_command(
         }
     }
 
-    let prompt = parsed.prompt.trim();
+    let mut prompt = parsed.prompt.trim().to_string();
+    if prompt.is_empty() {
+        if let Some(alias_prompt) = alias_def.and_then(|a| a.prompt.as_deref()) {
+            prompt = alias_prompt.trim().to_string();
+        }
+    }
     if prompt.is_empty() {
         return Err("prompt must not be empty");
     }
     if effective_runner.prompt_flag.is_empty() {
-        argv.push(prompt.to_string());
+        argv.push(prompt);
     } else {
         argv.push(effective_runner.prompt_flag.clone());
-        argv.push(prompt.to_string());
+        argv.push(prompt);
     }
 
     Ok((argv, env_overrides, warnings))

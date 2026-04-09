@@ -110,6 +110,7 @@ def _load_from_file(path: Path) -> CccConfig:
                     provider=defn.get("provider"),
                     model=defn.get("model"),
                     agent=defn.get("agent"),
+                    prompt=defn.get("prompt"),
                 )
                 if alias.thinking is not None:
                     alias.thinking = int(alias.thinking)

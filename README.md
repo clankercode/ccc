@@ -113,7 +113,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - runner selectors such as `c`, `cx`, `cc`, `oc`, `k`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `roocode`, `crush`, and `pi`
   - `+0..+4` thinking levels
   - `:provider:model` and `:model`
-  - `@name` for preset lookup with agent fallback
+  - `@name` for preset lookup with agent fallback; presets can also define a default prompt
   - `--permission-mode safe|auto|yolo|plan`
   - `--show-thinking` / `--no-show-thinking`
   - `--yolo` / `-y`

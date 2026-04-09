@@ -37,6 +37,7 @@ Controls (free order before the prompt):
                 Kimi maps +0 to --no-thinking and +1..+4 to --thinking
   :provider:model  Override provider and model
   @name         Use a named preset from config; if no preset exists, treat it as an agent
+                Presets can also define a default prompt when the user leaves prompt text blank
   .mode / ..mode
                 Output-mode sugar with a shared dot identity:
                   .text / ..text, .json / ..json, .fmt / ..fmt

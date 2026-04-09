@@ -414,6 +414,20 @@ class ResolveCommandTests(unittest.TestCase):
         self.assertIn("claude-4", argv)
         self.assertEqual(warnings, [])
 
+    def test_alias_prompt_fills_missing_prompt(self):
+        config = CccConfig(aliases={"commit": AliasDef(prompt="Commit all changes")})
+        parsed = ParsedArgs(alias="commit", prompt="   ")
+        argv, env, warnings = resolve_command(parsed, config)
+        self.assertEqual(argv, ["opencode", "run", "Commit all changes"])
+        self.assertEqual(warnings, [])
+
+    def test_explicit_prompt_overrides_alias_prompt(self):
+        config = CccConfig(aliases={"commit": AliasDef(prompt="Commit all changes")})
+        parsed = ParsedArgs(alias="commit", prompt="Write the commit summary")
+        argv, env, warnings = resolve_command(parsed, config)
+        self.assertEqual(argv, ["opencode", "run", "Write the commit summary"])
+        self.assertEqual(warnings, [])
+
     def test_explicit_overrides_alias(self):
         config = CccConfig(
             aliases={"work": AliasDef(runner="cc", thinking=3, model="claude-4")}
@@ -673,6 +687,9 @@ agent = "reviewer"
 
 [aliases.quick]
 runner = "oc"
+
+[aliases.commit]
+prompt = "Commit all changes"
 """)
             f.flush()
             config = load_config(f.name)
@@ -695,6 +712,7 @@ runner = "oc"
         self.assertEqual(config.aliases["work"].output_mode, "formatted")
         self.assertIn("quick", config.aliases)
         self.assertEqual(config.aliases["quick"].runner, "oc")
+        self.assertEqual(config.aliases["commit"].prompt, "Commit all changes")
 
     def test_legacy_default_output_mode(self):
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".toml", delete=False) as f:

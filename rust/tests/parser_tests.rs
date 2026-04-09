@@ -776,6 +776,65 @@ fn test_resolve_alias_preset_agent() {
 }
 
 #[test]
+fn test_resolve_alias_prompt_fills_missing_prompt() {
+    let config = CccConfig {
+        aliases: {
+            let mut m = std::collections::BTreeMap::new();
+            m.insert(
+                "commit".into(),
+                AliasDef {
+                    prompt: Some("Commit all changes".into()),
+                    ..Default::default()
+                },
+            );
+            m
+        },
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        alias: Some("commit".into()),
+        prompt: "   ".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(argv, vec!["opencode", "run", "Commit all changes"]);
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_explicit_prompt_overrides_alias_prompt() {
+    let config = CccConfig {
+        aliases: {
+            let mut m = std::collections::BTreeMap::new();
+            m.insert(
+                "commit".into(),
+                AliasDef {
+                    prompt: Some("Commit all changes".into()),
+                    ..Default::default()
+                },
+            );
+            m
+        },
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        alias: Some("commit".into()),
+        prompt: "Write the commit summary".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(
+        argv,
+        vec![
+            "opencode".to_string(),
+            "run".to_string(),
+            "Write the commit summary".to_string()
+        ]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
 fn test_resolve_name_falls_back_to_agent() {
     let parsed = ParsedArgs {
         alias: Some("reviewer".into()),

@@ -22,6 +22,15 @@ Entry format:
 
 ## 2026-04-10
 
+### Preset prompts now fall back in Python and Rust
+- Change: Python and Rust now parse `aliases.<name>.prompt` and let `@name` fall back to that preset prompt when explicit user prompt text is missing or whitespace-only; explicit prompt text still overrides the preset prompt when present
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `tests/test_runner.py`, `tests/test_ccc_contract_impl.py`, `rust/tests/parser_tests.rs`, `rust/tests/config_tests.rs`, `rust/tests/help_tests.rs`
+- Notes: updated `README.md`, `INDEX_MASTER_SPEC.md`, `CCC_PARSER_CONFIG_DESIGN.md`, `docs/llms.txt`, and the Python/Rust help text; `TASKS.md` backlog item removed
+
+## 2026-04-10
+
 ### Shared real-runner overrides now cover Claude and Kimi too
 - Change: Python and Rust now support `CCC_REAL_CLAUDE` and `CCC_REAL_KIMI` alongside `CCC_REAL_OPENCODE`, and the docs now include a maintained mock-smoke recipe for exercising formatted output without PATH symlink setup
 - Required implementations: Python and Rust

@@ -18,6 +18,8 @@ EXPECTED = f"opencode run {PROMPT}\n"
 CONFIG_DEFAULT_RUNNER_EXPECTED = f"claude -p {PROMPT}\n"
 AGENT_FALLBACK_EXPECTED = f"opencode run --agent reviewer {PROMPT}\n"
 PRESET_AGENT_EXPECTED = f"opencode run --agent specialist {PROMPT}\n"
+PRESET_PROMPT = "Commit all changes"
+PRESET_PROMPT_EXPECTED = f"opencode run {PRESET_PROMPT}\n"
 CODEX_RUNNER_EXPECTED = f"codex exec {PROMPT}\n"
 CLAUDE_RUNNER_EXPECTED = f"claude -p {PROMPT}\n"
 KIMI_RUNNER_EXPECTED = f"kimi --prompt {PROMPT}\n"
@@ -25,6 +27,7 @@ HELP_USAGE_LINE = 'ccc [controls...] "<Prompt>"'
 HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
 )
+HELP_PRESET_PROMPT_LINE = "Presets can also define a default prompt"
 HELP_SHOW_THINKING_SNIPPET = "--show-thinking"
 HELP_SANITIZE_OSC_SNIPPET = "--sanitize-osc / --no-sanitize-osc"
 HELP_OUTPUT_MODE_SNIPPET = "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>"
@@ -34,6 +37,7 @@ HELP_YOLO_SNIPPET = "--yolo / -y"
 HELP_DELIMITER_SNIPPET = "Treat all remaining args as prompt text"
 SHOW_THINKING_IMPLEMENTATIONS = {"Python", "Rust"}
 YOLO_IMPLEMENTATIONS = {"Python", "Rust"}
+PROMPT_PRESET_IMPLEMENTATIONS = {"Python", "Rust"}
 
 
 class SingleImplCccContractTests(unittest.TestCase):
@@ -166,6 +170,29 @@ class SingleImplCccContractTests(unittest.TestCase):
                     result = lang.invoke_extra(["@reviewer", PROMPT], env)
                     assertion(result)
 
+    def _run_with_prompt_preset_assertion(self, prompt: str | None, assertion) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+            self._write_prompt_preset_config(tmp_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in PROMPT_PRESET_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, config="preset_prompt"):
+                    env = self._make_env(opencode_path, lang)
+                    env["HOME"] = str(tmp_path)
+                    env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+                    env["CCC_CONFIG"] = str(tmp_path / "legacy-config")
+                    if prompt is None:
+                        result = lang.invoke_extra(["@commit"], env)
+                    else:
+                        result = lang.invoke_with_args(["@commit"], prompt, env)
+                    assertion(result)
+
     def test_happy_path(self) -> None:
         self._run_with_prompt_assertion(PROMPT, self.assert_equal_output)
 
@@ -228,6 +255,15 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def test_preset_agent_wins_over_name_fallback(self) -> None:
         self._run_with_agent_preset_assertion(self.assert_uses_preset_agent)
+
+    def test_preset_prompt_fills_missing_prompt(self) -> None:
+        self._run_with_prompt_preset_assertion(None, self.assert_uses_preset_prompt)
+
+    def test_explicit_prompt_overrides_preset_prompt(self) -> None:
+        self._run_with_prompt_preset_assertion(PROMPT, self.assert_equal_output)
+
+    def test_whitespace_prompt_falls_back_to_preset_prompt(self) -> None:
+        self._run_with_prompt_preset_assertion("   ", self.assert_uses_preset_prompt)
 
     def test_help_surface_mentions_standard_name_slot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -311,6 +347,23 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["--help"], self._make_env(opencode_path, lang)
                     )
                     self.assert_help_mentions_yolo_and_delimiter(result)
+
+    def test_help_surface_mentions_preset_prompt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in PROMPT_PRESET_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assert_help_mentions_preset_prompt(result)
 
     def test_permission_mode_maps_to_runner_specific_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -754,6 +807,11 @@ class SingleImplCccContractTests(unittest.TestCase):
         self.assertEqual(result.stdout, PRESET_AGENT_EXPECTED)
         self.assertEqual(result.stderr, "")
 
+    def assert_uses_preset_prompt(self, result) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, PRESET_PROMPT_EXPECTED)
+        self.assertEqual(result.stderr, "")
+
     def assert_help_mentions_standard_name_slot(
         self, result, expected_usage_line
     ) -> None:
@@ -782,6 +840,10 @@ class SingleImplCccContractTests(unittest.TestCase):
         self.assertIn(HELP_PERMISSION_MODE_SNIPPET, result.stdout)
         self.assertIn(HELP_YOLO_SNIPPET, result.stdout)
         self.assertIn(HELP_DELIMITER_SNIPPET, result.stdout)
+
+    def assert_help_mentions_preset_prompt(self, result) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(HELP_PRESET_PROMPT_LINE, result.stdout)
 
     def assert_uses_codex_exec_runner(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -889,6 +951,16 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def _write_agent_preset_config(self, tmp_path: Path) -> None:
         toml_config_text = '[aliases.reviewer]\nagent = "specialist"\n'
+        home_config_dir = tmp_path / ".config" / "ccc"
+        xdg_config_dir = tmp_path / "xdg" / "ccc"
+        home_config_dir.mkdir(parents=True)
+        xdg_config_dir.mkdir(parents=True)
+        (home_config_dir / "config.toml").write_text(toml_config_text)
+        (xdg_config_dir / "config.toml").write_text(toml_config_text)
+        (tmp_path / "legacy-config").write_text("")
+
+    def _write_prompt_preset_config(self, tmp_path: Path) -> None:
+        toml_config_text = '[aliases.commit]\nprompt = "Commit all changes"\n'
         home_config_dir = tmp_path / ".config" / "ccc"
         xdg_config_dir = tmp_path / "xdg" / "ccc"
         home_config_dir.mkdir(parents=True)

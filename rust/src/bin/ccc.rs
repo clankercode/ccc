@@ -207,10 +207,6 @@ fn main() -> ExitCode {
     }
 
     let parsed = parse_args(&args);
-    if parsed.prompt.trim().is_empty() {
-        eprintln!("prompt must not be empty");
-        return ExitCode::from(1);
-    }
     let config = load_config(None);
     let output_plan = match resolve_output_plan(&parsed, Some(&config)) {
         Ok(plan) => plan,

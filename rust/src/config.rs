@@ -146,6 +146,7 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                 ("alias", "provider") => current_alias.provider = Some(value.to_string()),
                 ("alias", "model") => current_alias.model = Some(value.to_string()),
                 ("alias", "agent") => current_alias.agent = Some(value.to_string()),
+                ("alias", "prompt") => current_alias.prompt = Some(value.to_string()),
                 _ => {}
             }
         }

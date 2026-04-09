@@ -50,7 +50,7 @@ Extends the CLI beyond simple `ccc "<Prompt>"` with structured argument parsing.
 
 ### Config loading
 
-Implementations read a config file for: default runner, custom abbreviations, alias/preset definitions, default provider/model.
+Implementations read a config file for: default runner, custom abbreviations, alias/preset definitions, default provider/model, and preset prompt fallbacks.
 
 **Full details:** [CCC_PARSER_CONFIG_DESIGN.md](CCC_PARSER_CONFIG_DESIGN.md)
 

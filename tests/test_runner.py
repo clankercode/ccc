@@ -179,6 +179,7 @@ class RunnerTests(unittest.TestCase):
         self.assertIn(".json / ..json", HELP_TEXT)
         self.assertIn("--permission-mode <safe|auto|yolo|plan>", HELP_TEXT)
         self.assertIn("--yolo / -y", HELP_TEXT)
+        self.assertIn("Presets can also define a default prompt", HELP_TEXT)
         self.assertIn("Treat all remaining args as prompt text", HELP_TEXT)
         self.assertIn("show_thinking", HELP_TEXT)
 

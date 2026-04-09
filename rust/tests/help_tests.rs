@@ -14,6 +14,9 @@ fn test_help_mentions_name_slot() {
         "@name         Use a named preset from config; if no preset exists, treat it as an agent"
     ));
     assert!(stdout.contains(
+        "Presets can also define a default prompt when the user leaves prompt text blank"
+    ));
+    assert!(stdout.contains(
         "--show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it"
     ));
     assert!(stdout.contains("--sanitize-osc / --no-sanitize-osc"));

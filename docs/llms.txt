@@ -17,7 +17,7 @@ Slots are positional and parsed in order before the prompt:
 - --output-mode: Choose `text`, `stream-text`, `json`, `stream-json`, `formatted`, or `stream-formatted`
   Dot-sugar aliases are available before the prompt: `.text` / `..text`, `.json` / `..json`, `.fmt` / `..fmt`.
 - :provider:model: Override provider and model
-- @name: Use a named preset from ~/.config/ccc/config.toml, or treat it as an agent when no preset exists
+- @name: Use a named preset from ~/.config/ccc/config.toml, or treat it as an agent when no preset exists; in Python and Rust, presets can also provide a default prompt when the user leaves prompt text blank
 
 Examples:
 - ccc "Fix the failing tests"

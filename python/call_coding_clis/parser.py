@@ -47,6 +47,7 @@ class AliasDef:
     provider: str | None = None
     model: str | None = None
     agent: str | None = None
+    prompt: str | None = None
 
 
 @dataclass(slots=True)
@@ -537,6 +538,8 @@ def resolve_command(
             )
 
     prompt = parsed.prompt.strip()
+    if not prompt and alias_def and alias_def.prompt is not None:
+        prompt = str(alias_def.prompt).strip()
     if not prompt:
         raise ValueError("prompt must not be empty")
 

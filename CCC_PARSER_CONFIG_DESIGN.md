@@ -27,8 +27,8 @@ This order is not yet committed as final behavior.
 ## `@alias` Design Notes
 
 - `@alias` should likely represent a named preset, not just a prompt shortcut.
-- A preset may later carry runner/model/thinking defaults.
-- Explicit CLI tokens should probably override alias-provided defaults, but this is not locked.
+- A preset may carry runner/model/thinking defaults and an optional prompt fallback.
+- Explicit CLI prompt text overrides a preset prompt; blank or whitespace-only prompt text can fall back to the preset prompt when present.
 
 ## `+0..+4` Thinking-Level Design Notes
 
@@ -58,6 +58,7 @@ Planned config responsibilities:
 - custom runner abbreviations or names
 - bundled-runner default provider/model values
 - custom-name default provider/model values
+- preset prompt fallbacks
 
 ## Normalization And Resolution Pipeline
 
@@ -66,7 +67,7 @@ Planned-only direction:
 1. tokenize argv
 2. detect explicit runner/thinking/provider-model/alias tokens
 3. load alias expansion if present
-4. apply explicit-token override rules
+4. apply explicit-token override rules and prompt fallback
 5. resolve default provider/model
 6. build a normalized invocation spec
 
@@ -83,4 +84,4 @@ Planned-only direction:
 2. Does `@alias` expand first and then yield to explicit CLI tokens, or does it win?
 3. How does `:model` resolve if multiple providers expose the same model name?
 4. How do config-defined names collide with built-in runner selectors?
-5. What is the final precedence stack among explicit tokens, alias contents, runner defaults, config defaults, and implicit fallbacks?
+5. What is the final precedence stack among explicit tokens, alias contents, runner defaults, and config defaults for non-prompt fields?

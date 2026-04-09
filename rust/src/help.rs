@@ -55,6 +55,9 @@ Flags:
                                         Select raw, streamed, or formatted output handling
                                         (config key: defaults.output_mode)
   --forward-unknown-json                In formatted modes, forward unhandled JSON objects to stderr
+  Environment:
+    FORCE_COLOR / NO_COLOR              Override TTY detection for formatted human output
+                                        (FORCE_COLOR wins if both are set)
   --            Treat all remaining args as prompt text, even if they look like controls
 
 Examples:

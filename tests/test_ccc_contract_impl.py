@@ -37,6 +37,7 @@ HELP_SHOW_THINKING_SNIPPET = "--show-thinking"
 HELP_SANITIZE_OSC_SNIPPET = "--sanitize-osc / --no-sanitize-osc"
 HELP_OUTPUT_MODE_SNIPPET = "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>"
 HELP_OUTPUT_SUGAR_SNIPPET = ".text / ..text, .json / ..json, .fmt / ..fmt"
+HELP_COLOR_ENV_SNIPPET = "FORCE_COLOR / NO_COLOR"
 HELP_PERMISSION_MODE_SNIPPET = "--permission-mode <safe|auto|yolo|plan>"
 HELP_YOLO_SNIPPET = "--yolo / -y"
 HELP_DELIMITER_SNIPPET = "Treat all remaining args as prompt text"
@@ -388,6 +389,23 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["--help"], self._make_env(opencode_path, lang)
                     )
                     self.assert_help_mentions_output_modes(result)
+
+    def test_help_surface_mentions_color_envs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assert_help_mentions_color_envs(result)
 
     def test_help_surface_mentions_yolo_and_delimiter(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -767,6 +785,30 @@ class SingleImplCccContractTests(unittest.TestCase):
                             self.assertEqual(result.stdout, expected_stdout)
                             self.assertEqual(result.stderr, "")
 
+    def test_force_color_env_overrides_no_color_in_formatted_modes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_structured_argv_echo_stub(opencode_path, "opencode", "opencode")
+
+            expected_stdout = (
+                "\x1b[96m💬\x1b[0m opencode run --format json Fix the failing tests\n"
+            )
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                env["FORCE_COLOR"] = "1"
+                env["NO_COLOR"] = "1"
+                with self.subTest(language=lang.name, capability="force-color"):
+                    result = lang.invoke_with_args(["oc", ".fmt"], PROMPT, env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, expected_stdout)
+                    self.assertEqual(result.stderr, "")
+
     def test_unsupported_output_mode_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -956,6 +998,12 @@ class SingleImplCccContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(HELP_OUTPUT_MODE_SNIPPET, result.stdout)
         self.assertIn(HELP_OUTPUT_SUGAR_SNIPPET, result.stdout)
+
+    def assert_help_mentions_color_envs(self, result) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(HELP_COLOR_ENV_SNIPPET, result.stdout)
+        self.assertIn("FORCE_COLOR", result.stdout)
+        self.assertIn("NO_COLOR", result.stdout)
 
     def assert_help_mentions_yolo_and_delimiter(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)

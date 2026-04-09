@@ -668,6 +668,16 @@ fn tool_preview(tool_name: &str, text: &str) -> String {
     }
 }
 
+pub fn resolve_human_tty(tty: bool, force_color: Option<&str>, no_color: Option<&str>) -> bool {
+    if force_color.is_some_and(|value| !value.is_empty()) {
+        return true;
+    }
+    if no_color.is_some_and(|value| !value.is_empty()) {
+        return false;
+    }
+    tty
+}
+
 fn style(text: &str, code: &str, tty: bool) -> String {
     if tty {
         format!("\x1b[{code}m{text}\x1b[0m")

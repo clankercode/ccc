@@ -33,6 +33,12 @@ Plain fallback:
 - `[ok]`
 - `[error]`
 
+Color override rules:
+
+- `FORCE_COLOR` forces the emoji/ANSI TTY lane markers on in human-formatted output
+- `NO_COLOR` forces the plain fallback labels on
+- if both are set, `FORCE_COLOR` wins
+
 ## Alternative: Ledger
 
 Ledger is the restrained editorial variant:
@@ -56,6 +62,7 @@ It was not chosen for v1 because it is more opinionated and more likely to age b
 ## Rendering Rules
 
 - Thinking stays hidden unless `--show-thinking` is enabled.
+- Human-formatted output falls back to plain labels unless `FORCE_COLOR` is set or `NO_COLOR` disables colors.
 - Bash tool output shows the executed command digest up to 400 characters.
 - File-edit tools are summarized; full file contents and diffs are intentionally hidden.
 - Tool previews are capped at 8 lines and 400 visible characters.

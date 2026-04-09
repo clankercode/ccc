@@ -472,6 +472,18 @@ def _tool_preview(tool_name: str, text: str) -> str:
     return _summarize_text(text)
 
 
+def resolve_human_tty(
+    tty: bool,
+    force_color: str | None = None,
+    no_color: str | None = None,
+) -> bool:
+    if force_color:
+        return True
+    if no_color:
+        return False
+    return tty
+
+
 class FormattedRenderer:
     def __init__(self, *, show_thinking: bool = False, tty: bool = False) -> None:
         self.show_thinking = show_thinking

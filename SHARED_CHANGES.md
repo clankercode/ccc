@@ -31,6 +31,13 @@ Entry format:
 
 ## 2026-04-10
 
+### Human-formatted output now honors FORCE_COLOR and NO_COLOR in Python and Rust
+- Change: Python and Rust now resolve human-formatted TTY rendering with `FORCE_COLOR` / `NO_COLOR`, so emoji and ANSI prefixes can be forced on or suppressed independently of whether stdout is a TTY
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_json_output.py`, `tests/test_ccc_contract_impl.py`, `rust/tests/json_output_tests.rs`
+- Notes: help text and the docs site now mention the environment override alongside the current TTY-based fallback
+
 ### Project-local config files are now discovered in Python and Rust
 - Change: Python and Rust now search upward from the current directory for a project-local `.ccc.toml` and merge it with the global config chain, with local values overriding XDG and home defaults
 - Required implementations: Python and Rust

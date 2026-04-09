@@ -170,6 +170,14 @@ fn test_render_opencode() {
 }
 
 #[test]
+fn test_render_opencode_uses_color_prefixes_on_tty() {
+    let raw = "{\"response\":\"hello\"}\n";
+    let parsed = parse_opencode_json(raw);
+    let rendered = render_parsed(&parsed, true, true);
+    assert_eq!(rendered, "\u{1b}[96m💬\u{1b}[0m hello");
+}
+
+#[test]
 fn test_render_claude_code_tool_use() {
     let raw = "{\"type\":\"tool_use\",\"tool_name\":\"Bash\",\"tool_input\":{\"cmd\":\"ls\"}}\n";
     let parsed = parse_claude_code_json(raw);
@@ -217,6 +225,23 @@ fn test_render_error_event() {
     let parsed = parse_opencode_json(raw);
     let rendered = render_parsed(&parsed, true, false);
     assert_eq!(rendered, "[error] bad");
+}
+
+#[test]
+fn test_resolve_human_tty_defaults_to_terminal_state() {
+    assert!(resolve_human_tty(true, None, None));
+    assert!(!resolve_human_tty(false, None, None));
+}
+
+#[test]
+fn test_resolve_human_tty_force_color_wins() {
+    assert!(resolve_human_tty(false, Some("1"), None));
+    assert!(resolve_human_tty(true, Some("1"), Some("1")));
+}
+
+#[test]
+fn test_resolve_human_tty_no_color_disables() {
+    assert!(!resolve_human_tty(true, None, Some("1")));
 }
 
 #[test]

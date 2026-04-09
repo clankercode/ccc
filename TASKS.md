@@ -2,10 +2,6 @@
 
 Living backlog of unfinished work. Completed items should move to `SHARED_CHANGES.md`, `FEATURES.md`, or the relevant feature docs.
 
-- [ ] Add a `FORCE_COLORS` env var or document the current-client equivalent
-  - Opposite of `NO_COLORS`: keep colors and emoji enabled even when streaming or when the terminal would normally disable them.
-  - If upstream clients already have an equivalent, document the exact flags/env vars instead of inventing a second path.
-  - Make the behavior explicit for human-facing output only.
 - [ ] Finish `--allow-tool` / `--deny-tool` support where the upstream CLI can express it
   - Start with Claude and OpenCode.
   - Keep the permission-mapping matrix in `docs/clis/README.md` current.

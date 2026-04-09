@@ -6,6 +6,7 @@ import re
 
 try:
     from .json_output import FormattedRenderer, StructuredStreamProcessor, parse_json_output, render_parsed
+    from .json_output import resolve_human_tty
     from .runner import CommandSpec, Runner
     from .parser import (
         parse_args,
@@ -18,6 +19,7 @@ try:
     from .help import print_help, print_usage
 except ImportError:
     from json_output import FormattedRenderer, StructuredStreamProcessor, parse_json_output, render_parsed
+    from json_output import resolve_human_tty
     from runner import CommandSpec, Runner
     from parser import (
         parse_args,
@@ -89,6 +91,11 @@ def main(argv: list[str] | None = None) -> int:
     show_thinking = resolve_show_thinking(parsed, config)
     sanitize_osc = resolve_sanitize_osc(parsed, config)
     forward_unknown_json = parsed.forward_unknown_json
+    human_tty = resolve_human_tty(
+        sys.stdout.isatty(),
+        os.environ.get("FORCE_COLOR"),
+        os.environ.get("NO_COLOR"),
+    )
 
     if output_plan.mode in {"text", "json"}:
         result = runner.run(spec)
@@ -120,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
         rendered = render_parsed(
             parsed_output,
             show_thinking=show_thinking,
-            tty=sys.stdout.isatty(),
+            tty=human_tty,
         )
         if rendered:
             print(_sanitize_human_output(rendered, sanitize_osc))
@@ -131,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
 
     renderer = FormattedRenderer(
         show_thinking=show_thinking,
-        tty=sys.stdout.isatty(),
+        tty=human_tty,
     )
     processor = StructuredStreamProcessor(output_plan.schema or "", renderer)
     stderr_filter = _HumanStderrFilter(output_plan.runner_name)

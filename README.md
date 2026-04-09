@@ -115,6 +115,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - `:provider:model` and `:model`
   - `@name` for preset lookup with agent fallback; presets can also define a default prompt
   - Python and Rust search project-local `.ccc.toml` files upward from the current directory and override the global config chain
+  - `formatted` and `stream-formatted` honor `FORCE_COLOR` / `NO_COLOR` before falling back to TTY detection
   - `--print-config` to print the canonical example `config.toml`
   - `--permission-mode safe|auto|yolo|plan`
   - `--show-thinking` / `--no-show-thinking`

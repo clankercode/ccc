@@ -4,6 +4,7 @@ from pathlib import Path
 from call_coding_clis.json_output import (
     FormattedRenderer,
     StructuredStreamProcessor,
+    resolve_human_tty,
     parse_json_output,
     render_parsed,
     parse_opencode_json,
@@ -169,6 +170,11 @@ class RenderParsedTests(unittest.TestCase):
         rendered = render_parsed(result)
         self.assertEqual(rendered, "[assistant] Hello from OpenCode")
 
+    def test_render_opencode_uses_color_prefixes_on_tty(self):
+        result = parse_opencode_json(OPENCODE_STDOUT)
+        rendered = render_parsed(result, tty=True)
+        self.assertEqual(rendered, "\x1b[96m💬\x1b[0m Hello from OpenCode")
+
     def test_render_claude(self):
         result = parse_claude_code_json(CLAUDE_CODE_STDOUT)
         rendered = render_parsed(result)
@@ -254,6 +260,17 @@ class RenderParsedTests(unittest.TestCase):
         self.assertEqual(render_parsed(result, show_thinking=True), "")
         self.assertEqual(len(result.unknown_json_lines), 1)
         self.assertIn('"type":"rate_limit_event"', result.unknown_json_lines[0])
+
+    def test_resolve_human_tty_defaults_to_terminal_state(self):
+        self.assertTrue(resolve_human_tty(True))
+        self.assertFalse(resolve_human_tty(False))
+
+    def test_resolve_human_tty_force_color_wins(self):
+        self.assertTrue(resolve_human_tty(False, force_color="1"))
+        self.assertTrue(resolve_human_tty(True, force_color="1", no_color="1"))
+
+    def test_resolve_human_tty_no_color_disables(self):
+        self.assertFalse(resolve_human_tty(True, no_color="1"))
 
     def test_fixture_claude_tool_bash(self):
         raw = (FIXTURES / "claude" / "tool_bash" / "stdout.ndjson").read_text()

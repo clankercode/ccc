@@ -1,7 +1,7 @@
 use call_coding_clis::{
     load_config, parse_args, parse_json_output, print_help, print_usage, render_parsed,
-    render_example_config, resolve_command, resolve_output_plan, resolve_sanitize_osc,
-    resolve_show_thinking,
+    render_example_config, resolve_command, resolve_human_tty, resolve_output_plan,
+    resolve_sanitize_osc, resolve_show_thinking,
     FormattedRenderer, Runner, StructuredStreamProcessor,
 };
 use std::env;
@@ -249,6 +249,11 @@ fn main() -> ExitCode {
     let show_thinking = resolve_show_thinking(&parsed, Some(&config));
     let sanitize_osc = resolve_sanitize_osc(&parsed, Some(&config));
     let forward_unknown_json = parsed.forward_unknown_json;
+    let human_tty = resolve_human_tty(
+        std::io::stdout().is_terminal(),
+        env::var("FORCE_COLOR").ok().as_deref(),
+        env::var("NO_COLOR").ok().as_deref(),
+    );
 
     match output_plan.mode.as_str() {
         "text" | "json" => {
@@ -282,7 +287,7 @@ fn main() -> ExitCode {
             let rendered = render_parsed(
                 &parse_json_output(&result.stdout, output_plan.schema.as_deref().unwrap_or("")),
                 show_thinking,
-                std::io::stdout().is_terminal(),
+                human_tty,
             );
             if !rendered.is_empty() {
                 println!("{}", sanitize_human_output(&rendered, sanitize_osc));
@@ -303,7 +308,7 @@ fn main() -> ExitCode {
             let stream_runner_name = output_plan.runner_name.clone();
             let processor = Arc::new(Mutex::new(StructuredStreamProcessor::new(
                 output_plan.schema.as_deref().unwrap_or(""),
-                FormattedRenderer::new(show_thinking, std::io::stdout().is_terminal()),
+                FormattedRenderer::new(show_thinking, human_tty),
             )));
             let callback_processor = Arc::clone(&processor);
             let result = runner.stream(spec, move |channel, chunk| {

@@ -118,6 +118,8 @@ Python and Rust now share these output modes:
 
 See [output-mode-compatibility.md](output-mode-compatibility.md) for the runner matrix and [stream-output-visual-systems.md](stream-output-visual-systems.md) for the current TTY rendering design.
 
+Human-formatted output honors `FORCE_COLOR` and `NO_COLOR` before falling back to TTY detection; raw modes are unchanged.
+
 Implementation notes for future language ports live in [output-mode-porting.md](output-mode-porting.md).
 
 Upstream structured-output references live in [json-event-references.md](json-event-references.md).

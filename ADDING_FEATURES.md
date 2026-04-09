@@ -13,8 +13,10 @@ These are not optional for shared CLI/library changes:
 5. Update [SHARED_CHANGES.md](/home/xertrov/src/call-coding-clis/SHARED_CHANGES.md) with a short entry describing the feature, fix, or semantic change.
 6. Run the targeted Python and Rust tests.
 7. Run `just install-rs` after the Rust update so the installed local `ccc` matches the tested Rust implementation.
+8. Commit the changes only after the required tests are passing.
 
 If step 5 is missing, the feature is not ready to land.
+If step 8 has not happened yet, the work is not fully finalized.
 
 Updating the other language implementations is encouraged, but optional unless the task explicitly calls for a broader rollout.
 
@@ -27,8 +29,9 @@ When a change is intended to roll out beyond Python and Rust:
 3. Update the relevant docs, the shared cross-implementation tests, and `SHARED_CHANGES.md`.
 4. Run the targeted Python and Rust tests.
 5. Run the shared cross-implementation contract tests.
-6. Only after Python and Rust are working, optionally update the remaining languages with subagents.
-7. Re-run targeted per-language tests plus the shared contract suite.
+6. Commit the Python/Rust reference implementation only after those tests are green.
+7. Only after Python and Rust are working, optionally update the remaining languages with subagents.
+8. Re-run targeted per-language tests plus the shared contract suite before any broader rollout commit.
 
 ## Why Python First
 
@@ -47,8 +50,10 @@ Every shared feature or fix must include:
 - doc updates for the user-facing or maintainer-facing behavior that changed
 - cross-implementation test updates
 - a `SHARED_CHANGES.md` entry written before finalizing the work
+- a commit created after the required verification passes
 
 Do not land a shared semantic change without adjusting the docs, updating the contract or harness coverage that should detect it, and recording the semantic change in `SHARED_CHANGES.md`.
+Do not commit a shared semantic change before the required verification commands have passed.
 
 For Python changes:
 
@@ -130,3 +135,5 @@ Before sending a final "implemented" response for a shared feature, explicitly v
 Do not start broad multi-language rollout until Python and Rust both express the final intended semantics, the docs have been updated, the shared tests have been updated, `SHARED_CHANGES.md` has been updated, and the targeted Python/Rust tests are green.
 
 Always run `just install-rs` after updating Rust so the installed local `ccc` binary matches the tested implementation.
+
+Before declaring the work done, make sure the repo has a commit that includes the tested changes.

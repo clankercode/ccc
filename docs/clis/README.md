@@ -31,9 +31,9 @@ This table describes the current `ccc` mapping and the likely future shape for f
 | Crush | warn and ignore | Not reliable for non-interactive run mode | none until upstream CLI is clearer |
 | RooCode | warn and ignore | Unverified | none until upstream CLI is verified |
 
-## Proposed Cross-Runner Permission Modes
+## Current Cross-Runner Permission Modes
 
-These are not implemented yet, but they are the cleanest shape if we extend beyond `--yolo`.
+Python and Rust now implement `--permission-mode <safe|auto|yolo|plan>` with partial runner-specific mappings.
 
 | Proposed `ccc` mode | OpenCode | Claude | Codex | Kimi | Crush | RooCode |
 |---|---|---|---|---|---|---|

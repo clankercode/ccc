@@ -5,6 +5,7 @@ import re
 
 
 RUNNER_REGISTRY: dict[str, RunnerInfo] = {}
+PERMISSION_MODES = {"safe", "auto", "yolo", "plan"}
 
 
 @dataclass(slots=True)
@@ -26,6 +27,7 @@ class ParsedArgs:
     thinking: int | None = None
     show_thinking: bool | None = None
     yolo: bool = False
+    permission_mode: str | None = None
     provider: str | None = None
     model: str | None = None
     alias: str | None = None
@@ -174,13 +176,17 @@ def parse_args(argv: list[str]) -> ParsedArgs:
     parsed = ParsedArgs()
     positional: list[str] = []
     force_prompt = False
+    index = 0
 
-    for token in argv:
+    while index < len(argv):
+        token = argv[index]
         if force_prompt or positional:
             positional.append(token)
+            index += 1
             continue
         if token == "--":
             force_prompt = True
+            index += 1
             continue
         if RUNNER_SELECTOR_RE.match(token):
             parsed.runner = token.lower()
@@ -192,6 +198,14 @@ def parse_args(argv: list[str]) -> ParsedArgs:
             parsed.show_thinking = token == "--show-thinking"
         elif token in {"--yolo", "-y"}:
             parsed.yolo = True
+            parsed.permission_mode = "yolo"
+        elif token == "--permission-mode":
+            if index + 1 >= len(argv):
+                parsed.permission_mode = ""
+            else:
+                parsed.permission_mode = argv[index + 1].lower()
+                parsed.yolo = parsed.permission_mode == "yolo"
+                index += 1
         elif PROVIDER_MODEL_RE.match(token):
             m = PROVIDER_MODEL_RE.match(token)
             parsed.provider = m.group(1)
@@ -203,6 +217,7 @@ def parse_args(argv: list[str]) -> ParsedArgs:
             parsed.alias = ALIAS_RE.match(token).group(1)
         else:
             positional.append(token)
+        index += 1
 
     parsed.prompt = " ".join(positional)
     return parsed
@@ -291,7 +306,27 @@ def resolve_command(
                 f'ignoring @{effective_agent}'
             )
 
-    if parsed.yolo:
+    effective_permission_mode = (
+        parsed.permission_mode if parsed.permission_mode is not None else ("yolo" if parsed.yolo else None)
+    )
+    if effective_permission_mode == "":
+        raise ValueError("permission mode requires one of: safe, auto, yolo, plan")
+    if effective_permission_mode is not None and effective_permission_mode not in PERMISSION_MODES:
+        raise ValueError("permission mode must be one of: safe, auto, yolo, plan")
+
+    if effective_permission_mode == "safe":
+        if effective_runner_name in {"cc", "claude"}:
+            argv.extend(["--permission-mode", "default"])
+    elif effective_permission_mode == "auto":
+        if effective_runner_name in {"cc", "claude"}:
+            argv.extend(["--permission-mode", "auto"])
+        elif effective_runner_name in {"c", "cx", "codex"}:
+            argv.append("--full-auto")
+        else:
+            warnings.append(
+                f'warning: runner "{effective_runner_name}" does not support permission mode "auto"; ignoring it'
+            )
+    elif effective_permission_mode == "yolo":
         if info.yolo_flags:
             argv.extend(info.yolo_flags)
         elif effective_runner_name in {"oc", "opencode"}:
@@ -303,6 +338,15 @@ def resolve_command(
         elif effective_runner_name in {"rc", "roocode"}:
             warnings.append(
                 'warning: runner "roocode" yolo mode is unverified; ignoring --yolo'
+            )
+    elif effective_permission_mode == "plan":
+        if effective_runner_name in {"cc", "claude"}:
+            argv.extend(["--permission-mode", "plan"])
+        elif effective_runner_name in {"k", "kimi"}:
+            argv.append("--plan")
+        else:
+            warnings.append(
+                f'warning: runner "{effective_runner_name}" does not support permission mode "plan"; ignoring it'
             )
 
     prompt = parsed.prompt.strip()

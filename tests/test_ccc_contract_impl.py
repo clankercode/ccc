@@ -24,6 +24,7 @@ HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
 )
 HELP_SHOW_THINKING_SNIPPET = "--show-thinking"
+HELP_PERMISSION_MODE_SNIPPET = "--permission-mode <safe|auto|yolo|plan>"
 HELP_YOLO_SNIPPET = "--yolo / -y"
 HELP_DELIMITER_SNIPPET = "Treat all remaining args as prompt text"
 SHOW_THINKING_IMPLEMENTATIONS = {"Python", "Rust"}
@@ -233,6 +234,59 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["--help"], self._make_env(opencode_path, lang)
                     )
                     self.assert_help_mentions_yolo_and_delimiter(result)
+
+    def test_permission_mode_maps_to_runner_specific_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            claude_path = bin_dir / "claude"
+            codex_path = bin_dir / "codex"
+            kimi_path = bin_dir / "kimi"
+            opencode_path = bin_dir / "opencode"
+            self._write_argv_echo_stub(claude_path, "claude")
+            self._write_argv_echo_stub(codex_path, "codex")
+            self._write_argv_echo_stub(kimi_path, "kimi")
+            self._write_argv_echo_stub(opencode_path, "opencode")
+
+            cases = {
+                "Python": [
+                    (["cc", "--permission-mode", "safe"], "claude -p --permission-mode default Fix the failing tests\n", ""),
+                    (["cc", "--permission-mode", "auto"], "claude -p --permission-mode auto Fix the failing tests\n", ""),
+                    (["c", "--permission-mode", "auto"], "codex exec --full-auto Fix the failing tests\n", ""),
+                    (["cc", "--permission-mode", "plan"], "claude -p --permission-mode plan Fix the failing tests\n", ""),
+                    (["k", "--permission-mode", "plan"], "kimi --plan --prompt Fix the failing tests\n", ""),
+                    (
+                        ["k", "--permission-mode", "auto"],
+                        "kimi --prompt Fix the failing tests\n",
+                        'warning: runner "k" does not support permission mode "auto"; ignoring it\n',
+                    ),
+                ],
+                "Rust": [
+                    (["cc", "--permission-mode", "safe"], "claude -p --permission-mode default Fix the failing tests\n", ""),
+                    (["cc", "--permission-mode", "auto"], "claude -p --permission-mode auto Fix the failing tests\n", ""),
+                    (["c", "--permission-mode", "auto"], "codex exec --full-auto Fix the failing tests\n", ""),
+                    (["cc", "--permission-mode", "plan"], "claude -p --permission-mode plan Fix the failing tests\n", ""),
+                    (["k", "--permission-mode", "plan"], "kimi --plan --prompt Fix the failing tests\n", ""),
+                    (
+                        ["k", "--permission-mode", "auto"],
+                        "kimi --prompt Fix the failing tests\n",
+                        'warning: runner "k" does not support permission mode "auto"; ignoring it\n',
+                    ),
+                ],
+            }
+
+            for lang in self.selected_languages:
+                if lang.name not in cases:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                with self.subTest(language=lang.name, capability="permission-mode"):
+                    for extra_args, expected_stdout, expected_stderr in cases[lang.name]:
+                        with self.subTest(language=lang.name, args=extra_args):
+                            result = lang.invoke_with_args(extra_args, PROMPT, env)
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            self.assertEqual(result.stdout, expected_stdout)
+                            self.assertEqual(result.stderr, expected_stderr)
 
     def test_codex_runner_uses_exec_subcommand(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -459,6 +513,7 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def assert_help_mentions_yolo_and_delimiter(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(HELP_PERMISSION_MODE_SNIPPET, result.stdout)
         self.assertIn(HELP_YOLO_SNIPPET, result.stdout)
         self.assertIn(HELP_DELIMITER_SNIPPET, result.stdout)
 

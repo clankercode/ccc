@@ -114,6 +114,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - `+0..+4` thinking levels
   - `:provider:model` and `:model`
   - `@name` for preset lookup with agent fallback
+  - `--permission-mode safe|auto|yolo|plan`
   - `--show-thinking` / `--no-show-thinking`
   - `--yolo` / `-y`
 - `--` forces the rest of argv to be treated as prompt text, even if it starts with control-like tokens
@@ -146,6 +147,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
 - cross-language test harness design: `TEST_HARNESS_PLAN.md`
 - expanded `ccc` token parsing for `@name`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
+- future advanced tool allow/deny design note: [docs/clis/allow-deny-tool-plan.md](/home/xertrov/src/call-coding-clis/docs/clis/allow-deny-tool-plan.md)
 
 ## Missing / Possible Future Features
 

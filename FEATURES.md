@@ -60,6 +60,7 @@
 | F22 | Default provider/model | Config-backed default resolution |
 | F32 | Yolo mode | `--yolo` / `-y` selects the runner's lowest-friction auto-approval mode |
 | F33 | Order-independent controls | Pre-prompt control tokens may appear in any order; `--` forces literal prompt text |
+| F34 | Permission mode | `--permission-mode <safe|auto|yolo|plan>` maps to runner-specific permission profiles where supported |
 
 ### v3 JSON Output Features
 

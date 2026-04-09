@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-09
 
+### Permission mode added to Python and Rust
+- Change: Python and Rust now support `--permission-mode <safe|auto|yolo|plan>` with runner-specific mappings where the semantics are honest
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/test_parser_config.py`, `tests/test_runner.py`, `rust/tests/parser_tests.rs`, `rust/tests/help_tests.rs`
+- Notes: `--yolo` remains supported as syntax sugar for `--permission-mode yolo`; current mappings are partial by runner and unsupported modes warn instead of guessing
+
 ### Yolo mode and free-order controls added to Python and Rust
 - Change: Python and Rust now support `--yolo` / `-y`, free-order pre-prompt control tokens, and `--` to force literal prompt text
 - Required implementations: Python and Rust

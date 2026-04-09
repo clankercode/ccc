@@ -37,6 +37,8 @@ Controls (free order before the prompt):
                 Kimi maps +0 to --no-thinking and +1..+4 to --thinking
   :provider:model  Override provider and model
   @name         Use a named preset from config; if no preset exists, treat it as an agent
+  --permission-mode <safe|auto|yolo|plan>
+                Request a higher-level permission profile when the selected runner supports it
   --yolo / -y   Request the runner's lowest-friction auto-approval mode when supported
 
 Flags:
@@ -47,7 +49,9 @@ Flags:
 Examples:
   ccc "Fix the failing tests"
   ccc oc "Refactor auth module"
+  ccc --permission-mode auto c "Add tests"
   ccc --yolo cc +2 :anthropic:claude-sonnet-4-20250514 "Add tests"
+  ccc --permission-mode plan k "Think before editing"
   ccc @reviewer k +4 "Debug the parser"
   ccc @reviewer "Audit the API boundary"
   ccc codex "Write a unit test"

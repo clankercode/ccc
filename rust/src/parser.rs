@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 use std::sync::LazyLock;
 use std::sync::RwLock;
 
+const PERMISSION_MODES: &[&str] = &["safe", "auto", "yolo", "plan"];
+
 #[derive(Clone, Debug)]
 pub struct RunnerInfo {
     pub binary: String,
@@ -21,6 +23,7 @@ pub struct ParsedArgs {
     pub thinking: Option<i32>,
     pub show_thinking: Option<bool>,
     pub yolo: bool,
+    pub permission_mode: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
     pub alias: Option<String>,
@@ -294,12 +297,15 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
     let mut parsed = ParsedArgs::default();
     let mut positional: Vec<String> = Vec::new();
     let mut force_prompt = false;
+    let mut index = 0;
 
-    for token in argv {
+    while index < argv.len() {
+        let token = &argv[index];
         if force_prompt || !positional.is_empty() {
             positional.push(token.clone());
         } else if token == "--" {
             force_prompt = true;
+            index += 1;
             continue;
         } else if is_runner_selector(token) {
             parsed.runner = Some(token.to_lowercase());
@@ -309,6 +315,16 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
             parsed.show_thinking = Some(token == "--show-thinking");
         } else if token == "--yolo" || token == "-y" {
             parsed.yolo = true;
+            parsed.permission_mode = Some("yolo".to_string());
+        } else if token == "--permission-mode" {
+            if index + 1 >= argv.len() {
+                parsed.permission_mode = Some(String::new());
+            } else {
+                let mode = argv[index + 1].to_lowercase();
+                parsed.yolo = mode == "yolo";
+                parsed.permission_mode = Some(mode);
+                index += 1;
+            }
         } else if let Some((provider, model)) = parse_provider_model(token) {
             parsed.provider = Some(provider.to_string());
             parsed.model = Some(model.to_string());
@@ -319,6 +335,7 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
         } else {
             positional.push(token.clone());
         }
+        index += 1;
     }
 
     parsed.prompt = positional.join(" ");
@@ -448,7 +465,40 @@ pub fn resolve_command(
         }
     }
 
-    if parsed.yolo {
+    let effective_permission_mode = parsed.permission_mode.clone().or_else(|| {
+        if parsed.yolo {
+            Some("yolo".to_string())
+        } else {
+            None
+        }
+    });
+    if let Some(ref mode) = effective_permission_mode {
+        if mode.is_empty() {
+            return Err("permission mode requires one of: safe, auto, yolo, plan");
+        }
+        if !PERMISSION_MODES.iter().any(|known| known == mode) {
+            return Err("permission mode must be one of: safe, auto, yolo, plan");
+        }
+    }
+
+    if matches!(effective_permission_mode.as_deref(), Some("safe")) {
+        if matches!(effective_runner_name.as_str(), "cc" | "claude") {
+            argv.push("--permission-mode".to_string());
+            argv.push("default".to_string());
+        }
+    } else if matches!(effective_permission_mode.as_deref(), Some("auto")) {
+        if matches!(effective_runner_name.as_str(), "cc" | "claude") {
+            argv.push("--permission-mode".to_string());
+            argv.push("auto".to_string());
+        } else if matches!(effective_runner_name.as_str(), "c" | "cx" | "codex") {
+            argv.push("--full-auto".to_string());
+        } else {
+            warnings.push(format!(
+                "warning: runner \"{}\" does not support permission mode \"auto\"; ignoring it",
+                effective_runner_name
+            ));
+        }
+    } else if matches!(effective_permission_mode.as_deref(), Some("yolo")) {
         if !effective_runner.yolo_flags.is_empty() {
             argv.extend(effective_runner.yolo_flags.iter().cloned());
         } else if matches!(effective_runner_name.as_str(), "oc" | "opencode") {
@@ -462,6 +512,18 @@ pub fn resolve_command(
             );
         } else if matches!(effective_runner_name.as_str(), "rc" | "roocode") {
             warnings.push("warning: runner \"roocode\" yolo mode is unverified; ignoring --yolo".to_string());
+        }
+    } else if matches!(effective_permission_mode.as_deref(), Some("plan")) {
+        if matches!(effective_runner_name.as_str(), "cc" | "claude") {
+            argv.push("--permission-mode".to_string());
+            argv.push("plan".to_string());
+        } else if matches!(effective_runner_name.as_str(), "k" | "kimi") {
+            argv.push("--plan".to_string());
+        } else {
+            warnings.push(format!(
+                "warning: runner \"{}\" does not support permission mode \"plan\"; ignoring it",
+                effective_runner_name
+            ));
         }
     }
 

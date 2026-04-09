@@ -9,6 +9,7 @@ fn test_parse_prompt_only() {
     assert!(parsed.thinking.is_none());
     assert!(parsed.show_thinking.is_none());
     assert!(!parsed.yolo);
+    assert!(parsed.permission_mode.is_none());
     assert!(parsed.alias.is_none());
 }
 
@@ -89,6 +90,7 @@ fn test_parse_full_combo() {
     assert_eq!(parsed.runner.as_deref(), Some("cc"));
     assert_eq!(parsed.thinking, Some(3));
     assert!(parsed.yolo);
+    assert_eq!(parsed.permission_mode.as_deref(), Some("yolo"));
     assert_eq!(parsed.provider.as_deref(), Some("anthropic"));
     assert_eq!(parsed.model.as_deref(), Some("claude-4"));
     assert_eq!(parsed.alias.as_deref(), Some("fast"));
@@ -101,8 +103,35 @@ fn test_parse_yolo_flags() {
         let args: Vec<String> = vec![token.into(), "hello".into()];
         let parsed = parse_args(&args);
         assert!(parsed.yolo);
+        assert_eq!(parsed.permission_mode.as_deref(), Some("yolo"));
         assert_eq!(parsed.prompt, "hello");
     }
+}
+
+#[test]
+fn test_parse_permission_mode_flag() {
+    let args: Vec<String> = vec!["--permission-mode".into(), "auto".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.permission_mode.as_deref(), Some("auto"));
+    assert!(!parsed.yolo);
+    assert_eq!(parsed.prompt, "hello");
+}
+
+#[test]
+fn test_parse_permission_mode_yolo_sets_yolo() {
+    let args: Vec<String> = vec!["--permission-mode".into(), "yolo".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.permission_mode.as_deref(), Some("yolo"));
+    assert!(parsed.yolo);
+}
+
+#[test]
+fn test_parse_permission_mode_last_wins_over_yolo_sugar() {
+    let args: Vec<String> = vec!["--yolo".into(), "--permission-mode".into(), "safe".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.permission_mode.as_deref(), Some("safe"));
+    assert!(!parsed.yolo);
+    assert_eq!(parsed.prompt, "hello");
 }
 
 #[test]
@@ -119,6 +148,7 @@ fn test_parse_control_tokens_in_any_order() {
     assert_eq!(parsed.runner.as_deref(), Some("cc"));
     assert_eq!(parsed.thinking, Some(3));
     assert!(parsed.yolo);
+    assert_eq!(parsed.permission_mode.as_deref(), Some("yolo"));
     assert_eq!(parsed.provider.as_deref(), Some("anthropic"));
     assert_eq!(parsed.model.as_deref(), Some("claude-4"));
     assert_eq!(parsed.alias.as_deref(), Some("fast"));
@@ -149,6 +179,14 @@ fn test_parse_double_dash_forces_literal_prompt() {
     let parsed = parse_args(&args);
     assert!(parsed.yolo);
     assert_eq!(parsed.prompt, "+1 @agent :model");
+}
+
+#[test]
+fn test_parse_permission_mode_missing_value_errors_in_resolve() {
+    let args: Vec<String> = vec!["--permission-mode".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.permission_mode.as_deref(), Some(""));
+    assert!(resolve_command(&parsed, None).is_err());
 }
 
 #[test]
@@ -683,4 +721,134 @@ fn test_resolve_yolo_for_roocode_warns() {
         warnings,
         vec!["warning: runner \"roocode\" yolo mode is unverified; ignoring --yolo".to_string()]
     );
+}
+
+#[test]
+fn test_resolve_permission_mode_safe_for_claude() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        permission_mode: Some("safe".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv[..4],
+        [
+            "claude".to_string(),
+            "-p".to_string(),
+            "--permission-mode".to_string(),
+            "default".to_string()
+        ]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_permission_mode_auto_for_claude() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        permission_mode: Some("auto".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv[..4],
+        [
+            "claude".to_string(),
+            "-p".to_string(),
+            "--permission-mode".to_string(),
+            "auto".to_string()
+        ]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_permission_mode_auto_for_codex() {
+    let parsed = ParsedArgs {
+        runner: Some("c".into()),
+        permission_mode: Some("auto".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv[..3],
+        ["codex".to_string(), "exec".to_string(), "--full-auto".to_string()]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_permission_mode_plan_for_claude() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        permission_mode: Some("plan".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv[..4],
+        [
+            "claude".to_string(),
+            "-p".to_string(),
+            "--permission-mode".to_string(),
+            "plan".to_string()
+        ]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_permission_mode_plan_for_kimi() {
+    let parsed = ParsedArgs {
+        runner: Some("k".into()),
+        permission_mode: Some("plan".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[..2], ["kimi".to_string(), "--plan".to_string()]);
+    assert_eq!(
+        argv[argv.len() - 2..],
+        ["--prompt".to_string(), "hello".to_string()]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_permission_mode_auto_warns_for_kimi() {
+    let parsed = ParsedArgs {
+        runner: Some("k".into()),
+        permission_mode: Some("auto".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv,
+        [
+            "kimi".to_string(),
+            "--prompt".to_string(),
+            "hello".to_string()
+        ]
+    );
+    assert_eq!(
+        warnings,
+        vec!["warning: runner \"k\" does not support permission mode \"auto\"; ignoring it".to_string()]
+    );
+}
+
+#[test]
+fn test_resolve_invalid_permission_mode_errors() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        permission_mode: Some("wild".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    assert!(resolve_command(&parsed, None).is_err());
 }

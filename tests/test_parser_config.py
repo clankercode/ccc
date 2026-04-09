@@ -21,6 +21,7 @@ class ParseArgsTests(unittest.TestCase):
         self.assertIsNone(parsed.thinking)
         self.assertIsNone(parsed.show_thinking)
         self.assertFalse(parsed.yolo)
+        self.assertIsNone(parsed.permission_mode)
         self.assertIsNone(parsed.provider)
         self.assertIsNone(parsed.model)
         self.assertIsNone(parsed.alias)
@@ -91,6 +92,7 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(parsed.runner, "cc")
         self.assertEqual(parsed.thinking, 3)
         self.assertTrue(parsed.yolo)
+        self.assertEqual(parsed.permission_mode, "yolo")
         self.assertEqual(parsed.provider, "anthropic")
         self.assertEqual(parsed.model, "claude-4")
         self.assertEqual(parsed.alias, "fast")
@@ -119,7 +121,25 @@ class ParseArgsTests(unittest.TestCase):
             with self.subTest(token=token):
                 parsed = parse_args([token, "hello"])
                 self.assertTrue(parsed.yolo)
+                self.assertEqual(parsed.permission_mode, "yolo")
                 self.assertEqual(parsed.prompt, "hello")
+
+    def test_permission_mode_flag(self):
+        parsed = parse_args(["--permission-mode", "auto", "hello"])
+        self.assertEqual(parsed.permission_mode, "auto")
+        self.assertFalse(parsed.yolo)
+        self.assertEqual(parsed.prompt, "hello")
+
+    def test_permission_mode_yolo_sets_yolo(self):
+        parsed = parse_args(["--permission-mode", "yolo", "hello"])
+        self.assertEqual(parsed.permission_mode, "yolo")
+        self.assertTrue(parsed.yolo)
+
+    def test_permission_mode_last_wins_over_yolo_sugar(self):
+        parsed = parse_args(["--yolo", "--permission-mode", "safe", "hello"])
+        self.assertEqual(parsed.permission_mode, "safe")
+        self.assertFalse(parsed.yolo)
+        self.assertEqual(parsed.prompt, "hello")
 
     def test_control_tokens_can_appear_in_any_order(self):
         parsed = parse_args(
@@ -128,6 +148,7 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(parsed.runner, "cc")
         self.assertEqual(parsed.thinking, 3)
         self.assertTrue(parsed.yolo)
+        self.assertEqual(parsed.permission_mode, "yolo")
         self.assertEqual(parsed.provider, "anthropic")
         self.assertEqual(parsed.model, "claude-4")
         self.assertEqual(parsed.alias, "fast")
@@ -146,6 +167,12 @@ class ParseArgsTests(unittest.TestCase):
         parsed = parse_args(["-y", "--", "+1", "@agent", ":model"])
         self.assertTrue(parsed.yolo)
         self.assertEqual(parsed.prompt, "+1 @agent :model")
+
+    def test_permission_mode_missing_value_errors_in_resolve(self):
+        parsed = parse_args(["--permission-mode"])
+        self.assertEqual(parsed.permission_mode, "")
+        with self.assertRaises(ValueError):
+            resolve_command(parsed)
 
     def test_thinking_out_of_range_not_matched(self):
         parsed = parse_args(["+5", "hello"])
@@ -438,6 +465,51 @@ class ResolveCommandTests(unittest.TestCase):
             warnings,
             ['warning: runner "roocode" yolo mode is unverified; ignoring --yolo'],
         )
+
+    def test_permission_mode_safe_for_claude(self):
+        parsed = ParsedArgs(runner="cc", permission_mode="safe", prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[:4], ["claude", "-p", "--permission-mode", "default"])
+        self.assertEqual(warnings, [])
+
+    def test_permission_mode_auto_for_claude(self):
+        parsed = ParsedArgs(runner="cc", permission_mode="auto", prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[:4], ["claude", "-p", "--permission-mode", "auto"])
+        self.assertEqual(warnings, [])
+
+    def test_permission_mode_auto_for_codex(self):
+        parsed = ParsedArgs(runner="c", permission_mode="auto", prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[:3], ["codex", "exec", "--full-auto"])
+        self.assertEqual(warnings, [])
+
+    def test_permission_mode_plan_for_claude(self):
+        parsed = ParsedArgs(runner="cc", permission_mode="plan", prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[:4], ["claude", "-p", "--permission-mode", "plan"])
+        self.assertEqual(warnings, [])
+
+    def test_permission_mode_plan_for_kimi(self):
+        parsed = ParsedArgs(runner="k", permission_mode="plan", prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[:2], ["kimi", "--plan"])
+        self.assertEqual(argv[-2:], ["--prompt", "hello"])
+        self.assertEqual(warnings, [])
+
+    def test_permission_mode_auto_warns_for_kimi(self):
+        parsed = ParsedArgs(runner="k", permission_mode="auto", prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(argv, ["kimi", "--prompt", "hello"])
+        self.assertEqual(
+            warnings,
+            ['warning: runner "k" does not support permission mode "auto"; ignoring it'],
+        )
+
+    def test_invalid_permission_mode_raises(self):
+        parsed = ParsedArgs(runner="cc", permission_mode="wild", prompt="hello")
+        with self.assertRaises(ValueError):
+            resolve_command(parsed)
 
 
 class LoadConfigTests(unittest.TestCase):

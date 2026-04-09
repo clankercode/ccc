@@ -16,6 +16,7 @@ fn test_help_mentions_name_slot() {
     assert!(stdout.contains(
         "--show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it"
     ));
+    assert!(stdout.contains("--permission-mode <safe|auto|yolo|plan>"));
     assert!(stdout.contains("--yolo / -y"));
     assert!(stdout.contains("Treat all remaining args as prompt text"));
     assert!(stdout.contains("show_thinking"));

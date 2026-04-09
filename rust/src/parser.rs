@@ -116,6 +116,14 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         model_flag: "--model".into(),
         agent_flag: String::new(),
     };
+    let roocode = RunnerInfo {
+        binary: "roocode".into(),
+        extra_args: vec![],
+        thinking_flags: BTreeMap::new(),
+        provider_flag: String::new(),
+        model_flag: String::new(),
+        agent_flag: String::new(),
+    };
     let crush = RunnerInfo {
         binary: "crush".into(),
         extra_args: vec![],
@@ -129,45 +137,31 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let kimi_clone = kimi.clone();
     let opencode_clone = opencode.clone();
 
+    let codex_clone = codex.clone();
+    let roocode_clone = roocode.clone();
+    let crush_clone = crush.clone();
+
     m.insert("opencode".into(), opencode);
     m.insert("claude".into(), claude);
     m.insert("kimi".into(), kimi);
     m.insert("codex".into(), codex);
+    m.insert("roocode".into(), roocode);
     m.insert("crush".into(), crush);
 
     m.insert("oc".into(), opencode_clone);
     m.insert("cc".into(), claude_clone.clone());
-    m.insert("c".into(), claude_clone);
+    m.insert("c".into(), codex_clone.clone());
+    m.insert("cx".into(), codex_clone);
     m.insert("k".into(), kimi_clone);
-    m.insert(
-        "rc".into(),
-        RunnerInfo {
-            binary: "codex".into(),
-            extra_args: vec![],
-            thinking_flags: BTreeMap::new(),
-            provider_flag: String::new(),
-            model_flag: "--model".into(),
-            agent_flag: String::new(),
-        },
-    );
-    m.insert(
-        "cr".into(),
-        RunnerInfo {
-            binary: "crush".into(),
-            extra_args: vec![],
-            thinking_flags: BTreeMap::new(),
-            provider_flag: String::new(),
-            model_flag: String::new(),
-            agent_flag: String::new(),
-        },
-    );
+    m.insert("rc".into(), roocode_clone.clone());
+    m.insert("cr".into(), crush_clone);
 
     RwLock::new(m)
 });
 
 static RUNNER_SELECTOR_STRS: &[&str] = &[
-    "oc", "cc", "c", "k", "rc", "cr", "codex", "claude", "opencode", "kimi", "roocode", "crush",
-    "pi",
+    "oc", "cc", "c", "cx", "k", "rc", "cr", "codex", "claude", "opencode", "kimi", "roocode",
+    "crush", "pi",
 ];
 
 fn is_runner_selector(s: &str) -> bool {

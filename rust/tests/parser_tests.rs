@@ -19,6 +19,22 @@ fn test_parse_runner_selector() {
 }
 
 #[test]
+fn test_parse_runner_selector_codex_c() {
+    let args: Vec<String> = vec!["c".into(), "fix bug".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.runner.as_deref(), Some("c"));
+    assert_eq!(parsed.prompt, "fix bug");
+}
+
+#[test]
+fn test_parse_runner_selector_codex_cx() {
+    let args: Vec<String> = vec!["cx".into(), "fix bug".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.runner.as_deref(), Some("cx"));
+    assert_eq!(parsed.prompt, "fix bug");
+}
+
+#[test]
 fn test_parse_thinking_level() {
     let args: Vec<String> = vec!["+2".into(), "hello".into()];
     let parsed = parse_args(&args);
@@ -81,6 +97,42 @@ fn test_resolve_claude_runner() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(argv[0], "claude");
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_codex_runner_via_c() {
+    let parsed = ParsedArgs {
+        runner: Some("c".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[0], "codex");
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_codex_runner_via_cx() {
+    let parsed = ParsedArgs {
+        runner: Some("cx".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[0], "codex");
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_roocode_runner_via_rc() {
+    let parsed = ParsedArgs {
+        runner: Some("rc".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[0], "roocode");
     assert!(warnings.is_empty());
 }
 
@@ -206,7 +258,8 @@ fn test_resolve_agent_warning_when_runner_lacks_support() {
         prompt: "hello".into(),
         ..Default::default()
     };
-    let (_, _, warnings) = resolve_command(&parsed, None).unwrap();
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[0], "roocode");
     assert_eq!(
         warnings,
         vec![

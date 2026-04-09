@@ -15,6 +15,9 @@ fn test_help_mentions_name_slot() {
     assert!(stdout.contains(
         "@name         Use a named preset from config; if no preset exists, treat it as an agent"
     ));
+    assert!(stdout.contains(
+        "opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)"
+    ));
 }
 
 #[test]

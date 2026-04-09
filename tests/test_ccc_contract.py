@@ -21,6 +21,7 @@ class CccContractTests(unittest.TestCase):
 
             env = os.environ.copy()
             env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+            env["LC_ALL"] = "C"
             env["PERL_BADLANG"] = "0"
 
             self.assert_equal_output(
@@ -317,6 +318,7 @@ class CccContractTests(unittest.TestCase):
 
             env = os.environ.copy()
             env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+            env["LC_ALL"] = "C"
             env["PERL_BADLANG"] = "0"
 
             self.assert_rejects_empty(
@@ -565,6 +567,7 @@ class CccContractTests(unittest.TestCase):
 
             env = os.environ.copy()
             env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+            env["LC_ALL"] = "C"
             env["PERL_BADLANG"] = "0"
 
             self.assert_rejects_missing_prompt(
@@ -809,6 +812,7 @@ class CccContractTests(unittest.TestCase):
 
             env = os.environ.copy()
             env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+            env["LC_ALL"] = "C"
             env["PERL_BADLANG"] = "0"
             whitespace_prompt = "   "
 

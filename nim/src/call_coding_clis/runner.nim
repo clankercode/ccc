@@ -48,7 +48,7 @@ proc defaultRun(spec: CommandSpec): CompletedRun =
       let inp = p.inputStream()
       inp.write(spec.stdinText.get())
       inp.flush()
-    p.closeStdin()
+      close(inp)
 
     let outStrm = p.outputStream()
     let errStrm = p.errorStream()

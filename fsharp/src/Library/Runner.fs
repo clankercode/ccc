@@ -37,8 +37,19 @@ module ProcessRunner =
             spec.StdinText |> Option.iter (fun text ->
                 proc.StandardInput.Write text
                 proc.StandardInput.Close())
-            let stdout = proc.StandardOutput.ReadToEnd()
-            let stderr = proc.StandardError.ReadToEnd()
+            
+            // Read stdout and stderr concurrently to avoid deadlock
+            let stdoutTask = async {
+                return proc.StandardOutput.ReadToEnd()
+            }
+            let stderrTask = async {
+                return proc.StandardError.ReadToEnd()
+            }
+            
+            let results = Async.RunSynchronously (Async.Parallel([stdoutTask; stderrTask]))
+            let stdout = results.[0]
+            let stderr = results.[1]
+            
             proc.WaitForExit()
             { Argv = spec.Argv
               ExitCode = proc.ExitCode

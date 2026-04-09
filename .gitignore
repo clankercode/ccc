@@ -60,3 +60,10 @@ elixir/deps/
 .headless-*
 .worktrees/
 haskell/ccc
+*.dump
+tmp/
+.zig-cache*
+.tmp/
+nim/tests/test_cli
+nim/tests/test_config
+nim/tests/test_help

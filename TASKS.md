@@ -9,9 +9,6 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
 - [ ] Keep `docs/clis/model-capabilities.json` current as new models land
   - Refresh `opencode models` snapshots when auth-scoped inventories change.
   - Smoke-test representative cheap routes before updating normalized entries.
-- [ ] Expand `--permission-mode` mappings only where the upstream CLI surface is honest
-  - Prefer runner-native flags and config over invented parity.
-  - Document unsupported cases explicitly.
 - [ ] Review and prune stale roadmap items in per-language `PLAN.md` files
   - Fold completed work into the main docs.
   - Keep the remaining plan items focused on actual open work.

@@ -1012,6 +1012,49 @@ fn test_resolve_permission_mode_safe_for_claude() {
 }
 
 #[test]
+fn test_resolve_permission_mode_safe_for_opencode_uses_ask_override() {
+    let parsed = ParsedArgs {
+        runner: Some("oc".into()),
+        permission_mode: Some("safe".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, env, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv,
+        [
+            "opencode".to_string(),
+            "run".to_string(),
+            "hello".to_string()
+        ]
+    );
+    assert_eq!(
+        env.get("OPENCODE_CONFIG_CONTENT").map(|s| s.as_str()),
+        Some("{\"permission\":\"ask\"}")
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_permission_mode_safe_for_roocode_warns() {
+    let parsed = ParsedArgs {
+        runner: Some("rc".into()),
+        permission_mode: Some("safe".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv, ["roocode".to_string(), "hello".to_string()]);
+    assert_eq!(
+        warnings,
+        vec![
+            "warning: runner \"roocode\" safe mode is unverified; leaving default permissions unchanged"
+                .to_string()
+        ]
+    );
+}
+
+#[test]
 fn test_resolve_permission_mode_auto_for_claude() {
     let parsed = ParsedArgs {
         runner: Some("cc".into()),

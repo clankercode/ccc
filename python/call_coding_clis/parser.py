@@ -508,6 +508,12 @@ def resolve_command(
     if effective_permission_mode == "safe":
         if effective_runner_name in {"cc", "claude"}:
             argv.extend(["--permission-mode", "default"])
+        elif effective_runner_name in {"oc", "opencode"}:
+            env_overrides["OPENCODE_CONFIG_CONTENT"] = '{"permission":"ask"}'
+        elif effective_runner_name in {"rc", "roocode"}:
+            warnings.append(
+                'warning: runner "roocode" safe mode is unverified; leaving default permissions unchanged'
+            )
     elif effective_permission_mode == "auto":
         if effective_runner_name in {"cc", "claude"}:
             argv.extend(["--permission-mode", "auto"])

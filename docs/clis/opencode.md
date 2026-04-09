@@ -48,6 +48,7 @@ Documented upstream controls:
 
 What this means for `ccc`:
 
+- a conservative safe mode can map honestly to `OPENCODE_CONFIG_CONTENT='{"permission":"ask"}'`
 - a simple yolo mode maps cleanly to `OPENCODE_CONFIG_CONTENT='{"permission":"allow"}'`
 - finer-grained profiles are realistic here
 - per-tool allow/ask/deny could be exposed later, but only as an OpenCode-specific feature unless other runners catch up

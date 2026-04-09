@@ -78,11 +78,11 @@ If you update thinking-capability notes, follow [updating-model-capabilities.md]
 
 ## Current Cross-Runner Permission Modes
 
-Python and Rust now implement `--permission-mode <safe|auto|yolo|plan>` with partial runner-specific mappings.
+Python and Rust now implement `--permission-mode <safe|auto|yolo|plan>` with partial runner-specific mappings. The matrix below distinguishes explicit upstream controls from honest default passthroughs and unverified cases that warn.
 
 | Proposed `ccc` mode | OpenCode | Claude | Codex | Kimi | Crush | RooCode |
 |---|---|---|---|---|---|---|
-| `safe` | default / ask-oriented config | default or `--permission-mode default` | default | default | default | unverified |
+| `safe` | `OPENCODE_CONFIG_CONTENT='{"permission":"ask"}'` | `--permission-mode default` | leave default permissions unchanged | leave default permissions unchanged | leave default permissions unchanged | unverified; warn and leave defaults |
 | `auto` | likely config-driven `ask`/`allow` mix | `--permission-mode auto` | `--full-auto` | no honest mapping yet | no honest mapping yet | unverified |
 | `yolo` | `OPENCODE_CONFIG_CONTENT='{"permission":"allow"}'` | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--yolo` | unsupported in `run`; warn | unverified; warn |
 | `plan` | no verified equivalent yet | `--permission-mode plan` | no verified equivalent yet | `--plan` | no verified equivalent yet | unverified |

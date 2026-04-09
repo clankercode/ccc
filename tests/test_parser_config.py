@@ -568,6 +568,22 @@ class ResolveCommandTests(unittest.TestCase):
         self.assertEqual(argv[:4], ["claude", "-p", "--permission-mode", "default"])
         self.assertEqual(warnings, [])
 
+    def test_permission_mode_safe_for_opencode_uses_ask_override(self):
+        parsed = ParsedArgs(runner="oc", permission_mode="safe", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(argv, ["opencode", "run", "hello"])
+        self.assertEqual(env["OPENCODE_CONFIG_CONTENT"], '{"permission":"ask"}')
+        self.assertEqual(warnings, [])
+
+    def test_permission_mode_safe_for_roocode_warns(self):
+        parsed = ParsedArgs(runner="rc", permission_mode="safe", prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(argv, ["roocode", "hello"])
+        self.assertEqual(
+            warnings,
+            ['warning: runner "roocode" safe mode is unverified; leaving default permissions unchanged'],
+        )
+
     def test_permission_mode_auto_for_claude(self):
         parsed = ParsedArgs(runner="cc", permission_mode="auto", prompt="hello")
         argv, _env, warnings = resolve_command(parsed)

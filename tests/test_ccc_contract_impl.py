@@ -510,14 +510,22 @@ class SingleImplCccContractTests(unittest.TestCase):
             codex_path = bin_dir / "codex"
             kimi_path = bin_dir / "kimi"
             opencode_path = bin_dir / "opencode"
+            roocode_path = bin_dir / "roocode"
             self._write_argv_echo_stub(claude_path, "claude")
             self._write_argv_echo_stub(codex_path, "codex")
             self._write_argv_echo_stub(kimi_path, "kimi")
-            self._write_argv_echo_stub(opencode_path, "opencode")
+            self._write_opencode_yolo_stub(opencode_path)
+            self._write_argv_echo_stub(roocode_path, "roocode")
 
             cases = {
                 "Python": [
                     (["cc", "--permission-mode", "safe"], "claude -p --permission-mode default Fix the failing tests\n", ""),
+                    (["oc", "--permission-mode", "safe"], "opencode run Fix the failing tests\n", '{"permission":"ask"}'),
+                    (
+                        ["rc", "--permission-mode", "safe"],
+                        "roocode Fix the failing tests\n",
+                        'warning: runner "roocode" safe mode is unverified; leaving default permissions unchanged\n',
+                    ),
                     (["cc", "--permission-mode", "auto"], "claude -p --permission-mode auto Fix the failing tests\n", ""),
                     (["c", "--permission-mode", "auto"], "codex exec --full-auto Fix the failing tests\n", ""),
                     (["cc", "--permission-mode", "plan"], "claude -p --permission-mode plan Fix the failing tests\n", ""),
@@ -530,6 +538,12 @@ class SingleImplCccContractTests(unittest.TestCase):
                 ],
                 "Rust": [
                     (["cc", "--permission-mode", "safe"], "claude -p --permission-mode default Fix the failing tests\n", ""),
+                    (["oc", "--permission-mode", "safe"], "opencode run Fix the failing tests\n", '{"permission":"ask"}'),
+                    (
+                        ["rc", "--permission-mode", "safe"],
+                        "roocode Fix the failing tests\n",
+                        'warning: runner "roocode" safe mode is unverified; leaving default permissions unchanged\n',
+                    ),
                     (["cc", "--permission-mode", "auto"], "claude -p --permission-mode auto Fix the failing tests\n", ""),
                     (["c", "--permission-mode", "auto"], "codex exec --full-auto Fix the failing tests\n", ""),
                     (["cc", "--permission-mode", "plan"], "claude -p --permission-mode plan Fix the failing tests\n", ""),

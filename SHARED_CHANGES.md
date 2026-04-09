@@ -22,6 +22,15 @@ Entry format:
 
 ## 2026-04-10
 
+### Permission-mode mappings were narrowed to honest upstream controls in Python and Rust
+- Change: Python and Rust now treat `--permission-mode safe` as an explicit OpenCode ask override, keep Claude on `--permission-mode default`, leave coarse default-only runners unchanged, and warn for unverified RooCode safe-mode requests instead of implying broader parity
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `tests/test_ccc_contract_impl.py`, `rust/tests/parser_tests.rs`
+- Notes: updated `docs/clis/README.md`, `docs/clis/opencode.md`, and `docs/clis/roocode.md`; removed the completed permission-mode backlog item from `TASKS.md`
+
+## 2026-04-10
+
 ### Canonical `--print-config` added in Python and Rust
 - Change: Python and Rust now support `ccc --print-config`, which prints a stable generated example `config.toml`; the canonical config schema is now `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`, and the old legacy root-key fallbacks were removed from both implementations
 - Required implementations: Python and Rust

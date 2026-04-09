@@ -527,6 +527,16 @@ pub fn resolve_command(
         if matches!(effective_runner_name.as_str(), "cc" | "claude") {
             argv.push("--permission-mode".to_string());
             argv.push("default".to_string());
+        } else if matches!(effective_runner_name.as_str(), "oc" | "opencode") {
+            env_overrides.insert(
+                "OPENCODE_CONFIG_CONTENT".to_string(),
+                "{\"permission\":\"ask\"}".to_string(),
+            );
+        } else if matches!(effective_runner_name.as_str(), "rc" | "roocode") {
+            warnings.push(
+                "warning: runner \"roocode\" safe mode is unverified; leaving default permissions unchanged"
+                    .to_string(),
+            );
         }
     } else if matches!(effective_permission_mode.as_deref(), Some("auto")) {
         if matches!(effective_runner_name.as_str(), "cc" | "claude") {

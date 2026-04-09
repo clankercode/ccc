@@ -18,6 +18,7 @@ Unverified locally.
 
 What this means for `ccc`:
 
+- safe mode should warn and leave defaults unchanged until the upstream CLI is verified directly
 - yolo support should remain unsupported for now
 - warnings are better than guessed flags
 - do not add fine-grained permission controls for RooCode until the upstream CLI is verified directly

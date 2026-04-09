@@ -2,11 +2,6 @@
 
 Living backlog of unfinished work. Completed items should move to `SHARED_CHANGES.md`, `FEATURES.md`, or the relevant feature docs.
 
-- [ ] Add a config option and CLI flag to strip disruptive OSC codes from human-facing output
-  - Preserve OSC 8 hyperlinks.
-  - Strip bells, title changes, and other terminal side effects that should not leak into text output.
-  - Wire the behavior through Python and Rust first, then propagate it to other implementations where applicable.
-  - Add tests for raw-output sanitization and real CLI smoke checks.
 - [ ] Add a `FORCE_COLORS` env var or document the current-client equivalent
   - Opposite of `NO_COLORS`: keep colors and emoji enabled even when streaming or when the terminal would normally disable them.
   - If upstream clients already have an equivalent, document the exact flags/env vars instead of inventing a second path.
@@ -31,3 +26,7 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
 - [ ] Decide whether structured output rendering needs templating or user customization
   - This is the `v2` rendering direction currently noted in `README.md`.
   - Keep the scope narrow unless there is a concrete user-facing need.
+- [ ] Support project-local config (e.g. `.config/ccc/config.toml` or `.ccc.toml` in CWD)
+  - Add a CWD-relative path to `_default_config_paths()` in `config.py`, checked before global paths.
+  - Allows repos to ship ccc presets (aliases, defaults) that apply when working in that repo.
+  - Merge order: project-local → XDG_CONFIG_HOME → ~/.config/ccc/config.toml.

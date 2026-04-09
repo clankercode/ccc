@@ -168,8 +168,9 @@ class ResolveCommandTests(unittest.TestCase):
     def test_max_for_kimi_uses_max_flag(self):
         parsed = parse_args(["k", "+max", "hello"])
         argv, _env, _warnings = resolve_command(parsed)
-        self.assertIn("--think", argv)
-        self.assertIn("max", argv)
+        self.assertEqual(argv[:2], ["kimi", "--thinking"])
+        self.assertNotIn("max", argv)
+        self.assertNotIn("--think", argv)
 
     def test_model_flag_for_claude(self):
         parsed = ParsedArgs(runner="cc", model="claude-4", prompt="hello")
@@ -237,14 +238,21 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(runner="k", alias="work", thinking=1, prompt="hello")
         argv, env, _warnings = resolve_command(parsed, config)
         self.assertEqual(argv[0], "kimi")
-        self.assertIn("--think", argv)
-        self.assertIn("low", argv)
+        self.assertEqual(argv[:2], ["kimi", "--thinking"])
+        self.assertNotIn("--think", argv)
 
     def test_kimi_thinking_flags(self):
         parsed = ParsedArgs(runner="k", thinking=4, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
-        self.assertIn("--think", argv)
-        self.assertIn("max", argv)
+        self.assertEqual(argv[:2], ["kimi", "--thinking"])
+        self.assertNotIn("max", argv)
+        self.assertNotIn("--think", argv)
+
+    def test_kimi_thinking_zero_uses_no_thinking(self):
+        parsed = ParsedArgs(runner="k", thinking=0, prompt="hello")
+        argv, env, _warnings = resolve_command(parsed)
+        self.assertEqual(argv[:2], ["kimi", "--no-thinking"])
+        self.assertNotIn("--thinking", argv)
 
     def test_alias_falls_back_to_agent_for_opencode(self):
         parsed = ParsedArgs(alias="reviewer", prompt="hello")

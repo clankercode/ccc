@@ -129,11 +129,11 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         extra_args: vec![],
         thinking_flags: {
             let mut tf = BTreeMap::new();
-            tf.insert(0, vec!["--no-think".into()]);
-            tf.insert(1, vec!["--think".into(), "low".into()]);
-            tf.insert(2, vec!["--think".into(), "medium".into()]);
-            tf.insert(3, vec!["--think".into(), "high".into()]);
-            tf.insert(4, vec!["--think".into(), "max".into()]);
+            tf.insert(0, vec!["--no-thinking".into()]);
+            tf.insert(1, vec!["--thinking".into()]);
+            tf.insert(2, vec!["--thinking".into()]);
+            tf.insert(3, vec!["--thinking".into()]);
+            tf.insert(4, vec!["--thinking".into()]);
             tf
         },
         provider_flag: String::new(),

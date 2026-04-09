@@ -174,6 +174,35 @@ fn test_resolve_thinking_zero_for_claude() {
 }
 
 #[test]
+fn test_resolve_kimi_thinking_flags() {
+    let parsed = ParsedArgs {
+        runner: Some("k".into()),
+        thinking: Some(4),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[..2], ["kimi".to_string(), "--thinking".to_string()]);
+    assert!(!argv.contains(&"--think".to_string()));
+    assert!(!argv.contains(&"max".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_kimi_thinking_zero() {
+    let parsed = ParsedArgs {
+        runner: Some("k".into()),
+        thinking: Some(0),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[..2], ["kimi".to_string(), "--no-thinking".to_string()]);
+    assert!(!argv.contains(&"--thinking".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
 fn test_resolve_model_flag() {
     let parsed = ParsedArgs {
         runner: Some("cc".into()),

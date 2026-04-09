@@ -31,6 +31,7 @@ Slots (in order):
                 opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)
   +thinking     Set thinking level: +0 (off) through +4 (max)
                 Claude maps +0 to --thinking disabled and +1..+4 to --thinking enabled with matching --effort
+                Kimi maps +0 to --no-thinking and +1..+4 to --thinking
   :provider:model  Override provider and model
   @name         Use a named preset from config; if no preset exists, treat it as an agent
 

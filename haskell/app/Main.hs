@@ -5,7 +5,6 @@ import CallCodingClis.Parser (parseArgs, resolveCommand)
 import CallCodingClis.PromptSpec (buildPromptSpec)
 import CallCodingClis.Runner (run)
 import CallCodingClis.Types
-import Data.List (intercalate)
 import Data.Map.Strict (toList)
 import System.Environment (getArgs, lookupEnv)
 import System.Exit (ExitCode(..), exitWith)
@@ -30,6 +29,9 @@ main = do
         exitWith (case crExitCode result of
                     0 -> ExitSuccess
                     n -> ExitFailure n)
+    [] -> do
+      hPutStrLn stderr "usage: ccc \"<Prompt>\""
+      exitWith (ExitFailure 1)
     _ -> do
       let parsed = parseArgs args
       config <- loadConfig Nothing

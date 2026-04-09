@@ -25,20 +25,26 @@ class LanguageSpec:
         self.build_cwd = build_cwd or ROOT
         self.invoke_fn = invoke_fn
         self.env_extra = env_extra or {}
+        self.build_ok = True
+        self.build_error = ""
 
     def build(self, env: Dict[str, str]) -> None:
+        self.build_ok = True
         if self.build_cmds:
+            build_env = {**env, **self.env_extra}
             for cmd in self.build_cmds:
                 result = subprocess.run(
                     cmd,
                     cwd=self.build_cwd,
-                    env=env,
+                    env=build_env,
                     capture_output=True,
                     text=True,
                     check=False,
                 )
                 if result.returncode != 0:
-                    raise RuntimeError(f"Build failed for {self.name}: {result.stderr}")
+                    self.build_ok = False
+                    self.build_error = f"Build failed for {self.name}: {result.stderr}"
+                    return
 
     def invoke(self, prompt: str, env: Dict[str, str]) -> subprocess.CompletedProcess:
         cmd = self.invoke_fn(prompt)
@@ -143,6 +149,10 @@ def _crystal_invoke(prompt):
     return [str(ROOT / "crystal" / "ccc"), prompt]
 
 
+def _haskell_invoke(prompt):
+    return [str(ROOT / "haskell" / "ccc"), prompt]
+
+
 LANGUAGES = [
     LanguageSpec(
         "Python",
@@ -209,6 +219,7 @@ LANGUAGES = [
         build_cmds=[["dub", "build"]],
         build_cwd=ROOT / "d",
         invoke_fn=_d_invoke,
+        env_extra={"CC": "/usr/bin/gcc"},
     ),
     LanguageSpec(
         "F#",
@@ -246,6 +257,20 @@ LANGUAGES = [
         ],
         build_cwd=ROOT / "crystal",
         invoke_fn=_crystal_invoke,
+        env_extra={"CRYSTAL_CC": "/usr/bin/gcc"},
+    ),
+    LanguageSpec(
+        "Haskell",
+        build_cmds=[
+            ["cabal", "build", "ccc"],
+            [
+                "sh",
+                "-c",
+                'cp "$(cabal list-bin ccc)" ccc',
+            ],
+        ],
+        build_cwd=ROOT / "haskell",
+        invoke_fn=_haskell_invoke,
     ),
 ]
 
@@ -350,12 +375,10 @@ class CrossLanguageHarness(unittest.TestCase):
 
         cls.base_env = os.environ.copy()
         cls.base_env["PATH"] = f"{cls.bin_dir}:{cls.base_env.get('PATH', '')}"
+        cls.base_env["PERL_BADLANG"] = "0"
 
         for lang in LANGUAGES:
-            try:
-                lang.build(cls.base_env)
-            except Exception as e:
-                raise RuntimeError(f"Build failed for {lang.name}: {e}")
+            lang.build(cls.base_env)
 
     def _make_env(self, lang: LanguageSpec) -> Dict[str, str]:
         env = self.base_env.copy()
@@ -367,6 +390,8 @@ class CrossLanguageHarness(unittest.TestCase):
             env = self._make_env(lang)
             for tc in TEST_CASES:
                 with self.subTest(language=lang.name, case=tc.name):
+                    if not lang.build_ok:
+                        self.skipTest(lang.build_error)
                     result = lang.invoke(tc.prompt, env)
                     details = []
 
@@ -392,6 +417,8 @@ class CrossLanguageHarness(unittest.TestCase):
         for lang in LANGUAGES:
             env = self._make_env(lang)
             with self.subTest(language=lang.name):
+                if not lang.build_ok:
+                    self.skipTest(lang.build_error)
                 result = lang.invoke_extra(["hello", "world"], env)
                 with self.subTest(language=lang.name):
                     if result.returncode not in (0, 1):

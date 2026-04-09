@@ -100,8 +100,8 @@
 | F14 Exit code fwd | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
 | F15 CCC_REAL_OPENCODE | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
 | F28 Unit tests | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
-| F29 Contract tests | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | yes | - | - | yes | - | yes |
-| F30 Harness tests | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | - | - | yes | - | - | yes | - | yes |
+| F29 Contract tests | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | - | yes | - | - | yes | - | yes |
+| F30 Harness tests | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | - | yes | - | - | yes | - | yes |
 
 ### v2 Parser/Config Features
 

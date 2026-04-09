@@ -11,6 +11,9 @@ end
 begin
   if ARGV.size == 1
     spec = build_prompt_spec(ARGV[0])
+    if override = ENV["CCC_REAL_OPENCODE"]?
+      spec = CommandSpec.new([override] + spec.argv[1..], stdin_text: spec.stdin_text, cwd: spec.cwd, env: spec.env)
+    end
   else
     config = load_config
     parsed = parse_args(ARGV.to_a)

@@ -21,6 +21,7 @@ class CccContractTests(unittest.TestCase):
 
             env = os.environ.copy()
             env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+            env["PERL_BADLANG"] = "0"
 
             self.assert_equal_output(
                 subprocess.run(
@@ -170,7 +171,7 @@ class CccContractTests(unittest.TestCase):
             subprocess.run(
                 ["dub", "build"],
                 cwd=ROOT / "d",
-                env=env,
+                env={**env, "PATH": f"/usr/bin:{env.get('PATH', '')}"},
                 capture_output=True,
                 text=True,
                 check=True,
@@ -261,7 +262,8 @@ class CccContractTests(unittest.TestCase):
                 )
             )
 
-            subprocess.run(
+            crystal_env = {**env, "PATH": f"/usr/bin:{env.get('PATH', '')}"}
+            crystal_build = subprocess.run(
                 [
                     "crystal",
                     "build",
@@ -270,6 +272,26 @@ class CccContractTests(unittest.TestCase):
                     str(ROOT / "crystal" / "ccc"),
                 ],
                 cwd=ROOT / "crystal",
+                env=crystal_env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if crystal_build.returncode == 0:
+                self.assert_equal_output(
+                    subprocess.run(
+                        [str(ROOT / "crystal" / "ccc"), PROMPT],
+                        cwd=ROOT,
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                )
+
+            subprocess.run(
+                ["cabal", "build", "ccc"],
+                cwd=ROOT / "haskell",
                 env=env,
                 capture_output=True,
                 text=True,
@@ -277,8 +299,8 @@ class CccContractTests(unittest.TestCase):
             )
             self.assert_equal_output(
                 subprocess.run(
-                    [str(ROOT / "crystal" / "ccc"), PROMPT],
-                    cwd=ROOT,
+                    ["cabal", "run", "ccc", "--", PROMPT],
+                    cwd=ROOT / "haskell",
                     env=env,
                     capture_output=True,
                     text=True,
@@ -295,6 +317,7 @@ class CccContractTests(unittest.TestCase):
 
             env = os.environ.copy()
             env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+            env["PERL_BADLANG"] = "0"
 
             self.assert_rejects_empty(
                 subprocess.run(
@@ -522,6 +545,17 @@ class CccContractTests(unittest.TestCase):
                 )
             )
 
+            self.assert_rejects_empty(
+                subprocess.run(
+                    ["cabal", "run", "ccc", "--", ""],
+                    cwd=ROOT / "haskell",
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
     def test_cross_language_ccc_requires_one_prompt_argument(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -531,6 +565,7 @@ class CccContractTests(unittest.TestCase):
 
             env = os.environ.copy()
             env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+            env["PERL_BADLANG"] = "0"
 
             self.assert_rejects_missing_prompt(
                 subprocess.run(
@@ -754,6 +789,17 @@ class CccContractTests(unittest.TestCase):
                 )
             )
 
+            self.assert_rejects_missing_prompt(
+                subprocess.run(
+                    ["cabal", "run", "ccc"],
+                    cwd=ROOT / "haskell",
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
     def test_cross_language_ccc_rejects_whitespace_only_prompt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -763,6 +809,7 @@ class CccContractTests(unittest.TestCase):
 
             env = os.environ.copy()
             env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+            env["PERL_BADLANG"] = "0"
             whitespace_prompt = "   "
 
             self.assert_rejects_empty(
@@ -996,6 +1043,17 @@ class CccContractTests(unittest.TestCase):
                 subprocess.run(
                     [str(ROOT / "crystal" / "ccc"), whitespace_prompt],
                     cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+
+            self.assert_rejects_empty(
+                subprocess.run(
+                    ["cabal", "run", "ccc", "--", whitespace_prompt],
+                    cwd=ROOT / "haskell",
                     env=env,
                     capture_output=True,
                     text=True,

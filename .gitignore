@@ -56,3 +56,4 @@ nim/tests/test_runner
 _build/
 MICROPLAN.md
 elixir/deps/
+.subagent-logs/

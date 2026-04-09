@@ -96,12 +96,12 @@ run_test "zig: zig build test" \
 
 printf "\n${BOLD}[10/22] Crystal — unit tests${RESET}\n"
 run_test "crystal: crystal spec" \
-    "(cd crystal && crystal spec 2>&1)" \
+    "(cd crystal && PATH=/usr/bin:$PATH crystal spec 2>&1)" \
     "$TMPDIR/crystal_unit.log"
 
 printf "\n${BOLD}[11/22] D — unit tests${RESET}\n"
 run_test "d: dub test" \
-    "(cd d && dub test 2>&1)" \
+    "(cd d && PATH=/usr/bin:$PATH dub test 2>&1)" \
     "$TMPDIR/d_unit.log"
 
 printf "\n${BOLD}[12/22] F# — unit tests${RESET}\n"
@@ -115,7 +115,9 @@ run_test "php: test suite" \
     "$TMPDIR/php_unit.log"
 
 printf "\n${BOLD}[14/22] PureScript — unit tests${RESET}\n"
-skip_test "purescript: spago test" "purs compiler not installed"
+run_test "purescript: spago test" \
+    "(cd purescript && spago test 2>&1)" \
+    "$TMPDIR/purescript_unit.log"
 
 printf "\n${BOLD}[15/22] x86-64 ASM — tests${RESET}\n"
 run_test "asm: test_ccc.sh" \
@@ -133,21 +135,25 @@ run_test "elixir: mix test" \
     "$TMPDIR/elixir_unit.log"
 
 printf "\n${BOLD}[18/22] Nim — unit tests${RESET}\n"
-skip_test "nim: test suite" "nim compiler not installed"
+run_test "nim: test suite" \
+    "(cd nim && for t in tests/test_*.nim; do PATH=/usr/bin:/home/xertrov/.nimble/bin:$PATH nim c -r --path:src --path:. \"\$t\" 2>&1; done)" \
+    "$TMPDIR/nim_unit.log"
 
 printf "\n${BOLD}[19/22] Haskell — unit tests${RESET}\n"
-skip_test "haskell: cabal test" "cabal/ghc not installed"
+run_test "haskell: cabal test" \
+    "(cd haskell && cabal test call-coding-clis-test 2>&1)" \
+    "$TMPDIR/haskell_unit.log"
 
 printf "\n${BOLD}[20/22] VBScript — unit tests${RESET}\n"
 skip_test "vbscript: test suite" "Windows only"
 
 printf "\n${BOLD}[21/22] Cross-language contract tests${RESET}\n"
-run_test "contract: ccc CLI behavior (15 languages)" \
+run_test "contract: ccc CLI behavior (16 languages)" \
     "PYTHONPATH=python python3 -m unittest tests.test_ccc_contract -v 2>&1" \
     "$TMPDIR/contract.log"
 
 printf "\n${BOLD}[22/22] Cross-language harness (mock-coding-cli)${RESET}\n"
-run_test "harness: mock binary behavior (15 langs × 9 cases)" \
+run_test "harness: mock binary behavior (16 langs × 9 cases)" \
     "PYTHONPATH=python python3 -m unittest tests.test_harness -v 2>&1" \
     "$TMPDIR/harness.log"
 

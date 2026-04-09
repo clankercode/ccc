@@ -159,8 +159,7 @@ TEST_F(ResolveCommandTest, CodexRunnerAliasC) {
     parsed.runner = "c";
     parsed.prompt = "hello";
     auto [argv, env, warnings] = resolveCommand(parsed);
-    EXPECT_EQ(argv[0], "codex");
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "hello"), argv.end());
+    EXPECT_EQ(argv, (std::vector<std::string>{"codex", "exec", "hello"}));
 }
 
 TEST_F(ResolveCommandTest, CodexRunnerAliasCx) {
@@ -168,8 +167,17 @@ TEST_F(ResolveCommandTest, CodexRunnerAliasCx) {
     parsed.runner = "cx";
     parsed.prompt = "hello";
     auto [argv, env, warnings] = resolveCommand(parsed);
-    EXPECT_EQ(argv[0], "codex");
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "hello"), argv.end());
+    EXPECT_EQ(argv, (std::vector<std::string>{"codex", "exec", "hello"}));
+}
+
+TEST_F(ResolveCommandTest, CodexRunnerAliasCWithModel) {
+    ParsedArgs parsed;
+    parsed.runner = "c";
+    parsed.model = "gpt-5.4-mini";
+    parsed.prompt = "hello";
+    auto [argv, env, warnings] = resolveCommand(parsed);
+    EXPECT_EQ(argv, (std::vector<std::string>{
+                          "codex", "exec", "--model", "gpt-5.4-mini", "hello"}));
 }
 
 TEST_F(ResolveCommandTest, RoocodeRunnerAliasRc) {
@@ -387,6 +395,9 @@ TEST_F(RegistryTest, AbbreviationsShareBinary) {
     EXPECT_EQ(reg.at("cx").binary, reg.at("codex").binary);
     EXPECT_EQ(reg.at("k").binary, reg.at("kimi").binary);
     EXPECT_EQ(reg.at("rc").binary, reg.at("roocode").binary);
+    EXPECT_EQ(reg.at("codex").extra_args, (std::vector<std::string>{"exec"}));
+    EXPECT_EQ(reg.at("c").extra_args, (std::vector<std::string>{"exec"}));
+    EXPECT_EQ(reg.at("cx").extra_args, (std::vector<std::string>{"exec"}));
 }
 
 TEST_F(RegistryTest, AgentFlagsAreRegisteredWhereSupported) {

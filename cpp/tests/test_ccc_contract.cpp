@@ -46,7 +46,9 @@ static fs::path write_codex_stub(const fs::path& dir) {
     auto stub = dir / "codex";
     std::ofstream f(stub);
     f << "#!/bin/sh\n"
-      << "printf 'codex %s\\n' \"$1\"\n";
+      << "if [ \"$1\" != \"exec\" ]; then exit 9; fi\n"
+      << "shift\n"
+      << "printf 'codex exec %s\\n' \"$1\"\n";
     f.close();
     fs::permissions(stub,
         fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
@@ -203,7 +205,7 @@ TEST_F(CccContract, RunnerCAliasesToCodex) {
         {"XDG_CONFIG_HOME", (tmp_dir / "xdg").string()},
     });
     EXPECT_EQ(result.exit_code, 0);
-    EXPECT_EQ(result.stdout_text, "codex Fix the failing tests\n");
+    EXPECT_EQ(result.stdout_text, "codex exec Fix the failing tests\n");
     EXPECT_TRUE(result.stderr_text.empty());
 }
 
@@ -220,7 +222,7 @@ TEST_F(CccContract, RunnerCxAliasesToCodex) {
         {"XDG_CONFIG_HOME", (tmp_dir / "xdg").string()},
     });
     EXPECT_EQ(result.exit_code, 0);
-    EXPECT_EQ(result.stdout_text, "codex Fix the failing tests\n");
+    EXPECT_EQ(result.stdout_text, "codex exec Fix the failing tests\n");
     EXPECT_TRUE(result.stderr_text.empty());
 }
 

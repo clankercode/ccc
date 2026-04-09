@@ -31,7 +31,7 @@ static const std::map<std::string, RunnerInfo>& initRunnerRegistry() {
                         "", "--model", "--agent"};
         r["kimi"] = kimi;
 
-        RunnerInfo codex{"codex", {}, {}, "", "--model", ""};
+        RunnerInfo codex{"codex", {"exec"}, {}, "", "--model", ""};
         r["codex"] = codex;
 
         RunnerInfo roocode{"roocode", {}, {}, "", "--model", ""};

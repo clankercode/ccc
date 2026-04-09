@@ -2,6 +2,7 @@ import subprocess
 import unittest
 from unittest import mock
 from call_coding_clis.cli import (
+    _apply_real_runner_override,
     _filtered_human_stderr,
     _sanitize_human_output,
     _sanitize_raw_output,
@@ -145,6 +146,22 @@ class RunnerTests(unittest.TestCase):
         spec = build_prompt_spec("Fix the failing tests")
 
         self.assertEqual(spec.argv, ["opencode", "run", "Fix the failing tests"])
+
+    def test_apply_real_runner_override_for_claude(self) -> None:
+        from call_coding_clis import CommandSpec
+
+        spec = CommandSpec(argv=["claude", "-p", "hello"])
+        with mock.patch.dict("os.environ", {"CCC_REAL_CLAUDE": "/tmp/mock-claude"}):
+            _apply_real_runner_override(spec)
+        self.assertEqual(spec.argv[0], "/tmp/mock-claude")
+
+    def test_apply_real_runner_override_for_kimi(self) -> None:
+        from call_coding_clis import CommandSpec
+
+        spec = CommandSpec(argv=["kimi", "--prompt", "hello"])
+        with mock.patch.dict("os.environ", {"CCC_REAL_KIMI": "/tmp/mock-kimi"}):
+            _apply_real_runner_override(spec)
+        self.assertEqual(spec.argv[0], "/tmp/mock-kimi")
 
     def test_ccc_rejects_empty_prompt(self) -> None:
         from call_coding_clis.cli import build_prompt_spec

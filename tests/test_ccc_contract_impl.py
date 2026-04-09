@@ -19,6 +19,8 @@ CONFIG_DEFAULT_RUNNER_EXPECTED = f"claude -p {PROMPT}\n"
 AGENT_FALLBACK_EXPECTED = f"opencode run --agent reviewer {PROMPT}\n"
 PRESET_AGENT_EXPECTED = f"opencode run --agent specialist {PROMPT}\n"
 CODEX_RUNNER_EXPECTED = f"codex exec {PROMPT}\n"
+CLAUDE_RUNNER_EXPECTED = f"claude -p {PROMPT}\n"
+KIMI_RUNNER_EXPECTED = f"kimi --prompt {PROMPT}\n"
 HELP_USAGE_LINE = 'ccc [controls...] "<Prompt>"'
 HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
@@ -180,6 +182,44 @@ class SingleImplCccContractTests(unittest.TestCase):
         self._run_with_configured_runner_assertion(
             self.assert_uses_configured_default_runner
         )
+
+    def test_env_override_can_replace_claude_binary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            claude_path = bin_dir / "claude-mock"
+            self._write_opencode_stub(opencode_path)
+            self._write_runner_stub(claude_path, "claude")
+
+            for lang in self.selected_languages:
+                with self.subTest(language=lang.name, env="CCC_REAL_CLAUDE"):
+                    env = self._make_env(opencode_path, lang)
+                    env["CCC_REAL_CLAUDE"] = str(claude_path)
+                    result = lang.invoke_extra(["cc", PROMPT], env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, CLAUDE_RUNNER_EXPECTED)
+                    self.assertEqual(result.stderr, "")
+
+    def test_env_override_can_replace_kimi_binary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            kimi_path = bin_dir / "kimi-mock"
+            self._write_opencode_stub(opencode_path)
+            self._write_runner_stub(kimi_path, "kimi")
+
+            for lang in self.selected_languages:
+                with self.subTest(language=lang.name, env="CCC_REAL_KIMI"):
+                    env = self._make_env(opencode_path, lang)
+                    env["CCC_REAL_KIMI"] = str(kimi_path)
+                    result = lang.invoke_extra(["k", PROMPT], env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, KIMI_RUNNER_EXPECTED)
+                    self.assertEqual(result.stderr, "")
 
     def test_name_without_preset_falls_back_to_agent(self) -> None:
         self._run_with_agent_stub_extra_args_assertion(

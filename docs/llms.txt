@@ -31,14 +31,20 @@ Examples:
 
 Implemented in: Python, Rust, TypeScript, C, Go, Ruby, Perl, C++, Zig, D, F#, Haskell, Nim, Crystal, PHP, PureScript, Elixir, OCaml, VBScript, x86-64 ASM.
 
-All implementations share: build_prompt_spec, CommandSpec, CompletedRun, Runner.run, ccc CLI, prompt trimming, empty prompt rejection, usage on bad args, CCC_REAL_OPENCODE env var, exit code forwarding, and startup failure reporting.
+All implementations share: build_prompt_spec, CommandSpec, CompletedRun, Runner.run, ccc CLI, prompt trimming, empty prompt rejection, usage on bad args, exit code forwarding, and startup failure reporting.
+
+Python and Rust also support real-runner override env vars for local smoke/debugging:
+- `CCC_REAL_OPENCODE`
+- `CCC_REAL_CLAUDE`
+- `CCC_REAL_KIMI`
 
 18 of 20 languages also implement: v2 parser/config (runner selector, thinking levels, provider/model override, preset and agent resolution, config loading) and v3 JSON output parsing (OpenCode, Claude Code, Kimi schemas).
 
 ## Docs
 
 - [CLI Reference](https://xertrov.github.io/call-coding-clis/): Full usage, slots, examples, feature matrix, build and test instructions
-- [JSON Event References](/home/xertrov/src/call-coding-clis/docs/clis/json-event-references.md): upstream structured-output references for Claude, Kimi, and OpenCode
+- [JSON Event References](clis/json-event-references.md): upstream structured-output references for Claude, Kimi, and OpenCode
+- [Mock Smoke Recipes](clis/mock-smoke.md): mock-runner smoke commands for formatted and raw output checks
 
 ## Optional
 

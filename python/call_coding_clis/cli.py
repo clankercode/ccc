@@ -37,6 +37,22 @@ def build_prompt_spec(prompt: str) -> CommandSpec:
     return CommandSpec(argv=["opencode", "run", normalized_prompt])
 
 
+def _apply_real_runner_override(spec: CommandSpec) -> None:
+    if not spec.argv:
+        return
+    env_var_by_binary = {
+        "opencode": "CCC_REAL_OPENCODE",
+        "claude": "CCC_REAL_CLAUDE",
+        "kimi": "CCC_REAL_KIMI",
+    }
+    env_var = env_var_by_binary.get(spec.argv[0])
+    if not env_var:
+        return
+    override = os.environ.get(env_var, "")
+    if override:
+        spec.argv[0] = override
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
 
@@ -48,9 +64,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     parsed = parse_args(args)
-    if not parsed.prompt.strip():
-        print("prompt must not be empty", file=sys.stderr)
-        return 1
     config = load_config()
     try:
         argv_list, env_overrides, warnings = resolve_command(parsed, config)
@@ -60,9 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     spec = CommandSpec(argv=argv_list, env=env_overrides)
 
-    real_opencode = os.environ.get("CCC_REAL_OPENCODE", "")
-    if real_opencode:
-        spec.argv[0] = real_opencode
+    _apply_real_runner_override(spec)
 
     for warning in warnings:
         print(warning, file=sys.stderr)

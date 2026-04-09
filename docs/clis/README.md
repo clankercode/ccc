@@ -21,6 +21,7 @@ Current files:
 - [stream-output-visual-systems.md](stream-output-visual-systems.md)
 - [output-mode-porting.md](output-mode-porting.md)
 - [json-event-references.md](json-event-references.md)
+- [mock-smoke.md](mock-smoke.md)
 - [model-capabilities.json](model-capabilities.json)
 - [updating-model-capabilities.md](updating-model-capabilities.md)
 
@@ -151,3 +152,5 @@ Manual smoke checks:
 - `scripts/smoke-output-modes.sh python cc stream-formatted`
 - `scripts/smoke-output-modes.sh rust cc stream-formatted`
 - swap `cc` for `k` or `oc`, and swap `stream-formatted` for `formatted`, `json`, or `stream-json` to inspect the other paths
+
+For mock-based local smoke recipes that avoid temporary `PATH` symlinks, see [mock-smoke.md](mock-smoke.md).

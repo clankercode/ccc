@@ -20,6 +20,15 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-04-10
+
+### Shared real-runner overrides now cover Claude and Kimi too
+- Change: Python and Rust now support `CCC_REAL_CLAUDE` and `CCC_REAL_KIMI` alongside `CCC_REAL_OPENCODE`, and the docs now include a maintained mock-smoke recipe for exercising formatted output without PATH symlink setup
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/test_runner.py`, `rust/tests/help_tests.rs`
+- Notes: this follow-up closes the local debugging gap discovered while validating OSC sanitization; ad hoc mock smoke runs can now point `ccc` at a mock Claude or Kimi binary directly through env overrides
+
 ## 2026-04-09
 
 ### Human-facing OSC sanitization is configurable in Python and Rust

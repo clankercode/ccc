@@ -88,9 +88,31 @@ fn sanitize_human_output(text: &str, sanitize_osc: bool) -> String {
     sanitized
 }
 
+fn apply_real_runner_override(spec: &mut call_coding_clis::CommandSpec) {
+    if spec.argv.is_empty() {
+        return;
+    }
+    let env_var = match spec.argv[0].as_str() {
+        "opencode" => Some("CCC_REAL_OPENCODE"),
+        "claude" => Some("CCC_REAL_CLAUDE"),
+        "kimi" => Some("CCC_REAL_KIMI"),
+        _ => None,
+    };
+    if let Some(env_var) = env_var {
+        if let Ok(override_binary) = env::var(env_var) {
+            if !override_binary.is_empty() {
+                spec.argv[0] = override_binary;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{filtered_human_stderr, sanitize_human_output, sanitize_raw_output};
+    use super::{
+        apply_real_runner_override, filtered_human_stderr, sanitize_human_output,
+        sanitize_raw_output,
+    };
 
     #[test]
     fn strips_kimi_resume_hint() {
@@ -139,6 +161,36 @@ mod tests {
         let text = "hello\u{1b}]9;title here\u{7}world\u{7}!\n";
         assert_eq!(sanitize_human_output(text, false), text);
     }
+
+    #[test]
+    fn apply_real_runner_override_for_claude() {
+        let key = "CCC_REAL_CLAUDE";
+        let original = std::env::var(key).ok();
+        unsafe { std::env::set_var(key, "/tmp/mock-claude") };
+        let mut spec = call_coding_clis::CommandSpec::new(["claude", "-p", "hello"]);
+        apply_real_runner_override(&mut spec);
+        assert_eq!(spec.argv[0], "/tmp/mock-claude");
+        if let Some(value) = original {
+            unsafe { std::env::set_var(key, value) };
+        } else {
+            unsafe { std::env::remove_var(key) };
+        }
+    }
+
+    #[test]
+    fn apply_real_runner_override_for_kimi() {
+        let key = "CCC_REAL_KIMI";
+        let original = std::env::var(key).ok();
+        unsafe { std::env::set_var(key, "/tmp/mock-kimi") };
+        let mut spec = call_coding_clis::CommandSpec::new(["kimi", "--prompt", "hello"]);
+        apply_real_runner_override(&mut spec);
+        assert_eq!(spec.argv[0], "/tmp/mock-kimi");
+        if let Some(value) = original {
+            unsafe { std::env::set_var(key, value) };
+        } else {
+            unsafe { std::env::remove_var(key) };
+        }
+    }
 }
 
 fn main() -> ExitCode {
@@ -185,11 +237,7 @@ fn main() -> ExitCode {
     };
 
     let mut spec = spec;
-    if let Ok(real_opencode) = env::var("CCC_REAL_OPENCODE") {
-        if !real_opencode.is_empty() {
-            spec.argv[0] = real_opencode;
-        }
-    }
+    apply_real_runner_override(&mut spec);
 
     let runner = Runner::new();
     let show_thinking = resolve_show_thinking(&parsed, Some(&config));

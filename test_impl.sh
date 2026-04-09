@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
-export HOME="/tmp/ccc-test-home"
 export XDG_CONFIG_HOME="/tmp/ccc-test-xdg-config"
 export XDG_CACHE_HOME="/tmp/ccc-test-xdg-cache"
 export XDG_DATA_HOME="/tmp/ccc-test-xdg-data"
@@ -14,7 +13,6 @@ export GOCACHE="/tmp/ccc-go-cache"
 export ZIG_GLOBAL_CACHE_DIR="/tmp/ccc-zig-global-cache"
 export ZIG_LOCAL_CACHE_DIR="/tmp/ccc-zig-local-cache"
 export DOTNET_CLI_HOME="/tmp/ccc-dotnet-home"
-export NUGET_PACKAGES="/tmp/ccc-nuget"
 export CRYSTAL_CACHE_DIR="/tmp/ccc-crystal-cache"
 export CABAL_DIR="/tmp/ccc-cabal"
 export LC_ALL=C
@@ -23,7 +21,6 @@ export DOTNET_NOLOGO=1
 export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 mkdir -p \
-    "$HOME" \
     "$XDG_CONFIG_HOME" \
     "$XDG_CACHE_HOME" \
     "$XDG_DATA_HOME" \
@@ -32,9 +29,10 @@ mkdir -p \
     "$ZIG_GLOBAL_CACHE_DIR" \
     "$ZIG_LOCAL_CACHE_DIR" \
     "$DOTNET_CLI_HOME" \
-    "$NUGET_PACKAGES" \
     "$CRYSTAL_CACHE_DIR" \
     "$CABAL_DIR"
+mkdir -p "$XDG_CONFIG_HOME/ccc"
+: > "$XDG_CONFIG_HOME/ccc/config.toml"
 
 if [ "$#" -ne 1 ]; then
     echo "usage: ./test_impl.sh <language|all>" >&2

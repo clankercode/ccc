@@ -17,14 +17,15 @@ class CccContractTests(unittest.TestCase):
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
         env["LC_ALL"] = "C"
         env["PERL_BADLANG"] = "0"
-        env["HOME"] = str(tmp_path)
         env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
         env["XDG_CACHE_HOME"] = str(tmp_path / "xdg-cache")
         env["XDG_DATA_HOME"] = str(tmp_path / "xdg-data")
         env["XDG_STATE_HOME"] = str(tmp_path / "xdg-state")
         env["GOCACHE"] = str(tmp_path / "go-cache")
         env["DOTNET_CLI_HOME"] = str(tmp_path / "dotnet-home")
-        env["NUGET_PACKAGES"] = str(tmp_path / "nuget")
+        env["DOTNET_NOLOGO"] = "1"
+        env["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1"
+        env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
         env["CABAL_DIR"] = str(tmp_path / "cabal")
         env["CRYSTAL_CACHE_DIR"] = str(tmp_path / "crystal-cache")
         env["ZIG_GLOBAL_CACHE_DIR"] = str(tmp_path / "zig-global-cache")
@@ -37,13 +38,15 @@ class CccContractTests(unittest.TestCase):
             "XDG_STATE_HOME",
             "GOCACHE",
             "DOTNET_CLI_HOME",
-            "NUGET_PACKAGES",
             "CABAL_DIR",
             "CRYSTAL_CACHE_DIR",
             "ZIG_GLOBAL_CACHE_DIR",
             "ZIG_LOCAL_CACHE_DIR",
         ):
             Path(env[key]).mkdir(parents=True, exist_ok=True)
+        xdg_config = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+        xdg_config.parent.mkdir(parents=True, exist_ok=True)
+        xdg_config.write_text("", encoding="utf-8")
         return env
 
     def _c_build_env(self, env: dict[str, str]) -> dict[str, str]:

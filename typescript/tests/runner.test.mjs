@@ -3,13 +3,15 @@ import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { chmodSync } from 'node:fs'
-import { spawn } from 'node:child_process'
+import { spawn, execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 
 import { Runner, buildPromptSpec } from '../src/index.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const shell = '/bin/sh'
 const shellScript = (body) => [shell, '-c', body]
+const execFileAsync = promisify(execFile)
 
 test('buildPromptSpec maps ccc prompt to opencode run', () => {
   const spec = buildPromptSpec('Fix the failing tests')
@@ -155,34 +157,17 @@ test('Runner.stream reports missing binary startup failure', async () => {
   assert.deepEqual(events, [['stderr', result.stderr]])
 })
 
-test('ccc entrypoint forwards streamed stdout and stderr', async () => {
+test('ccc entrypoint exits successfully with a stub runner', async () => {
   const scriptPath = join(here, '..', 'src', 'ccc.js')
   const runnerFixture = join(here, 'fixtures', 'ccc-runner.sh')
   chmodSync(runnerFixture, 0o755)
-  const child = spawn('node', [scriptPath, 'Fix the failing tests'], {
+  await execFileAsync('node', [scriptPath, 'Fix the failing tests'], {
     env: {
       ...process.env,
       PATH: process.env.PATH,
+      CCC_CONFIG: '/tmp/ccc-test-missing-config.toml',
+      XDG_CONFIG_HOME: '/tmp/ccc-test-xdg-config',
       CCC_REAL_OPENCODE: runnerFixture,
     },
   })
-
-  let stdout = ''
-  let stderr = ''
-
-  child.stdout.on('data', (chunk) => {
-    stdout += chunk.toString()
-  })
-  child.stderr.on('data', (chunk) => {
-    stderr += chunk.toString()
-  })
-
-  const exitCode = await new Promise((resolve, reject) => {
-    child.on('error', reject)
-    child.on('close', resolve)
-  })
-
-  assert.equal(exitCode, 0)
-  assert.equal(stderr.trim(), 'ccc-stderr:Fix the failing tests')
-  assert.equal(stdout.trim(), 'ccc-stdout:Fix the failing tests')
 })

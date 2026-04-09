@@ -36,30 +36,27 @@ run_test() {
 GO_CACHE="/tmp/ccc-go-cache"
 ZIG_GLOBAL_CACHE_DIR="/tmp/ccc-zig-global-cache"
 ZIG_LOCAL_CACHE_DIR="/tmp/ccc-zig-local-cache"
-TEST_HOME="/tmp/ccc-test-home"
 TEST_XDG_CONFIG_HOME="/tmp/ccc-test-xdg-config"
 TEST_XDG_CACHE_HOME="/tmp/ccc-test-xdg-cache"
 TEST_XDG_DATA_HOME="/tmp/ccc-test-xdg-data"
 TEST_XDG_STATE_HOME="/tmp/ccc-test-xdg-state"
 TEST_CCC_CONFIG="/tmp/ccc-test-missing-config.toml"
 DOTNET_HOME="/tmp/ccc-dotnet-home"
-NUGET_HOME="/tmp/ccc-nuget"
 CRYSTAL_CACHE_DIR="/tmp/ccc-crystal-cache"
 CABAL_DIR="/tmp/ccc-cabal"
 mkdir -p \
     "$GO_CACHE" \
     "$ZIG_GLOBAL_CACHE_DIR" \
     "$ZIG_LOCAL_CACHE_DIR" \
-    "$TEST_HOME" \
     "$TEST_XDG_CONFIG_HOME" \
     "$TEST_XDG_CACHE_HOME" \
     "$TEST_XDG_DATA_HOME" \
     "$TEST_XDG_STATE_HOME" \
     "$DOTNET_HOME" \
-    "$NUGET_HOME" \
     "$CRYSTAL_CACHE_DIR" \
     "$CABAL_DIR"
-export HOME="$TEST_HOME"
+mkdir -p "$TEST_XDG_CONFIG_HOME/ccc"
+: > "$TEST_XDG_CONFIG_HOME/ccc/config.toml"
 export XDG_CONFIG_HOME="$TEST_XDG_CONFIG_HOME"
 export XDG_CACHE_HOME="$TEST_XDG_CACHE_HOME"
 export XDG_DATA_HOME="$TEST_XDG_DATA_HOME"
@@ -69,7 +66,6 @@ export GOCACHE="$GO_CACHE"
 export ZIG_GLOBAL_CACHE_DIR
 export ZIG_LOCAL_CACHE_DIR
 export DOTNET_CLI_HOME="$DOTNET_HOME"
-export NUGET_PACKAGES="$NUGET_HOME"
 export CRYSTAL_CACHE_DIR
 export CABAL_DIR
 export LC_ALL=C

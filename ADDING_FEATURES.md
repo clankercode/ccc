@@ -62,6 +62,7 @@ PYTHONPATH=. python3 tests/test_harness.py all -v
 Once Python and Rust are green:
 
 - dispatch one subagent per language, unless two languages are close enough that a shared worker is clearly cheaper
+- prefer `gpt-5.4-mini` with `xhigh` reasoning for these language-specific rollout workers
 - give each subagent ownership of one language directory only
 - tell each subagent not to revert unrelated edits
 - require the smallest relevant unit/spec tests first

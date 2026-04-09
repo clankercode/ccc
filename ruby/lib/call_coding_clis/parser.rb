@@ -2,13 +2,13 @@
 
 module CallCodingClis
   module Parser
-    RunnerInfo = Struct.new(:binary, :extra_args, :thinking_flags, :provider_flag, :model_flag, keyword_init: true)
+    RunnerInfo = Struct.new(:binary, :extra_args, :thinking_flags, :provider_flag, :model_flag, :agent_flag, keyword_init: true)
     ParsedArgs = Struct.new(:runner, :thinking, :provider, :model, :alias_name, :prompt, keyword_init: true) do
       def initialize(runner: nil, thinking: nil, provider: nil, model: nil, alias_name: nil, prompt: "")
         super
       end
     end
-    AliasDef = Struct.new(:runner, :thinking, :provider, :model, keyword_init: true)
+    AliasDef = Struct.new(:runner, :thinking, :provider, :model, :agent, keyword_init: true)
     CccConfig = Struct.new(:default_runner, :default_provider, :default_model, :default_thinking, :aliases, :abbreviations, keyword_init: true) do
       def initialize(default_runner: "oc", default_provider: "", default_model: "", default_thinking: nil, aliases: {}, abbreviations: {})
         super
@@ -25,7 +25,8 @@ module CallCodingClis
         extra_args: ["run"],
         thinking_flags: {},
         provider_flag: "",
-        model_flag: ""
+        model_flag: "",
+        agent_flag: "--agent"
       )
       RUNNER_REGISTRY["claude"] = RunnerInfo.new(
         binary: "claude",
@@ -38,7 +39,8 @@ module CallCodingClis
           4 => ["--thinking", "max"]
         },
         provider_flag: "",
-        model_flag: "--model"
+        model_flag: "--model",
+        agent_flag: "--agent"
       )
       RUNNER_REGISTRY["kimi"] = RunnerInfo.new(
         binary: "kimi",
@@ -51,21 +53,24 @@ module CallCodingClis
           4 => ["--think", "max"]
         },
         provider_flag: "",
-        model_flag: "--model"
+        model_flag: "--model",
+        agent_flag: "--agent"
       )
       RUNNER_REGISTRY["codex"] = RunnerInfo.new(
         binary: "codex",
         extra_args: [],
         thinking_flags: {},
         provider_flag: "",
-        model_flag: "--model"
+        model_flag: "--model",
+        agent_flag: ""
       )
       RUNNER_REGISTRY["crush"] = RunnerInfo.new(
         binary: "crush",
         extra_args: [],
         thinking_flags: {},
         provider_flag: "",
-        model_flag: ""
+        model_flag: "",
+        agent_flag: ""
       )
 
       RUNNER_REGISTRY["oc"] = RUNNER_REGISTRY["opencode"]
@@ -114,8 +119,9 @@ module CallCodingClis
       config.abbreviations.fetch(name, name)
     end
 
-    def self.resolve_command(parsed, config = nil)
+    def self.resolve_command(parsed, config = nil, warnings: nil)
       config ||= CccConfig.new
+      warnings ||= []
 
       runner_name = resolve_runner_name(parsed.runner, config)
       info = RUNNER_REGISTRY.fetch(runner_name) {
@@ -158,6 +164,27 @@ module CallCodingClis
 
       if effective_model && !effective_model.empty? && !info.model_flag.empty?
         argv.concat([info.model_flag, effective_model])
+      end
+
+      effective_agent = nil
+      agent_source = nil
+      if parsed.alias_name
+        if alias_def && alias_def.agent && !alias_def.agent.to_s.empty?
+          effective_agent = alias_def.agent
+          agent_source = "@#{parsed.alias_name}"
+        elsif alias_def.nil?
+          effective_agent = parsed.alias_name
+          agent_source = "@#{parsed.alias_name}"
+        end
+      end
+
+      if effective_agent && !effective_agent.to_s.empty?
+        if info.agent_flag && !info.agent_flag.empty?
+          argv.concat([info.agent_flag, effective_agent])
+        else
+          warning_suffix = (alias_def && alias_def.agent && alias_def.agent.to_s != parsed.alias_name) ? " (agent #{effective_agent})" : ""
+          warnings << "warning: runner \"#{effective_runner_name}\" does not support agents; ignoring #{agent_source}#{warning_suffix}"
+        end
       end
 
       env_overrides = {}

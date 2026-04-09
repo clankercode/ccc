@@ -90,38 +90,40 @@ class ParseArgsTests(unittest.TestCase):
 class ResolveCommandTests(unittest.TestCase):
     def test_default_runner_is_opencode(self):
         parsed = ParsedArgs(prompt="hello")
-        argv, env = resolve_command(parsed)
+        argv, env, warnings = resolve_command(parsed)
         self.assertEqual(argv[0], "opencode")
         self.assertIn("run", argv)
         self.assertIn("hello", argv)
+        self.assertEqual(warnings, [])
 
     def test_claude_runner(self):
         parsed = ParsedArgs(runner="cc", prompt="hello")
-        argv, env = resolve_command(parsed)
+        argv, env, warnings = resolve_command(parsed)
         self.assertEqual(argv[0], "claude")
         self.assertNotIn("run", argv)
         self.assertIn("hello", argv)
+        self.assertEqual(warnings, [])
 
     def test_thinking_flags_for_claude(self):
         parsed = ParsedArgs(runner="cc", thinking=2, prompt="hello")
-        argv, env = resolve_command(parsed)
+        argv, env, _warnings = resolve_command(parsed)
         self.assertIn("--thinking", argv)
         self.assertIn("medium", argv)
 
     def test_thinking_zero_for_claude(self):
         parsed = ParsedArgs(runner="cc", thinking=0, prompt="hello")
-        argv, env = resolve_command(parsed)
+        argv, env, _warnings = resolve_command(parsed)
         self.assertIn("--no-thinking", argv)
 
     def test_model_flag_for_claude(self):
         parsed = ParsedArgs(runner="cc", model="claude-4", prompt="hello")
-        argv, env = resolve_command(parsed)
+        argv, env, _warnings = resolve_command(parsed)
         self.assertIn("--model", argv)
         self.assertIn("claude-4", argv)
 
     def test_provider_sets_env(self):
         parsed = ParsedArgs(provider="anthropic", prompt="hello")
-        argv, env = resolve_command(parsed)
+        argv, env, _warnings = resolve_command(parsed)
         self.assertEqual(env.get("CCC_PROVIDER"), "anthropic")
 
     def test_empty_prompt_raises(self):
@@ -132,27 +134,27 @@ class ResolveCommandTests(unittest.TestCase):
     def test_config_default_runner(self):
         config = CccConfig(default_runner="cc")
         parsed = ParsedArgs(prompt="hello")
-        argv, env = resolve_command(parsed, config)
+        argv, env, _warnings = resolve_command(parsed, config)
         self.assertEqual(argv[0], "claude")
 
     def test_config_default_thinking(self):
         config = CccConfig(default_runner="cc", default_thinking=1)
         parsed = ParsedArgs(prompt="hello")
-        argv, env = resolve_command(parsed, config)
+        argv, env, _warnings = resolve_command(parsed, config)
         self.assertIn("--thinking", argv)
         self.assertIn("low", argv)
 
     def test_config_default_model(self):
         config = CccConfig(default_runner="cc", default_model="claude-3.5")
         parsed = ParsedArgs(prompt="hello")
-        argv, env = resolve_command(parsed, config)
+        argv, env, _warnings = resolve_command(parsed, config)
         self.assertIn("--model", argv)
         self.assertIn("claude-3.5", argv)
 
     def test_config_abbreviation(self):
         config = CccConfig(abbreviations={"mycc": "cc"})
         parsed = ParsedArgs(runner="mycc", prompt="hello")
-        argv, env = resolve_command(parsed, config)
+        argv, env, _warnings = resolve_command(parsed, config)
         self.assertEqual(argv[0], "claude")
 
     def test_alias_provides_defaults(self):
@@ -160,28 +162,65 @@ class ResolveCommandTests(unittest.TestCase):
             aliases={"work": AliasDef(runner="cc", thinking=3, model="claude-4")}
         )
         parsed = ParsedArgs(alias="work", prompt="hello")
-        argv, env = resolve_command(parsed, config)
+        argv, env, warnings = resolve_command(parsed, config)
         self.assertEqual(argv[0], "claude")
         self.assertIn("--thinking", argv)
         self.assertIn("high", argv)
         self.assertIn("--model", argv)
         self.assertIn("claude-4", argv)
+        self.assertEqual(warnings, [])
 
     def test_explicit_overrides_alias(self):
         config = CccConfig(
             aliases={"work": AliasDef(runner="cc", thinking=3, model="claude-4")}
         )
         parsed = ParsedArgs(runner="k", alias="work", thinking=1, prompt="hello")
-        argv, env = resolve_command(parsed, config)
+        argv, env, _warnings = resolve_command(parsed, config)
         self.assertEqual(argv[0], "kimi")
         self.assertIn("--think", argv)
         self.assertIn("low", argv)
 
     def test_kimi_thinking_flags(self):
         parsed = ParsedArgs(runner="k", thinking=4, prompt="hello")
-        argv, env = resolve_command(parsed)
+        argv, env, _warnings = resolve_command(parsed)
         self.assertIn("--think", argv)
         self.assertIn("max", argv)
+
+    def test_alias_falls_back_to_agent_for_opencode(self):
+        parsed = ParsedArgs(alias="reviewer", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[:4], ["opencode", "run", "--agent", "reviewer"])
+        self.assertEqual(env, {})
+        self.assertEqual(warnings, [])
+
+    def test_alias_falls_back_to_agent_for_claude(self):
+        parsed = ParsedArgs(runner="cc", alias="reviewer", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[:3], ["claude", "--agent", "reviewer"])
+        self.assertEqual(warnings, [])
+
+    def test_alias_falls_back_to_agent_for_kimi(self):
+        parsed = ParsedArgs(runner="k", alias="reviewer", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[:3], ["kimi", "--agent", "reviewer"])
+        self.assertEqual(warnings, [])
+
+    def test_alias_falls_back_to_agent_with_warning_when_runner_lacks_support(self):
+        parsed = ParsedArgs(runner="rc", alias="reviewer", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[0], "codex")
+        self.assertNotIn("--agent", argv)
+        self.assertEqual(
+            warnings,
+            ['warning: runner "rc" does not support agents; ignoring @reviewer'],
+        )
+
+    def test_alias_preset_can_set_agent(self):
+        config = CccConfig(aliases={"work": AliasDef(agent="reviewer")})
+        parsed = ParsedArgs(alias="work", prompt="hello")
+        argv, env, warnings = resolve_command(parsed, config)
+        self.assertEqual(argv[:4], ["opencode", "run", "--agent", "reviewer"])
+        self.assertEqual(warnings, [])
 
 
 class LoadConfigTests(unittest.TestCase):
@@ -206,6 +245,7 @@ mycc = "cc"
 runner = "cc"
 thinking = 3
 model = "claude-4"
+agent = "reviewer"
 
 [aliases.quick]
 runner = "oc"
@@ -222,6 +262,7 @@ runner = "oc"
         self.assertEqual(config.aliases["work"].runner, "cc")
         self.assertEqual(config.aliases["work"].thinking, 3)
         self.assertEqual(config.aliases["work"].model, "claude-4")
+        self.assertEqual(config.aliases["work"].agent, "reviewer")
         self.assertIn("quick", config.aliases)
         self.assertEqual(config.aliases["quick"].runner, "oc")
 

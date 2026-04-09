@@ -110,7 +110,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 
 - the only implemented cross-language contract today is still `ccc "<Prompt>"`
 - the next syntax shapes under consideration are:
-  - `ccc @foo-bar "<Prompt>"` for a named alias or preset
+  - `ccc @foo-bar "<Prompt>"` to use a named preset, or fall back to agent selection when no preset exists
   - `ccc +0 "<Prompt>"` through `ccc +4 "<Prompt>"` for thinking level selection
   - `ccc :provider:model "<Prompt>"` and `ccc :model "<Prompt>"` for explicit provider/model selection
   - runner selectors such as `c`, `cc`, `oc`, `k`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `roocode`, `crush`, and `pi`
@@ -139,12 +139,12 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - parser and config design for planned alias, thinking, runner, and provider/model selectors: `CCC_PARSER_CONFIG_DESIGN.md`
 - language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
 - cross-language test harness design: `TEST_HARNESS_PLAN.md`
-- expanded `ccc` token parsing for `@alias`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
+- expanded `ccc` token parsing for `@name`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
 
 ## Missing / Possible Future Features
 
-- expanded `ccc` token parsing for `@alias`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
-- config-backed custom aliases, abbreviations, and default provider/model resolution
+- expanded `ccc` token parsing for `@name`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
+- config-backed presets, runner abbreviations, agent defaults, and provider/model resolution
 - richer stdin/cwd/env coverage and docs for every implementation
 - v2: parse structured JSON output from supported runners and render it consistently
 - v2: templated or user-customizable rendering for structured output

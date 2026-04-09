@@ -2,15 +2,14 @@ module Main where
 
 import Prelude
 import Effect (Effect)
-import Effect.Console (error)
 import Data.Array (drop)
-import Data.Either (Either(..))
+import Data.Foldable (traverse_)
 import Data.Maybe (Maybe(..))
 import Node.Process (argv, lookupEnv)
 import CallCodingClis.Config (loadConfig)
 import CallCodingClis.Parser (parseArgs, resolveCommand)
 import CallCodingClis.Runner (run)
-import CallCodingClis.Help (helpText, runnerChecklist)
+import CallCodingClis.Help (helpText, runnerChecklist, usageText)
 
 foreign import writeStdout :: String -> Effect Unit
 foreign import writeStderr :: String -> Effect Unit
@@ -22,7 +21,7 @@ main = do
   let args = drop 2 rawArgs
   case args of
     [] -> do
-      writeStderr $ "usage: ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"\n"
+      writeStderr $ usageText <> "\n"
       checklist <- runnerChecklist
       writeStderr $ checklist <> "\n"
       processExit 1
@@ -41,12 +40,18 @@ main = do
         processExit 1
       else do
         config <- loadConfig
-        let spec = resolveCommand parsed config
+        let resolved = resolveCommand parsed config
+        traverse_ writeStderr resolved.warnings
         runnerBin <- lookupEnv "CCC_REAL_OPENCODE"
-        let adjustedSpec = case runnerBin of
-              Nothing -> spec
-              Just bin -> spec { argv = [bin] <> drop 1 spec.argv }
-        result <- run adjustedSpec
+        let spec =
+              { argv: case runnerBin of
+                  Nothing -> resolved.argv
+                  Just bin -> [bin] <> drop 1 resolved.argv
+              , stdinText: Nothing
+              , cwd: Nothing
+              , env: resolved.env
+              }
+        result <- run spec
         when (result.stdout /= "") $ writeStdout result.stdout
         when (result.stderr /= "") $ writeStderr result.stderr
         processExit result.exitCode

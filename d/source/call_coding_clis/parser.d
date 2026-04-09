@@ -12,6 +12,7 @@ struct RunnerInfo {
     string[][int] thinkingFlags;
     string providerFlag;
     string modelFlag;
+    string agentFlag;
 }
 
 struct ParsedArgs {
@@ -28,6 +29,7 @@ struct AliasDef {
     Nullable!int thinking;
     Nullable!string provider;
     Nullable!string model;
+    Nullable!string agent;
 }
 
 struct CccConfig {
@@ -46,23 +48,23 @@ private void ensureRegistry() {
     if (registryInitialized_) return;
     registryInitialized_ = true;
 
-    auto opencode = RunnerInfo("opencode", ["run"], null, "", "");
+    auto opencode = RunnerInfo("opencode", ["run"], null, "", "", "--agent");
     auto claude = RunnerInfo("claude", null, [
         0: ["--no-thinking"],
         1: ["--thinking", "low"],
         2: ["--thinking", "medium"],
         3: ["--thinking", "high"],
         4: ["--thinking", "max"],
-    ], "", "--model");
+    ], "", "--model", "--agent");
     auto kimi = RunnerInfo("kimi", null, [
         0: ["--no-think"],
         1: ["--think", "low"],
         2: ["--think", "medium"],
         3: ["--think", "high"],
         4: ["--think", "max"],
-    ], "", "--model");
-    auto codex = RunnerInfo("codex", null, null, "", "--model");
-    auto crush = RunnerInfo("crush", null, null, "", "");
+    ], "", "--model", "--agent");
+    auto codex = RunnerInfo("codex", null, null, "", "--model", "");
+    auto crush = RunnerInfo("crush", null, null, "", "", "");
 
     registry_["opencode"] = opencode;
     registry_["claude"] = claude;
@@ -169,6 +171,7 @@ private string resolveRunnerName(Nullable!string name, ref CccConfig config) {
 struct ResolvedCommand {
     string[] argv;
     string[string] env;
+    string[] warnings;
 }
 
 ResolvedCommand resolveCommand(ref ParsedArgs parsed, CccConfig config) {
@@ -245,6 +248,26 @@ ResolvedCommand resolveCommand(ref ParsedArgs parsed, CccConfig config) {
         argv ~= effectiveModel.get;
     }
 
+    string[] warnings;
+
+    Nullable!string requestedAgent;
+    if (!parsed.aliasName.isNull && aliasDef is null) {
+        requestedAgent = parsed.aliasName;
+    }
+
+    Nullable!string effectiveAgent = requestedAgent;
+    if (effectiveAgent.isNull && aliasDef !is null && !aliasDef.agent.isNull) {
+        effectiveAgent = aliasDef.agent;
+    }
+    if (!effectiveAgent.isNull && effectiveAgent.get.length > 0) {
+        if (info.agentFlag.length > 0) {
+            argv ~= info.agentFlag;
+            argv ~= effectiveAgent.get;
+        } else {
+            warnings ~= "warning: runner \"" ~ effectiveRunnerName ~ "\" does not support agents; ignoring @" ~ effectiveAgent.get;
+        }
+    }
+
     string[string] envOverrides;
     if (!effectiveProvider.isNull && effectiveProvider.get.length > 0) {
         envOverrides["CCC_PROVIDER"] = effectiveProvider.get;
@@ -257,5 +280,34 @@ ResolvedCommand resolveCommand(ref ParsedArgs parsed, CccConfig config) {
 
     argv ~= prompt;
 
-    return ResolvedCommand(argv.data, envOverrides);
+    return ResolvedCommand(argv.data, envOverrides, warnings);
+}
+
+unittest {
+    auto reg = getRunnerRegistry();
+    assert(reg["opencode"].agentFlag == "--agent");
+    assert(reg["claude"].agentFlag == "--agent");
+    assert(reg["kimi"].agentFlag == "--agent");
+    assert(reg["codex"].agentFlag.length == 0);
+    assert(reg["crush"].agentFlag.length == 0);
+}
+
+unittest {
+    auto parsed = parseArgs(["@reviewer", "task"]);
+    auto r = resolveCommand(parsed, CccConfig());
+    assert(r.argv[0] == "opencode");
+    assert(r.argv[1] == "run");
+    assert(r.argv[2] == "--agent");
+    assert(r.argv[3] == "reviewer");
+    assert(r.argv[$ - 1] == "task");
+    assert(r.warnings.length == 0);
+}
+
+unittest {
+    auto parsed = parseArgs(["rc", "@reviewer", "task"]);
+    auto r = resolveCommand(parsed, CccConfig());
+    assert(r.argv[0] == "codex");
+    assert(r.argv[$ - 1] == "task");
+    assert(r.warnings.length == 1);
+    assert(r.warnings[0] == "warning: runner \"rc\" does not support agents; ignoring @reviewer");
 }

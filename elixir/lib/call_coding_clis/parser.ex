@@ -1,6 +1,11 @@
 defmodule CallCodingClis.Parser do
   defmodule RunnerInfo do
-    defstruct binary: "", extra_args: [], thinking_flags: %{}, provider_flag: "", model_flag: ""
+    defstruct binary: "",
+              extra_args: [],
+              thinking_flags: %{},
+              provider_flag: "",
+              model_flag: "",
+              agent_flag: ""
   end
 
   defmodule ParsedArgs do
@@ -8,7 +13,7 @@ defmodule CallCodingClis.Parser do
   end
 
   defmodule AliasDef do
-    defstruct runner: nil, thinking: nil, provider: nil, model: nil
+    defstruct runner: nil, thinking: nil, provider: nil, model: nil, agent: nil
   end
 
   defmodule CccConfig do
@@ -32,7 +37,8 @@ defmodule CallCodingClis.Parser do
       extra_args: ["run"],
       thinking_flags: %{},
       provider_flag: "",
-      model_flag: ""
+      model_flag: "",
+      agent_flag: "--agent"
     }
 
     claude = %RunnerInfo{
@@ -46,7 +52,8 @@ defmodule CallCodingClis.Parser do
         4 => ["--thinking", "max"]
       },
       provider_flag: "",
-      model_flag: "--model"
+      model_flag: "--model",
+      agent_flag: "--agent"
     }
 
     kimi = %RunnerInfo{
@@ -60,7 +67,8 @@ defmodule CallCodingClis.Parser do
         4 => ["--think", "max"]
       },
       provider_flag: "",
-      model_flag: "--model"
+      model_flag: "--model",
+      agent_flag: "--agent"
     }
 
     codex = %RunnerInfo{
@@ -68,7 +76,8 @@ defmodule CallCodingClis.Parser do
       extra_args: [],
       thinking_flags: %{},
       provider_flag: "",
-      model_flag: "--model"
+      model_flag: "--model",
+      agent_flag: ""
     }
 
     crush = %RunnerInfo{
@@ -76,7 +85,8 @@ defmodule CallCodingClis.Parser do
       extra_args: [],
       thinking_flags: %{},
       provider_flag: "",
-      model_flag: ""
+      model_flag: "",
+      agent_flag: ""
     }
 
     %{
@@ -130,6 +140,7 @@ defmodule CallCodingClis.Parser do
   def resolve_command(%ParsedArgs{} = parsed, %CccConfig{} = config) do
     registry = runner_registry()
     runner_name = resolve_runner_name(parsed.runner, config)
+    warnings = []
 
     default_info = Map.get(registry, config.default_runner, Map.get(registry, "opencode"))
     info = Map.get(registry, runner_name, default_info)
@@ -141,7 +152,7 @@ defmodule CallCodingClis.Parser do
         nil
       end
 
-    {_effective_runner_name, info} =
+    {effective_runner_name, info} =
       if alias_def != nil and alias_def.runner != nil and parsed.runner == nil do
         ern = resolve_runner_name(alias_def.runner, config)
         {ern, Map.get(registry, ern, info)}
@@ -202,6 +213,32 @@ defmodule CallCodingClis.Parser do
         argv
       end
 
+    effective_agent =
+      cond do
+        alias_def != nil and alias_def.agent != nil and alias_def.agent != "" ->
+          alias_def.agent
+
+        alias_def == nil and parsed.alias != nil ->
+          parsed.alias
+
+        true ->
+          nil
+      end
+
+    {argv, warnings} =
+      if effective_agent != nil and effective_agent != "" do
+        if info.agent_flag != "" do
+          {argv ++ [info.agent_flag, effective_agent], warnings}
+        else
+          warning =
+            "warning: runner \"#{effective_runner_name}\" does not support agents; ignoring @#{effective_agent}"
+
+          {argv, warnings ++ [warning]}
+        end
+      else
+        {argv, warnings}
+      end
+
     env_overrides =
       if effective_provider != nil and effective_provider != "" do
         %{"CCC_PROVIDER" => effective_provider}
@@ -214,7 +251,7 @@ defmodule CallCodingClis.Parser do
     if prompt == "" do
       {:error, "prompt must not be empty"}
     else
-      {:ok, {argv ++ [prompt], env_overrides}}
+      {:ok, {argv ++ [prompt], env_overrides, warnings}}
     end
   end
 

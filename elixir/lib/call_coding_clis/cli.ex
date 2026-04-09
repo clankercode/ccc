@@ -27,7 +27,11 @@ defmodule CallCodingClis.CLI do
         config = Config.load_config()
 
         case Parser.resolve_command(parsed, config) do
-          {:ok, {resolved_argv, env_overrides}} ->
+          {:ok, {resolved_argv, env_overrides, warnings}} ->
+            Enum.each(warnings, fn warning ->
+              IO.write(:stderr, warning <> "\n")
+            end)
+
             spec = %CommandSpec{argv: resolved_argv, env: env_overrides}
             run_spec(spec)
 
@@ -47,7 +51,11 @@ defmodule CallCodingClis.CLI do
         config = Config.load_config()
 
         case Parser.resolve_command(parsed, config) do
-          {:ok, {resolved_argv, env_overrides}} ->
+          {:ok, {resolved_argv, env_overrides, warnings}} ->
+            Enum.each(warnings, fn warning ->
+              IO.write(:stderr, warning <> "\n")
+            end)
+
             spec = %CommandSpec{argv: resolved_argv, env: env_overrides}
             run_spec(spec)
 

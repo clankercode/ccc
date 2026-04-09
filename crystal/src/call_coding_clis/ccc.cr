@@ -1,8 +1,7 @@
 require "./runner"
 require "./parser"
 require "./config"
-
-USAGE = "usage: ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\""
+require "./help"
 
 if ARGV.empty?
   STDERR.puts(USAGE)
@@ -10,9 +9,7 @@ if ARGV.empty?
 end
 
 if ARGV == ["--help"] || ARGV == ["-h"]
-  puts("ccc — call coding CLIs")
-  puts
-  puts(USAGE)
+  puts(HELP_TEXT)
   exit 0
 end
 
@@ -23,7 +20,9 @@ begin
     STDERR.puts("prompt must not be empty")
     exit 1
   end
-  argv, env_overrides = resolve_command(parsed, config)
+  warnings = [] of String
+  argv, env_overrides = resolve_command(parsed, config, warnings)
+  warnings.each { |warning| STDERR.puts(warning) }
   if override = ENV["CCC_REAL_OPENCODE"]?
     argv[0] = override
   end

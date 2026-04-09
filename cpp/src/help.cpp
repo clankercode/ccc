@@ -13,7 +13,7 @@ static const char* const kHelpText =
     "ccc \xe2\x80\x94 call coding CLIs\n"
     "\n"
     "Usage:\n"
-    "  ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"\n"
+    "  ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"\n"
     "  ccc --help\n"
     "  ccc -h\n"
     "\n"
@@ -22,17 +22,18 @@ static const char* const kHelpText =
     "                opencode (oc), claude (cc), kimi (k), codex (rc), crush (cr)\n"
     "  +thinking     Set thinking level: +0 (off) through +4 (max)\n"
     "  :provider:model  Override provider and model\n"
-    "  @alias        Use a named preset from config\n"
+    "  @name         Use a named preset from config; if no preset exists, treat it as an agent\n"
     "\n"
     "Examples:\n"
     "  ccc \"Fix the failing tests\"\n"
     "  ccc oc \"Refactor auth module\"\n"
     "  ccc cc +2 :anthropic:claude-sonnet-4-20250514 \"Add tests\"\n"
     "  ccc k +4 \"Debug the parser\"\n"
+    "  ccc @reviewer \"Audit the API boundary\"\n"
     "  ccc codex \"Write a unit test\"\n"
     "\n"
     "Config:\n"
-    "  ~/.config/ccc/config.toml  \xe2\x80\x94 default runner, aliases, abbreviations\n"
+    "  ~/.config/ccc/config.toml  \xe2\x80\x94 default runner, presets, abbreviations\n"
     "\n";
 
 const char* const HELP_TEXT = kHelpText;
@@ -56,6 +57,14 @@ static std::string getVersion(const std::string& binary) {
     return result;
 }
 
+static bool isOnPath(const std::string& binary) {
+    std::string cmd = "command -v " + binary + " >/dev/null 2>&1";
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) return false;
+    int status = pclose(pipe);
+    return status == 0;
+}
+
 std::string runnerChecklist() {
     static const std::vector<std::pair<std::string, std::string>> runners = {
         {"opencode", "oc"},
@@ -75,8 +84,7 @@ std::string runnerChecklist() {
         if (it != registry.end()) {
             binary = it->second.binary;
         }
-        if (auto fp = popen(("command -v " + binary + " 2>/dev/null").c_str(), "r")) {
-            pclose(fp);
+        if (isOnPath(binary)) {
             std::string version = getVersion(binary);
             std::string tag = version.empty() ? "found" : version;
             oss << "  [+] " << name;
@@ -96,6 +104,6 @@ void printHelp() {
 }
 
 void printUsage() {
-    std::cerr << "usage: ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"\n";
+    std::cerr << "usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"\n";
     std::cerr << runnerChecklist();
 }

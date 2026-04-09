@@ -14,6 +14,7 @@ class RunnerInfo:
     thinking_flags: dict[int, list[str]] = field(default_factory=dict)
     provider_flag: str = ""
     model_flag: str = ""
+    agent_flag: str = ""
 
 
 @dataclass(slots=True)
@@ -32,6 +33,7 @@ class AliasDef:
     thinking: int | None = None
     provider: str | None = None
     model: str | None = None
+    agent: str | None = None
 
 
 @dataclass(slots=True)
@@ -53,6 +55,7 @@ def _register_defaults() -> None:
         thinking_flags={},
         provider_flag="",
         model_flag="",
+        agent_flag="--agent",
     )
     RUNNER_REGISTRY["claude"] = RunnerInfo(
         binary="claude",
@@ -66,6 +69,7 @@ def _register_defaults() -> None:
         },
         provider_flag="",
         model_flag="--model",
+        agent_flag="--agent",
     )
     RUNNER_REGISTRY["kimi"] = RunnerInfo(
         binary="kimi",
@@ -79,6 +83,7 @@ def _register_defaults() -> None:
         },
         provider_flag="",
         model_flag="--model",
+        agent_flag="--agent",
     )
     RUNNER_REGISTRY["codex"] = RunnerInfo(
         binary="codex",
@@ -151,7 +156,7 @@ def resolve_runner_name(name: str | None, config: CccConfig) -> str:
 def resolve_command(
     parsed: ParsedArgs,
     config: CccConfig | None = None,
-) -> tuple[list[str], dict[str, str]]:
+) -> tuple[list[str], dict[str, str], list[str]]:
     if config is None:
         config = CccConfig()
 
@@ -161,9 +166,11 @@ def resolve_command(
         RUNNER_REGISTRY.get(config.default_runner, RUNNER_REGISTRY["opencode"]),
     )
 
+    warnings: list[str] = []
     alias_def = None
     if parsed.alias and parsed.alias in config.aliases:
         alias_def = config.aliases[parsed.alias]
+    requested_agent = parsed.alias if parsed.alias and alias_def is None else None
 
     effective_runner_name = runner_name
     if alias_def and alias_def.runner and parsed.runner is None:
@@ -195,6 +202,18 @@ def resolve_command(
     if effective_model and info.model_flag:
         argv.extend([info.model_flag, effective_model])
 
+    effective_agent = requested_agent
+    if effective_agent is None and alias_def and alias_def.agent:
+        effective_agent = alias_def.agent
+    if effective_agent:
+        if info.agent_flag:
+            argv.extend([info.agent_flag, effective_agent])
+        else:
+            warnings.append(
+                f'warning: runner "{effective_runner_name}" does not support agents; '
+                f'ignoring @{effective_agent}'
+            )
+
     env_overrides: dict[str, str] = {}
     if effective_provider:
         env_overrides["CCC_PROVIDER"] = effective_provider
@@ -204,4 +223,4 @@ def resolve_command(
         raise ValueError("prompt must not be empty")
 
     argv.append(prompt)
-    return argv, env_overrides
+    return argv, env_overrides, warnings

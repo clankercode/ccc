@@ -45,6 +45,17 @@ static char *ccc_read_file(const char *path) {
     return buffer;
 }
 
+static int ccc_build_temp_template(char *out, size_t out_max, const char *dir, const char *suffix) {
+    size_t dir_len = strlen(dir);
+    size_t suffix_len = strlen(suffix);
+    if (dir_len + suffix_len + 1 > out_max) {
+        return 1;
+    }
+    memcpy(out, dir, dir_len);
+    memcpy(out + dir_len, suffix, suffix_len + 1);
+    return 0;
+}
+
 static int ccc_write_all(int fd, const char *text) {
     size_t remaining = strlen(text);
     const char *cursor = text;
@@ -72,8 +83,18 @@ int ccc_run_command(
         return 1;
     }
 
-    char stdout_template[] = "/tmp/ccc-stdout-XXXXXX";
-    char stderr_template[] = "/tmp/ccc-stderr-XXXXXX";
+    const char *tmpdir = getenv("TMPDIR");
+    if (tmpdir == NULL || tmpdir[0] == '\0') {
+        tmpdir = "/tmp";
+    }
+
+    char stdout_template[512];
+    char stderr_template[512];
+    if (ccc_build_temp_template(stdout_template, sizeof(stdout_template), tmpdir, "/ccc-stdout-XXXXXX") != 0 ||
+        ccc_build_temp_template(stderr_template, sizeof(stderr_template), tmpdir, "/ccc-stderr-XXXXXX") != 0) {
+        return 1;
+    }
+
     int stdout_fd = mkstemp(stdout_template);
     int stderr_fd = mkstemp(stderr_template);
     int stdin_fd = -1;

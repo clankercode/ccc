@@ -4,6 +4,7 @@ type runner_info = {
   thinking_flags : (int * string list) list;
   provider_flag : string;
   model_flag : string;
+  agent_flag : string;
 }
 
 type parsed_args = {
@@ -20,6 +21,7 @@ type alias_def = {
   ad_thinking : int option;
   ad_provider : string option;
   ad_model : string option;
+  ad_agent : string option;
 }
 
 type ccc_config = {
@@ -36,4 +38,7 @@ exception Empty_prompt
 val default_config : ccc_config
 val runner_registry : (string, runner_info) Hashtbl.t
 val parse_args : string list -> parsed_args
-val resolve_command : parsed_args -> ccc_config option -> string list * (string * string) list
+val resolve_command :
+  parsed_args ->
+  ccc_config option ->
+  string list * (string * string) list * string list

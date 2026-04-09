@@ -7,11 +7,8 @@ def load_config(path : String? = nil) : CccConfig
   if p = path
     search_paths << p
   else
-    if ccc = ENV["CCC_CONFIG"]?
-      search_paths << ccc
-    end
     if xdg = ENV["XDG_CONFIG_HOME"]?
-      search_paths << File.join(xdg, "ccc", "config.toml")
+      search_paths << File.join(xdg, "ccc", "config.toml") unless xdg.empty?
     end
     search_paths << File.join(Path.home, ".config", "ccc", "config.toml")
   end
@@ -40,7 +37,7 @@ def load_config(path : String? = nil) : CccConfig
     elsif line == "[abbreviations]"
       current_section = "abbreviations"
       next
-    elsif m = /^\[aliases\.(\w+)\]$/.match(line)
+    elsif m = /^\[aliases\.([A-Za-z0-9_-]+)\]$/.match(line)
       current_section = "alias"
       if !current_alias_name.empty?
         config.aliases[current_alias_name] = current_alias
@@ -74,6 +71,7 @@ def load_config(path : String? = nil) : CccConfig
       when "thinking" then current_alias.thinking = val.to_i32?
       when "provider" then current_alias.provider = val.empty? ? nil : val
       when "model"    then current_alias.model = val.empty? ? nil : val
+      when "agent"    then current_alias.agent = val.empty? ? nil : val
       end
     when ""
       case key

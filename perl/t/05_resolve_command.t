@@ -2,6 +2,8 @@ use strict;
 use warnings;
 use Test::More;
 use lib 'lib';
+use File::Temp qw(tempfile);
+use Call::Coding::Clis::Config qw(load_config);
 use Call::Coding::Clis::Parser qw(parse_args resolve_command);
 
 {
@@ -89,12 +91,37 @@ use Call::Coding::Clis::Parser qw(parse_args resolve_command);
 {
     my $config = {
         aliases => {
-            fast => { runner => 'claude', thinking => 1, provider => '', model => '' },
+            fast => { runner => 'claude', thinking => 1, provider => '', model => '', agent => '' },
         },
     };
     my $p   = parse_args('@fast', "hello");
     my $cmd = resolve_command($p, $config);
     is_deeply $cmd->{argv}, ['claude', '--thinking', 'low', 'hello'], 'alias overrides runner+thinking';
+}
+
+{
+    my $p   = parse_args('@reviewer', "hello");
+    my $cmd = resolve_command($p);
+    is_deeply $cmd->{argv}, ['opencode', 'run', '--agent', 'reviewer', 'hello'], 'name fallback uses agent';
+    is_deeply $cmd->{warnings}, [], 'supported agent emits no warning';
+}
+
+{
+    my $config = {
+        aliases => {
+            reviewer => { agent => 'specialist', runner => '', thinking => undef, provider => '', model => '' },
+        },
+    };
+    my $p   = parse_args('@reviewer', "hello");
+    my $cmd = resolve_command($p, $config);
+    is_deeply $cmd->{argv}, ['opencode', 'run', '--agent', 'specialist', 'hello'], 'preset agent wins over name fallback';
+}
+
+{
+    my $p   = parse_args('codex', '@reviewer', "hello");
+    my $cmd = resolve_command($p);
+    is_deeply $cmd->{argv}, ['codex', 'hello'], 'unsupported agent is ignored';
+    is_deeply $cmd->{warnings}, ['warning: runner "codex" does not support agents; ignoring @reviewer'], 'unsupported agent warns';
 }
 
 {
@@ -104,6 +131,24 @@ use Call::Coding::Clis::Parser qw(parse_args resolve_command);
     my $p   = parse_args("claude", "hello");
     my $cmd = resolve_command($p, $config);
     is_deeply $cmd->{argv}, ['claude', '--thinking', 'medium', 'hello'], 'config default_thinking';
+}
+
+{
+    my ($fh, $path) = tempfile(SUFFIX => '.toml');
+    print $fh <<'TOML';
+[aliases.work]
+runner = "cc"
+thinking = 3
+model = "claude-4"
+agent = "reviewer"
+TOML
+    close $fh;
+
+    my $config = load_config($path);
+    is $config->{aliases}{work}{runner}, 'cc', 'config alias runner';
+    is $config->{aliases}{work}{thinking}, 3, 'config alias thinking';
+    is $config->{aliases}{work}{model}, 'claude-4', 'config alias model';
+    is $config->{aliases}{work}{agent}, 'reviewer', 'config alias agent';
 }
 
 done_testing;

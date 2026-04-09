@@ -17,9 +17,9 @@ build/test_runner: tests/test_runner.c src/runner.c
 	mkdir -p build
 	$(CC) $(CFLAGS) -o build/test_runner tests/test_runner.c src/runner.c
 
-build/test_parser: tests/test_parser.c src/parser.c
+build/test_parser: tests/test_parser.c src/parser.c src/config.c
 	mkdir -p build
-	$(CC) $(CFLAGS) -o build/test_parser tests/test_parser.c src/parser.c
+	$(CC) $(CFLAGS) -o build/test_parser tests/test_parser.c src/parser.c src/config.c
 
 build/test_json_output: tests/test_json_output.c src/json_output.c
 	mkdir -p build

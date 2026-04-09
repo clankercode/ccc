@@ -1,6 +1,7 @@
 defmodule CallCodingClis.ParserTest do
   use ExUnit.Case
 
+  alias CallCodingClis.Config
   alias CallCodingClis.Parser
   alias CallCodingClis.Parser.{ParsedArgs, CccConfig, AliasDef}
 
@@ -94,44 +95,50 @@ defmodule CallCodingClis.ParserTest do
   describe "resolve_command/2" do
     test "default runner is opencode" do
       parsed = %ParsedArgs{prompt: "hello"}
-      assert {:ok, {argv, _env}} = Parser.resolve_command(parsed)
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
       assert List.first(argv) == "opencode"
       assert "run" in argv
       assert "hello" in argv
+      assert warnings == []
     end
 
     test "claude runner" do
       parsed = %ParsedArgs{runner: "cc", prompt: "hello"}
-      assert {:ok, {argv, _env}} = Parser.resolve_command(parsed)
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
       assert List.first(argv) == "claude"
       refute "run" in argv
       assert "hello" in argv
+      assert warnings == []
     end
 
     test "thinking flags for claude" do
       parsed = %ParsedArgs{runner: "cc", thinking: 2, prompt: "hello"}
-      assert {:ok, {argv, _env}} = Parser.resolve_command(parsed)
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
       assert "--thinking" in argv
       assert "medium" in argv
+      assert warnings == []
     end
 
     test "thinking zero for claude" do
       parsed = %ParsedArgs{runner: "cc", thinking: 0, prompt: "hello"}
-      assert {:ok, {argv, _env}} = Parser.resolve_command(parsed)
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
       assert "--no-thinking" in argv
+      assert warnings == []
     end
 
     test "model flag for claude" do
       parsed = %ParsedArgs{runner: "cc", model: "claude-4", prompt: "hello"}
-      assert {:ok, {argv, _env}} = Parser.resolve_command(parsed)
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
       assert "--model" in argv
       assert "claude-4" in argv
+      assert warnings == []
     end
 
     test "provider sets env" do
       parsed = %ParsedArgs{provider: "anthropic", prompt: "hello"}
-      assert {:ok, {_argv, env}} = Parser.resolve_command(parsed)
+      assert {:ok, {_argv, env, warnings}} = Parser.resolve_command(parsed)
       assert env["CCC_PROVIDER"] == "anthropic"
+      assert warnings == []
     end
 
     test "empty prompt returns error" do
@@ -142,31 +149,35 @@ defmodule CallCodingClis.ParserTest do
     test "config default runner" do
       config = %CccConfig{default_runner: "cc"}
       parsed = %ParsedArgs{prompt: "hello"}
-      assert {:ok, {argv, _env}} = Parser.resolve_command(parsed, config)
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed, config)
       assert List.first(argv) == "claude"
+      assert warnings == []
     end
 
     test "config default thinking" do
       config = %CccConfig{default_runner: "cc", default_thinking: 1}
       parsed = %ParsedArgs{prompt: "hello"}
-      assert {:ok, {argv, _env}} = Parser.resolve_command(parsed, config)
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed, config)
       assert "--thinking" in argv
       assert "low" in argv
+      assert warnings == []
     end
 
     test "config default model" do
       config = %CccConfig{default_runner: "cc", default_model: "claude-3.5"}
       parsed = %ParsedArgs{prompt: "hello"}
-      assert {:ok, {argv, _env}} = Parser.resolve_command(parsed, config)
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed, config)
       assert "--model" in argv
       assert "claude-3.5" in argv
+      assert warnings == []
     end
 
     test "config abbreviation" do
       config = %CccConfig{abbreviations: %{"mycc" => "cc"}}
       parsed = %ParsedArgs{runner: "mycc", prompt: "hello"}
-      assert {:ok, {argv, _env}} = Parser.resolve_command(parsed, config)
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed, config)
       assert List.first(argv) == "claude"
+      assert warnings == []
     end
 
     test "alias provides defaults" do
@@ -175,12 +186,13 @@ defmodule CallCodingClis.ParserTest do
       }
 
       parsed = %ParsedArgs{alias: "work", prompt: "hello"}
-      assert {:ok, {argv, _env}} = Parser.resolve_command(parsed, config)
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed, config)
       assert List.first(argv) == "claude"
       assert "--thinking" in argv
       assert "high" in argv
       assert "--model" in argv
       assert "claude-4" in argv
+      assert warnings == []
     end
 
     test "explicit overrides alias" do
@@ -189,17 +201,94 @@ defmodule CallCodingClis.ParserTest do
       }
 
       parsed = %ParsedArgs{runner: "k", alias: "work", thinking: 1, prompt: "hello"}
-      assert {:ok, {argv, _env}} = Parser.resolve_command(parsed, config)
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed, config)
       assert List.first(argv) == "kimi"
       assert "--think" in argv
       assert "low" in argv
+      assert warnings == []
     end
 
     test "kimi thinking flags" do
       parsed = %ParsedArgs{runner: "k", thinking: 4, prompt: "hello"}
-      assert {:ok, {argv, _env}} = Parser.resolve_command(parsed)
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
       assert "--think" in argv
       assert "max" in argv
+      assert warnings == []
+    end
+
+    test "unknown name falls back to agent on opencode" do
+      parsed = %ParsedArgs{alias: "reviewer", prompt: "hello"}
+      assert {:ok, {argv, env, warnings}} = Parser.resolve_command(parsed)
+      assert argv == ["opencode", "run", "--agent", "reviewer", "hello"]
+      assert env == %{}
+      assert warnings == []
+    end
+
+    test "unknown name uses agent flag for claude" do
+      parsed = %ParsedArgs{runner: "cc", alias: "reviewer", prompt: "hello"}
+      assert {:ok, {argv, env, warnings}} = Parser.resolve_command(parsed)
+      assert argv == ["claude", "--agent", "reviewer", "hello"]
+      assert env == %{}
+      assert warnings == []
+    end
+
+    test "unknown name uses agent flag for kimi" do
+      parsed = %ParsedArgs{runner: "k", alias: "reviewer", prompt: "hello"}
+      assert {:ok, {argv, env, warnings}} = Parser.resolve_command(parsed)
+      assert argv == ["kimi", "--agent", "reviewer", "hello"]
+      assert env == %{}
+      assert warnings == []
+    end
+
+    test "preset agent wins over name fallback" do
+      config = %CccConfig{
+        aliases: %{"reviewer" => %AliasDef{agent: "specialist"}}
+      }
+
+      parsed = %ParsedArgs{alias: "reviewer", prompt: "hello"}
+      assert {:ok, {argv, env, warnings}} = Parser.resolve_command(parsed, config)
+      assert argv == ["opencode", "run", "--agent", "specialist", "hello"]
+      assert env == %{}
+      assert warnings == []
+    end
+
+    test "unsupported agent returns warning and no agent flag" do
+      parsed = %ParsedArgs{runner: "rc", alias: "reviewer", prompt: "hello"}
+      assert {:ok, {argv, env, warnings}} = Parser.resolve_command(parsed)
+      assert argv == ["codex", "hello"]
+      assert env == %{}
+
+      assert warnings == [
+               "warning: runner \"rc\" does not support agents; ignoring @reviewer"
+             ]
+    end
+  end
+
+  describe "load_config/1" do
+    test "parses agent in alias presets" do
+      path =
+        Path.join(
+          System.tmp_dir!(),
+          "ccc-elixir-agent-#{System.unique_integer([:positive])}.toml"
+        )
+
+      File.write!(path, """
+      [aliases.work]
+      runner = "cc"
+      thinking = 3
+      model = "claude-4"
+      agent = "reviewer"
+      """)
+
+      try do
+        config = Config.load_config(path)
+        assert config.aliases["work"].runner == "cc"
+        assert config.aliases["work"].thinking == 3
+        assert config.aliases["work"].model == "claude-4"
+        assert config.aliases["work"].agent == "reviewer"
+      after
+        File.rm(path)
+      end
     end
   end
 
@@ -230,6 +319,15 @@ defmodule CallCodingClis.ParserTest do
       assert registry["cc"] == registry["claude"]
       assert registry["c"] == registry["claude"]
       assert registry["k"] == registry["kimi"]
+    end
+
+    test "agent flags are registered where supported" do
+      registry = Parser.runner_registry()
+      assert registry["opencode"].agent_flag == "--agent"
+      assert registry["claude"].agent_flag == "--agent"
+      assert registry["kimi"].agent_flag == "--agent"
+      assert registry["codex"].agent_flag == ""
+      assert registry["crush"].agent_flag == ""
     end
   end
 end

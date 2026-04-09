@@ -17,6 +17,7 @@ sub _register_defaults {
             thinking_flags => {},
             provider_flag  => '',
             model_flag     => '',
+            agent_flag     => '--agent',
         },
         claude => {
             binary         => 'claude',
@@ -30,6 +31,7 @@ sub _register_defaults {
             },
             provider_flag => '',
             model_flag    => '--model',
+            agent_flag    => '--agent',
         },
         kimi => {
             binary         => 'kimi',
@@ -43,6 +45,7 @@ sub _register_defaults {
             },
             provider_flag => '',
             model_flag    => '--model',
+            agent_flag    => '--agent',
         },
         codex => {
             binary         => 'codex',
@@ -50,6 +53,7 @@ sub _register_defaults {
             thinking_flags => {},
             provider_flag  => '',
             model_flag     => '--model',
+            agent_flag     => '',
         },
         crush => {
             binary         => 'crush',
@@ -57,6 +61,7 @@ sub _register_defaults {
             thinking_flags => {},
             provider_flag  => '',
             model_flag     => '',
+            agent_flag     => '',
         },
     );
 
@@ -119,6 +124,7 @@ sub parse_args {
 sub resolve_command {
     my ($parsed, $config) = @_;
     $config //= {};
+    my @warnings;
 
     my $default_runner = $config->{default_runner} // 'oc';
     my $runner_name    = $parsed->{runner} // $default_runner;
@@ -136,6 +142,7 @@ sub resolve_command {
     if (defined $parsed->{alias} && ($config->{aliases} || {})->{$parsed->{alias}}) {
         $alias_def = $config->{aliases}{$parsed->{alias}};
     }
+    my $requested_agent = defined $parsed->{alias} && !$alias_def ? $parsed->{alias} : undef;
 
     my $effective_runner_name = $runner_name;
     if ($alias_def && $alias_def->{runner} && !defined $parsed->{runner}) {
@@ -179,6 +186,22 @@ sub resolve_command {
         push @argv, $info->{model_flag}, $effective_model;
     }
 
+    my $effective_agent = $requested_agent;
+    if (!defined $effective_agent && $alias_def && $alias_def->{agent}) {
+        $effective_agent = $alias_def->{agent};
+    }
+    if (defined $effective_agent && length $effective_agent) {
+        if ($info->{agent_flag}) {
+            push @argv, $info->{agent_flag}, $effective_agent;
+        }
+        else {
+            push @warnings, sprintf(
+                'warning: runner "%s" does not support agents; ignoring @%s',
+                $effective_runner_name, $effective_agent
+            );
+        }
+    }
+
     my %env_overrides;
     if ($effective_provider) {
         $env_overrides{CCC_PROVIDER} = $effective_provider;
@@ -191,7 +214,7 @@ sub resolve_command {
 
     push @argv, $prompt;
 
-    return { argv => \@argv, env => \%env_overrides };
+    return { argv => \@argv, env => \%env_overrides, warnings => \@warnings };
 }
 
 sub runner_registry {

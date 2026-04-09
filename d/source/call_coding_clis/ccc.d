@@ -6,7 +6,7 @@ import std.string : strip;
 
 import call_coding_clis.runner : Runner, CommandSpec;
 import call_coding_clis.parser : parseArgs, resolveCommand, CccConfig, ResolvedCommand;
-import call_coding_clis.config : loadConfig;
+import call_coding_clis.config : loadConfig, findConfigPath;
 import call_coding_clis.help : printHelp, printUsage;
 
 int main(string[] args) {
@@ -21,21 +21,14 @@ int main(string[] args) {
     }
 
     CccConfig config;
-    string configPath;
     auto cccConfig = environment.get("CCC_CONFIG");
-    if (cccConfig !is null && cccConfig.length > 0) {
-        configPath = cccConfig.idup;
-    } else {
-        auto xdg = environment.get("XDG_CONFIG_HOME");
-        if (xdg !is null && xdg.length > 0) {
-            configPath = (xdg ~ "/ccc/config.toml").idup;
-        } else {
-            auto home = environment.get("HOME");
-            if (home !is null && home.length > 0) {
-                configPath = (home ~ "/.config/ccc/config.toml").idup;
-            }
-        }
-    }
+    auto xdg = environment.get("XDG_CONFIG_HOME");
+    auto home = environment.get("HOME");
+    auto configPath = findConfigPath(
+        cccConfig !is null ? cccConfig.idup : "",
+        xdg !is null ? xdg.idup : "",
+        home !is null ? home.idup : "",
+    );
     if (configPath.length > 0) {
         config = loadConfig(configPath);
     }
@@ -52,6 +45,10 @@ int main(string[] args) {
     auto spec = CommandSpec(resolved.argv);
     foreach (k, v; resolved.env) {
         spec.env[k] = v;
+    }
+
+    foreach (warning; resolved.warnings) {
+        stderr.writeln(warning);
     }
 
     auto realOpencode = environment.get("CCC_REAL_OPENCODE");

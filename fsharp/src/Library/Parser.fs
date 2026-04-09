@@ -8,6 +8,7 @@ type RunnerInfo = {
     ThinkingFlags: Map<int, string list>
     ProviderFlag: string
     ModelFlag: string
+    AgentFlag: string
 }
 
 type ParsedArgs = {
@@ -24,6 +25,7 @@ type AliasDef = {
     Thinking: int option
     Provider: string option
     Model: string option
+    Agent: string option
 }
 
 type CccConfig = {
@@ -44,6 +46,7 @@ module Parser =
             ThinkingFlags = Map.empty
             ProviderFlag = ""
             ModelFlag = ""
+            AgentFlag = "--agent"
         }
         let claudeInfo = {
             Binary = "claude"
@@ -57,6 +60,7 @@ module Parser =
             ]
             ProviderFlag = ""
             ModelFlag = "--model"
+            AgentFlag = "--agent"
         }
         let kimiInfo = {
             Binary = "kimi"
@@ -70,6 +74,7 @@ module Parser =
             ]
             ProviderFlag = ""
             ModelFlag = "--model"
+            AgentFlag = "--agent"
         }
         let codexInfo = {
             Binary = "codex"
@@ -77,6 +82,7 @@ module Parser =
             ThinkingFlags = Map.empty
             ProviderFlag = ""
             ModelFlag = "--model"
+            AgentFlag = ""
         }
         let crushInfo = {
             Binary = "crush"
@@ -84,6 +90,7 @@ module Parser =
             ThinkingFlags = Map.empty
             ProviderFlag = ""
             ModelFlag = ""
+            AgentFlag = ""
         }
         Map.ofList [
             "opencode", openCodeInfo
@@ -147,7 +154,7 @@ module Parser =
             | Some abbrev -> abbrev
             | None -> n
 
-    let resolveCommand (parsed: ParsedArgs) (config: CccConfig option) : string list * Map<string, string> =
+    let resolveCommand (parsed: ParsedArgs) (config: CccConfig option) : string list * Map<string, string> * string list =
         let config = defaultArg config {
             DefaultRunner = "oc"
             DefaultProvider = ""
@@ -158,11 +165,19 @@ module Parser =
         }
 
         let runnerName = resolveRunnerName parsed.Runner config
+        let mutable warnings = []
 
         let openCodeInfo =
             match runnerRegistry.TryFind("opencode") with
             | Some info -> info
-            | None -> { Binary = "opencode"; ExtraArgs = ["run"]; ThinkingFlags = Map.empty; ProviderFlag = ""; ModelFlag = "" }
+            | None -> {
+                Binary = "opencode"
+                ExtraArgs = ["run"]
+                ThinkingFlags = Map.empty
+                ProviderFlag = ""
+                ModelFlag = ""
+                AgentFlag = "--agent"
+            }
 
         let fallbackInfo =
             match runnerRegistry.TryFind(config.DefaultRunner) with
@@ -173,6 +188,8 @@ module Parser =
             match runnerRegistry.TryFind(runnerName) with
             | Some i -> i
             | None -> fallbackInfo
+
+        let mutable effectiveRunnerName = runnerName
 
         let aliasDef =
             match parsed.Alias with
@@ -188,6 +205,7 @@ module Parser =
                 match ad.Runner with
                 | Some r when parsed.Runner.IsNone ->
                     let ern = resolveRunnerName (Some r) config
+                    effectiveRunnerName <- ern
                     match runnerRegistry.TryFind(ern) with Some i -> i | None -> info
                 | _ -> info
             | None -> info
@@ -237,6 +255,26 @@ module Parser =
             argv.Add(m)
         | _ -> ()
 
+        let effectiveAgent =
+            match parsed.Alias with
+            | Some alias ->
+                match aliasDef with
+                | Some ad when ad.Agent.IsSome && not (System.String.IsNullOrEmpty ad.Agent.Value) ->
+                    ad.Agent
+                | Some _ ->
+                    None
+                | None -> Some alias
+            | None -> None
+
+        match effectiveAgent with
+        | Some agent when not (System.String.IsNullOrEmpty agent) ->
+            if not (System.String.IsNullOrEmpty info.AgentFlag) then
+                argv.Add(info.AgentFlag)
+                argv.Add(agent)
+            else
+                warnings <- warnings @ [sprintf "warning: runner \"%s\" does not support agents; ignoring @%s" effectiveRunnerName agent]
+        | _ -> ()
+
         let envOverrides = ResizeArray<string * string>()
         match effectiveProvider with
         | Some p -> envOverrides.Add(("CCC_PROVIDER", p))
@@ -247,4 +285,4 @@ module Parser =
             failwith "prompt must not be empty"
 
         argv.Add(prompt)
-        List.ofSeq argv, Map.ofSeq envOverrides
+        List.ofSeq argv, Map.ofSeq envOverrides, warnings

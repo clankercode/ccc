@@ -91,6 +91,7 @@ module Config =
                         Thinking = match def.TryFind("thinking") with Some(:? int as v) -> Some v | _ -> None
                         Provider = match def.TryFind("provider") with Some(:? string as v) -> Some v | _ -> None
                         Model = match def.TryFind("model") with Some(:? string as v) -> Some v | _ -> None
+                        Agent = match def.TryFind("agent") with Some(:? string as v) -> Some v | _ -> None
                     }
                     acc.Add(name, ad)
                 else

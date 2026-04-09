@@ -1,4 +1,8 @@
-module CallCodingClis.Help where
+module CallCodingClis.Help
+  ( helpText
+  , usageText
+  , runnerChecklist
+  ) where
 
 import Prelude
 import Effect (Effect)
@@ -14,7 +18,7 @@ helpText =
   "ccc — call coding CLIs\n"
     <> "\n"
     <> "Usage:\n"
-    <> "  ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"\n"
+    <> "  ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"\n"
     <> "  ccc --help\n"
     <> "  ccc -h\n"
     <> "\n"
@@ -23,17 +27,21 @@ helpText =
     <> "                opencode (oc), claude (cc), kimi (k), codex (rc), crush (cr)\n"
     <> "  +thinking     Set thinking level: +0 (off) through +4 (max)\n"
     <> "  :provider:model  Override provider and model\n"
-    <> "  @alias        Use a named preset from config\n"
+    <> "  @name         Use a named preset from config; if no preset exists, treat it as an agent\n"
     <> "\n"
     <> "Examples:\n"
     <> "  ccc \"Fix the failing tests\"\n"
     <> "  ccc oc \"Refactor auth module\"\n"
     <> "  ccc cc +2 :anthropic:claude-sonnet-4-20250514 \"Add tests\"\n"
     <> "  ccc k +4 \"Debug the parser\"\n"
+    <> "  ccc @reviewer \"Audit the API boundary\"\n"
     <> "  ccc codex \"Write a unit test\"\n"
     <> "\n"
     <> "Config:\n"
-    <> "  ~/.config/ccc/config.toml  — default runner, aliases, abbreviations\n"
+    <> "  ~/.config/ccc/config.toml  — default runner, presets, abbreviations\n"
+
+usageText :: String
+usageText = "usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
 
 type RunnerEntry =
   { name :: String

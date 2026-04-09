@@ -17,21 +17,20 @@ configDirName = "ccc"
 
 defaultConfigPaths :: IO [FilePath]
 defaultConfigPaths = do
-  explicit <- lookupEnv "CCC_CONFIG"
   xdg <- lookupEnv "XDG_CONFIG_HOME"
   home <- getHomeDirectory
-  let explicitPaths = maybe [] pure explicit
-      xdgPaths = case xdg of
-        Just d  ->
+  let xdgPaths = case xdg of
+        Just d | not (null d) ->
           [ d </> configDirName </> "config.toml"
           , d </> configDirName </> "config"
           ]
         Nothing -> []
+        _ -> []
       homePaths =
         [ home </> ".config" </> configDirName </> "config.toml"
         , home </> ".config" </> configDirName </> "config"
         ]
-  return (explicitPaths ++ xdgPaths ++ homePaths)
+  return (xdgPaths ++ homePaths)
 
 loadConfig :: Maybe FilePath -> IO CccConfig
 loadConfig (Just path) = do
@@ -74,10 +73,10 @@ parseConfig contents = Right finalCfg
             (secName, "]")
               | secName == "defaults" ->
                   (cfg, Just ("defaults", ""))
-              | "alias." `isPrefixOf` secName ->
-                  (cfg, Just ("alias", drop 6 secName))
               | "aliases." `isPrefixOf` secName ->
                   (cfg, Just ("alias", drop 8 secName))
+              | "alias." `isPrefixOf` secName ->
+                  (cfg, Just ("alias", drop 6 secName))
               | secName == "abbreviations" ->
                   (cfg, Just ("abbreviations", ""))
               | otherwise -> (cfg, Nothing)
@@ -106,12 +105,13 @@ parseConfig contents = Right finalCfg
 
     applySetting cfg (Just ("alias", name)) key val =
       let aliases = ccAliases cfg
-          existing = Map.findWithDefault (AliasDef Nothing Nothing Nothing Nothing) name aliases
+          existing = Map.findWithDefault (AliasDef Nothing Nothing Nothing Nothing Nothing) name aliases
           updated = case key of
             "runner"   -> existing { adRunner = nonEmpty (parseStringValue val) }
             "thinking" -> existing { adThinking = readMaybeInt val }
             "provider" -> existing { adProvider = nonEmpty (parseStringValue val) }
             "model"    -> existing { adModel = nonEmpty (parseStringValue val) }
+            "agent"    -> existing { adAgent = nonEmpty (parseStringValue val) }
             _          -> existing
       in (cfg { ccAliases = Map.insert name updated aliases }, Just ("alias", name))
 

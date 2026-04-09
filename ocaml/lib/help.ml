@@ -1,8 +1,8 @@
 let help_text = "\
-ccc \226 call coding CLIs
+ccc - call coding CLIs
 
 Usage:
-  ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"
+  ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"
   ccc --help
   ccc -h
 
@@ -11,17 +11,18 @@ Slots (in order):
                 opencode (oc), claude (cc), kimi (k), codex (rc), crush (cr)
   +thinking     Set thinking level: +0 (off) through +4 (max)
   :provider:model  Override provider and model
-  @alias        Use a named preset from config
+  @name         Use a named preset from config; if no preset exists, treat it as an agent
 
 Examples:
   ccc \"Fix the failing tests\"
   ccc oc \"Refactor auth module\"
   ccc cc +2 :anthropic:claude-sonnet-4-20250514 \"Add tests\"
   ccc k +4 \"Debug the parser\"
+  ccc @reviewer \"Audit the API boundary\"
   ccc codex \"Write a unit test\"
 
 Config:
-  ~/.config/ccc/config.toml  \226 default runner, aliases, abbreviations
+  ~/.config/ccc/config.toml  - default runner, presets, abbreviations
 "
 
 let canonical_runners = [
@@ -73,12 +74,14 @@ let get_version binary =
          | n -> Buffer.add_subbytes buf tmp 0 n
      done with Exit -> ());
     Unix.close stdout_r;
-    if !finished then () else
-      (match Unix.waitpid [Unix.WNOHANG] pid with
-       | (_, Unix.WEXITED _) | (_, Unix.WSIGNALED _) | (_, Unix.WSTOPPED _) -> ()
-       | _ ->
-         Unix.kill pid Sys.sigkill;
-         ignore (Unix.waitpid [] pid));
+    if !finished then ()
+    else (
+      let (waited_pid, _) = Unix.waitpid [Unix.WNOHANG] pid in
+      if waited_pid = 0 then (
+        Unix.kill pid Sys.sigkill;
+        ignore (Unix.waitpid [] pid)
+      )
+    );
     let s = Buffer.contents buf in
     let trimmed = String.trim s in
     if trimmed = "" then "" else
@@ -90,7 +93,7 @@ let get_version binary =
 let runner_checklist () =
   let lines = Buffer.create 256 in
   Buffer.add_string lines "Runners:\n";
-  List.iter (fun (name, alias) ->
+  List.iter (fun (name, _) ->
     let binary = match Hashtbl.find_opt Parser.runner_registry name with
       | Some info -> info.binary
       | None -> name
@@ -113,5 +116,5 @@ let print_help () =
   output_string stdout (runner_checklist ())
 
 let print_usage () =
-  output_string stderr "usage: ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"\n";
+  output_string stderr "usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"\n";
   output_string stderr (runner_checklist ())

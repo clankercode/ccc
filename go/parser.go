@@ -13,6 +13,7 @@ type RunnerInfo struct {
 	ThinkingFlags map[int][]string
 	ProviderFlag  string
 	ModelFlag     string
+	AgentFlag     string
 }
 
 type ParsedArgs struct {
@@ -29,6 +30,7 @@ type AliasDef struct {
 	Thinking *int
 	Provider *string
 	Model    *string
+	Agent    *string
 }
 
 type CccConfig struct {
@@ -55,6 +57,7 @@ func init() {
 		"opencode": {
 			Binary:    "opencode",
 			ExtraArgs: []string{"run"},
+			AgentFlag: "--agent",
 		},
 		"claude": {
 			Binary: "claude",
@@ -66,6 +69,7 @@ func init() {
 				4: {"--thinking", "max"},
 			},
 			ModelFlag: "--model",
+			AgentFlag: "--agent",
 		},
 		"kimi": {
 			Binary: "kimi",
@@ -77,6 +81,7 @@ func init() {
 				4: {"--think", "max"},
 			},
 			ModelFlag: "--model",
+			AgentFlag: "--agent",
 		},
 		"codex": {
 			Binary:    "codex",
@@ -140,7 +145,7 @@ func resolveRunnerName(name *string, config *CccConfig) string {
 	return *name
 }
 
-func ResolveCommand(parsed ParsedArgs, config *CccConfig) ([]string, map[string]string, error) {
+func ResolveCommand(parsed ParsedArgs, config *CccConfig) ([]string, map[string]string, []string, error) {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -154,11 +159,17 @@ func ResolveCommand(parsed ParsedArgs, config *CccConfig) ([]string, map[string]
 		}
 	}
 
+	var warnings []string
 	var aliasDef *AliasDef
 	if parsed.Alias != nil {
 		if ad, exists := config.Aliases[*parsed.Alias]; exists {
 			aliasDef = &ad
 		}
+	}
+
+	var requestedAgent *string
+	if parsed.Alias != nil && aliasDef == nil {
+		requestedAgent = parsed.Alias
 	}
 
 	if aliasDef != nil && aliasDef.Runner != nil && parsed.Runner == nil {
@@ -205,6 +216,18 @@ func ResolveCommand(parsed ParsedArgs, config *CccConfig) ([]string, map[string]
 		argv = append(argv, info.ModelFlag, *effectiveModel)
 	}
 
+	effectiveAgent := requestedAgent
+	if aliasDef != nil && aliasDef.Agent != nil && *aliasDef.Agent != "" {
+		effectiveAgent = aliasDef.Agent
+	}
+	if effectiveAgent != nil && *effectiveAgent != "" {
+		if info.AgentFlag != "" {
+			argv = append(argv, info.AgentFlag, *effectiveAgent)
+		} else {
+			warnings = append(warnings, fmt.Sprintf("warning: runner %s does not support agents; ignoring @%s", info.Binary, *effectiveAgent))
+		}
+	}
+
 	envOverrides := map[string]string{}
 	if effectiveProvider != nil && *effectiveProvider != "" {
 		envOverrides["CCC_PROVIDER"] = *effectiveProvider
@@ -212,9 +235,9 @@ func ResolveCommand(parsed ParsedArgs, config *CccConfig) ([]string, map[string]
 
 	prompt := strings.TrimSpace(parsed.Prompt)
 	if prompt == "" {
-		return nil, nil, fmt.Errorf("prompt must not be empty")
+		return nil, nil, nil, fmt.Errorf("prompt must not be empty")
 	}
 
 	argv = append(argv, prompt)
-	return argv, envOverrides, nil
+	return argv, envOverrides, warnings, nil
 }

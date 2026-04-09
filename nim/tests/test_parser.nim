@@ -69,37 +69,40 @@ suite "parseArgs":
 suite "resolveCommand":
   test "default runner":
     let p = parseArgs(@["hello"])
-    let (argv, env) = resolveCommand(p, none(CccConfig))
-    check argv == @["opencode", "run", "hello"]
-    check env.len == 0
+    let res = resolveCommand(p, none(CccConfig))
+    check res.argv == @["opencode", "run", "hello"]
+    check res.env.len == 0
+    check res.warnings.len == 0
 
   test "claude runner":
     let p = parseArgs(@["claude", "hello"])
-    let (argv, env) = resolveCommand(p, none(CccConfig))
-    check argv == @["claude", "hello"]
-    check env.len == 0
+    let res = resolveCommand(p, none(CccConfig))
+    check res.argv == @["claude", "hello"]
+    check res.env.len == 0
+    check res.warnings.len == 0
 
   test "claude thinking +3":
     let p = parseArgs(@["claude", "+3", "hello"])
-    let (argv, _) = resolveCommand(p, none(CccConfig))
-    check argv == @["claude", "--thinking", "high", "hello"]
+    let res = resolveCommand(p, none(CccConfig))
+    check res.argv == @["claude", "--thinking", "high", "hello"]
 
   test "claude thinking +0":
     let p = parseArgs(@["claude", "+0", "hello"])
-    let (argv, _) = resolveCommand(p, none(CccConfig))
-    check argv == @["claude", "--no-thinking", "hello"]
+    let res = resolveCommand(p, none(CccConfig))
+    check res.argv == @["claude", "--no-thinking", "hello"]
 
   test "codex model flag":
     let p = parseArgs(@["codex", ":gpt-4", "hello"])
-    let (argv, _) = resolveCommand(p, none(CccConfig))
-    check argv == @["codex", "--model", "gpt-4", "hello"]
+    let res = resolveCommand(p, none(CccConfig))
+    check res.argv == @["codex", "--model", "gpt-4", "hello"]
 
   test "provider sets env":
     let p = parseArgs(@[":anthropic:opus", "hello"])
-    let (argv, env) = resolveCommand(p, none(CccConfig))
-    check argv == @["opencode", "run", "hello"]
-    check env.hasKey("CCC_PROVIDER")
-    check env["CCC_PROVIDER"] == "anthropic"
+    let res = resolveCommand(p, none(CccConfig))
+    check res.argv == @["opencode", "run", "hello"]
+    check res.env.hasKey("CCC_PROVIDER")
+    check res.env["CCC_PROVIDER"] == "anthropic"
+    check res.warnings.len == 0
 
   test "empty prompt raises ValueError":
     let p = parseArgs(@["+2"])
@@ -117,11 +120,13 @@ suite "resolveCommand":
       runner: some("claude"),
       thinking: some(1),
       provider: none(string),
-      model: none(string)
+      model: none(string),
+      agent: none(string)
     )
     let p = parseArgs(@["@fast", "hello"])
-    let (argv, _) = resolveCommand(p, some(cfg))
-    check argv == @["claude", "--thinking", "low", "hello"]
+    let res = resolveCommand(p, some(cfg))
+    check res.argv == @["claude", "--thinking", "low", "hello"]
+    check res.warnings.len == 0
 
   test "alias with provider and model":
     var cfg = defaultConfig()
@@ -129,37 +134,76 @@ suite "resolveCommand":
       runner: some("claude"),
       thinking: some(4),
       provider: some("anthropic"),
-      model: some("opus")
+      model: some("opus"),
+      agent: none(string)
     )
     let p = parseArgs(@["@deep", "hello"])
-    let (argv, env) = resolveCommand(p, some(cfg))
-    check argv[0] == "claude"
-    check env["CCC_PROVIDER"] == "anthropic"
+    let res = resolveCommand(p, some(cfg))
+    check res.argv[0] == "claude"
+    check res.env["CCC_PROVIDER"] == "anthropic"
+    check res.warnings.len == 0
+
+  test "name falls back to agent when preset missing":
+    let p = parseArgs(@["@reviewer", "hello"])
+    let res = resolveCommand(p, none(CccConfig))
+    check res.argv == @["opencode", "run", "--agent", "reviewer", "hello"]
+    check res.env.len == 0
+    check res.warnings.len == 0
+
+  test "preset agent is applied":
+    var cfg = defaultConfig()
+    cfg.aliases["work"] = AliasDef(
+      runner: some("opencode"),
+      thinking: none(int),
+      provider: none(string),
+      model: none(string),
+      agent: some("specialist")
+    )
+    let p = parseArgs(@["@work", "hello"])
+    let res = resolveCommand(p, some(cfg))
+    check res.argv == @["opencode", "run", "--agent", "specialist", "hello"]
+    check res.warnings.len == 0
+
+  test "unsupported runner warns about agent":
+    var cfg = defaultConfig()
+    cfg.aliases["work"] = AliasDef(
+      runner: some("rc"),
+      thinking: none(int),
+      provider: none(string),
+      model: none(string),
+      agent: some("reviewer")
+    )
+    let p = parseArgs(@["@work", "hello"])
+    let res = resolveCommand(p, some(cfg))
+    check res.argv == @["codex", "hello"]
+    check res.warnings == @[
+      "warning: runner \"rc\" does not support agents; ignoring @reviewer"
+    ]
 
   test "abbreviation resolution":
     var cfg = defaultConfig()
     cfg.abbreviations["c"] = "kimi"
     let p = parseArgs(@["c", "hello"])
-    let (argv, _) = resolveCommand(p, some(cfg))
-    check argv == @["kimi", "hello"]
+    let res = resolveCommand(p, some(cfg))
+    check res.argv == @["kimi", "hello"]
 
   test "config default thinking":
     var cfg = defaultConfig()
     cfg.defaultThinking = some(2)
     let p = parseArgs(@["claude", "hello"])
-    let (argv, _) = resolveCommand(p, some(cfg))
-    check argv == @["claude", "--thinking", "medium", "hello"]
+    let res = resolveCommand(p, some(cfg))
+    check res.argv == @["claude", "--thinking", "medium", "hello"]
 
   test "config default provider":
     var cfg = defaultConfig()
     cfg.defaultProvider = "openai"
     let p = parseArgs(@["hello"])
-    let (_, env) = resolveCommand(p, some(cfg))
-    check env["CCC_PROVIDER"] == "openai"
+    let res = resolveCommand(p, some(cfg))
+    check res.env["CCC_PROVIDER"] == "openai"
 
   test "config default model":
     var cfg = defaultConfig()
     cfg.defaultModel = "gpt-4"
     let p = parseArgs(@["codex", "hello"])
-    let (argv, _) = resolveCommand(p, some(cfg))
-    check argv == @["codex", "--model", "gpt-4", "hello"]
+    let res = resolveCommand(p, some(cfg))
+    check res.argv == @["codex", "--model", "gpt-4", "hello"]

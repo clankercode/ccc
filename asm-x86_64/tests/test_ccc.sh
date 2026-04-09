@@ -12,9 +12,30 @@ if [ "$1" != "run" ]; then
   exit 9
 fi
 shift
-printf "opencode run %s\n" "$1"
+agent=""
+if [ "$1" = "--agent" ]; then
+  agent="$2"
+  shift 2
+fi
+if [ -n "$agent" ]; then
+  printf "opencode run --agent %s %s\n" "$agent" "$1"
+else
+  printf "opencode run %s\n" "$1"
+fi
 MOCK
 chmod +x "$MOCK_DIR/opencode"
+
+cat > "$MOCK_DIR/claude" << 'MOCK'
+#!/bin/sh
+printf "claude %s\n" "$1"
+MOCK
+chmod +x "$MOCK_DIR/claude"
+
+cat > "$MOCK_DIR/codex" << 'MOCK'
+#!/bin/sh
+printf "codex %s\n" "$1"
+MOCK
+chmod +x "$MOCK_DIR/codex"
 
 PASS=0
 FAIL=0
@@ -56,6 +77,14 @@ else
     fail "whitespace prompt (rc=$rc, out=$out)"
 fi
 
+echo "help surface..."
+out=$("$CCC" --help 2>&1); rc=$?
+if [ "$rc" = 0 ] && echo "$out" | grep -q '\[@name\]' && echo "$out" | grep -q 'preset/agent fallback' && echo "$out" | grep -q 'Runner/thinking/provider CLI slots are not parsed here.'; then
+    pass "help surface"
+else
+    fail "help surface (rc=$rc, out=$out)"
+fi
+
 echo "happy path..."
 out=$(CCC_REAL_OPENCODE="$MOCK_DIR/opencode" "$CCC" "hello world" 2>&1); rc=$?
 if [ "$rc" = 0 ] && [ "$out" = "opencode run hello world" ]; then
@@ -64,12 +93,52 @@ else
     fail "happy path (rc=$rc, out=$out)"
 fi
 
+echo "@name falls back to agent..."
+out=$(PATH="$MOCK_DIR:$PATH" CCC_REAL_OPENCODE="$MOCK_DIR/opencode" "$CCC" "@reviewer" "hello world" 2>&1); rc=$?
+if [ "$rc" = 0 ] && [ "$out" = "opencode run --agent reviewer hello world" ]; then
+    pass "@name falls back to agent"
+else
+    fail "@name falls back to agent (rc=$rc, out=$out)"
+fi
+
+echo "preset agent..."
+mkdir -p "$MOCK_DIR/xdg/ccc"
+cat > "$MOCK_DIR/xdg/ccc/config.toml" << 'MOCK'
+[aliases.reviewer]
+agent = "specialist"
+MOCK
+out=$(PATH="$MOCK_DIR:$PATH" XDG_CONFIG_HOME="$MOCK_DIR/xdg" CCC_REAL_OPENCODE="$MOCK_DIR/opencode" "$CCC" "@reviewer" "hello" 2>&1); rc=$?
+if [ "$rc" = 0 ] && [ "$out" = "opencode run --agent specialist hello" ]; then
+    pass "preset agent"
+else
+    fail "preset agent (rc=$rc, out=$out)"
+fi
+
 echo "env override..."
 out=$(CCC_REAL_OPENCODE="$MOCK_DIR/opencode" "$CCC" "test prompt" 2>&1); rc=$?
 if [ "$rc" = 0 ] && [ "$out" = "opencode run test prompt" ]; then
     pass "env override"
 else
     fail "env override (rc=$rc, out=$out)"
+fi
+
+echo "unsupported agent warning..."
+mkdir -p "$MOCK_DIR/xdg_warn/ccc"
+cat > "$MOCK_DIR/xdg_warn/ccc/config.toml" << 'MOCK'
+[defaults]
+runner = "codex"
+MOCK
+stdout_file="$MOCK_DIR/stdout"
+stderr_file="$MOCK_DIR/stderr"
+: > "$stdout_file"
+: > "$stderr_file"
+PATH="$MOCK_DIR:$PATH" XDG_CONFIG_HOME="$MOCK_DIR/xdg_warn" "$CCC" "@reviewer" "warn me" >"$stdout_file" 2>"$stderr_file"; rc=$?
+stdout=$(cat "$stdout_file")
+stderr=$(cat "$stderr_file")
+if [ "$rc" = 0 ] && [ "$stdout" = "codex warn me" ] && echo "$stderr" | grep -q 'warning: runner "codex" does not support agents; ignoring @reviewer'; then
+    pass "unsupported agent warning"
+else
+    fail "unsupported agent warning (rc=$rc, stdout=$stdout, stderr=$stderr)"
 fi
 
 echo "nonexistent runner..."

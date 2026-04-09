@@ -1,10 +1,11 @@
 export class RunnerInfo {
-  constructor({ binary, extraArgs = [], thinkingFlags = {}, providerFlag = '', modelFlag = '' }) {
+  constructor({ binary, extraArgs = [], thinkingFlags = {}, providerFlag = '', modelFlag = '', agentFlag = '' }) {
     this.binary = binary
     this.extraArgs = extraArgs
     this.thinkingFlags = thinkingFlags
     this.providerFlag = providerFlag
     this.modelFlag = modelFlag
+    this.agentFlag = agentFlag
   }
 }
 
@@ -19,6 +20,7 @@ function registerDefaults() {
     thinkingFlags: {},
     providerFlag: '',
     modelFlag: '',
+    agentFlag: '--agent',
   })
   RUNNER_REGISTRY.claude = new RunnerInfo({
     binary: 'claude',
@@ -32,6 +34,7 @@ function registerDefaults() {
     },
     providerFlag: '',
     modelFlag: '--model',
+    agentFlag: '--agent',
   })
   RUNNER_REGISTRY.kimi = new RunnerInfo({
     binary: 'kimi',
@@ -45,6 +48,7 @@ function registerDefaults() {
     },
     providerFlag: '',
     modelFlag: '--model',
+    agentFlag: '--agent',
   })
   RUNNER_REGISTRY.codex = new RunnerInfo({
     binary: 'codex',
@@ -126,6 +130,7 @@ export function resolveCommand(parsed, config) {
     }
   }
 
+  const warnings = []
   let runnerName = resolveRunnerName(parsed.runner, config)
   let info = RUNNER_REGISTRY[runnerName] || RUNNER_REGISTRY[config.defaultRunner] || RUNNER_REGISTRY.opencode
 
@@ -135,8 +140,8 @@ export function resolveCommand(parsed, config) {
   }
 
   if (aliasDef && aliasDef.runner && parsed.runner === null) {
-    const effectiveRunnerName = resolveRunnerName(aliasDef.runner, config)
-    info = RUNNER_REGISTRY[effectiveRunnerName] || info
+    runnerName = resolveRunnerName(aliasDef.runner, config)
+    info = RUNNER_REGISTRY[runnerName] || info
   }
 
   const argv = [info.binary, ...info.extraArgs]
@@ -172,6 +177,23 @@ export function resolveCommand(parsed, config) {
     argv.push(info.modelFlag, effectiveModel)
   }
 
+  let effectiveAgent = null
+  if (parsed.alias && !aliasDef) {
+    effectiveAgent = parsed.alias
+  }
+  if (effectiveAgent === null && aliasDef && aliasDef.agent) {
+    effectiveAgent = aliasDef.agent
+  }
+  if (effectiveAgent) {
+    if (info.agentFlag) {
+      argv.push(info.agentFlag, effectiveAgent)
+    } else {
+      warnings.push(
+        `warning: runner "${runnerName}" does not support agents; ignoring @${effectiveAgent}`,
+      )
+    }
+  }
+
   const envOverrides = {}
   if (effectiveProvider) {
     envOverrides.CCC_PROVIDER = effectiveProvider
@@ -183,5 +205,5 @@ export function resolveCommand(parsed, config) {
   }
 
   argv.push(prompt)
-  return { argv, env: envOverrides }
+  return { argv, env: envOverrides, warnings }
 }

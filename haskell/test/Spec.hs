@@ -3,11 +3,13 @@ module Main where
 import CallCodingClis.Config (parseConfig)
 import CallCodingClis.PromptSpec (buildPromptSpec)
 import CallCodingClis.Runner (run, stream)
-import CallCodingClis.Parser (ccDefaultRunner)
+import CallCodingClis.Help (helpText, usageText)
+import CallCodingClis.Parser (AliasDef(..), ccAliases, ccDefaultRunner)
 import CallCodingClis.Types
 import Control.Monad (when)
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
+import qualified Data.Map.Strict as Map
 import ParserSpec (parserSpec)
 import JsonOutputSpec (jsonOutputSpec)
 import System.Exit (exitFailure, exitSuccess)
@@ -78,6 +80,23 @@ main = do
     Left err -> do
       putStrLn $ "FAIL: parseConfig defaults section returned Left: " ++ err
       exitFailure
+
+  case parseConfig "[aliases.work]\nrunner = \"cc\"\nagent = \"reviewer\"\n" of
+    Right cfg -> do
+      case Map.lookup "work" (ccAliases cfg) of
+        Just aliasDef -> assertEqual "alias agent" (Just "reviewer") (adAgent aliasDef)
+        Nothing -> do
+          putStrLn "FAIL: parseConfig aliases section missing work alias"
+          exitFailure
+    Left err -> do
+      putStrLn $ "FAIL: parseConfig aliases section returned Left: " ++ err
+      exitFailure
+
+  putStrLn "=== Help ==="
+
+  assertContains "help usage" "ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"" helpText
+  assertContains "help agent fallback" "if no preset exists, treat it as an agent" helpText
+  assertContains "usage line" "[@name]" usageText
 
   putStrLn "=== Runner ==="
 

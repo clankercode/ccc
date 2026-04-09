@@ -117,6 +117,9 @@ func loadFromFile(path string) *CccConfig {
 				case "model":
 					v := unquote(val)
 					alias.Model = &v
+				case "agent":
+					v := unquote(val)
+					alias.Agent = &v
 				}
 				config.Aliases[subsection] = alias
 			}

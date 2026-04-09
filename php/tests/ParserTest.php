@@ -132,6 +132,45 @@ assert_test('codex model flag', $r['argv'] === ['codex', '--model', 'my-model', 
 $r = Parser::resolveCommand(Parser::parseArgs(['crush', 'hello']));
 assert_test('crush no model flag', $r['argv'] === ['crush', 'hello']);
 
+$warnings = [];
+$r = Parser::resolveCommand(Parser::parseArgs(['@reviewer', 'hello']), null, $warnings);
+assert_test('name fallback uses agent flag on opencode', $r['argv'] === ['opencode', 'run', '--agent', 'reviewer', 'hello']);
+assert_test('name fallback on opencode has no warnings', $warnings === []);
+
+$warnings = [];
+$r = Parser::resolveCommand(Parser::parseArgs(['cc', '@reviewer', 'hello']), null, $warnings);
+assert_test('name fallback uses agent flag on claude', $r['argv'] === ['claude', '--agent', 'reviewer', 'hello']);
+assert_test('name fallback on claude has no warnings', $warnings === []);
+
+$warnings = [];
+$r = Parser::resolveCommand(Parser::parseArgs(['k', '@reviewer', 'hello']), null, $warnings);
+assert_test('name fallback uses agent flag on kimi', $r['argv'] === ['kimi', '--agent', 'reviewer', 'hello']);
+assert_test('name fallback on kimi has no warnings', $warnings === []);
+
+$warnings = [];
+$r = Parser::resolveCommand(Parser::parseArgs(['rc', '@reviewer', 'hello']), null, $warnings);
+assert_test('name fallback warning on unsupported runner', $r['argv'] === ['codex', 'hello']);
+assert_test('name fallback warning text', $warnings === ['warning: runner "rc" does not support agents; ignoring @reviewer']);
+
+$cfg = new CccConfig();
+$alias = new AliasDef();
+$alias->agent = 'specialist';
+$cfg->aliases['work'] = $alias;
+$warnings = [];
+$r = Parser::resolveCommand(Parser::parseArgs(['@work', 'hello']), $cfg, $warnings);
+assert_test('preset agent wins over fallback', $r['argv'] === ['opencode', 'run', '--agent', 'specialist', 'hello']);
+assert_test('preset agent has no warnings', $warnings === []);
+
+$cfg = new CccConfig();
+$alias = new AliasDef();
+$alias->runner = 'claude';
+$alias->agent = 'specialist';
+$cfg->aliases['work'] = $alias;
+$warnings = [];
+$r = Parser::resolveCommand(Parser::parseArgs(['k', '@work', 'hello']), $cfg, $warnings);
+assert_test('explicit runner overrides preset runner with agent retained', $r['argv'] === ['kimi', '--agent', 'specialist', 'hello']);
+assert_test('explicit runner with preset agent has no warnings', $warnings === []);
+
 echo "\n";
 echo "Results: $passed passed, $failed failed\n";
 exit($failed > 0 ? 1 : 0);

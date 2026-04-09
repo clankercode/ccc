@@ -22,6 +22,7 @@ data RunnerInfo = RunnerInfo
   , riThinkingFlags :: Map Int [String]
   , riProviderFlag  :: String
   , riModelFlag     :: String
+  , riAgentFlag     :: String
   } deriving (Eq, Show)
 
 data ParsedArgs = ParsedArgs
@@ -38,6 +39,7 @@ data AliasDef = AliasDef
   , adThinking :: Maybe Int
   , adProvider :: Maybe String
   , adModel    :: Maybe String
+  , adAgent    :: Maybe String
   } deriving (Eq, Show)
 
 data CccConfig = CccConfig
@@ -52,23 +54,23 @@ data CccConfig = CccConfig
 runnerRegistry :: Map String RunnerInfo
 runnerRegistry = Map.fromList $ baseRunners ++ abbrevs
   where
-    opencode = RunnerInfo "opencode" ["run"] Map.empty "" ""
+    opencode = RunnerInfo "opencode" ["run"] Map.empty "" "" "--agent"
     claude = RunnerInfo "claude" [] (Map.fromList
       [ (0, ["--no-thinking"])
       , (1, ["--thinking", "low"])
       , (2, ["--thinking", "medium"])
       , (3, ["--thinking", "high"])
       , (4, ["--thinking", "max"])
-      ]) "" "--model"
+      ]) "" "--model" "--agent"
     kimi = RunnerInfo "kimi" [] (Map.fromList
       [ (0, ["--no-think"])
       , (1, ["--think", "low"])
       , (2, ["--think", "medium"])
       , (3, ["--think", "high"])
       , (4, ["--think", "max"])
-      ]) "" "--model"
-    codex = RunnerInfo "codex" [] Map.empty "" "--model"
-    crush = RunnerInfo "crush" [] Map.empty "" ""
+      ]) "" "--model" "--agent"
+    codex = RunnerInfo "codex" [] Map.empty "" "--model" ""
+    crush = RunnerInfo "crush" [] Map.empty "" "" ""
 
     baseRunners =
       [ ("opencode", opencode)
@@ -167,10 +169,11 @@ nonEmpty s
   | null s    = Nothing
   | otherwise = Just s
 
-resolveCommand :: ParsedArgs -> Maybe CccConfig -> Either String ([String], Map String String)
+resolveCommand :: ParsedArgs -> Maybe CccConfig -> Either String ([String], Map String String, [String])
 resolveCommand parsed mConfig =
   let
     config = fromMaybe defaultConfig mConfig
+    warnings = []
 
     runnerName = resolveRunnerName (paRunner parsed) config
 
@@ -180,6 +183,9 @@ resolveCommand parsed mConfig =
       Map.lookup (ccDefaultRunner config) runnerRegistry
 
     aliasDef = paAlias parsed >>= \a -> Map.lookup a (ccAliases config)
+    effectiveRunnerName = case (aliasDef >>= adRunner, paRunner parsed) of
+      (Just ar, Nothing) -> resolveRunnerName (Just ar) config
+      _                  -> runnerName
 
     effectiveInfo = case (aliasDef >>= adRunner, paRunner parsed) of
       (Just ar, Nothing) ->
@@ -210,10 +216,25 @@ resolveCommand parsed mConfig =
       (aliasDef >>= adModel) <|>
       nonEmpty (ccDefaultModel config)
 
+    effectiveAgent = case paAlias parsed of
+      Nothing    -> Nothing
+      Just alias ->
+        case aliasDef >>= adAgent of
+          Just agent -> Just agent
+          Nothing    -> if Map.member alias (ccAliases config) then Nothing else Just alias
+
     argvWithModel = case effectiveModel of
       Just m | not (null (riModelFlag effectiveInfo)) ->
         argvWithThinking ++ [riModelFlag effectiveInfo, m]
       _ -> argvWithThinking
+
+    (argvWithAgent, warnings') = case effectiveAgent of
+      Just agent | not (null (riAgentFlag effectiveInfo)) ->
+        (argvWithModel ++ [riAgentFlag effectiveInfo, agent], warnings)
+      Just agent ->
+        let warning = "warning: runner \"" ++ effectiveRunnerName ++ "\" does not support agents; ignoring @" ++ agent
+        in (argvWithModel, warnings ++ [warning])
+      Nothing -> (argvWithModel, warnings)
 
     envOverrides = case effectiveProvider of
       Just p  -> Map.singleton "CCC_PROVIDER" p
@@ -223,4 +244,4 @@ resolveCommand parsed mConfig =
   in
     if null prompt
       then Left "prompt must not be empty"
-      else Right (argvWithModel ++ [prompt], envOverrides)
+      else Right (argvWithAgent ++ [prompt], envOverrides, warnings')

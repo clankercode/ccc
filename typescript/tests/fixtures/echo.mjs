@@ -1,1 +1,1 @@
-console.log('fixture-ok')
+process.stdout.write('fixture-ok\n')

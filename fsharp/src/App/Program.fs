@@ -19,7 +19,8 @@ let main args =
         let config = Config.loadConfig None
 
         try
-            let argv, env = Parser.resolveCommand parsed (Some config)
+            let argv, env, warnings = Parser.resolveCommand parsed (Some config)
+            warnings |> List.iter (fun warning -> eprintfn "%s" warning)
             let argv =
                 match binaryOverride with
                 | Some b -> b :: (List.skip 1 argv)

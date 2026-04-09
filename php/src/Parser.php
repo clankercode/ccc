@@ -9,19 +9,22 @@ class RunnerInfo
     public array $thinkingFlags;
     public string $providerFlag;
     public string $modelFlag;
+    public string $agentFlag;
 
     public function __construct(
         string $binary,
         array $extraArgs = [],
         array $thinkingFlags = [],
         string $providerFlag = '',
-        string $modelFlag = ''
+        string $modelFlag = '',
+        string $agentFlag = ''
     ) {
         $this->binary = $binary;
         $this->extraArgs = $extraArgs;
         $this->thinkingFlags = $thinkingFlags;
         $this->providerFlag = $providerFlag;
         $this->modelFlag = $modelFlag;
+        $this->agentFlag = $agentFlag;
     }
 }
 
@@ -41,6 +44,7 @@ class AliasDef
     public ?int $thinking = null;
     public ?string $provider = null;
     public ?string $model = null;
+    public ?string $agent = null;
 }
 
 class CccConfig
@@ -76,7 +80,8 @@ class Parser
             ['run'],
             [],
             '',
-            ''
+            '',
+            '--agent'
         );
 
         self::$runnerRegistry['claude'] = new RunnerInfo(
@@ -90,7 +95,8 @@ class Parser
                 4 => ['--thinking', 'max'],
             ],
             '',
-            '--model'
+            '--model',
+            '--agent'
         );
 
         self::$runnerRegistry['kimi'] = new RunnerInfo(
@@ -104,7 +110,8 @@ class Parser
                 4 => ['--think', 'max'],
             ],
             '',
-            '--model'
+            '--model',
+            '--agent'
         );
 
         self::$runnerRegistry['codex'] = new RunnerInfo(
@@ -173,11 +180,12 @@ class Parser
         return $config->abbreviations[$name] ?? $name;
     }
 
-    public static function resolveCommand(ParsedArgs $parsed, ?CccConfig $config = null): array
+    public static function resolveCommand(ParsedArgs $parsed, ?CccConfig $config = null, ?array &$warnings = null): array
     {
         if ($config === null) {
             $config = new CccConfig();
         }
+        $warnings = [];
 
         $registry = self::getRegistry();
         $runnerName = self::resolveRunnerName($parsed->runner, $config);
@@ -190,6 +198,7 @@ class Parser
         if ($parsed->alias !== null && isset($config->aliases[$parsed->alias])) {
             $aliasDef = $config->aliases[$parsed->alias];
         }
+        $requestedAgent = ($parsed->alias !== null && $aliasDef === null) ? $parsed->alias : null;
 
         $effectiveRunnerName = $runnerName;
         if ($aliasDef !== null && $aliasDef->runner !== null && $parsed->runner === null) {
@@ -231,6 +240,23 @@ class Parser
             $cmdArgv[] = $effectiveModel;
         }
 
+        $effectiveAgent = $requestedAgent;
+        if ($effectiveAgent === null && $aliasDef !== null && $aliasDef->agent !== null && $aliasDef->agent !== '') {
+            $effectiveAgent = $aliasDef->agent;
+        }
+        if ($effectiveAgent !== null && $effectiveAgent !== '') {
+            if ($info->agentFlag !== '') {
+                $cmdArgv[] = $info->agentFlag;
+                $cmdArgv[] = $effectiveAgent;
+            } else {
+                $warnings[] = sprintf(
+                    'warning: runner "%s" does not support agents; ignoring @%s',
+                    $effectiveRunnerName,
+                    $effectiveAgent
+                );
+            }
+        }
+
         $envOverrides = [];
         if ($effectiveProvider !== '' && $effectiveProvider !== null) {
             $envOverrides['CCC_PROVIDER'] = $effectiveProvider;
@@ -243,6 +269,6 @@ class Parser
 
         $cmdArgv[] = $prompt;
 
-        return ['argv' => $cmdArgv, 'env' => $envOverrides];
+        return ['argv' => $cmdArgv, 'env' => $envOverrides, 'warnings' => $warnings];
     }
 }

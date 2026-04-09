@@ -33,6 +33,10 @@ if ($@) {
     exit 1;
 }
 
+if ($cmd->{warnings} && @{$cmd->{warnings}}) {
+    print STDERR "$_\n" for @{$cmd->{warnings}};
+}
+
 my @argv = @{$cmd->{argv}};
 if ($ENV{CCC_REAL_OPENCODE}) {
     $argv[0] = $ENV{CCC_REAL_OPENCODE};

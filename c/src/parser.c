@@ -3,6 +3,7 @@
 #include "parser.h"
 
 #include <ctype.h>
+#include <stdio.h>
 #include <strings.h>
 #include <string.h>
 
@@ -13,6 +14,7 @@ static const RunnerInfo OPENCODE_INFO = {
     .thinking = {{{0}}, {{0}}, {{0}}, {{0}}, {{0}}},
     .provider_flag = "",
     .model_flag = "",
+    .agent_flag = "--agent",
 };
 
 static const RunnerInfo CLAUDE_INFO = {
@@ -28,6 +30,7 @@ static const RunnerInfo CLAUDE_INFO = {
     },
     .provider_flag = "",
     .model_flag = "--model",
+    .agent_flag = "--agent",
 };
 
 static const RunnerInfo KIMI_INFO = {
@@ -43,6 +46,7 @@ static const RunnerInfo KIMI_INFO = {
     },
     .provider_flag = "",
     .model_flag = "--model",
+    .agent_flag = "--agent",
 };
 
 static const RunnerInfo CODEX_INFO = {
@@ -52,6 +56,7 @@ static const RunnerInfo CODEX_INFO = {
     .thinking = {{{0}}, {{0}}, {{0}}, {{0}}, {{0}}},
     .provider_flag = "",
     .model_flag = "--model",
+    .agent_flag = "",
 };
 
 static const RunnerInfo CRUSH_INFO = {
@@ -61,6 +66,7 @@ static const RunnerInfo CRUSH_INFO = {
     .thinking = {{{0}}, {{0}}, {{0}}, {{0}}, {{0}}},
     .provider_flag = "",
     .model_flag = "",
+    .agent_flag = "",
 };
 
 void ccc_init_config(CccConfig *config) {
@@ -210,13 +216,19 @@ static const char *resolve_runner_name(const char *name, const CccConfig *config
     return name;
 }
 
+static int runner_supports_agent(const RunnerInfo *info) {
+    return info != NULL && info->agent_flag != NULL && info->agent_flag[0] != '\0';
+}
+
 int ccc_resolve_command(
     ParsedArgs *parsed,
     const CccConfig *config,
     const char *out_argv[],
     int out_argv_max,
     char *out_provider,
-    int provider_max
+    int provider_max,
+    char warnings[][CCC_MAX_WARNING_LEN],
+    int warnings_max
 ) {
     const char *runner_name = resolve_runner_name(
         parsed->has_runner ? parsed->runner : NULL, config);
@@ -230,6 +242,7 @@ int ccc_resolve_command(
     }
 
     const AliasDef *alias_def = NULL;
+    const char *effective_runner_name = runner_name;
     if (parsed->has_alias) {
         for (int i = 0; i < config->alias_count; i++) {
             if (strcmp(config->aliases[i].name, parsed->alias) == 0) {
@@ -242,6 +255,7 @@ int ccc_resolve_command(
     const RunnerInfo *effective_info = info;
     if (alias_def && alias_def->has_runner && !parsed->has_runner) {
         const char *alias_runner = resolve_runner_name(alias_def->runner, config);
+        effective_runner_name = alias_runner;
         const RunnerInfo *alias_info = ccc_get_runner(alias_runner);
         if (alias_info != NULL) effective_info = alias_info;
     }
@@ -301,6 +315,36 @@ int ccc_resolve_command(
             out_provider[provider_max - 1] = '\0';
         } else {
             out_provider[0] = '\0';
+        }
+    }
+
+    if (warnings != NULL && warnings_max > 0) {
+        warnings[0][0] = '\0';
+    }
+
+    const char *effective_agent = NULL;
+    if (parsed->has_alias) {
+        if (alias_def != NULL && alias_def->has_agent) {
+            effective_agent = alias_def->agent;
+        } else if (alias_def == NULL) {
+            effective_agent = parsed->alias;
+        }
+    }
+
+    if (effective_agent != NULL && effective_agent[0] != '\0') {
+        if (runner_supports_agent(effective_info)) {
+            if (argc + 2 < out_argv_max) {
+                out_argv[argc++] = effective_info->agent_flag;
+                out_argv[argc++] = effective_agent;
+            }
+        } else if (warnings != NULL && warnings_max > 0) {
+            snprintf(
+                warnings[0],
+                CCC_MAX_WARNING_LEN,
+                "warning: runner \"%s\" does not support agents; ignoring @%s",
+                effective_runner_name,
+                effective_agent
+            );
         }
     }
 

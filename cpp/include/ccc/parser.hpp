@@ -2,6 +2,7 @@
 
 #include <map>
 #include <optional>
+#include <tuple>
 #include <string>
 #include <utility>
 #include <vector>
@@ -12,6 +13,7 @@ struct RunnerInfo {
     std::map<int, std::vector<std::string>> thinking_flags;
     std::string provider_flag;
     std::string model_flag;
+    std::string agent_flag;
 };
 
 struct ParsedArgs {
@@ -28,6 +30,7 @@ struct AliasDef {
     std::optional<int> thinking;
     std::optional<std::string> provider;
     std::optional<std::string> model;
+    std::optional<std::string> agent;
 };
 
 struct CccConfig {
@@ -43,5 +46,5 @@ const std::map<std::string, RunnerInfo>& getRunnerRegistry();
 
 ParsedArgs parseArgs(const std::vector<std::string>& argv);
 
-std::pair<std::vector<std::string>, std::map<std::string, std::string>>
+std::tuple<std::vector<std::string>, std::map<std::string, std::string>, std::vector<std::string>>
 resolveCommand(const ParsedArgs& parsed, const CccConfig* config = nullptr);

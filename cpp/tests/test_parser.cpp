@@ -1,9 +1,11 @@
 #include <ccc/config.hpp>
+#include <ccc/help.hpp>
 #include <ccc/parser.hpp>
 
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -95,12 +97,27 @@ TEST_F(ParseArgsTest, MultiWordPrompt) {
     EXPECT_EQ(p.prompt, "fix the bug");
 }
 
+class HelpTest : public ::testing::Test {};
+
+TEST_F(HelpTest, HelpTextUsesNameSlotAndFallback) {
+    std::string help = HELP_TEXT;
+    EXPECT_NE(help.find("[@name]"), std::string::npos);
+    EXPECT_NE(help.find("if no preset exists, treat it as an agent"), std::string::npos);
+}
+
+TEST_F(HelpTest, PrintUsageUsesNameSlot) {
+    testing::internal::CaptureStderr();
+    printUsage();
+    std::string usage = testing::internal::GetCapturedStderr();
+    EXPECT_NE(usage.find("[@name]"), std::string::npos);
+}
+
 class ResolveCommandTest : public ::testing::Test {};
 
 TEST_F(ResolveCommandTest, DefaultRunnerIsOpencode) {
     ParsedArgs parsed;
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed);
+    auto [argv, env, warnings] = resolveCommand(parsed);
     EXPECT_EQ(argv[0], "opencode");
     EXPECT_NE(std::find(argv.begin(), argv.end(), "run"), argv.end());
     EXPECT_NE(std::find(argv.begin(), argv.end(), "hello"), argv.end());
@@ -110,7 +127,7 @@ TEST_F(ResolveCommandTest, ClaudeRunner) {
     ParsedArgs parsed;
     parsed.runner = "cc";
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed);
+    auto [argv, env, warnings] = resolveCommand(parsed);
     EXPECT_EQ(argv[0], "claude");
     EXPECT_EQ(std::find(argv.begin(), argv.end(), "run"), argv.end());
     EXPECT_NE(std::find(argv.begin(), argv.end(), "hello"), argv.end());
@@ -121,7 +138,7 @@ TEST_F(ResolveCommandTest, ThinkingFlagsForClaude) {
     parsed.runner = "cc";
     parsed.thinking = 2;
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed);
+    auto [argv, env, warnings] = resolveCommand(parsed);
     EXPECT_NE(std::find(argv.begin(), argv.end(), "--thinking"), argv.end());
     EXPECT_NE(std::find(argv.begin(), argv.end(), "medium"), argv.end());
 }
@@ -131,7 +148,7 @@ TEST_F(ResolveCommandTest, ThinkingZeroForClaude) {
     parsed.runner = "cc";
     parsed.thinking = 0;
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed);
+    auto [argv, env, warnings] = resolveCommand(parsed);
     EXPECT_NE(std::find(argv.begin(), argv.end(), "--no-thinking"), argv.end());
 }
 
@@ -140,7 +157,7 @@ TEST_F(ResolveCommandTest, ModelFlagForClaude) {
     parsed.runner = "cc";
     parsed.model = "claude-4";
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed);
+    auto [argv, env, warnings] = resolveCommand(parsed);
     EXPECT_NE(std::find(argv.begin(), argv.end(), "--model"), argv.end());
     EXPECT_NE(std::find(argv.begin(), argv.end(), "claude-4"), argv.end());
 }
@@ -149,7 +166,7 @@ TEST_F(ResolveCommandTest, ProviderSetsEnv) {
     ParsedArgs parsed;
     parsed.provider = "anthropic";
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed);
+    auto [argv, env, warnings] = resolveCommand(parsed);
     EXPECT_EQ(env.at("CCC_PROVIDER"), "anthropic");
 }
 
@@ -164,7 +181,7 @@ TEST_F(ResolveCommandTest, ConfigDefaultRunner) {
     config.default_runner = "cc";
     ParsedArgs parsed;
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed, &config);
+    auto [argv, env, warnings] = resolveCommand(parsed, &config);
     EXPECT_EQ(argv[0], "claude");
 }
 
@@ -174,7 +191,7 @@ TEST_F(ResolveCommandTest, ConfigDefaultThinking) {
     config.default_thinking = 1;
     ParsedArgs parsed;
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed, &config);
+    auto [argv, env, warnings] = resolveCommand(parsed, &config);
     EXPECT_NE(std::find(argv.begin(), argv.end(), "--thinking"), argv.end());
     EXPECT_NE(std::find(argv.begin(), argv.end(), "low"), argv.end());
 }
@@ -185,7 +202,7 @@ TEST_F(ResolveCommandTest, ConfigDefaultModel) {
     config.default_model = "claude-3.5";
     ParsedArgs parsed;
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed, &config);
+    auto [argv, env, warnings] = resolveCommand(parsed, &config);
     EXPECT_NE(std::find(argv.begin(), argv.end(), "--model"), argv.end());
     EXPECT_NE(std::find(argv.begin(), argv.end(), "claude-3.5"), argv.end());
 }
@@ -196,7 +213,7 @@ TEST_F(ResolveCommandTest, ConfigAbbreviation) {
     ParsedArgs parsed;
     parsed.runner = "mycc";
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed, &config);
+    auto [argv, env, warnings] = resolveCommand(parsed, &config);
     EXPECT_EQ(argv[0], "claude");
 }
 
@@ -210,7 +227,7 @@ TEST_F(ResolveCommandTest, AliasProvidesDefaults) {
     ParsedArgs parsed;
     parsed.alias = "work";
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed, &config);
+    auto [argv, env, warnings] = resolveCommand(parsed, &config);
     EXPECT_EQ(argv[0], "claude");
     EXPECT_NE(std::find(argv.begin(), argv.end(), "--thinking"), argv.end());
     EXPECT_NE(std::find(argv.begin(), argv.end(), "high"), argv.end());
@@ -230,7 +247,7 @@ TEST_F(ResolveCommandTest, ExplicitOverridesAlias) {
     parsed.alias = "work";
     parsed.thinking = 1;
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed, &config);
+    auto [argv, env, warnings] = resolveCommand(parsed, &config);
     EXPECT_EQ(argv[0], "kimi");
     EXPECT_NE(std::find(argv.begin(), argv.end(), "--think"), argv.end());
     EXPECT_NE(std::find(argv.begin(), argv.end(), "low"), argv.end());
@@ -241,9 +258,48 @@ TEST_F(ResolveCommandTest, KimiThinkingFlags) {
     parsed.runner = "k";
     parsed.thinking = 4;
     parsed.prompt = "hello";
-    auto [argv, env] = resolveCommand(parsed);
+    auto [argv, env, warnings] = resolveCommand(parsed);
     EXPECT_NE(std::find(argv.begin(), argv.end(), "--think"), argv.end());
     EXPECT_NE(std::find(argv.begin(), argv.end(), "max"), argv.end());
+}
+
+TEST_F(ResolveCommandTest, UnknownNameFallsBackToAgentOnOpencode) {
+    ParsedArgs parsed;
+    parsed.alias = "reviewer";
+    parsed.prompt = "hello";
+    auto [argv, env, warnings] = resolveCommand(parsed);
+    EXPECT_EQ(argv[0], "opencode");
+    EXPECT_NE(std::find(argv.begin(), argv.end(), "--agent"), argv.end());
+    EXPECT_NE(std::find(argv.begin(), argv.end(), "reviewer"), argv.end());
+    EXPECT_TRUE(warnings.empty());
+}
+
+TEST_F(ResolveCommandTest, PresetAgentAppliesWhenPresent) {
+    CccConfig config;
+    AliasDef alias;
+    alias.agent = "specialist";
+    config.aliases["reviewer"] = alias;
+    ParsedArgs parsed;
+    parsed.alias = "reviewer";
+    parsed.prompt = "hello";
+    auto [argv, env, warnings] = resolveCommand(parsed, &config);
+    EXPECT_EQ(argv[0], "opencode");
+    EXPECT_NE(std::find(argv.begin(), argv.end(), "--agent"), argv.end());
+    EXPECT_NE(std::find(argv.begin(), argv.end(), "specialist"), argv.end());
+    EXPECT_TRUE(warnings.empty());
+}
+
+TEST_F(ResolveCommandTest, UnsupportedAgentWarnsAndIsIgnored) {
+    ParsedArgs parsed;
+    parsed.runner = "rc";
+    parsed.alias = "reviewer";
+    parsed.prompt = "hello";
+    auto [argv, env, warnings] = resolveCommand(parsed);
+    EXPECT_EQ(argv[0], "codex");
+    EXPECT_EQ(std::find(argv.begin(), argv.end(), "--agent"), argv.end());
+    ASSERT_EQ(warnings.size(), 1u);
+    EXPECT_NE(warnings[0].find("warning: runner \"rc\" does not support agents; ignoring @reviewer"),
+              std::string::npos);
 }
 
 class RegistryTest : public ::testing::Test {};
@@ -262,6 +318,15 @@ TEST_F(RegistryTest, AbbreviationsShareBinary) {
     EXPECT_EQ(reg.at("cc").binary, reg.at("claude").binary);
     EXPECT_EQ(reg.at("c").binary, reg.at("claude").binary);
     EXPECT_EQ(reg.at("k").binary, reg.at("kimi").binary);
+}
+
+TEST_F(RegistryTest, AgentFlagsAreRegisteredWhereSupported) {
+    const auto& reg = getRunnerRegistry();
+    EXPECT_EQ(reg.at("opencode").agent_flag, "--agent");
+    EXPECT_EQ(reg.at("claude").agent_flag, "--agent");
+    EXPECT_EQ(reg.at("kimi").agent_flag, "--agent");
+    EXPECT_TRUE(reg.at("codex").agent_flag.empty());
+    EXPECT_TRUE(reg.at("crush").agent_flag.empty());
 }
 
 class LoadConfigTest : public ::testing::Test {};
@@ -289,6 +354,7 @@ TEST_F(LoadConfigTest, ValidTomlConfig) {
           << "runner = \"cc\"\n"
           << "thinking = 3\n"
           << "model = \"claude-4\"\n"
+          << "agent = \"reviewer\"\n"
           << "\n"
           << "[aliases.quick]\n"
           << "runner = \"oc\"\n";
@@ -307,6 +373,7 @@ TEST_F(LoadConfigTest, ValidTomlConfig) {
     ASSERT_TRUE(config.aliases["work"].thinking.has_value());
     EXPECT_EQ(config.aliases["work"].thinking.value(), 3);
     EXPECT_EQ(config.aliases["work"].model, "claude-4");
+    EXPECT_EQ(config.aliases["work"].agent, "reviewer");
     EXPECT_NE(config.aliases.find("quick"), config.aliases.end());
     EXPECT_EQ(config.aliases["quick"].runner, "oc");
 }

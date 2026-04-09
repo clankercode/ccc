@@ -21,10 +21,14 @@ func main() {
 	parsed := ccc.ParseArgs(args)
 	config := ccc.LoadConfig("")
 
-	argv, env, err := ccc.ResolveCommand(parsed, config)
+	argv, env, warnings, err := ccc.ResolveCommand(parsed, config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
+	}
+
+	for _, warning := range warnings {
+		fmt.Fprintln(os.Stderr, warning)
 	}
 
 	spec := ccc.CommandSpec{

@@ -4,6 +4,54 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+
+static int path_exists(const char *path) {
+    struct stat st;
+    return path != NULL && path[0] != '\0' && stat(path, &st) == 0;
+}
+
+static int copy_path(char *out_path, int out_max, const char *path) {
+    size_t len;
+    if (out_path == NULL || out_max <= 0 || path == NULL) return 0;
+    len = strlen(path);
+    if (len >= (size_t)out_max) return 0;
+    memcpy(out_path, path, len + 1);
+    return 1;
+}
+
+int ccc_find_config_path(
+    const char *ccc_config,
+    const char *xdg_config_home,
+    const char *home,
+    char *out_path,
+    size_t out_max
+) {
+    char candidate[512];
+
+    (void)ccc_config;
+
+    if (out_path == NULL || out_max == 0) {
+        return 0;
+    }
+    out_path[0] = '\0';
+
+    if (xdg_config_home != NULL && xdg_config_home[0] != '\0') {
+        if (snprintf(candidate, sizeof(candidate), "%s/ccc/config.toml", xdg_config_home) < (int)sizeof(candidate) &&
+            path_exists(candidate) && copy_path(out_path, (int)out_max, candidate)) {
+            return 1;
+        }
+    }
+
+    if (home != NULL && home[0] != '\0') {
+        if (snprintf(candidate, sizeof(candidate), "%s/.config/ccc/config.toml", home) < (int)sizeof(candidate) &&
+            path_exists(candidate) && copy_path(out_path, (int)out_max, candidate)) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
 
 static void trim_str(char *str) {
     char *start = str;
@@ -18,6 +66,15 @@ static void trim_str(char *str) {
     str[len] = '\0';
 }
 
+static void strip_quotes(char *str) {
+    size_t len = strlen(str);
+    if (len >= 2 &&
+        ((str[0] == '"' && str[len - 1] == '"') || (str[0] == '\'' && str[len - 1] == '\''))) {
+        memmove(str, str + 1, len - 2);
+        str[len - 2] = '\0';
+    }
+}
+
 static int parse_kv(const char *line, char *key, int key_max, char *val, int val_max) {
     const char *eq = strchr(line, '=');
     if (eq == NULL) return 0;
@@ -29,10 +86,16 @@ static int parse_kv(const char *line, char *key, int key_max, char *val, int val
     memcpy(val, eq + 1, vlen + 1);
     trim_str(key);
     trim_str(val);
+    strip_quotes(val);
     return 1;
 }
 
 int ccc_load_config(const char *path, CccConfig *out) {
+    if (out == NULL) return -1;
+    ccc_init_config(out);
+
+    if (path == NULL || path[0] == '\0') return -1;
+
     FILE *fp = fopen(path, "r");
     if (fp == NULL) return -1;
 
@@ -49,14 +112,21 @@ int ccc_load_config(const char *path, CccConfig *out) {
             if (end == NULL) continue;
             *end = '\0';
             const char *inner = line + 1;
-            const char *dot = strchr(inner, '.');
-            if (dot != NULL && strncmp(inner, "alias", (size_t)(dot - inner)) == 0) {
+            if (strcmp(inner, "defaults") == 0) {
+                section = 3;
+            } else if (strncmp(inner, "aliases.", 8) == 0) {
                 section = 1;
-                size_t nlen = strlen(dot + 1);
+                size_t nlen = strlen(inner + 8);
                 if (nlen >= sizeof(section_name)) nlen = sizeof(section_name) - 1;
-                memcpy(section_name, dot + 1, nlen);
+                memcpy(section_name, inner + 8, nlen);
                 section_name[nlen] = '\0';
-            } else if (strcmp(inner, "abbrev") == 0) {
+            } else if (strncmp(inner, "alias.", 6) == 0) {
+                section = 1;
+                size_t nlen = strlen(inner + 6);
+                if (nlen >= sizeof(section_name)) nlen = sizeof(section_name) - 1;
+                memcpy(section_name, inner + 6, nlen);
+                section_name[nlen] = '\0';
+            } else if (strcmp(inner, "abbrev") == 0 || strcmp(inner, "abbreviations") == 0) {
                 section = 2;
             } else {
                 section = 0;
@@ -75,6 +145,17 @@ int ccc_load_config(const char *path, CccConfig *out) {
             } else if (strcmp(key, "default_model") == 0) {
                 strncpy(out->default_model, val, sizeof(out->default_model) - 1);
             } else if (strcmp(key, "default_thinking") == 0) {
+                out->default_thinking = atoi(val);
+                out->has_default_thinking = 1;
+            }
+        } else if (section == 3) {
+            if (strcmp(key, "runner") == 0) {
+                strncpy(out->default_runner, val, sizeof(out->default_runner) - 1);
+            } else if (strcmp(key, "provider") == 0) {
+                strncpy(out->default_provider, val, sizeof(out->default_provider) - 1);
+            } else if (strcmp(key, "model") == 0) {
+                strncpy(out->default_model, val, sizeof(out->default_model) - 1);
+            } else if (strcmp(key, "thinking") == 0) {
                 out->default_thinking = atoi(val);
                 out->has_default_thinking = 1;
             }
@@ -100,6 +181,9 @@ int ccc_load_config(const char *path, CccConfig *out) {
             } else if (strcmp(key, "model") == 0) {
                 strncpy(ad->model, val, sizeof(ad->model) - 1);
                 ad->has_model = 1;
+            } else if (strcmp(key, "agent") == 0) {
+                strncpy(ad->agent, val, sizeof(ad->agent) - 1);
+                ad->has_agent = 1;
             }
         } else if (section == 2) {
             if (out->abbrev_count < CCC_MAX_ABBREVS) {

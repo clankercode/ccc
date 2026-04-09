@@ -9,7 +9,9 @@ module CallCodingClis
 
   def self.build_v2_spec(argv, config: nil)
     parsed = Parser.parse_args(argv)
-    cmd_argv, env = Parser.resolve_command(parsed, config)
+    warnings = []
+    cmd_argv, env = Parser.resolve_command(parsed, config, warnings: warnings)
+    warnings.each { |warning| warn warning }
     CommandSpec.new(argv: cmd_argv, env: env)
   end
 end

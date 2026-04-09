@@ -133,6 +133,27 @@ class TestParser < Minitest::Test
     assert_equal ["crush", "hello"], argv
   end
 
+  def test_resolve_name_falls_back_to_agent_for_opencode
+    parsed = CallCodingClis::Parser.parse_args(["@reviewer", "hello"])
+    argv, env = CallCodingClis::Parser.resolve_command(parsed)
+    assert_equal ["opencode", "run", "--agent", "reviewer", "hello"], argv
+    assert_equal({}, env)
+  end
+
+  def test_resolve_name_uses_agent_flag_for_claude
+    parsed = CallCodingClis::Parser.parse_args(["claude", "@reviewer", "hello"])
+    argv, env = CallCodingClis::Parser.resolve_command(parsed)
+    assert_equal ["claude", "--agent", "reviewer", "hello"], argv
+    assert_equal({}, env)
+  end
+
+  def test_resolve_name_uses_agent_flag_for_kimi
+    parsed = CallCodingClis::Parser.parse_args(["kimi", "@reviewer", "hello"])
+    argv, env = CallCodingClis::Parser.resolve_command(parsed)
+    assert_equal ["kimi", "--agent", "reviewer", "hello"], argv
+    assert_equal({}, env)
+  end
+
   def test_resolve_provider_env
     parsed = CallCodingClis::Parser.parse_args([":anthropic:gpt-4o", "hello"])
     argv, env = CallCodingClis::Parser.resolve_command(parsed)
@@ -193,6 +214,20 @@ class TestParser < Minitest::Test
     assert_equal "hello", argv.last
   end
 
+  def test_resolve_alias_agent
+    parsed = CallCodingClis::Parser.parse_args(["@fast", "hello"])
+    config = CallCodingClis::Parser::CccConfig.new(
+      aliases: {
+        "fast" => CallCodingClis::Parser::AliasDef.new(
+          agent: "specialist"
+        )
+      }
+    )
+    argv, env = CallCodingClis::Parser.resolve_command(parsed, config)
+    assert_equal ["opencode", "run", "--agent", "specialist", "hello"], argv
+    assert_equal({}, env)
+  end
+
   def test_resolve_alias_runner_overridden_by_explicit
     parsed = CallCodingClis::Parser.parse_args(["kimi", "@fast", "hello"])
     config = CallCodingClis::Parser::CccConfig.new(
@@ -204,11 +239,20 @@ class TestParser < Minitest::Test
     assert_equal "kimi", argv[0]
   end
 
-  def test_resolve_unknown_alias_ignored
+  def test_resolve_unknown_name_falls_back_to_agent
     parsed = CallCodingClis::Parser.parse_args(["@nonexistent", "hello"])
     argv, env = CallCodingClis::Parser.resolve_command(parsed)
-    assert_equal ["opencode", "run", "hello"], argv
+    assert_equal ["opencode", "run", "--agent", "nonexistent", "hello"], argv
     assert_equal({}, env)
+  end
+
+  def test_resolve_name_warning_for_unsupported_runner
+    parsed = CallCodingClis::Parser.parse_args(["codex", "@reviewer", "hello"])
+    warnings = []
+    argv, env = CallCodingClis::Parser.resolve_command(parsed, nil, warnings: warnings)
+    assert_equal ["codex", "hello"], argv
+    assert_equal({}, env)
+    assert_equal ['warning: runner "codex" does not support agents; ignoring @reviewer'], warnings
   end
 
   def test_resolve_abbreviation_via_config
@@ -298,6 +342,7 @@ class TestConfig < Minitest::Test
       thinking = 4
       provider = "anthropic"
       model = "opus"
+      agent = "specialist"
     TOML
     file.close
 
@@ -311,6 +356,7 @@ class TestConfig < Minitest::Test
     assert_equal 4, config.aliases["fast"].thinking
     assert_equal "anthropic", config.aliases["fast"].provider
     assert_equal "opus", config.aliases["fast"].model
+    assert_equal "specialist", config.aliases["fast"].agent
   ensure
     file.unlink
   end

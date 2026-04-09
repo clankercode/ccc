@@ -27,6 +27,9 @@ const config = loadConfig()
 try {
   const resolved = resolveCommand(parsed, config)
   spec = { argv: resolved.argv, env: resolved.env }
+  for (const warning of resolved.warnings || []) {
+    console.error(warning)
+  }
 } catch (err) {
   console.error(err.message)
   process.exit(1)
@@ -37,15 +40,26 @@ if (realOpencode) {
   spec.argv[0] = realOpencode
 }
 
+const pendingWrites = []
+
 const result = await new Runner().stream(
   spec,
   (channel, chunk) => {
     if (channel === 'stdout') {
-      process.stdout.write(chunk)
+      pendingWrites.push(
+        new Promise((resolve) => {
+          process.stdout.write(chunk, resolve)
+        }),
+      )
       return
     }
-    process.stderr.write(chunk)
+    pendingWrites.push(
+      new Promise((resolve) => {
+        process.stderr.write(chunk, resolve)
+      }),
+    )
   },
 )
 
-process.exit(result.exitCode)
+await Promise.all(pendingWrites)
+process.exitCode = result.exitCode

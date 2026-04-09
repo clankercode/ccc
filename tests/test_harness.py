@@ -258,6 +258,12 @@ LANGUAGES = [
         build_cmds=[["zig", "build"]],
         build_cwd=ROOT / "zig",
         invoke_fn=_zig_invoke,
+        env_extra={
+            "HOME": "/tmp/ccc-home-zig",
+            "XDG_CACHE_HOME": "/tmp/ccc-xdg-cache-zig",
+            "ZIG_GLOBAL_CACHE_DIR": "/tmp/ccc-zig-global-cache",
+            "ZIG_LOCAL_CACHE_DIR": "/tmp/ccc-zig-local-cache",
+        },
     ),
     LanguageSpec(
         "D",

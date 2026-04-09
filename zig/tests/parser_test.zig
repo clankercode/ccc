@@ -256,6 +256,104 @@ test "resolveCommand alias runner override" {
     try std.testing.expectEqualStrings("prompt", resolved.argv[3]);
 }
 
+test "resolveCommand name falls back to agent" {
+    const allocator = std.testing.allocator;
+    var config = parser.CccConfig.init(allocator);
+    defer config.deinit();
+
+    var parsed = try parser.parseArgs(allocator, &[_][]const u8{ "@reviewer", "prompt" });
+    defer parsed.deinit(allocator);
+
+    var resolved = try parser.resolveCommand(allocator, parsed, &config);
+    defer resolved.deinit(allocator);
+
+    try std.testing.expectEqualStrings("opencode", resolved.argv[0]);
+    try std.testing.expectEqualStrings("run", resolved.argv[1]);
+    try std.testing.expectEqualStrings("--agent", resolved.argv[2]);
+    try std.testing.expectEqualStrings("reviewer", resolved.argv[3]);
+    try std.testing.expectEqualStrings("prompt", resolved.argv[4]);
+    try std.testing.expect(resolved.warnings.len == 0);
+}
+
+test "resolveCommand preset agent wins over name fallback" {
+    const allocator = std.testing.allocator;
+    var config = parser.CccConfig.init(allocator);
+    defer config.deinit();
+
+    try config.aliases.put("reviewer", .{
+        .agent = "specialist",
+    });
+
+    var parsed = try parser.parseArgs(allocator, &[_][]const u8{ "@reviewer", "prompt" });
+    defer parsed.deinit(allocator);
+
+    var resolved = try parser.resolveCommand(allocator, parsed, &config);
+    defer resolved.deinit(allocator);
+
+    try std.testing.expectEqualStrings("opencode", resolved.argv[0]);
+    try std.testing.expectEqualStrings("run", resolved.argv[1]);
+    try std.testing.expectEqualStrings("--agent", resolved.argv[2]);
+    try std.testing.expectEqualStrings("specialist", resolved.argv[3]);
+    try std.testing.expectEqualStrings("prompt", resolved.argv[4]);
+    try std.testing.expect(resolved.warnings.len == 0);
+}
+
+test "resolveCommand claude agent flag" {
+    const allocator = std.testing.allocator;
+    var config = parser.CccConfig.init(allocator);
+    defer config.deinit();
+
+    var parsed = try parser.parseArgs(allocator, &[_][]const u8{ "claude", "@reviewer", "prompt" });
+    defer parsed.deinit(allocator);
+
+    var resolved = try parser.resolveCommand(allocator, parsed, &config);
+    defer resolved.deinit(allocator);
+
+    try std.testing.expectEqualStrings("claude", resolved.argv[0]);
+    try std.testing.expectEqualStrings("--agent", resolved.argv[1]);
+    try std.testing.expectEqualStrings("reviewer", resolved.argv[2]);
+    try std.testing.expectEqualStrings("prompt", resolved.argv[3]);
+    try std.testing.expect(resolved.warnings.len == 0);
+}
+
+test "resolveCommand kimi agent flag" {
+    const allocator = std.testing.allocator;
+    var config = parser.CccConfig.init(allocator);
+    defer config.deinit();
+
+    var parsed = try parser.parseArgs(allocator, &[_][]const u8{ "k", "@reviewer", "prompt" });
+    defer parsed.deinit(allocator);
+
+    var resolved = try parser.resolveCommand(allocator, parsed, &config);
+    defer resolved.deinit(allocator);
+
+    try std.testing.expectEqualStrings("kimi", resolved.argv[0]);
+    try std.testing.expectEqualStrings("--agent", resolved.argv[1]);
+    try std.testing.expectEqualStrings("reviewer", resolved.argv[2]);
+    try std.testing.expectEqualStrings("prompt", resolved.argv[3]);
+    try std.testing.expect(resolved.warnings.len == 0);
+}
+
+test "resolveCommand unsupported agent warns" {
+    const allocator = std.testing.allocator;
+    var config = parser.CccConfig.init(allocator);
+    defer config.deinit();
+
+    var parsed = try parser.parseArgs(allocator, &[_][]const u8{ "rc", "@reviewer", "prompt" });
+    defer parsed.deinit(allocator);
+
+    var resolved = try parser.resolveCommand(allocator, parsed, &config);
+    defer resolved.deinit(allocator);
+
+    try std.testing.expectEqualStrings("codex", resolved.argv[0]);
+    try std.testing.expectEqualStrings("prompt", resolved.argv[1]);
+    try std.testing.expect(resolved.warnings.len == 1);
+    try std.testing.expectEqualStrings(
+        "warning: runner codex does not support agents; ignoring @reviewer",
+        resolved.warnings[0],
+    );
+}
+
 test "resolveCommand default thinking from config" {
     const allocator = std.testing.allocator;
     var config = parser.CccConfig.init(allocator);

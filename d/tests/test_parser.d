@@ -93,6 +93,11 @@ unittest {
     assert("k" in reg);
     assert("rc" in reg);
     assert("cr" in reg);
+    assert(reg["opencode"].agentFlag == "--agent");
+    assert(reg["claude"].agentFlag == "--agent");
+    assert(reg["kimi"].agentFlag == "--agent");
+    assert(reg["codex"].agentFlag.length == 0);
+    assert(reg["crush"].agentFlag.length == 0);
 }
 
 unittest {
@@ -179,7 +184,8 @@ unittest {
         Nullable!string("claude"),
         Nullable!int(2),
         Nullable!string("anthropic"),
-        Nullable!string("claude-sonnet-4")
+        Nullable!string("claude-sonnet-4"),
+        Nullable!string("reviewer")
     );
     auto parsed = parseArgs(["@work", "task"]);
     auto r = resolveCommand(parsed, config);
@@ -188,8 +194,31 @@ unittest {
     assert(r.argv[2] == "medium");
     assert(r.argv[3] == "--model");
     assert(r.argv[4] == "claude-sonnet-4");
+    assert(r.argv[5] == "--agent");
+    assert(r.argv[6] == "reviewer");
     assert(r.env["CCC_PROVIDER"] == "anthropic");
     assert(r.argv[$ - 1] == "task");
+    assert(r.warnings.length == 0);
+}
+
+unittest {
+    auto parsed = parseArgs(["@reviewer", "task"]);
+    auto r = resolveCommand(parsed, CccConfig());
+    assert(r.argv[0] == "opencode");
+    assert(r.argv[1] == "run");
+    assert(r.argv[2] == "--agent");
+    assert(r.argv[3] == "reviewer");
+    assert(r.argv[$ - 1] == "task");
+    assert(r.warnings.length == 0);
+}
+
+unittest {
+    auto parsed = parseArgs(["rc", "@reviewer", "task"]);
+    auto r = resolveCommand(parsed, CccConfig());
+    assert(r.argv[0] == "codex");
+    assert(r.argv[$ - 1] == "task");
+    assert(r.warnings.length == 1);
+    assert(r.warnings[0] == "warning: runner \"rc\" does not support agents; ignoring @reviewer");
 }
 
 unittest {
@@ -263,6 +292,7 @@ unittest {
         f.writeln(`[aliases.work]`);
         f.writeln(`runner = "oc"`);
         f.writeln(`thinking = 1`);
+        f.writeln(`agent = "reviewer"`);
         f.close();
     }
 
@@ -277,6 +307,7 @@ unittest {
     assert("work" in config.aliases);
     assert(config.aliases["work"].runner.get == "oc");
     assert(config.aliases["work"].thinking.get == 1);
+    assert(config.aliases["work"].agent.get == "reviewer");
 
     remove(tmpPath);
 }

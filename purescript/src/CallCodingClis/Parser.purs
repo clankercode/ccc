@@ -1,16 +1,22 @@
-module CallCodingClis.Parser where
+module CallCodingClis.Parser
+  ( ParsedArgs(..)
+  , ResolvedCommand
+  , parseArgs
+  , resolveCommand
+  , resolveRunnerName
+  ) where
 
 import Prelude
 
 import CallCodingClis.Config (CccConfig)
-import CallCodingClis.Types (CommandSpec)
 import Data.Array (uncons)
 import Data.Foldable (any, foldl)
 import Data.Maybe (Maybe(..))
 import Data.String (trim)
 import Data.String.CodeUnits as CU
-import Data.String.Pattern (Pattern(..))
 import Data.String.Common (split)
+import Data.String.Pattern (Pattern(..))
+import Data.Tuple (Tuple(..))
 import Foreign.Object as Object
 
 type ParsedArgs =
@@ -20,6 +26,19 @@ type ParsedArgs =
   , model :: Maybe String
   , alias :: Maybe String
   , prompt :: String
+  }
+
+type ResolvedCommand =
+  { argv :: Array String
+  , env :: Object.Object String
+  , warnings :: Array String
+  }
+
+type RunnerSpec =
+  { binary :: String
+  , extraArgs :: Array String
+  , modelFlag :: String
+  , agentFlag :: String
   }
 
 parseArgs :: Array String -> ParsedArgs
@@ -118,33 +137,136 @@ isModelToken token =
 isAliasToken :: String -> Boolean
 isAliasToken token = CU.indexOf (Pattern "@") token == Just 0 && CU.length token > 1
 
-resolveCommand :: ParsedArgs -> CccConfig -> CommandSpec
-resolveCommand parsed config =
-  let
-    runnerName = case parsed.runner of
-      Just runner -> resolveRunnerName runner
-      Nothing -> resolveRunnerName config.defaultRunner
-    prompt = trim parsed.prompt
-    argv = case runnerName of
-      "opencode" -> ["opencode", "run", prompt]
-      "claude" -> ["claude", prompt]
-      "kimi" -> ["kimi", prompt]
-      "codex" -> ["codex", prompt]
-      "crush" -> ["crush", prompt]
-      other -> [other, prompt]
-  in
-    { argv
-    , stdinText: Nothing
-    , cwd: Nothing
-    , env: Object.empty
+resolveRunnerName :: String -> CccConfig -> String
+resolveRunnerName name config =
+  case Object.lookup name config.abbreviations of
+    Just resolved -> resolveRunnerName resolved config
+    Nothing ->
+      case normalizeRunner name of
+        "oc" -> "opencode"
+        "cc" -> "claude"
+        "c" -> "claude"
+        "k" -> "kimi"
+        "rc" -> "codex"
+        "cr" -> "crush"
+        other -> other
+
+runnerSpec :: String -> RunnerSpec
+runnerSpec runnerName = case runnerName of
+  "opencode" ->
+    { binary: "opencode"
+    , extraArgs: ["run"]
+    , modelFlag: ""
+    , agentFlag: "--agent"
+    }
+  "claude" ->
+    { binary: "claude"
+    , extraArgs: []
+    , modelFlag: "--model"
+    , agentFlag: "--agent"
+    }
+  "kimi" ->
+    { binary: "kimi"
+    , extraArgs: []
+    , modelFlag: "--model"
+    , agentFlag: "--agent"
+    }
+  "codex" ->
+    { binary: "codex"
+    , extraArgs: []
+    , modelFlag: "--model"
+    , agentFlag: ""
+    }
+  "crush" ->
+    { binary: "crush"
+    , extraArgs: []
+    , modelFlag: ""
+    , agentFlag: ""
+    }
+  other ->
+    { binary: other
+    , extraArgs: []
+    , modelFlag: ""
+    , agentFlag: ""
     }
 
-resolveRunnerName :: String -> String
-resolveRunnerName name = case normalizeRunner name of
-  "oc" -> "opencode"
-  "cc" -> "claude"
-  "c" -> "claude"
-  "k" -> "kimi"
-  "rc" -> "codex"
-  "cr" -> "crush"
-  other -> other
+thinkingArgs :: String -> Maybe Int -> Array String
+thinkingArgs runnerName thinking = case Tuple runnerName thinking of
+  Tuple "claude" (Just 0) -> ["--no-thinking"]
+  Tuple "claude" (Just 1) -> ["--thinking", "low"]
+  Tuple "claude" (Just 2) -> ["--thinking", "medium"]
+  Tuple "claude" (Just 3) -> ["--thinking", "high"]
+  Tuple "claude" (Just 4) -> ["--thinking", "max"]
+  Tuple "kimi" (Just 0) -> ["--no-think"]
+  Tuple "kimi" (Just 1) -> ["--think", "low"]
+  Tuple "kimi" (Just 2) -> ["--think", "medium"]
+  Tuple "kimi" (Just 3) -> ["--think", "high"]
+  Tuple "kimi" (Just 4) -> ["--think", "max"]
+  Tuple _ _ -> []
+
+resolveCommand :: ParsedArgs -> CccConfig -> ResolvedCommand
+resolveCommand parsed config =
+  let
+    aliasDef = parsed.alias >>= \name -> Object.lookup name config.aliases
+    selectedRunnerToken = case parsed.runner of
+      Just runner -> runner
+      Nothing -> case aliasDef >>= _.runner of
+        Just aliasRunner -> aliasRunner
+        Nothing -> config.defaultRunner
+    runnerName = resolveRunnerName selectedRunnerToken config
+    spec = runnerSpec runnerName
+    warningRunnerName = selectedRunnerToken
+
+    effectiveThinking = case parsed.thinking of
+      Just level -> Just level
+      Nothing -> case aliasDef >>= _.thinking of
+        Just level -> Just level
+        Nothing -> config.defaultThinking
+
+    effectiveProvider = case parsed.provider of
+      Just provider -> Just provider
+      Nothing -> case aliasDef >>= _.provider of
+        Just provider -> Just provider
+        Nothing -> nonEmpty config.defaultProvider
+
+    effectiveModel = case parsed.model of
+      Just model -> Just model
+      Nothing -> case aliasDef >>= _.model of
+        Just model -> Just model
+        Nothing -> nonEmpty config.defaultModel
+
+    effectiveAgent = case parsed.alias of
+      Nothing -> Nothing
+      Just aliasName ->
+        case aliasDef >>= _.agent of
+          Just agent -> Just agent
+          Nothing -> Just aliasName
+
+    argvWithRunner = [spec.binary] <> spec.extraArgs
+    argvWithThinking = argvWithRunner <> thinkingArgs runnerName effectiveThinking
+    argvWithModel = case effectiveModel of
+      Just model | spec.modelFlag /= "" -> argvWithThinking <> [spec.modelFlag, model]
+      _ -> argvWithThinking
+
+    warnings = case effectiveAgent of
+      Just agent | spec.agentFlag == "" ->
+        [ "warning: runner \"" <> warningRunnerName <> "\" does not support agents; ignoring @" <> agent ]
+      _ -> []
+
+    argvWithAgent = case effectiveAgent of
+      Just agent | spec.agentFlag /= "" -> argvWithModel <> [spec.agentFlag, agent]
+      _ -> argvWithModel
+
+    envOverrides = case effectiveProvider of
+      Just provider -> Object.singleton "CCC_PROVIDER" provider
+      Nothing -> Object.empty
+
+    prompt = trim parsed.prompt
+  in
+    { argv: argvWithAgent <> [prompt]
+    , env: envOverrides
+    , warnings
+    }
+
+nonEmpty :: String -> Maybe String
+nonEmpty value = if value == "" then Nothing else Just value

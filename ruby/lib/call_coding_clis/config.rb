@@ -58,7 +58,8 @@ module CallCodingClis
             runner: defn["runner"],
             thinking: defn.key?("thinking") && !defn["thinking"].nil? ? defn["thinking"].to_i : nil,
             provider: defn["provider"],
-            model: defn["model"]
+            model: defn["model"],
+            agent: defn["agent"]
           )
           config.aliases[name.to_s] = alias_def
         end

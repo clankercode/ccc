@@ -19,14 +19,12 @@ pub fn main() !void {
     }
 
     if (argv.items.len == 0) {
-        const stderr_file = std.fs.File.stderr();
-        stderr_file.writeAll("usage: ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"\n") catch {};
+        help.printUsage(allocator) catch {};
         std.process.exit(1);
     }
 
     if (argv.items.len == 1 and (std.mem.eql(u8, argv.items[0], "--help") or std.mem.eql(u8, argv.items[0], "-h"))) {
-        const stdout_file = std.fs.File.stdout();
-        stdout_file.writeAll("ccc — call coding CLIs\n\nUsage:\n  ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"\n") catch {};
+        help.printHelp(allocator) catch {};
         std.process.exit(0);
     }
 
@@ -44,6 +42,12 @@ pub fn main() !void {
         std.process.exit(1);
     };
     defer resolved.deinit(allocator);
+
+    const stderr_file = std.fs.File.stderr();
+    for (resolved.warnings) |warning| {
+        stderr_file.writeAll(warning) catch {};
+        stderr_file.writeAll("\n") catch {};
+    }
 
     const real_opencode = std.process.getEnvVarOwned(allocator, "CCC_REAL_OPENCODE") catch null;
     const effective_argv: []const []const u8 = blk: {

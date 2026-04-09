@@ -6,13 +6,13 @@ ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Cl
 
 ## Usage
 
-ccc [runner] [+thinking] [:provider:model] [@alias] "<Prompt>"
+ccc [runner] [+thinking] [:provider:model] [@name] "<Prompt>"
 
 Slots are positional and parsed in order before the prompt:
 - runner: Select which coding CLI (default: oc). Options: opencode (oc), claude (cc), kimi (k), codex (rc), crush (cr)
 - +thinking: Set thinking level from +0 (off) to +4 (max)
 - :provider:model: Override provider and model
-- @alias: Use a named preset from ~/.config/ccc/config.toml
+- @name: Use a named preset from ~/.config/ccc/config.toml, or treat it as an agent when no preset exists
 
 Examples:
 - ccc "Fix the failing tests"
@@ -25,7 +25,7 @@ Implemented in: Python, Rust, TypeScript, C, Go, Ruby, Perl, C++, Zig, D, F#, Ha
 
 All implementations share: build_prompt_spec, CommandSpec, CompletedRun, Runner.run, ccc CLI, prompt trimming, empty prompt rejection, usage on bad args, CCC_REAL_OPENCODE env var, exit code forwarding, and startup failure reporting.
 
-18 of 20 languages also implement: v2 parser/config (runner selector, thinking levels, provider/model override, alias presets, config loading) and v3 JSON output parsing (OpenCode, Claude Code, Kimi schemas).
+18 of 20 languages also implement: v2 parser/config (runner selector, thinking levels, provider/model override, preset and agent resolution, config loading) and v3 JSON output parsing (OpenCode, Claude Code, Kimi schemas).
 
 ## Docs
 

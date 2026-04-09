@@ -105,6 +105,9 @@ function parseTomlConfig(content, config) {
         case 'runner':
           config.aliases[aliasName].runner = strVal
           break
+        case 'agent':
+          config.aliases[aliasName].agent = strVal
+          break
         case 'provider':
           config.aliases[aliasName].provider = strVal
           break

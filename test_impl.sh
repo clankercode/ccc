@@ -4,6 +4,38 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
+export HOME="/tmp/ccc-test-home"
+export XDG_CONFIG_HOME="/tmp/ccc-test-xdg-config"
+export XDG_CACHE_HOME="/tmp/ccc-test-xdg-cache"
+export XDG_DATA_HOME="/tmp/ccc-test-xdg-data"
+export XDG_STATE_HOME="/tmp/ccc-test-xdg-state"
+export CCC_CONFIG="/tmp/ccc-test-missing-config.toml"
+export GOCACHE="/tmp/ccc-go-cache"
+export ZIG_GLOBAL_CACHE_DIR="/tmp/ccc-zig-global-cache"
+export ZIG_LOCAL_CACHE_DIR="/tmp/ccc-zig-local-cache"
+export DOTNET_CLI_HOME="/tmp/ccc-dotnet-home"
+export NUGET_PACKAGES="/tmp/ccc-nuget"
+export CRYSTAL_CACHE_DIR="/tmp/ccc-crystal-cache"
+export CABAL_DIR="/tmp/ccc-cabal"
+export LC_ALL=C
+export PERL_BADLANG=0
+export DOTNET_NOLOGO=1
+export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+export DOTNET_CLI_TELEMETRY_OPTOUT=1
+mkdir -p \
+    "$HOME" \
+    "$XDG_CONFIG_HOME" \
+    "$XDG_CACHE_HOME" \
+    "$XDG_DATA_HOME" \
+    "$XDG_STATE_HOME" \
+    "$GOCACHE" \
+    "$ZIG_GLOBAL_CACHE_DIR" \
+    "$ZIG_LOCAL_CACHE_DIR" \
+    "$DOTNET_CLI_HOME" \
+    "$NUGET_PACKAGES" \
+    "$CRYSTAL_CACHE_DIR" \
+    "$CABAL_DIR"
+
 if [ "$#" -ne 1 ]; then
     echo "usage: ./test_impl.sh <language|all>" >&2
     exit 2
@@ -17,16 +49,16 @@ run_unit_tests() {
             return 0
             ;;
         python)
-            PYTHONPATH=python python3 -m unittest tests.test_runner -v
+            PYTHONPATH=python python3 -m unittest tests.test_runner tests.test_json_output tests.test_parser_config tests.test_ccc_contract -v
             ;;
         rust)
             (cd rust && cargo test)
             ;;
         typescript|ts)
-            node --test typescript/tests/runner.test.mjs
+            node --test typescript/tests/*.mjs
             ;;
         c)
-            make -C c test
+            CC=/usr/bin/gcc make -C c test
             ;;
         go)
             (cd go && go test ./... && go vet ./...)
@@ -55,7 +87,7 @@ run_unit_tests() {
             (cd fsharp && dotnet test)
             ;;
         php)
-            (cd php && php tests/RunnerTest.php)
+            (cd php && for t in tests/*Test.php; do php "$t"; done)
             ;;
         purescript)
             (cd purescript && spago test)

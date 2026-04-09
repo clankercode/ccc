@@ -9,6 +9,16 @@
  (libraries alcotest ccc_lib))
 
 (test
+ (name test_config)
+ (modules test_config)
+ (libraries alcotest ccc_lib unix))
+
+(test
+ (name test_help)
+ (modules test_help)
+ (libraries alcotest ccc_lib unix))
+
+(test
  (name test_json_output)
  (modules test_json_output)
  (libraries alcotest ccc_lib))

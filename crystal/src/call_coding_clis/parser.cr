@@ -4,13 +4,15 @@ struct RunnerInfo
   getter thinking_flags : Hash(Int32, Array(String))
   getter provider_flag : String
   getter model_flag : String
+  getter agent_flag : String
 
   def initialize(
     @binary : String,
     @extra_args : Array(String) = [] of String,
     @thinking_flags : Hash(Int32, Array(String)) = Hash(Int32, Array(String)).new,
     @provider_flag : String = "",
-    @model_flag : String = ""
+    @model_flag : String = "",
+    @agent_flag : String = ""
   )
   end
 end
@@ -39,12 +41,14 @@ struct AliasDef
   property thinking : Int32?
   property provider : String?
   property model : String?
+  property agent : String?
 
   def initialize(
     @runner : String? = nil,
     @thinking : Int32? = nil,
     @provider : String? = nil,
-    @model : String? = nil
+    @model : String? = nil,
+    @agent : String? = nil
   )
   end
 end
@@ -79,7 +83,8 @@ module RunnerRegistry
       extra_args: ["run"],
       thinking_flags: Hash(Int32, Array(String)).new,
       provider_flag: "",
-      model_flag: ""
+      model_flag: "",
+      agent_flag: "--agent"
     )
     cc = RunnerInfo.new(
       binary: "claude",
@@ -92,7 +97,8 @@ module RunnerRegistry
         4 => ["--thinking", "max"],
       },
       provider_flag: "",
-      model_flag: "--model"
+      model_flag: "--model",
+      agent_flag: "--agent"
     )
     k = RunnerInfo.new(
       binary: "kimi",
@@ -105,21 +111,24 @@ module RunnerRegistry
         4 => ["--think", "max"],
       },
       provider_flag: "",
-      model_flag: "--model"
+      model_flag: "--model",
+      agent_flag: "--agent"
     )
     rc = RunnerInfo.new(
       binary: "codex",
       extra_args: [] of String,
       thinking_flags: Hash(Int32, Array(String)).new,
       provider_flag: "",
-      model_flag: "--model"
+      model_flag: "--model",
+      agent_flag: ""
     )
     cr = RunnerInfo.new(
       binary: "crush",
       extra_args: [] of String,
       thinking_flags: Hash(Int32, Array(String)).new,
       provider_flag: "",
-      model_flag: ""
+      model_flag: "",
+      agent_flag: ""
     )
 
     reg["opencode"] = oc
@@ -191,13 +200,14 @@ def resolve_runner_name(name : String?, config : CccConfig) : String
   name
 end
 
-def resolve_command(parsed : ParsedArgs, config : CccConfig = CccConfig.new) : {Array(String), Hash(String, String)}
+def resolve_command(parsed : ParsedArgs, config : CccConfig = CccConfig.new, warnings : Array(String)? = nil) : {Array(String), Hash(String, String)}
   runner_name = resolve_runner_name(parsed.runner, config)
 
   info = RunnerRegistry[runner_name]? ||
     RunnerRegistry[config.default_runner]? ||
     RunnerRegistry["opencode"].not_nil!
 
+  warnings ||= [] of String
   alias_def : AliasDef? = nil
   if (a = parsed.alias) && (ad = config.aliases[a]?)
     alias_def = ad
@@ -244,6 +254,21 @@ def resolve_command(parsed : ParsedArgs, config : CccConfig = CccConfig.new) : {
 
   if (em = effective_model) && !info.model_flag.empty?
     argv += [info.model_flag, em]
+  end
+
+  effective_agent : String? = nil
+  if alias_def && (agent = alias_def.agent) && !agent.empty?
+    effective_agent = agent
+  elsif (a = parsed.alias) && alias_def.nil?
+    effective_agent = a
+  end
+
+  if (agent = effective_agent) && !agent.empty?
+    if info.agent_flag.empty?
+      warnings << %(warning: runner "#{effective_runner_name}" does not support agents; ignoring @#{agent})
+    else
+      argv += [info.agent_flag, agent]
+    end
   end
 
   env_overrides = Hash(String, String).new

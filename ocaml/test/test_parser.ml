@@ -83,36 +83,36 @@ let () =
     ("resolve_command", [
       test_case "default runner opencode" `Quick (fun () ->
         let parsed = Parser.parse_args ["hello"] in
-        let argv, env = Parser.resolve_command parsed None in
+        let argv, env, _warnings = Parser.resolve_command parsed None in
         check (list string) "argv" ["opencode"; "run"; "hello"] argv;
         check (list (pair string string)) "env" [] env);
 
       test_case "claude runner" `Quick (fun () ->
         let parsed = Parser.parse_args ["claude"; "hello"] in
-        let argv, env = Parser.resolve_command parsed None in
+        let argv, env, _warnings = Parser.resolve_command parsed None in
         check (list string) "argv" ["claude"; "hello"] argv;
         check (list (pair string string)) "env" [] env);
 
       test_case "claude thinking +3" `Quick (fun () ->
         let parsed = Parser.parse_args ["claude"; "+3"; "hello"] in
-        let argv, env = Parser.resolve_command parsed None in
+        let argv, env, _warnings = Parser.resolve_command parsed None in
         check (list string) "argv"
           ["claude"; "--thinking"; "high"; "hello"] argv;
         check (list (pair string string)) "env" [] env);
 
       test_case "claude thinking 0 (no-thinking)" `Quick (fun () ->
         let parsed = Parser.parse_args ["claude"; "+0"; "hello"] in
-        let argv, _ = Parser.resolve_command parsed None in
+        let argv, _, _warnings = Parser.resolve_command parsed None in
         check (list string) "argv" ["claude"; "--no-thinking"; "hello"] argv);
 
       test_case "codex model flag" `Quick (fun () ->
         let parsed = Parser.parse_args ["codex"; ":gpt-4"; "hello"] in
-        let argv, _ = Parser.resolve_command parsed None in
+        let argv, _, _warnings = Parser.resolve_command parsed None in
         check (list string) "argv" ["codex"; "--model"; "gpt-4"; "hello"] argv);
 
       test_case "provider env override" `Quick (fun () ->
         let parsed = Parser.parse_args [":anthropic:sonnet-4"; "hello"] in
-        let argv, env = Parser.resolve_command parsed None in
+        let argv, env, _warnings = Parser.resolve_command parsed None in
         check (list string) "argv" ["opencode"; "run"; "hello"] argv;
         check (list (pair string string)) "env"
           [("CCC_PROVIDER", "anthropic")] env);
@@ -129,7 +129,7 @@ let () =
             ~model:None ~alias:None ~prompt:"   " in
           ignore (Parser.resolve_command parsed None)));
 
-      test_case "alias with config" `Quick (fun () ->
+      test_case "preset with config" `Quick (fun () ->
         let parsed = Parser.parse_args ["@review"; "fix"; "bugs"] in
         let config = {
           Parser.default_runner = "oc"; Parser.default_provider = "";
@@ -140,24 +140,76 @@ let () =
               Parser.ad_thinking = Some 3;
               Parser.ad_provider = None;
               Parser.ad_model = None;
+              Parser.ad_agent = None;
             })
           ];
           Parser.abbreviations = [];
         } in
-        let argv, env = Parser.resolve_command parsed (Some config) in
+        let argv, env, _warnings = Parser.resolve_command parsed (Some config) in
         check (list string) "argv"
           ["claude"; "--thinking"; "high"; "fix bugs"] argv;
         check (list (pair string string)) "env" [] env);
 
+      test_case "name without preset falls back to agent" `Quick (fun () ->
+        let parsed = Parser.parse_args ["@reviewer"; "fix"; "bugs"] in
+        let argv, env, warnings = Parser.resolve_command parsed None in
+        check (list string) "argv"
+          ["opencode"; "run"; "--agent"; "reviewer"; "fix bugs"] argv;
+        check (list (pair string string)) "env" [] env;
+        check (list string) "warnings" [] warnings);
+
+      test_case "preset agent wins over name fallback" `Quick (fun () ->
+        let parsed = Parser.parse_args ["@reviewer"; "fix"; "bugs"] in
+        let config = {
+          Parser.default_runner = "oc"; Parser.default_provider = "";
+          Parser.default_model = ""; Parser.default_thinking = None;
+          Parser.aliases = [
+            ("reviewer", {
+              Parser.ad_runner = None;
+              Parser.ad_thinking = None;
+              Parser.ad_provider = None;
+              Parser.ad_model = None;
+              Parser.ad_agent = Some "specialist";
+            })
+          ];
+          Parser.abbreviations = [];
+        } in
+        let argv, env, warnings = Parser.resolve_command parsed (Some config) in
+        check (list string) "argv"
+          ["opencode"; "run"; "--agent"; "specialist"; "fix bugs"] argv;
+        check (list (pair string string)) "env" [] env;
+        check (list string) "warnings" [] warnings);
+
+      test_case "unsupported runner warns and ignores agent" `Quick (fun () ->
+        let parsed = Parser.parse_args ["rc"; "@reviewer"; "fix"; "bugs"] in
+        let argv, env, warnings = Parser.resolve_command parsed None in
+        check (list string) "argv" ["codex"; "fix bugs"] argv;
+        check (list (pair string string)) "env" [] env;
+        check (list string) "warnings"
+          ["warning: runner \"rc\" does not support agents; ignoring @reviewer"]
+          warnings);
+
+      test_case "runner registry agent flags" `Quick (fun () ->
+        let agent_flag name =
+          match Hashtbl.find_opt Parser.runner_registry name with
+          | Some info -> info.Parser.agent_flag
+          | None -> failwith name
+        in
+        check string "opencode" "--agent" (agent_flag "opencode");
+        check string "claude" "--agent" (agent_flag "claude");
+        check string "kimi" "--agent" (agent_flag "kimi");
+        check string "codex" "" (agent_flag "codex");
+        check string "crush" "" (agent_flag "crush"));
+
       test_case "kimi thinking +2" `Quick (fun () ->
         let parsed = Parser.parse_args ["kimi"; "+2"; "test"] in
-        let argv, _ = Parser.resolve_command parsed None in
+        let argv, _, _warnings = Parser.resolve_command parsed None in
         check (list string) "argv"
           ["kimi"; "--think"; "medium"; "test"] argv);
 
       test_case "crush ignores model flag" `Quick (fun () ->
         let parsed = Parser.parse_args ["crush"; ":model-1"; "hello"] in
-        let argv, _ = Parser.resolve_command parsed None in
+        let argv, _, _warnings = Parser.resolve_command parsed None in
         check (list string) "argv" ["crush"; "hello"] argv);
 
       test_case "config defaults" `Quick (fun () ->
@@ -170,7 +222,7 @@ let () =
           Parser.aliases = [];
           Parser.abbreviations = [];
         } in
-        let argv, env = Parser.resolve_command parsed (Some config) in
+        let argv, env, _warnings = Parser.resolve_command parsed (Some config) in
         check (list string) "argv"
           ["claude"; "--thinking"; "medium";
            "--model"; "sonnet-4"; "hello"] argv;
@@ -185,7 +237,7 @@ let () =
           Parser.aliases = [];
           Parser.abbreviations = [("c", "codex")];
         } in
-        let argv, _ = Parser.resolve_command parsed (Some config) in
+        let argv, _, _warnings = Parser.resolve_command parsed (Some config) in
         check (list string) "argv" ["codex"; "hello"] argv
       );
 
@@ -197,13 +249,13 @@ let () =
           Parser.aliases = [];
           Parser.abbreviations = [("rc", "claude")];
         } in
-        let argv, _ = Parser.resolve_command parsed (Some config) in
+        let argv, _, _warnings = Parser.resolve_command parsed (Some config) in
         check (list string) "argv"
           ["claude"; "--thinking"; "low"; "hello"] argv);
 
       test_case "opencode thinking ignored (no flags)" `Quick (fun () ->
         let parsed = Parser.parse_args ["oc"; "+2"; "hello"] in
-        let argv, _ = Parser.resolve_command parsed None in
+        let argv, _, _warnings = Parser.resolve_command parsed None in
         check (list string) "argv" ["opencode"; "run"; "hello"] argv);
     ]);
   ]

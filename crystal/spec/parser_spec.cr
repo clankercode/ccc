@@ -166,6 +166,33 @@ describe "resolve_command" do
     argv.should contain("medium")
   end
 
+  it "uses preset agent from config" do
+    config = CccConfig.new
+    config.aliases["work"] = AliasDef.new(agent: "specialist")
+    parsed = parse_args(["@work", "hello"])
+    argv, env = resolve_command(parsed, config)
+    argv.should eq(["opencode", "run", "--agent", "specialist", "hello"])
+    env.should be_empty
+  end
+
+  it "falls back to agent when preset is missing" do
+    parsed = parse_args(["@reviewer", "hello"])
+    argv, env = resolve_command(parsed)
+    argv.should eq(["opencode", "run", "--agent", "reviewer", "hello"])
+    env.should be_empty
+  end
+
+  it "warns when runner does not support agents" do
+    parsed = parse_args(["rc", "@reviewer", "hello"])
+    warnings = [] of String
+    argv, env = resolve_command(parsed, CccConfig.new, warnings)
+    argv.should eq(["codex", "hello"])
+    env.should be_empty
+    warnings.should eq([
+      %(warning: runner "rc" does not support agents; ignoring @reviewer),
+    ])
+  end
+
   it "resolves abbreviation from config" do
     config = CccConfig.new
     config.abbreviations["oc"] = "claude"
@@ -201,6 +228,7 @@ describe "load_config" do
         [aliases.work]
         runner = kimi
         thinking = 1
+        agent = reviewer
         CFG
       config = load_config(path)
       config.default_runner.should eq("claude")
@@ -210,6 +238,58 @@ describe "load_config" do
       config.abbreviations["my"].should eq("claude")
       config.aliases["work"].runner.should eq("kimi")
       config.aliases["work"].thinking.should eq(1)
+      config.aliases["work"].agent.should eq("reviewer")
+    ensure
+      `rm -rf #{Process.quote(tmpdir)}` if Dir.exists?(tmpdir)
+    end
+  end
+
+  it "prefers XDG config over CCC_CONFIG" do
+    tmpdir = File.join(Dir.tempdir, "ccc_test_env_#{Random.rand(999999)}")
+    Dir.mkdir_p(tmpdir)
+    begin
+      legacy_path = File.join(tmpdir, "legacy-config")
+      xdg_dir = File.join(tmpdir, "xdg")
+      home_dir = File.join(tmpdir, "home")
+      Dir.mkdir_p(File.join(xdg_dir, "ccc"))
+      Dir.mkdir_p(File.join(home_dir, ".config", "ccc"))
+      File.write(legacy_path, <<-CFG)
+        [defaults]
+        runner = codex
+        CFG
+      File.write(File.join(xdg_dir, "ccc", "config.toml"), <<-CFG)
+        [defaults]
+        runner = claude
+        CFG
+
+      old_ccc_config = ENV["CCC_CONFIG"]?
+      old_xdg = ENV["XDG_CONFIG_HOME"]?
+      old_home = ENV["HOME"]?
+
+      begin
+        ENV["CCC_CONFIG"] = legacy_path
+        ENV["XDG_CONFIG_HOME"] = xdg_dir
+        ENV["HOME"] = home_dir
+
+        config = load_config
+        config.default_runner.should eq("claude")
+      ensure
+        if old_ccc_config
+          ENV["CCC_CONFIG"] = old_ccc_config
+        else
+          ENV.delete("CCC_CONFIG")
+        end
+        if old_xdg
+          ENV["XDG_CONFIG_HOME"] = old_xdg
+        else
+          ENV.delete("XDG_CONFIG_HOME")
+        end
+        if old_home
+          ENV["HOME"] = old_home
+        else
+          ENV.delete("HOME")
+        end
+      end
     ensure
       `rm -rf #{Process.quote(tmpdir)}` if Dir.exists?(tmpdir)
     end

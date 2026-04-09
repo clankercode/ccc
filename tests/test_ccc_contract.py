@@ -12,6 +12,47 @@ EXPECTED = f"opencode run {PROMPT}\n"
 
 
 class CccContractTests(unittest.TestCase):
+    def _make_env(self, tmp_path: Path, bin_dir: Path) -> dict[str, str]:
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        env["LC_ALL"] = "C"
+        env["PERL_BADLANG"] = "0"
+        env["HOME"] = str(tmp_path)
+        env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+        env["XDG_CACHE_HOME"] = str(tmp_path / "xdg-cache")
+        env["XDG_DATA_HOME"] = str(tmp_path / "xdg-data")
+        env["XDG_STATE_HOME"] = str(tmp_path / "xdg-state")
+        env["GOCACHE"] = str(tmp_path / "go-cache")
+        env["DOTNET_CLI_HOME"] = str(tmp_path / "dotnet-home")
+        env["NUGET_PACKAGES"] = str(tmp_path / "nuget")
+        env["CABAL_DIR"] = str(tmp_path / "cabal")
+        env["CRYSTAL_CACHE_DIR"] = str(tmp_path / "crystal-cache")
+        env["ZIG_GLOBAL_CACHE_DIR"] = str(tmp_path / "zig-global-cache")
+        env["ZIG_LOCAL_CACHE_DIR"] = str(tmp_path / "zig-local-cache")
+        env["CCC_CONFIG"] = str(tmp_path / "missing-config.toml")
+        for key in (
+            "XDG_CONFIG_HOME",
+            "XDG_CACHE_HOME",
+            "XDG_DATA_HOME",
+            "XDG_STATE_HOME",
+            "GOCACHE",
+            "DOTNET_CLI_HOME",
+            "NUGET_PACKAGES",
+            "CABAL_DIR",
+            "CRYSTAL_CACHE_DIR",
+            "ZIG_GLOBAL_CACHE_DIR",
+            "ZIG_LOCAL_CACHE_DIR",
+        ):
+            Path(env[key]).mkdir(parents=True, exist_ok=True)
+        return env
+
+    def _c_build_env(self, env: dict[str, str]) -> dict[str, str]:
+        return {
+            **env,
+            "PATH": f"/usr/bin:{env.get('PATH', '')}",
+            "CC": "/usr/bin/gcc",
+        }
+
     def test_cross_language_ccc_happy_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -19,10 +60,7 @@ class CccContractTests(unittest.TestCase):
             bin_dir.mkdir()
             self._write_opencode_stub(bin_dir / "opencode")
 
-            env = os.environ.copy()
-            env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
-            env["LC_ALL"] = "C"
-            env["PERL_BADLANG"] = "0"
+            env = self._make_env(tmp_path, bin_dir)
 
             self.assert_equal_output(
                 subprocess.run(
@@ -38,7 +76,7 @@ class CccContractTests(unittest.TestCase):
             self.assert_equal_output(
                 subprocess.run(
                     ["cargo", "run", "--quiet", "--bin", "ccc", "--", PROMPT],
-                    cwd=ROOT,
+                    cwd=ROOT / "rust",
                     env=env,
                     capture_output=True,
                     text=True,
@@ -60,7 +98,7 @@ class CccContractTests(unittest.TestCase):
             subprocess.run(
                 ["make", "-C", "c", "build/ccc"],
                 cwd=ROOT,
-                env={**env, "PATH": f"/usr/bin:{env.get('PATH', '')}"},
+                env=self._c_build_env(env),
                 capture_output=True,
                 text=True,
                 check=True,
@@ -316,10 +354,7 @@ class CccContractTests(unittest.TestCase):
             bin_dir.mkdir()
             self._write_opencode_stub(bin_dir / "opencode")
 
-            env = os.environ.copy()
-            env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
-            env["LC_ALL"] = "C"
-            env["PERL_BADLANG"] = "0"
+            env = self._make_env(tmp_path, bin_dir)
 
             self.assert_rejects_empty(
                 subprocess.run(
@@ -335,7 +370,7 @@ class CccContractTests(unittest.TestCase):
             self.assert_rejects_empty(
                 subprocess.run(
                     ["cargo", "run", "--quiet", "--bin", "ccc", "--", ""],
-                    cwd=ROOT,
+                    cwd=ROOT / "rust",
                     env=env,
                     capture_output=True,
                     text=True,
@@ -357,7 +392,7 @@ class CccContractTests(unittest.TestCase):
             subprocess.run(
                 ["make", "-C", "c", "build/ccc"],
                 cwd=ROOT,
-                env={**env, "PATH": f"/usr/bin:{env.get('PATH', '')}"},
+                env=self._c_build_env(env),
                 capture_output=True,
                 text=True,
                 check=True,
@@ -573,10 +608,7 @@ class CccContractTests(unittest.TestCase):
             bin_dir.mkdir()
             self._write_opencode_stub(bin_dir / "opencode")
 
-            env = os.environ.copy()
-            env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
-            env["LC_ALL"] = "C"
-            env["PERL_BADLANG"] = "0"
+            env = self._make_env(tmp_path, bin_dir)
 
             self.assert_rejects_missing_prompt(
                 subprocess.run(
@@ -592,7 +624,7 @@ class CccContractTests(unittest.TestCase):
             self.assert_rejects_missing_prompt(
                 subprocess.run(
                     ["cargo", "run", "--quiet", "--bin", "ccc"],
-                    cwd=ROOT,
+                    cwd=ROOT / "rust",
                     env=env,
                     capture_output=True,
                     text=True,
@@ -614,7 +646,7 @@ class CccContractTests(unittest.TestCase):
             subprocess.run(
                 ["make", "-C", "c", "build/ccc"],
                 cwd=ROOT,
-                env={**env, "PATH": f"/usr/bin:{env.get('PATH', '')}"},
+                env=self._c_build_env(env),
                 capture_output=True,
                 text=True,
                 check=True,
@@ -826,10 +858,7 @@ class CccContractTests(unittest.TestCase):
             bin_dir.mkdir()
             self._write_opencode_stub(bin_dir / "opencode")
 
-            env = os.environ.copy()
-            env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
-            env["LC_ALL"] = "C"
-            env["PERL_BADLANG"] = "0"
+            env = self._make_env(tmp_path, bin_dir)
             whitespace_prompt = "   "
 
             self.assert_rejects_empty(
@@ -854,7 +883,7 @@ class CccContractTests(unittest.TestCase):
                         "--",
                         whitespace_prompt,
                     ],
-                    cwd=ROOT,
+                    cwd=ROOT / "rust",
                     env=env,
                     capture_output=True,
                     text=True,
@@ -876,7 +905,7 @@ class CccContractTests(unittest.TestCase):
             subprocess.run(
                 ["make", "-C", "c", "build/ccc"],
                 cwd=ROOT,
-                env={**env, "PATH": f"/usr/bin:{env.get('PATH', '')}"},
+                env=self._c_build_env(env),
                 capture_output=True,
                 text=True,
                 check=True,

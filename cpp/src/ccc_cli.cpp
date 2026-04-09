@@ -36,9 +36,12 @@ int main(int argc, char* argv[]) {
     CccConfig config = loadDefaultConfig();
 
     try {
-        auto [cmd_argv, env_overrides] = resolveCommand(parsed, &config);
+        auto [cmd_argv, env_overrides, warnings] = resolveCommand(parsed, &config);
         spec.argv = std::move(cmd_argv);
         spec.env = std::move(env_overrides);
+        for (const auto& warning : warnings) {
+            std::cerr << warning << "\n";
+        }
     } catch (const std::exception& e) {
         std::cerr << e.what() << "\n";
         return 1;

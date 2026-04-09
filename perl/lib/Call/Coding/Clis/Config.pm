@@ -8,7 +8,7 @@ our @EXPORT_OK = qw(load_config find_config_path);
 
 sub find_config_path {
     my $ccc_config = $ENV{CCC_CONFIG};
-    return $ccc_config if defined $ccc_config && -f $ccc_config;
+    return $ccc_config if defined $ccc_config && -f $ccc_config && -s $ccc_config;
 
     my $xdg = $ENV{XDG_CONFIG_HOME};
     if (defined $xdg && length $xdg) {
@@ -90,6 +90,7 @@ sub _parse_toml {
                 thinking => undef,
                 provider => '',
                 model    => '',
+                agent    => '',
             };
             next;
         }
@@ -136,6 +137,9 @@ sub _parse_toml {
                 elsif ($key eq 'model') {
                     $config->{aliases}{$current_alias}{model} = $val;
                 }
+                elsif ($key eq 'agent') {
+                    $config->{aliases}{$current_alias}{agent} = $val;
+                }
             }
         }
     }
@@ -172,12 +176,13 @@ sub _parse_legacy {
                 $config->{default_thinking} = ($val =~ /^[0-4]$/ ? $val + 0 : undef);
             }
             elsif ($key eq 'alias') {
-                if ($val =~ /^(\w+)\s+runner=(\S+)(?:\s+thinking=([0-4]))?(?:\s+provider=(\S+))?(?:\s+model=(\S+))?$/) {
+                if ($val =~ /^(\w+)\s+runner=(\S+)(?:\s+thinking=([0-4]))?(?:\s+provider=(\S+))?(?:\s+model=(\S+))?(?:\s+agent=(\S+))?$/) {
                     $config->{aliases}{$1} = {
                         runner   => $2,
                         thinking => (defined $3 ? $3 + 0 : undef),
                         provider => ($4 // ''),
                         model    => ($5 // ''),
+                        agent    => ($6 // ''),
                     };
                 }
             }

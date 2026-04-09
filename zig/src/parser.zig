@@ -6,6 +6,7 @@ pub const RunnerInfo = struct {
     thinking_flags: [5]?[]const []const u8,
     provider_flag: []const u8,
     model_flag: []const u8,
+    agent_flag: []const u8,
 };
 
 pub const ParsedArgs = struct {
@@ -27,18 +28,22 @@ pub const AliasDef = struct {
     thinking: ?i32 = null,
     provider: ?[]const u8 = null,
     model: ?[]const u8 = null,
+    agent: ?[]const u8 = null,
 };
 
 pub const CccConfig = struct {
+    allocator: std.mem.Allocator,
     default_runner: []const u8 = "oc",
     default_provider: []const u8 = "",
     default_model: []const u8 = "",
     default_thinking: ?i32 = null,
     aliases: std.StringHashMap(AliasDef),
     abbreviations: std.StringHashMap([]const u8),
+    contents: ?[]u8 = null,
 
     pub fn init(allocator: std.mem.Allocator) CccConfig {
         return .{
+            .allocator = allocator,
             .aliases = std.StringHashMap(AliasDef).init(allocator),
             .abbreviations = std.StringHashMap([]const u8).init(allocator),
         };
@@ -47,14 +52,23 @@ pub const CccConfig = struct {
     pub fn deinit(self: *CccConfig) void {
         self.aliases.deinit();
         self.abbreviations.deinit();
+        if (self.contents) |contents| {
+            self.allocator.free(contents);
+            self.contents = null;
+        }
     }
 };
 
 pub const ResolvedCommand = struct {
     argv: []const []const u8,
     env: std.StringHashMap([]const u8),
+    warnings: []const []const u8,
 
     pub fn deinit(self: *ResolvedCommand, allocator: std.mem.Allocator) void {
+        if (self.warnings.len > 0) {
+            for (self.warnings) |warning| allocator.free(warning);
+            allocator.free(self.warnings);
+        }
         allocator.free(self.argv);
         self.env.deinit();
     }
@@ -71,6 +85,7 @@ const opencode_info = RunnerInfo{
     .thinking_flags = .{ null, null, null, null, null },
     .provider_flag = "",
     .model_flag = "",
+    .agent_flag = "--agent",
 };
 
 const claude_thinking_0 = &[_][]const u8{"--no-thinking"};
@@ -91,6 +106,7 @@ const claude_info = RunnerInfo{
     },
     .provider_flag = "",
     .model_flag = "--model",
+    .agent_flag = "--agent",
 };
 
 const kimi_thinking_0 = &[_][]const u8{"--no-think"};
@@ -111,6 +127,7 @@ const kimi_info = RunnerInfo{
     },
     .provider_flag = "",
     .model_flag = "--model",
+    .agent_flag = "--agent",
 };
 
 const codex_info = RunnerInfo{
@@ -119,6 +136,7 @@ const codex_info = RunnerInfo{
     .thinking_flags = .{ null, null, null, null, null },
     .provider_flag = "",
     .model_flag = "--model",
+    .agent_flag = "",
 };
 
 const crush_info = RunnerInfo{
@@ -127,6 +145,7 @@ const crush_info = RunnerInfo{
     .thinking_flags = .{ null, null, null, null, null },
     .provider_flag = "",
     .model_flag = "",
+    .agent_flag = "",
 };
 
 pub fn runnerRegistry(allocator: std.mem.Allocator) !std.StringHashMap(RunnerInfo) {
@@ -319,6 +338,8 @@ pub fn resolveCommand(allocator: std.mem.Allocator, parsed: ParsedArgs, config: 
         alias_def = config.aliases.get(a);
     }
 
+    const requested_agent = if (parsed.alias != null and alias_def == null) parsed.alias else null;
+
     var effective_info = info;
     if (alias_def) |ad| {
         if (ad.runner != null and parsed.runner == null) {
@@ -331,6 +352,12 @@ pub fn resolveCommand(allocator: std.mem.Allocator, parsed: ParsedArgs, config: 
 
     var argv: std.ArrayList([]const u8) = .empty;
     errdefer argv.deinit(allocator);
+
+    var warnings: std.ArrayList([]const u8) = .empty;
+    errdefer {
+        for (warnings.items) |warning| allocator.free(warning);
+        warnings.deinit(allocator);
+    }
 
     try argv.append(allocator, effective_info.binary);
     try argv.appendSlice(allocator, effective_info.extra_args);
@@ -384,6 +411,31 @@ pub fn resolveCommand(allocator: std.mem.Allocator, parsed: ParsedArgs, config: 
         }
     }
 
+    var effective_agent: ?[]const u8 = requested_agent;
+    if (alias_def) |ad| {
+        if (ad.agent) |agent| {
+            if (agent.len > 0) {
+                effective_agent = agent;
+            }
+        }
+    }
+    if (effective_agent) |agent| {
+        if (effective_info.agent_flag.len > 0) {
+            try argv.append(allocator, effective_info.agent_flag);
+            try argv.append(allocator, agent);
+        } else {
+            const warning = try std.fmt.allocPrint(
+                allocator,
+                "warning: runner {s} does not support agents; ignoring @{s}",
+                .{ effective_info.binary, agent },
+            );
+            warnings.append(allocator, warning) catch |err| {
+                allocator.free(warning);
+                return err;
+            };
+        }
+    }
+
     const prompt = std.mem.trim(u8, parsed.prompt, " \t\n\r");
     if (prompt.len == 0) return error.EmptyPrompt;
     try argv.append(allocator, prompt);
@@ -400,5 +452,6 @@ pub fn resolveCommand(allocator: std.mem.Allocator, parsed: ParsedArgs, config: 
     return .{
         .argv = try argv.toOwnedSlice(allocator),
         .env = env,
+        .warnings = try warnings.toOwnedSlice(allocator),
     };
 }

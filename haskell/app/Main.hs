@@ -32,7 +32,8 @@ main = do
         Left err -> do
           hPutStrLn stderr err
           exitWith (ExitFailure 1)
-        Right (argv, envOverrides) -> do
+        Right (argv, envOverrides, warnings) -> do
+          mapM_ (hPutStrLn stderr) warnings
           mOverride <- lookupEnv "CCC_REAL_OPENCODE"
           let argv' = case mOverride of
                 Nothing  -> argv

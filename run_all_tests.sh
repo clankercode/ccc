@@ -33,6 +33,51 @@ run_test() {
     fi
 }
 
+GO_CACHE="/tmp/ccc-go-cache"
+ZIG_GLOBAL_CACHE_DIR="/tmp/ccc-zig-global-cache"
+ZIG_LOCAL_CACHE_DIR="/tmp/ccc-zig-local-cache"
+TEST_HOME="/tmp/ccc-test-home"
+TEST_XDG_CONFIG_HOME="/tmp/ccc-test-xdg-config"
+TEST_XDG_CACHE_HOME="/tmp/ccc-test-xdg-cache"
+TEST_XDG_DATA_HOME="/tmp/ccc-test-xdg-data"
+TEST_XDG_STATE_HOME="/tmp/ccc-test-xdg-state"
+TEST_CCC_CONFIG="/tmp/ccc-test-missing-config.toml"
+DOTNET_HOME="/tmp/ccc-dotnet-home"
+NUGET_HOME="/tmp/ccc-nuget"
+CRYSTAL_CACHE_DIR="/tmp/ccc-crystal-cache"
+CABAL_DIR="/tmp/ccc-cabal"
+mkdir -p \
+    "$GO_CACHE" \
+    "$ZIG_GLOBAL_CACHE_DIR" \
+    "$ZIG_LOCAL_CACHE_DIR" \
+    "$TEST_HOME" \
+    "$TEST_XDG_CONFIG_HOME" \
+    "$TEST_XDG_CACHE_HOME" \
+    "$TEST_XDG_DATA_HOME" \
+    "$TEST_XDG_STATE_HOME" \
+    "$DOTNET_HOME" \
+    "$NUGET_HOME" \
+    "$CRYSTAL_CACHE_DIR" \
+    "$CABAL_DIR"
+export HOME="$TEST_HOME"
+export XDG_CONFIG_HOME="$TEST_XDG_CONFIG_HOME"
+export XDG_CACHE_HOME="$TEST_XDG_CACHE_HOME"
+export XDG_DATA_HOME="$TEST_XDG_DATA_HOME"
+export XDG_STATE_HOME="$TEST_XDG_STATE_HOME"
+export CCC_CONFIG="$TEST_CCC_CONFIG"
+export GOCACHE="$GO_CACHE"
+export ZIG_GLOBAL_CACHE_DIR
+export ZIG_LOCAL_CACHE_DIR
+export DOTNET_CLI_HOME="$DOTNET_HOME"
+export NUGET_PACKAGES="$NUGET_HOME"
+export CRYSTAL_CACHE_DIR
+export CABAL_DIR
+export LC_ALL=C
+export PERL_BADLANG=0
+export DOTNET_NOLOGO=1
+export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+export DOTNET_CLI_TELEMETRY_OPTOUT=1
+
 skip_test() {
     local label="$1"
     local reason="$2"
@@ -51,7 +96,7 @@ echo ""
 
 printf "${BOLD}[1/22] Python — unit tests${RESET}\n"
 run_test "python: runner + prompt_spec" \
-    "PYTHONPATH=python python3 -m unittest tests.test_runner -v" \
+    "PYTHONPATH=python python3 -m unittest tests.test_runner tests.test_json_output tests.test_parser_config tests.test_ccc_contract -v" \
     "$TMPDIR/python_unit.log"
 
 printf "\n${BOLD}[2/22] Rust — unit tests${RESET}\n"
@@ -61,12 +106,12 @@ run_test "rust: cargo test" \
 
 printf "\n${BOLD}[3/22] TypeScript — unit tests${RESET}\n"
 run_test "typescript: node --test" \
-    "node --test typescript/tests/runner.test.mjs 2>&1" \
+    "node --test typescript/tests/*.mjs 2>&1" \
     "$TMPDIR/ts_unit.log"
 
 printf "\n${BOLD}[4/22] C — unit tests${RESET}\n"
 run_test "c: make test" \
-    "make -C c test 2>&1" \
+    "CC=/usr/bin/gcc make -C c test 2>&1" \
     "$TMPDIR/c_unit.log"
 
 printf "\n${BOLD}[5/22] Go — unit tests${RESET}\n"
@@ -111,7 +156,7 @@ run_test "fsharp: dotnet test" \
 
 printf "\n${BOLD}[13/22] PHP — unit tests${RESET}\n"
 run_test "php: test suite" \
-    "(cd php && php tests/RunnerTest.php) 2>&1" \
+    "(cd php && for t in tests/*Test.php; do php \"\$t\"; done) 2>&1" \
     "$TMPDIR/php_unit.log"
 
 printf "\n${BOLD}[14/22] PureScript — unit tests${RESET}\n"
@@ -148,8 +193,8 @@ printf "\n${BOLD}[20/22] VBScript — unit tests${RESET}\n"
 skip_test "vbscript: test suite" "Windows only"
 
 printf "\n${BOLD}[21/22] Cross-language contract tests${RESET}\n"
-run_test "contract: ccc CLI behavior (16 languages)" \
-    "PYTHONPATH=python python3 -m unittest tests.test_ccc_contract -v 2>&1" \
+run_test "contract: ccc CLI behavior (legacy + @name matrix)" \
+    "PYTHONPATH=python python3 -m unittest tests.test_ccc_contract -v 2>&1 && PYTHONPATH=. python3 tests/test_ccc_contract_impl.py all -v 2>&1" \
     "$TMPDIR/contract.log"
 
 printf "\n${BOLD}[22/22] Cross-language harness (mock-coding-cli)${RESET}\n"

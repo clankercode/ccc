@@ -87,6 +87,8 @@ CccConfig loadConfig(const std::string& path) {
                 alias.provider = unquote(val);
             } else if (key == "model") {
                 alias.model = unquote(val);
+            } else if (key == "agent") {
+                alias.agent = unquote(val);
             }
         }
     }

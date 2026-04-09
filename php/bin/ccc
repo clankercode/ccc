@@ -35,7 +35,11 @@ try {
         exit(1);
     }
 
-    $resolved = Parser::resolveCommand($parsed, $config);
+    $warnings = [];
+    $resolved = Parser::resolveCommand($parsed, $config, $warnings);
+    foreach ($warnings as $warning) {
+        fwrite(STDERR, $warning . "\n");
+    }
     $spec = new CommandSpec($resolved['argv'], null, null, $resolved['env']);
 } catch (\Throwable $e) {
     fwrite(STDERR, $e->getMessage() . "\n");

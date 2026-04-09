@@ -9,6 +9,7 @@ pub struct RunnerInfo {
     pub thinking_flags: BTreeMap<i32, Vec<String>>,
     pub provider_flag: String,
     pub model_flag: String,
+    pub agent_flag: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -27,6 +28,7 @@ pub struct AliasDef {
     pub thinking: Option<i32>,
     pub provider: Option<String>,
     pub model: Option<String>,
+    pub agent: Option<String>,
 }
 
 impl Default for AliasDef {
@@ -36,6 +38,7 @@ impl Default for AliasDef {
             thinking: None,
             provider: None,
             model: None,
+            agent: None,
         }
     }
 }
@@ -71,6 +74,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         thinking_flags: BTreeMap::new(),
         provider_flag: String::new(),
         model_flag: String::new(),
+        agent_flag: "--agent".into(),
     };
     let claude = RunnerInfo {
         binary: "claude".into(),
@@ -86,6 +90,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         },
         provider_flag: String::new(),
         model_flag: "--model".into(),
+        agent_flag: "--agent".into(),
     };
     let kimi = RunnerInfo {
         binary: "kimi".into(),
@@ -101,6 +106,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         },
         provider_flag: String::new(),
         model_flag: "--model".into(),
+        agent_flag: "--agent".into(),
     };
     let codex = RunnerInfo {
         binary: "codex".into(),
@@ -108,6 +114,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         thinking_flags: BTreeMap::new(),
         provider_flag: String::new(),
         model_flag: "--model".into(),
+        agent_flag: String::new(),
     };
     let crush = RunnerInfo {
         binary: "crush".into(),
@@ -115,6 +122,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         thinking_flags: BTreeMap::new(),
         provider_flag: String::new(),
         model_flag: String::new(),
+        agent_flag: String::new(),
     };
 
     let claude_clone = claude.clone();
@@ -139,6 +147,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
             thinking_flags: BTreeMap::new(),
             provider_flag: String::new(),
             model_flag: "--model".into(),
+            agent_flag: String::new(),
         },
     );
     m.insert(
@@ -149,6 +158,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
             thinking_flags: BTreeMap::new(),
             provider_flag: String::new(),
             model_flag: String::new(),
+            agent_flag: String::new(),
         },
     );
 
@@ -251,9 +261,10 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
 pub fn resolve_command(
     parsed: &ParsedArgs,
     config: Option<&CccConfig>,
-) -> Result<(Vec<String>, BTreeMap<String, String>), &'static str> {
+) -> Result<(Vec<String>, BTreeMap<String, String>, Vec<String>), &'static str> {
     let config = config.cloned().unwrap_or_default();
     let registry = RUNNER_REGISTRY.read().unwrap();
+    let mut warnings = Vec::new();
 
     let runner_name = parsed.runner.as_deref().unwrap_or(&config.default_runner);
     let resolved_name = config
@@ -269,19 +280,27 @@ pub fn resolve_command(
         .ok_or("no runner found")?;
 
     let alias_def = parsed.alias.as_ref().and_then(|a| config.aliases.get(a));
+    let mut effective_runner_name = resolved_name.to_string();
 
-    let effective_runner =
-        if alias_def.and_then(|a| a.runner.as_ref()).is_some() && parsed.runner.is_none() {
-            let alias_runner = alias_def.unwrap().runner.as_deref().unwrap();
-            let resolved = config
-                .abbreviations
-                .get(alias_runner)
-                .map(|s| s.as_str())
-                .unwrap_or(alias_runner);
-            registry.get(resolved).unwrap_or(info)
+    let effective_runner = if let Some(alias_def) = alias_def {
+        if parsed.runner.is_none() {
+            if let Some(alias_runner) = alias_def.runner.as_deref() {
+                let resolved = config
+                    .abbreviations
+                    .get(alias_runner)
+                    .map(|s| s.as_str())
+                    .unwrap_or(alias_runner);
+                effective_runner_name = resolved.to_string();
+                registry.get(resolved).unwrap_or(info)
+            } else {
+                info
+            }
         } else {
             info
-        };
+        }
+    } else {
+        info
+    };
 
     let mut argv: Vec<String> = vec![effective_runner.binary.clone()];
     argv.extend(effective_runner.extra_args.iter().cloned());
@@ -333,11 +352,29 @@ pub fn resolve_command(
         }
     }
 
+    let effective_agent = if let Some(alias_def) = alias_def {
+        alias_def.agent.clone()
+    } else {
+        parsed.alias.clone()
+    };
+
+    if let Some(agent) = effective_agent {
+        if effective_runner.agent_flag.is_empty() {
+            warnings.push(format!(
+                "warning: runner \"{}\" does not support agents; ignoring @{}",
+                effective_runner_name, agent
+            ));
+        } else {
+            argv.push(effective_runner.agent_flag.clone());
+            argv.push(agent);
+        }
+    }
+
     let prompt = parsed.prompt.trim();
     if prompt.is_empty() {
         return Err("prompt must not be empty");
     }
     argv.push(prompt.to_string());
 
-    Ok((argv, env_overrides))
+    Ok((argv, env_overrides, warnings))
 }

@@ -24,38 +24,54 @@ defmodule CallCodingClis.Runner do
 
   defp do_run(spec, resolved, args, bin) do
     stderr_path = temp_path()
-    {stdin_prefix, stdin_path} = build_stdin_prefix(spec.stdin_text)
+    {stdin_part, stdin_path} = build_stdin(spec.stdin_text)
 
     try do
-      escaped = [resolved | args] |> Enum.map(&shell_escape/1) |> Enum.join(" ")
+      escaped_args =
+        [resolved | args]
+        |> Enum.map(&shell_escape/1)
+        |> Enum.join(" ")
 
-      stdin_redirect = if stdin_path, do: "", else: " </dev/null"
+      env_part =
+        if map_size(spec.env) == 0 do
+          ""
+        else
+          spec.env
+          |> Enum.map(fn {k, v} -> "#{shell_escape(k)}=#{shell_escape(v)}" end)
+          |> Enum.join(" ")
+          |> then(&(&1 <> " "))
+        end
 
       shell_cmd =
-        "#{stdin_prefix}#{escaped} 2>#{shell_escape(stderr_path)}#{stdin_redirect}"
+        "#{env_part}#{stdin_part}#{escaped_args} 2>#{shell_escape(stderr_path)}"
 
       opts =
         [into: ""]
         |> maybe_put(:cd, spec.cwd)
-        |> add_env_opt(spec.env)
 
       {stdout, exit_code} = System.cmd("sh", ["-c", shell_cmd], opts)
-
-      stderr = read_and_delete(stderr_path)
-      cleanup(stdin_path)
 
       %CompletedRun{
         argv: spec.argv,
         exit_code: exit_code,
         stdout: stdout,
-        stderr: stderr
+        stderr: read_and_delete(stderr_path)
       }
     catch
       kind, reason ->
-        cleanup(stdin_path)
-        read_and_delete(stderr_path)
         startup_failure(spec, bin, format_err({kind, reason}))
+    after
+      File.rm(stderr_path)
+      cleanup(stdin_path)
     end
+  end
+
+  defp build_stdin(nil), do: {"", nil}
+
+  defp build_stdin(text) do
+    path = temp_path()
+    File.write!(path, text)
+    {"cat #{shell_escape(path)} | ", path}
   end
 
   defp startup_failure(spec, bin, msg) do
@@ -65,14 +81,6 @@ defmodule CallCodingClis.Runner do
       stdout: "",
       stderr: "failed to start #{bin}: #{msg}\n"
     }
-  end
-
-  defp build_stdin_prefix(nil), do: {"", nil}
-
-  defp build_stdin_prefix(text) do
-    path = temp_path()
-    File.write!(path, text)
-    {"cat #{shell_escape(path)} | ", path}
   end
 
   defp shell_escape(s) do
@@ -94,20 +102,13 @@ defmodule CallCodingClis.Runner do
     end
   end
 
+  defp maybe_put(opts, _key, nil), do: opts
+  defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
+
   defp cleanup(nil), do: :ok
 
   defp cleanup(path) do
     File.rm(path)
-  end
-
-  defp maybe_put(opts, _key, nil), do: opts
-  defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
-
-  defp add_env_opt(opts, overrides) when map_size(overrides) == 0, do: opts
-
-  defp add_env_opt(opts, overrides) do
-    env_list = Enum.map(overrides, fn {k, v} -> {k, v} end)
-    Keyword.put(opts, :env, env_list)
   end
 
   defp format_err({:error, :enoent}), do: "no such file or directory"

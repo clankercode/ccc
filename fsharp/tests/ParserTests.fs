@@ -92,44 +92,50 @@ let ``parseArgs multi word prompt`` () =
 [<Fact>]
 let ``resolveCommand default runner is opencode`` () =
     let parsed = { Runner = None; Thinking = None; Provider = None; Model = None; Alias = None; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed None
+    let argv, env, warnings = Parser.resolveCommand parsed None
     Assert.Equal("opencode", List.head argv)
     Assert.Contains("run", argv)
     Assert.Contains("hello", argv)
+    Assert.Empty(warnings)
 
 [<Fact>]
 let ``resolveCommand claude runner`` () =
     let parsed = { Runner = Some "cc"; Thinking = None; Provider = None; Model = None; Alias = None; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed None
+    let argv, env, warnings = Parser.resolveCommand parsed None
     Assert.Equal("claude", List.head argv)
     Assert.DoesNotContain("run", argv)
     Assert.Contains("hello", argv)
+    Assert.Empty(warnings)
 
 [<Fact>]
 let ``resolveCommand thinking flags for claude`` () =
     let parsed = { Runner = Some "cc"; Thinking = Some 2; Provider = None; Model = None; Alias = None; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed None
+    let argv, env, warnings = Parser.resolveCommand parsed None
     Assert.Contains("--thinking", argv)
     Assert.Contains("medium", argv)
+    Assert.Empty(warnings)
 
 [<Fact>]
 let ``resolveCommand thinking zero for claude`` () =
     let parsed = { Runner = Some "cc"; Thinking = Some 0; Provider = None; Model = None; Alias = None; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed None
+    let argv, env, warnings = Parser.resolveCommand parsed None
     Assert.Contains("--no-thinking", argv)
+    Assert.Empty(warnings)
 
 [<Fact>]
 let ``resolveCommand model flag for claude`` () =
     let parsed = { Runner = Some "cc"; Thinking = None; Provider = None; Model = Some "claude-4"; Alias = None; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed None
+    let argv, env, warnings = Parser.resolveCommand parsed None
     Assert.Contains("--model", argv)
     Assert.Contains("claude-4", argv)
+    Assert.Empty(warnings)
 
 [<Fact>]
 let ``resolveCommand provider sets env`` () =
     let parsed = { Runner = None; Thinking = None; Provider = Some "anthropic"; Model = None; Alias = None; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed None
+    let argv, env, warnings = Parser.resolveCommand parsed None
     Assert.Equal(Some "anthropic", env.TryFind("CCC_PROVIDER"))
+    Assert.Empty(warnings)
 
 [<Fact>]
 let ``resolveCommand empty prompt raises`` () =
@@ -140,60 +146,92 @@ let ``resolveCommand empty prompt raises`` () =
 let ``resolveCommand config default runner`` () =
     let config = { Config.defaultConfig with DefaultRunner = "cc" }
     let parsed = { Runner = None; Thinking = None; Provider = None; Model = None; Alias = None; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed (Some config)
+    let argv, env, warnings = Parser.resolveCommand parsed (Some config)
     Assert.Equal("claude", List.head argv)
+    Assert.Empty(warnings)
 
 [<Fact>]
 let ``resolveCommand config default thinking`` () =
     let config = { Config.defaultConfig with DefaultRunner = "cc"; DefaultThinking = Some 1 }
     let parsed = { Runner = None; Thinking = None; Provider = None; Model = None; Alias = None; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed (Some config)
+    let argv, env, warnings = Parser.resolveCommand parsed (Some config)
     Assert.Contains("--thinking", argv)
     Assert.Contains("low", argv)
+    Assert.Empty(warnings)
 
 [<Fact>]
 let ``resolveCommand config default model`` () =
     let config = { Config.defaultConfig with DefaultRunner = "cc"; DefaultModel = "claude-3.5" }
     let parsed = { Runner = None; Thinking = None; Provider = None; Model = None; Alias = None; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed (Some config)
+    let argv, env, warnings = Parser.resolveCommand parsed (Some config)
     Assert.Contains("--model", argv)
     Assert.Contains("claude-3.5", argv)
+    Assert.Empty(warnings)
 
 [<Fact>]
 let ``resolveCommand config abbreviation`` () =
     let config = { Config.defaultConfig with Abbreviations = Map.ofList [("mycc", "cc")] }
     let parsed = { Runner = Some "mycc"; Thinking = None; Provider = None; Model = None; Alias = None; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed (Some config)
+    let argv, env, warnings = Parser.resolveCommand parsed (Some config)
     Assert.Equal("claude", List.head argv)
+    Assert.Empty(warnings)
 
 [<Fact>]
 let ``resolveCommand alias provides defaults`` () =
-    let alias = { Runner = Some "cc"; Thinking = Some 3; Provider = None; Model = Some "claude-4" }
+    let alias = { Runner = Some "cc"; Thinking = Some 3; Provider = None; Model = Some "claude-4"; Agent = None }
     let config = { Config.defaultConfig with Aliases = Map.ofList [("work", alias)] }
     let parsed = { Runner = None; Thinking = None; Provider = None; Model = None; Alias = Some "work"; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed (Some config)
+    let argv, env, warnings = Parser.resolveCommand parsed (Some config)
     Assert.Equal("claude", List.head argv)
     Assert.Contains("--thinking", argv)
     Assert.Contains("high", argv)
     Assert.Contains("--model", argv)
     Assert.Contains("claude-4", argv)
+    Assert.Empty(warnings)
 
 [<Fact>]
 let ``resolveCommand explicit overrides alias`` () =
-    let alias = { Runner = Some "cc"; Thinking = Some 3; Provider = None; Model = Some "claude-4" }
+    let alias = { Runner = Some "cc"; Thinking = Some 3; Provider = None; Model = Some "claude-4"; Agent = Some "specialist" }
     let config = { Config.defaultConfig with Aliases = Map.ofList [("work", alias)] }
     let parsed = { Runner = Some "k"; Thinking = Some 1; Provider = None; Model = None; Alias = Some "work"; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed (Some config)
+    let argv, env, warnings = Parser.resolveCommand parsed (Some config)
     Assert.Equal("kimi", List.head argv)
     Assert.Contains("--think", argv)
     Assert.Contains("low", argv)
+    Assert.Contains("--agent", argv)
+    Assert.Contains("specialist", argv)
+    Assert.Empty(warnings)
 
 [<Fact>]
 let ``resolveCommand kimi thinking flags`` () =
     let parsed = { Runner = Some "k"; Thinking = Some 4; Provider = None; Model = None; Alias = None; Prompt = "hello" }
-    let argv, env = Parser.resolveCommand parsed None
+    let argv, env, warnings = Parser.resolveCommand parsed None
     Assert.Contains("--think", argv)
     Assert.Contains("max", argv)
+    Assert.Empty(warnings)
+
+[<Fact>]
+let ``resolveCommand name falls back to agent`` () =
+    let parsed = { Runner = None; Thinking = None; Provider = None; Model = None; Alias = Some "reviewer"; Prompt = "hello" }
+    let argv, env, warnings = Parser.resolveCommand parsed None
+    Assert.Equal<string list>(["opencode"; "run"; "--agent"; "reviewer"; "hello"], argv)
+    Assert.Empty(warnings)
+
+[<Fact>]
+let ``resolveCommand preset agent wins over name fallback`` () =
+    let alias = { Runner = None; Thinking = None; Provider = None; Model = None; Agent = Some "specialist" }
+    let config = { Config.defaultConfig with Aliases = Map.ofList [("reviewer", alias)] }
+    let parsed = { Runner = None; Thinking = None; Provider = None; Model = None; Alias = Some "reviewer"; Prompt = "hello" }
+    let argv, env, warnings = Parser.resolveCommand parsed (Some config)
+    Assert.Equal<string list>(["opencode"; "run"; "--agent"; "specialist"; "hello"], argv)
+    Assert.Empty(warnings)
+
+[<Fact>]
+let ``resolveCommand unsupported agent warns`` () =
+    let parsed = { Runner = Some "rc"; Thinking = None; Provider = None; Model = None; Alias = Some "reviewer"; Prompt = "hello" }
+    let argv, env, warnings = Parser.resolveCommand parsed None
+    Assert.Equal<string list>(["codex"; "hello"], argv)
+    Assert.Equal<string list>(["warning: runner \"rc\" does not support agents; ignoring @reviewer"], warnings)
 
 [<Fact>]
 let ``loadConfig missing file returns defaults`` () =
@@ -216,6 +254,7 @@ mycc = "cc"
 runner = "cc"
 thinking = 3
 model = "claude-4"
+agent = "reviewer"
 
 [aliases.quick]
 runner = "oc"
@@ -233,6 +272,7 @@ runner = "oc"
         Assert.Equal(Some "cc", config.Aliases.["work"].Runner)
         Assert.Equal(Some 3, config.Aliases.["work"].Thinking)
         Assert.Equal(Some "claude-4", config.Aliases.["work"].Model)
+        Assert.Equal(Some "reviewer", config.Aliases.["work"].Agent)
         Assert.True(config.Aliases.ContainsKey("quick"))
         Assert.Equal(Some "oc", config.Aliases.["quick"].Runner)
     finally
@@ -259,3 +299,17 @@ let ``runnerRegistry abbreviations point to same info`` () =
     Assert.Equal(Parser.runnerRegistry.["cc"].Binary, Parser.runnerRegistry.["claude"].Binary)
     Assert.Equal(Parser.runnerRegistry.["c"].Binary, Parser.runnerRegistry.["claude"].Binary)
     Assert.Equal(Parser.runnerRegistry.["k"].Binary, Parser.runnerRegistry.["kimi"].Binary)
+
+[<Fact>]
+let ``runnerRegistry agent flags registered`` () =
+    Assert.Equal("--agent", Parser.runnerRegistry.["opencode"].AgentFlag)
+    Assert.Equal("--agent", Parser.runnerRegistry.["claude"].AgentFlag)
+    Assert.Equal("--agent", Parser.runnerRegistry.["kimi"].AgentFlag)
+    Assert.Equal("", Parser.runnerRegistry.["codex"].AgentFlag)
+    Assert.Equal("", Parser.runnerRegistry.["crush"].AgentFlag)
+
+[<Fact>]
+let ``help text mentions name slot and fallback`` () =
+    Assert.Contains("[@name]", Help.helpText)
+    Assert.Contains("if no preset exists, treat it as an agent", Help.helpText)
+    Assert.Contains("[@name]", Help.usageText)

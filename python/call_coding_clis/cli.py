@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     config = load_config()
     try:
-        argv_list, env_overrides = resolve_command(parsed, config)
+        argv_list, env_overrides, warnings = resolve_command(parsed, config)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -47,6 +47,9 @@ def main(argv: list[str] | None = None) -> int:
     real_opencode = os.environ.get("CCC_REAL_OPENCODE", "")
     if real_opencode:
         spec.argv[0] = real_opencode
+
+    for warning in warnings:
+        print(warning, file=sys.stderr)
 
     result = Runner().run(spec)
     if result.stdout:

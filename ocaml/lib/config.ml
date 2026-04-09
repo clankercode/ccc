@@ -7,6 +7,7 @@ let parse_alias_fields fields =
   let thinking = ref None in
   let provider = ref None in
   let model = ref None in
+  let agent = ref None in
   List.iter (fun field ->
     if String.starts_with ~prefix:"runner=" field then
       runner := Some (String.sub field 7 (String.length field - 7))
@@ -17,9 +18,11 @@ let parse_alias_fields fields =
       provider := Some (String.sub field 9 (String.length field - 9))
     else if String.starts_with ~prefix:"model=" field then
       model := Some (String.sub field 6 (String.length field - 6))
+    else if String.starts_with ~prefix:"agent=" field then
+      agent := Some (String.sub field 6 (String.length field - 6))
   ) fields;
   { Parser.ad_runner = !runner; ad_thinking = !thinking;
-    ad_provider = !provider; ad_model = !model }
+    ad_provider = !provider; ad_model = !model; ad_agent = !agent }
 
 let strip_quotes s =
   let n = String.length s in
@@ -28,6 +31,12 @@ let strip_quotes s =
   else s
 
 let load_config path_opt =
+  let file_is_nonempty path =
+    try
+      let stat = Unix.stat path in
+      stat.Unix.st_kind = Unix.S_REG && stat.Unix.st_size > 0
+    with _ -> false
+  in
   let search_paths () =
     match path_opt with
     | Some p -> [p]
@@ -35,7 +44,7 @@ let load_config path_opt =
       let paths = ref [] in
       (try
         let ccc = Sys.getenv "CCC_CONFIG" in
-        paths := ccc :: !paths
+        if ccc <> "" && file_is_nonempty ccc then paths := ccc :: !paths
       with Not_found -> ());
       (try
         let xdg = Sys.getenv "XDG_CONFIG_HOME" in
@@ -69,13 +78,14 @@ let load_config path_opt =
     let alias_thinking = ref None in
     let alias_provider = ref None in
     let alias_model = ref None in
+    let alias_agent = ref None in
     let flush_alias () =
       if !alias_name <> "" then begin
         aliases := (!alias_name, { Parser.ad_runner = !alias_runner;
           Parser.ad_thinking = !alias_thinking; Parser.ad_provider = !alias_provider;
-          Parser.ad_model = !alias_model }) :: !aliases;
+          Parser.ad_model = !alias_model; Parser.ad_agent = !alias_agent }) :: !aliases;
         alias_name := ""; alias_runner := None; alias_thinking := None;
-        alias_provider := None; alias_model := None
+        alias_provider := None; alias_model := None; alias_agent := None
       end in
     (try while true do
       let line = String.trim (input_line ic) in
@@ -109,6 +119,7 @@ let load_config path_opt =
               (try alias_thinking := Some (int_of_string val_) with Failure _ -> ())
             | "provider" -> alias_provider := (if val_ = "" then None else Some val_)
             | "model" -> alias_model := (if val_ = "" then None else Some val_)
+            | "agent" -> alias_agent := (if val_ = "" then None else Some val_)
             | _ -> ()
           end else begin
             match key with

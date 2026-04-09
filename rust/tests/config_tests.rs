@@ -1,0 +1,52 @@
+use call_coding_clis::load_config;
+use std::fs;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+#[test]
+fn test_load_config_parses_alias_agent() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-config-{unique}"));
+    let config_path = base_dir.join("config.toml");
+    fs::create_dir_all(&base_dir).unwrap();
+    fs::write(
+        &config_path,
+        r#"
+[defaults]
+runner = "cc"
+provider = "anthropic"
+model = "claude-4"
+thinking = 2
+
+[abbreviations]
+mycc = "cc"
+
+[aliases.work]
+runner = "cc"
+thinking = 3
+model = "claude-4"
+agent = "reviewer"
+
+[aliases.quick]
+runner = "oc"
+"#,
+    )
+    .unwrap();
+
+    let config = load_config(Some(&config_path));
+
+    assert_eq!(config.default_runner, "cc");
+    assert_eq!(config.default_provider, "anthropic");
+    assert_eq!(config.default_model, "claude-4");
+    assert_eq!(config.default_thinking, Some(2));
+    assert_eq!(config.abbreviations.get("mycc").map(|s| s.as_str()), Some("cc"));
+    let work = config.aliases.get("work").unwrap();
+    assert_eq!(work.runner.as_deref(), Some("cc"));
+    assert_eq!(work.thinking, Some(3));
+    assert_eq!(work.model.as_deref(), Some("claude-4"));
+    assert_eq!(work.agent.as_deref(), Some("reviewer"));
+    let quick = config.aliases.get("quick").unwrap();
+    assert_eq!(quick.runner.as_deref(), Some("oc"));
+}

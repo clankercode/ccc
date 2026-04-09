@@ -65,10 +65,11 @@ fn test_resolve_default_runner_is_opencode() {
         prompt: "hello".into(),
         ..Default::default()
     };
-    let (argv, _) = resolve_command(&parsed, None).unwrap();
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(argv[0], "opencode");
     assert!(argv.contains(&"run".to_string()));
     assert!(argv.contains(&"hello".to_string()));
+    assert!(warnings.is_empty());
 }
 
 #[test]
@@ -78,8 +79,9 @@ fn test_resolve_claude_runner() {
         prompt: "hello".into(),
         ..Default::default()
     };
-    let (argv, _) = resolve_command(&parsed, None).unwrap();
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(argv[0], "claude");
+    assert!(warnings.is_empty());
 }
 
 #[test]
@@ -90,9 +92,10 @@ fn test_resolve_thinking_flags() {
         prompt: "hello".into(),
         ..Default::default()
     };
-    let (argv, _) = resolve_command(&parsed, None).unwrap();
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert!(argv.contains(&"--thinking".to_string()));
     assert!(argv.contains(&"medium".to_string()));
+    assert!(warnings.is_empty());
 }
 
 #[test]
@@ -103,9 +106,10 @@ fn test_resolve_model_flag() {
         prompt: "hello".into(),
         ..Default::default()
     };
-    let (argv, _) = resolve_command(&parsed, None).unwrap();
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert!(argv.contains(&"--model".to_string()));
     assert!(argv.contains(&"claude-4".to_string()));
+    assert!(warnings.is_empty());
 }
 
 #[test]
@@ -115,11 +119,12 @@ fn test_resolve_provider_sets_env() {
         prompt: "hello".into(),
         ..Default::default()
     };
-    let (_, env) = resolve_command(&parsed, None).unwrap();
+    let (_, env, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
         env.get("CCC_PROVIDER").map(|s| s.as_str()),
         Some("anthropic")
     );
+    assert!(warnings.is_empty());
 }
 
 #[test]
@@ -141,12 +146,13 @@ fn test_resolve_config_default_runner() {
         prompt: "hello".into(),
         ..Default::default()
     };
-    let (argv, _) = resolve_command(&parsed, Some(&config)).unwrap();
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
     assert_eq!(argv[0], "claude");
+    assert!(warnings.is_empty());
 }
 
 #[test]
-fn test_resolve_alias() {
+fn test_resolve_alias_preset_agent() {
     let config = CccConfig {
         aliases: {
             let mut m = std::collections::BTreeMap::new();
@@ -156,6 +162,7 @@ fn test_resolve_alias() {
                     runner: Some("cc".into()),
                     thinking: Some(3),
                     model: Some("claude-4".into()),
+                    agent: Some("reviewer".into()),
                     ..Default::default()
                 },
             );
@@ -168,8 +175,42 @@ fn test_resolve_alias() {
         prompt: "hello".into(),
         ..Default::default()
     };
-    let (argv, _) = resolve_command(&parsed, Some(&config)).unwrap();
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
     assert_eq!(argv[0], "claude");
     assert!(argv.contains(&"--thinking".to_string()));
     assert!(argv.contains(&"high".to_string()));
+    assert!(argv.contains(&"--agent".to_string()));
+    assert!(argv.contains(&"reviewer".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_name_falls_back_to_agent() {
+    let parsed = ParsedArgs {
+        alias: Some("reviewer".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[0], "opencode");
+    assert!(argv.contains(&"--agent".to_string()));
+    assert!(argv.contains(&"reviewer".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_agent_warning_when_runner_lacks_support() {
+    let parsed = ParsedArgs {
+        runner: Some("rc".into()),
+        alias: Some("reviewer".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (_, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        warnings,
+        vec![
+            "warning: runner \"rc\" does not support agents; ignoring @reviewer".to_string()
+        ]
+    );
 }

@@ -22,10 +22,13 @@ fn main() -> ExitCode {
     }
     let config = load_config(None);
     let spec = match resolve_command(&parsed, Some(&config)) {
-        Ok((argv, env_overrides)) => {
+        Ok((argv, env_overrides, warnings)) => {
             let mut spec = call_coding_clis::CommandSpec::new(argv);
             for (k, v) in env_overrides {
                 spec = spec.with_env(k, v);
+            }
+            for warning in warnings {
+                eprintln!("{warning}");
             }
             spec
         }

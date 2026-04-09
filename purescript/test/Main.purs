@@ -1,51 +1,163 @@
 module Test.Main where
 
 import Prelude
-import Effect (Effect)
-import Effect.Console (log)
+
+import CallCodingClis.Config (defaultConfig, parseConfig)
+import CallCodingClis.Help (helpText, usageText)
+import CallCodingClis.Parser (resolveCommand)
+import CallCodingClis.PromptSpec (buildPromptSpec)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import CallCodingClis.PromptSpec (buildPromptSpec)
+import Data.String.CodeUnits as CU
+import Data.String.Pattern (Pattern(..))
+import Effect (Effect)
+import Effect.Console (log)
+import Foreign.Object as Object
+import Node.Process (exit')
 
-check :: String -> Boolean -> Effect Unit
-check name true = log $ "PASS: " <> name
-check name false = log $ "FAIL: " <> name
+check :: String -> Boolean -> Effect Boolean
+check name passed = do
+  log $ (if passed then "PASS: " else "FAIL: ") <> name
+  pure passed
 
 main :: Effect Unit
 main = do
-  let r1 = case buildPromptSpec "Fix the failing tests" of
-        Right spec -> spec.argv == ["opencode", "run", "Fix the failing tests"]
-        Left _ -> false
-  check "buildPromptSpec: valid prompt" r1
+  r1 <- check "buildPromptSpec: valid prompt" $
+    case buildPromptSpec "Fix the failing tests" of
+      Right spec -> spec.argv == ["opencode", "run", "Fix the failing tests"]
+      Left _ -> false
 
-  let r2 = case buildPromptSpec "" of
-        Left msg -> msg == "prompt must not be empty"
-        Right _ -> false
-  check "buildPromptSpec: empty prompt rejected" r2
+  r2 <- check "buildPromptSpec: empty prompt rejected" $
+    case buildPromptSpec "" of
+      Left msg -> msg == "prompt must not be empty"
+      Right _ -> false
 
-  let r3 = case buildPromptSpec "   " of
-        Left _ -> true
-        Right _ -> false
-  check "buildPromptSpec: whitespace prompt rejected" r3
+  r3 <- check "buildPromptSpec: whitespace prompt rejected" $
+    case buildPromptSpec "   " of
+      Left _ -> true
+      Right _ -> false
 
-  let r4 = case buildPromptSpec "  hello  " of
-        Right spec -> spec.argv == ["opencode", "run", "hello"]
-        Left _ -> false
-  check "buildPromptSpec: prompt trimmed" r4
+  r4 <- check "buildPromptSpec: prompt trimmed" $
+    case buildPromptSpec "  hello  " of
+      Right spec -> spec.argv == ["opencode", "run", "hello"]
+      Left _ -> false
 
-  let r5 = case buildPromptSpec "\t\nmixed whitespace \n" of
-        Right spec -> spec.argv == ["opencode", "run", "mixed whitespace"]
-        Left _ -> false
-  check "buildPromptSpec: tabs and newlines trimmed" r5
+  r5 <- check "buildPromptSpec: tabs and newlines trimmed" $
+    case buildPromptSpec "\t\nmixed whitespace \n" of
+      Right spec -> spec.argv == ["opencode", "run", "mixed whitespace"]
+      Left _ -> false
 
-  let r6 = case buildPromptSpec "Fix the failing tests" of
-        Right spec -> spec.stdinText == Nothing
-        Left _ -> false
-  check "buildPromptSpec: stdinText is Nothing" r6
+  r6 <- check "buildPromptSpec: stdinText is Nothing" $
+    case buildPromptSpec "Fix the failing tests" of
+      Right spec -> spec.stdinText == Nothing
+      Left _ -> false
 
-  let r7 = case buildPromptSpec "Fix the failing tests" of
-        Right spec -> spec.cwd == Nothing
-        Left _ -> false
-  check "buildPromptSpec: cwd is Nothing" r7
+  r7 <- check "buildPromptSpec: cwd is Nothing" $
+    case buildPromptSpec "Fix the failing tests" of
+      Right spec -> spec.cwd == Nothing
+      Left _ -> false
 
-  log "done"
+  r8 <- check "usageText uses @name" $
+    usageText == "usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
+
+  r9 <- check "helpText explains preset-then-agent fallback" $
+    CU.indexOf (Pattern "[@name]") helpText /= Nothing
+      && CU.indexOf (Pattern "if no preset exists, treat it as an agent") helpText /= Nothing
+
+  let configText =
+        "[defaults]\n"
+          <> "runner = \"cc\"\n"
+          <> "provider = \"anthropic\"\n"
+          <> "model = \"claude-4\"\n"
+          <> "thinking = 2\n"
+          <> "\n"
+          <> "[abbreviations]\n"
+          <> "mycc = \"cc\"\n"
+          <> "\n"
+          <> "[aliases.work]\n"
+          <> "runner = \"cc\"\n"
+          <> "thinking = 3\n"
+          <> "provider = \"anthropic\"\n"
+          <> "model = \"claude-4\"\n"
+          <> "agent = \"reviewer\"\n"
+
+  let parsedConfig = parseConfig configText
+  r10 <- check "parseConfig loads defaults, abbreviations, and agent" $
+    parsedConfig.defaultRunner == "cc"
+      && parsedConfig.defaultProvider == "anthropic"
+      && parsedConfig.defaultModel == "claude-4"
+      && parsedConfig.defaultThinking == Just 2
+      && Object.lookup "mycc" parsedConfig.abbreviations == Just "cc"
+      && Object.lookup "work" parsedConfig.aliases
+        == Just
+          { runner: Just "cc"
+          , thinking: Just 3
+          , provider: Just "anthropic"
+          , model: Just "claude-4"
+          , agent: Just "reviewer"
+          }
+
+  let agentFallbackConfig = defaultConfig { defaultRunner = "oc" }
+  r11 <- check "resolveCommand falls back to agent when preset is absent" $
+    let resolved =
+          resolveCommand
+            { runner: Nothing
+            , thinking: Nothing
+            , provider: Nothing
+            , model: Nothing
+            , alias: Just "reviewer"
+            , prompt: "Fix the failing tests"
+            }
+            agentFallbackConfig
+    in resolved.argv
+        == ["opencode", "run", "--agent", "reviewer", "Fix the failing tests"]
+        && Object.isEmpty resolved.env
+        && resolved.warnings == []
+
+  let presetAgentConfig =
+        defaultConfig
+          { aliases =
+              Object.insert
+                "work"
+                { runner: Nothing
+                , thinking: Nothing
+                , provider: Nothing
+                , model: Nothing
+                , agent: Just "specialist"
+                }
+                Object.empty
+          }
+  r12 <- check "resolveCommand uses preset agent over fallback" $
+    let resolved =
+          resolveCommand
+            { runner: Nothing
+            , thinking: Nothing
+            , provider: Nothing
+            , model: Nothing
+            , alias: Just "work"
+            , prompt: "Fix the failing tests"
+            }
+            presetAgentConfig
+    in resolved.argv
+        == ["opencode", "run", "--agent", "specialist", "Fix the failing tests"]
+        && resolved.warnings == []
+
+  let unsupportedAgentConfig = defaultConfig { defaultRunner = "rc" }
+  r13 <- check "resolveCommand warns when runner lacks agent support" $
+    let resolved =
+          resolveCommand
+            { runner: Nothing
+            , thinking: Nothing
+            , provider: Nothing
+            , model: Nothing
+            , alias: Just "reviewer"
+            , prompt: "Fix the failing tests"
+            }
+            unsupportedAgentConfig
+    in resolved.argv == ["codex", "Fix the failing tests"]
+      && resolved.warnings
+        == [ "warning: runner \"rc\" does not support agents; ignoring @reviewer"
+           ]
+
+  let allPassed = r1 && r2 && r3 && r4 && r5 && r6 && r7 && r8 && r9 && r10 && r11 && r12 && r13
+  if allPassed then pure unit else exit' 1

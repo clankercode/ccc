@@ -54,6 +54,7 @@ runner = "claude"
 thinking = 2
 provider = "anthropic"
 model = "opus"
+agent = "reviewer"
 
 [aliases.quick]
 runner = "kimi"
@@ -78,6 +79,9 @@ runner = "kimi"
 	}
 	if fast.Model == nil || *fast.Model != "opus" {
 		t.Fatalf("expected fast.model=opus, got %v", fast.Model)
+	}
+	if fast.Agent == nil || *fast.Agent != "reviewer" {
+		t.Fatalf("expected fast.agent=reviewer, got %v", fast.Agent)
 	}
 
 	quick, ok := cfg.Aliases["quick"]
@@ -128,6 +132,7 @@ cl = "claude"
 runner = "claude"
 thinking = 4
 model = "opus"
+agent = "specialist"
 `
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
@@ -146,6 +151,9 @@ model = "opus"
 	}
 	if power.Thinking == nil || *power.Thinking != 4 {
 		t.Fatalf("expected power.thinking=4, got %v", power.Thinking)
+	}
+	if power.Agent == nil || *power.Agent != "specialist" {
+		t.Fatalf("expected power.agent=specialist, got %v", power.Agent)
 	}
 }
 

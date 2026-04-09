@@ -141,7 +141,7 @@ func TestParseArgs_AliasAndModel(t *testing.T) {
 }
 
 func TestResolveCommand_DefaultRunner(t *testing.T) {
-	argv, env, err := ResolveCommand(ParsedArgs{Prompt: "hello"}, nil)
+	argv, env, warnings, err := ResolveCommand(ParsedArgs{Prompt: "hello"}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -149,18 +149,24 @@ func TestResolveCommand_DefaultRunner(t *testing.T) {
 	if len(env) != 0 {
 		t.Fatalf("expected empty env, got %v", env)
 	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
 }
 
 func TestResolveCommand_ClaudeRunner(t *testing.T) {
-	argv, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Prompt: "hi"}, nil)
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Prompt: "hi"}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"claude", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
 }
 
 func TestResolveCommand_ThinkingFlags(t *testing.T) {
-	argv, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Thinking: intPtr(2), Prompt: "hi"}, nil)
+	argv, _, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Thinking: intPtr(2), Prompt: "hi"}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -168,7 +174,7 @@ func TestResolveCommand_ThinkingFlags(t *testing.T) {
 }
 
 func TestResolveCommand_ModelFlag(t *testing.T) {
-	argv, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Model: strPtr("gpt-4"), Prompt: "hi"}, nil)
+	argv, _, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Model: strPtr("gpt-4"), Prompt: "hi"}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -176,7 +182,7 @@ func TestResolveCommand_ModelFlag(t *testing.T) {
 }
 
 func TestResolveCommand_ProviderEnv(t *testing.T) {
-	_, env, err := ResolveCommand(ParsedArgs{Provider: strPtr("anthropic"), Prompt: "hi"}, nil)
+	_, env, _, err := ResolveCommand(ParsedArgs{Provider: strPtr("anthropic"), Prompt: "hi"}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -186,7 +192,7 @@ func TestResolveCommand_ProviderEnv(t *testing.T) {
 }
 
 func TestResolveCommand_EmptyPromptError(t *testing.T) {
-	_, _, err := ResolveCommand(ParsedArgs{}, nil)
+	_, _, _, err := ResolveCommand(ParsedArgs{}, nil)
 	if err == nil {
 		t.Fatal("expected error for empty prompt")
 	}
@@ -197,16 +203,19 @@ func TestResolveCommand_EmptyPromptError(t *testing.T) {
 
 func TestResolveCommand_ConfigDefaultsRunner(t *testing.T) {
 	cfg := &CccConfig{DefaultRunner: "claude", Aliases: map[string]AliasDef{}, Abbreviations: map[string]string{}}
-	argv, _, err := ResolveCommand(ParsedArgs{Prompt: "hi"}, cfg)
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Prompt: "hi"}, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"claude", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
 }
 
 func TestResolveCommand_ConfigDefaultsModel(t *testing.T) {
 	cfg := &CccConfig{DefaultModel: "gpt-4", Aliases: map[string]AliasDef{}, Abbreviations: map[string]string{}}
-	argv, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Prompt: "hi"}, cfg)
+	argv, _, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Prompt: "hi"}, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -215,7 +224,7 @@ func TestResolveCommand_ConfigDefaultsModel(t *testing.T) {
 
 func TestResolveCommand_ConfigDefaultsThinking(t *testing.T) {
 	cfg := &CccConfig{DefaultThinking: intPtr(3), Aliases: map[string]AliasDef{}, Abbreviations: map[string]string{}}
-	argv, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Prompt: "hi"}, cfg)
+	argv, _, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Prompt: "hi"}, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -229,11 +238,68 @@ func TestResolveCommand_AliasResolution(t *testing.T) {
 		},
 		Abbreviations: map[string]string{},
 	}
-	argv, _, err := ResolveCommand(ParsedArgs{Alias: strPtr("fast"), Prompt: "hi"}, cfg)
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Alias: strPtr("fast"), Prompt: "hi"}, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"claude", "--thinking", "medium", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
+}
+
+func TestResolveCommand_NameFallsBackToAgent(t *testing.T) {
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Alias: strPtr("reviewer"), Prompt: "hi"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertArgv(t, []string{"opencode", "run", "--agent", "reviewer", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
+}
+
+func TestResolveCommand_NameFallsBackToAgentForClaude(t *testing.T) {
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Alias: strPtr("reviewer"), Prompt: "hi"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertArgv(t, []string{"claude", "--agent", "reviewer", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
+}
+
+func TestResolveCommand_AliasPresetAgent(t *testing.T) {
+	cfg := &CccConfig{
+		Aliases: map[string]AliasDef{
+			"reviewer": {Agent: strPtr("specialist")},
+		},
+		Abbreviations: map[string]string{},
+	}
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Alias: strPtr("reviewer"), Prompt: "hi"}, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertArgv(t, []string{"opencode", "run", "--agent", "specialist", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
+}
+
+func TestResolveCommand_AgentUnsupportedWarning(t *testing.T) {
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("rc"), Alias: strPtr("reviewer"), Prompt: "hi"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertArgv(t, []string{"codex", "hi"}, argv)
+	if len(warnings) != 1 {
+		t.Fatalf("expected one warning, got %v", warnings)
+	}
+	want := "warning: runner codex does not support agents; ignoring @reviewer"
+	if warnings[0] != want {
+		t.Fatalf("expected warning %q, got %q", want, warnings[0])
+	}
 }
 
 func TestResolveCommand_AliasWithProviderModel(t *testing.T) {
@@ -244,13 +310,16 @@ func TestResolveCommand_AliasWithProviderModel(t *testing.T) {
 		},
 		Abbreviations: map[string]string{},
 	}
-	argv, env, err := ResolveCommand(ParsedArgs{Alias: strPtr("fast"), Prompt: "hi"}, cfg)
+	argv, env, warnings, err := ResolveCommand(ParsedArgs{Alias: strPtr("fast"), Prompt: "hi"}, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"claude", "--model", "opus", "hi"}, argv)
 	if env["CCC_PROVIDER"] != "anthropic" {
 		t.Fatalf("expected CCC_PROVIDER=anthropic, got %v", env)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
 	}
 }
 
@@ -259,51 +328,69 @@ func TestResolveCommand_Abbreviation(t *testing.T) {
 		Abbreviations: map[string]string{"my": "claude"},
 		Aliases:       map[string]AliasDef{},
 	}
-	argv, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("my"), Prompt: "hi"}, cfg)
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("my"), Prompt: "hi"}, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"claude", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
 }
 
 func TestResolveCommand_NilConfig(t *testing.T) {
-	argv, _, err := ResolveCommand(ParsedArgs{Prompt: "test"}, nil)
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Prompt: "test"}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"opencode", "run", "test"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
 }
 
 func TestResolveCommand_KimiThinking(t *testing.T) {
-	argv, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("kimi"), Thinking: intPtr(0), Prompt: "hi"}, nil)
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("kimi"), Thinking: intPtr(0), Prompt: "hi"}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"kimi", "--no-think", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
 }
 
 func TestResolveCommand_CodexRunner(t *testing.T) {
-	argv, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("codex"), Model: strPtr("gpt-4"), Prompt: "hi"}, nil)
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("codex"), Model: strPtr("gpt-4"), Prompt: "hi"}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"codex", "--model", "gpt-4", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
 }
 
 func TestResolveCommand_CrushRunner(t *testing.T) {
-	argv, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("crush"), Prompt: "hi"}, nil)
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("crush"), Prompt: "hi"}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"crush", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
 }
 
 func TestResolveCommand_OpencodeIgnoresModel(t *testing.T) {
-	argv, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("oc"), Model: strPtr("gpt-4"), Prompt: "hi"}, nil)
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("oc"), Model: strPtr("gpt-4"), Prompt: "hi"}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"opencode", "run", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
 }
 
 func TestResolveCommand_AliasOverridesRunner(t *testing.T) {
@@ -313,11 +400,14 @@ func TestResolveCommand_AliasOverridesRunner(t *testing.T) {
 		},
 		Abbreviations: map[string]string{},
 	}
-	argv, _, err := ResolveCommand(ParsedArgs{Alias: strPtr("fast"), Prompt: "hi"}, cfg)
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Alias: strPtr("fast"), Prompt: "hi"}, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"claude", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
 }
 
 func TestResolveCommand_AliasDoesNotOverrideExplicitRunner(t *testing.T) {
@@ -327,20 +417,26 @@ func TestResolveCommand_AliasDoesNotOverrideExplicitRunner(t *testing.T) {
 		},
 		Abbreviations: map[string]string{},
 	}
-	argv, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("kimi"), Alias: strPtr("fast"), Prompt: "hi"}, cfg)
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("kimi"), Alias: strPtr("fast"), Prompt: "hi"}, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"kimi", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
 }
 
 func TestResolveCommand_ProviderEmptyDefault(t *testing.T) {
 	cfg := &CccConfig{DefaultProvider: "", Aliases: map[string]AliasDef{}, Abbreviations: map[string]string{}}
-	_, env, err := ResolveCommand(ParsedArgs{Prompt: "hi"}, cfg)
+	_, env, warnings, err := ResolveCommand(ParsedArgs{Prompt: "hi"}, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, ok := env["CCC_PROVIDER"]; ok {
 		t.Fatalf("expected no CCC_PROVIDER in env, got %v", env)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
 	}
 }

@@ -81,7 +81,8 @@ defmodule CallCodingClis.Config do
                   runner: Map.get(defn, "runner"),
                   thinking: parse_thinking(Map.get(defn, "thinking")),
                   provider: Map.get(defn, "provider"),
-                  model: Map.get(defn, "model")
+                  model: Map.get(defn, "model"),
+                  agent: Map.get(defn, "agent")
                 }
               else
                 %AliasDef{}

@@ -9,6 +9,7 @@ type
     thinkingFlags*: Table[int, seq[string]]
     providerFlag*: string
     modelFlag*: string
+    agentFlag*: string
 
   ParsedArgs* = object
     runner*: Option[string]
@@ -23,6 +24,7 @@ type
     thinking*: Option[int]
     provider*: Option[string]
     model*: Option[string]
+    agent*: Option[string]
 
   CccConfig* = object
     defaultRunner*: string
@@ -120,35 +122,40 @@ proc runnerRegistry*(): Table[string, RunnerInfo] =
     extraArgs: @["run"],
     thinkingFlags: emptyThinking,
     providerFlag: "",
-    modelFlag: ""
+    modelFlag: "",
+    agentFlag: "--agent"
   )
   let claudeInfo = RunnerInfo(
     binary: "claude",
     extraArgs: @[],
     thinkingFlags: claudeThinking,
     providerFlag: "",
-    modelFlag: "--model"
+    modelFlag: "--model",
+    agentFlag: "--agent"
   )
   let kimiInfo = RunnerInfo(
     binary: "kimi",
     extraArgs: @[],
     thinkingFlags: kimiThinking,
     providerFlag: "",
-    modelFlag: "--model"
+    modelFlag: "--model",
+    agentFlag: "--agent"
   )
   let codexInfo = RunnerInfo(
     binary: "codex",
     extraArgs: @[],
     thinkingFlags: emptyThinking,
     providerFlag: "",
-    modelFlag: "--model"
+    modelFlag: "--model",
+    agentFlag: ""
   )
   let crushInfo = RunnerInfo(
     binary: "crush",
     extraArgs: @[],
     thinkingFlags: emptyThinking,
     providerFlag: "",
-    modelFlag: ""
+    modelFlag: "",
+    agentFlag: ""
   )
 
   result["opencode"] = opencodeInfo
@@ -213,7 +220,7 @@ proc resolveRunnerName(name: Option[string], config: CccConfig): string =
     return config.abbreviations[n]
   return n
 
-proc resolveCommand*(parsed: ParsedArgs, config: Option[CccConfig]): tuple[argv: seq[string], env: Table[string, string]] =
+proc resolveCommand*(parsed: ParsedArgs, config: Option[CccConfig]): tuple[argv: seq[string], env: Table[string, string], warnings: seq[string]] =
   let cfg = if config.isSome: config.get() else: defaultConfig()
   let registry = runnerRegistry()
 
@@ -233,10 +240,12 @@ proc resolveCommand*(parsed: ParsedArgs, config: Option[CccConfig]): tuple[argv:
     if cfg.aliases.hasKey(aliasName):
       aliasDef = some(cfg.aliases[aliasName])
 
+  var effectiveRunnerName = runnerName
   if aliasDef.isSome:
     let ad = aliasDef.get()
     if ad.runner.isSome and parsed.runner.isNone:
       let effectiveRunner = resolveRunnerName(ad.runner, cfg)
+      effectiveRunnerName = effectiveRunner
       if registry.hasKey(effectiveRunner):
         info = registry[effectiveRunner]
 
@@ -280,6 +289,24 @@ proc resolveCommand*(parsed: ParsedArgs, config: Option[CccConfig]): tuple[argv:
   result.env = initTable[string, string]()
   if effectiveProvider.isSome and effectiveProvider.get().len > 0:
     result.env["CCC_PROVIDER"] = effectiveProvider.get()
+
+  var effectiveAgent: Option[string] = none(string)
+  if parsed.alias.isSome and aliasDef.isNone:
+    effectiveAgent = some(parsed.alias.get())
+  elif aliasDef.isSome:
+    let ad = aliasDef.get()
+    if ad.agent.isSome:
+      effectiveAgent = ad.agent
+
+  if effectiveAgent.isSome and effectiveAgent.get().len > 0:
+    if info.agentFlag.len > 0:
+      result.argv.add(info.agentFlag)
+      result.argv.add(effectiveAgent.get())
+    else:
+      result.warnings.add(
+        "warning: runner \"" & effectiveRunnerName & "\" does not support agents; ignoring @" &
+        effectiveAgent.get()
+      )
 
   let prompt = parsed.prompt.strip()
   if prompt.len == 0:

@@ -6,6 +6,7 @@
 #define CCC_MAX_PROMPT 4096
 #define CCC_MAX_ARGV 20
 #define CCC_MAX_THINKING_ARGS 3
+#define CCC_MAX_WARNING_LEN 256
 
 typedef struct {
     const char *args[CCC_MAX_THINKING_ARGS];
@@ -19,6 +20,7 @@ typedef struct {
     ThinkingLevel thinking[5];
     const char *provider_flag;
     const char *model_flag;
+    const char *agent_flag;
 } RunnerInfo;
 
 typedef struct {
@@ -41,10 +43,12 @@ typedef struct {
     int thinking;
     char provider[128];
     char model[256];
+    char agent[128];
     int has_runner;
     int has_thinking;
     int has_provider;
     int has_model;
+    int has_agent;
 } AliasDef;
 
 #define CCC_MAX_ALIASES 32
@@ -74,7 +78,9 @@ int ccc_resolve_command(
     const char *out_argv[],
     int out_argv_max,
     char *out_provider,
-    int provider_max
+    int provider_max,
+    char warnings[][CCC_MAX_WARNING_LEN],
+    int warnings_max
 );
 
 #endif

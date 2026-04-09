@@ -24,7 +24,7 @@ class Config
 
         $paths = [];
         $explicit = getenv('CCC_CONFIG');
-        if (is_string($explicit) && $explicit !== '') {
+        if (is_string($explicit) && $explicit !== '' && is_file($explicit) && filesize($explicit) > 0) {
             $paths[] = $explicit;
         }
 
@@ -120,6 +120,9 @@ class Config
                     case 'model':
                         $alias->model = $value;
                         break;
+                    case 'agent':
+                        $alias->agent = $value;
+                        break;
                 }
                 $config->aliases[$aliasName] = $alias;
                 continue;
@@ -177,6 +180,8 @@ class Config
                 $def->provider = $m[1];
             } elseif (preg_match('/^model=(.+)$/', $part, $m)) {
                 $def->model = $m[1];
+            } elseif (preg_match('/^agent=(.+)$/', $part, $m)) {
+                $def->agent = $m[1];
             }
         }
 

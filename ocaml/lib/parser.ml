@@ -4,6 +4,7 @@ type runner_info = {
   thinking_flags : (int * string list) list;
   provider_flag : string;
   model_flag : string;
+  agent_flag : string;
 }
 
 type parsed_args = {
@@ -20,6 +21,7 @@ type alias_def = {
   ad_thinking : int option;
   ad_provider : string option;
   ad_model : string option;
+  ad_agent : string option;
 }
 
 type ccc_config = {
@@ -51,6 +53,7 @@ let () =
     thinking_flags = [];
     provider_flag = "";
     model_flag = "";
+    agent_flag = "--agent";
   } in
   let claude = {
     binary = "claude";
@@ -64,6 +67,7 @@ let () =
     ];
     provider_flag = "";
     model_flag = "--model";
+    agent_flag = "--agent";
   } in
   let kimi = {
     binary = "kimi";
@@ -77,6 +81,7 @@ let () =
     ];
     provider_flag = "";
     model_flag = "--model";
+    agent_flag = "--agent";
   } in
   let codex = {
     binary = "codex";
@@ -84,6 +89,7 @@ let () =
     thinking_flags = [];
     provider_flag = "";
     model_flag = "--model";
+    agent_flag = "";
   } in
   let crush = {
     binary = "crush";
@@ -91,6 +97,7 @@ let () =
     thinking_flags = [];
     provider_flag = "";
     model_flag = "";
+    agent_flag = "";
   } in
   Hashtbl.replace runner_registry "opencode" opencode;
   Hashtbl.replace runner_registry "oc" opencode;
@@ -219,11 +226,13 @@ let resolve_command parsed config_opt =
     | Some a -> List.assoc_opt a config.aliases
     | None -> None
   in
+  let effective_runner_name = ref runner_name in
   let effective_info = match alias_def with
     | Some ad ->
       begin match ad.ad_runner with
       | Some r when parsed.runner = None ->
         let resolved = resolve_runner_name (Some r) config in
+        effective_runner_name := resolved;
         begin match Hashtbl.find_opt runner_registry resolved with
         | Some i -> i
         | None -> info
@@ -276,6 +285,36 @@ let resolve_command parsed config_opt =
     then [effective_info.model_flag; effective_model]
     else []
   in
+  let warnings = ref [] in
+  let argv_agent =
+    match alias_def with
+    | Some ad ->
+      begin match ad.ad_agent with
+      | Some agent when agent <> "" ->
+        if effective_info.agent_flag <> "" then
+          [effective_info.agent_flag; agent]
+        else begin
+          warnings := Printf.sprintf
+            "warning: runner \"%s\" does not support agents; ignoring @%s"
+            !effective_runner_name agent :: !warnings;
+          []
+        end
+      | _ -> []
+      end
+    | None ->
+      begin match parsed.alias with
+      | Some agent ->
+        if effective_info.agent_flag <> "" then
+          [effective_info.agent_flag; agent]
+        else begin
+          warnings := Printf.sprintf
+            "warning: runner \"%s\" does not support agents; ignoring @%s"
+            !effective_runner_name agent :: !warnings;
+          []
+        end
+      | None -> []
+      end
+  in
   let env =
     if effective_provider <> ""
     then [("CCC_PROVIDER", effective_provider)]
@@ -283,5 +322,5 @@ let resolve_command parsed config_opt =
   in
   let prompt = String.trim parsed.prompt in
   if prompt = "" then raise Empty_prompt;
-  let argv = argv_base @ argv_thinking @ argv_model @ [prompt] in
-  (argv, env)
+  let argv = argv_base @ argv_thinking @ argv_model @ argv_agent @ [prompt] in
+  (argv, env, List.rev !warnings)

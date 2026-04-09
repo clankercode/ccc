@@ -2,11 +2,14 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { chmodSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 
 import { Runner, buildPromptSpec } from '../src/index.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
+const shell = '/bin/sh'
+const shellScript = (body) => [shell, '-c', body]
 
 test('buildPromptSpec maps ccc prompt to opencode run', () => {
   const spec = buildPromptSpec('Fix the failing tests')
@@ -45,9 +48,10 @@ test('Runner.run returns a completed result from injected executor', async () =>
 
 test('Runner.run executes a real subprocess by default', async () => {
   const runner = new Runner()
-  const scriptPath = join(here, 'fixtures', 'echo.mjs')
 
-  const result = await runner.run({ argv: ['node', scriptPath] })
+  const result = await runner.run({
+    argv: shellScript("printf 'fixture-ok\\n'"),
+  })
 
   assert.equal(result.exitCode, 0)
   assert.equal(result.stdout.trim(), 'fixture-ok')
@@ -66,11 +70,12 @@ test('Runner.run reports missing binary startup failure', async () => {
 
 test('Runner.run preserves stdinText, cwd, and env', async () => {
   const runner = new Runner()
-  const scriptPath = join(here, 'fixtures', 'run-shape.mjs')
   const cwdPath = join(here, 'fixtures')
 
   const result = await runner.run({
-    argv: ['node', scriptPath],
+    argv: shellScript(
+      "read input; printf 'stdin:%s\\n' \"$input\"; printf 'cwd:%s\\n' \"$(basename \"$PWD\")\"; printf 'env:%s\\n' \"$RUN_SHAPE_ENV\"",
+    ),
     stdinText: 'stdin-value',
     cwd: cwdPath,
     env: { RUN_SHAPE_ENV: 'env-value' },
@@ -110,12 +115,13 @@ test('Runner.stream emits injected stdout and stderr events', async () => {
 
 test('Runner.stream executes a real subprocess and emits output', async () => {
   const runner = new Runner()
-  const scriptPath = join(here, 'fixtures', 'stream.mjs')
   const events = []
 
   const result = await runner.stream(
     {
-      argv: ['node', scriptPath],
+      argv: shellScript(
+        "read input; printf 'stdout:%s\\n' \"$input\"; printf 'stderr:%s\\n' \"$STREAM_TEST\" >&2",
+      ),
       stdinText: 'stdin-value',
       env: { STREAM_TEST: 'env-value' },
     },
@@ -151,7 +157,8 @@ test('Runner.stream reports missing binary startup failure', async () => {
 
 test('ccc entrypoint forwards streamed stdout and stderr', async () => {
   const scriptPath = join(here, '..', 'src', 'ccc.js')
-  const runnerFixture = join(here, 'fixtures', 'ccc-runner.mjs')
+  const runnerFixture = join(here, 'fixtures', 'ccc-runner.sh')
+  chmodSync(runnerFixture, 0o755)
   const child = spawn('node', [scriptPath, 'Fix the failing tests'], {
     env: {
       ...process.env,

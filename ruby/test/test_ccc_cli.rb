@@ -3,6 +3,7 @@
 require "minitest/autorun"
 require "open3"
 require "tmpdir"
+require "fileutils"
 require "rbconfig"
 require_relative "../lib/call_coding_clis"
 
@@ -19,7 +20,15 @@ class TestCccCli < Minitest::Test
   def test_usage_with_no_args
     output, status = run_ccc
     assert_match(/usage: ccc/, output)
+    assert_includes output, "[@name]"
     refute_equal 0, status
+  end
+
+  def test_help_mentions_name_slot
+    output, status = run_ccc("--help")
+    assert_equal 0, status
+    assert_includes output, "[@name]"
+    assert_includes output, "if no preset exists, treat it as an agent"
   end
 
   def test_two_args_joined_as_prompt
@@ -67,6 +76,33 @@ class TestCccCli < Minitest::Test
       output, status = run_ccc("Fix the failing tests", env: env)
       assert_equal "opencode run Fix the failing tests\n", output
       assert_equal 0, status
+    end
+  end
+
+  def test_agent_warning_for_unsupported_runner
+    Dir.mktmpdir do |tmp|
+      stub = File.join(tmp, "codex")
+      File.write(stub, <<~SH)
+        #!/bin/sh
+        printf 'codex %s\n' "$*"
+      SH
+      File.chmod(0o755, stub)
+
+      config_dir = File.join(tmp, ".config", "ccc")
+      FileUtils.mkdir_p(config_dir)
+      File.write(File.join(config_dir, "config.toml"), <<~TOML)
+        [defaults]
+        runner = "codex"
+      TOML
+
+      env = {
+        "PATH" => "#{tmp}:#{ENV['PATH']}",
+        "HOME" => tmp
+      }
+      output, status = run_ccc("@reviewer", "hello", env: env)
+      assert_equal 0, status
+      assert_includes output, 'warning: runner "codex" does not support agents; ignoring @reviewer'
+      assert_includes output, "codex hello"
     end
   end
 

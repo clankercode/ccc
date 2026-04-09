@@ -25,9 +25,9 @@ pub fn load_config(path: Option<&Path>) -> CccConfig {
 }
 
 fn default_config_path() -> Option<std::path::PathBuf> {
-    if let Ok(p) = std::env::var("CCC_CONFIG") {
-        if !p.is_empty() {
-            return Some(std::path::PathBuf::from(p));
+    if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
+        if !xdg.is_empty() {
+            return Some(std::path::PathBuf::from(xdg).join("ccc/config.toml"));
         }
     }
     let home = std::env::var("HOME").ok()?;
@@ -36,6 +36,18 @@ fn default_config_path() -> Option<std::path::PathBuf> {
 
 fn parse_toml_config(content: &str, config: &mut CccConfig) {
     let mut section: &str = "";
+    let mut current_alias_name: Option<String> = None;
+    let mut current_alias = crate::parser::AliasDef::default();
+
+    let flush_alias = |config: &mut CccConfig,
+                        current_alias_name: &mut Option<String>,
+                        current_alias: &mut crate::parser::AliasDef| {
+        if let Some(name) = current_alias_name.take() {
+            config
+                .aliases
+                .insert(name, std::mem::take(current_alias));
+        }
+    };
 
     for line in content.lines() {
         let trimmed = line.trim();
@@ -45,10 +57,23 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
         }
 
         if trimmed.starts_with('[') {
+            flush_alias(config, &mut current_alias_name, &mut current_alias);
             if trimmed == "[defaults]" {
                 section = "defaults";
             } else if trimmed == "[abbreviations]" {
                 section = "abbreviations";
+            } else if let Some(name) = trimmed
+                .strip_prefix("[aliases.")
+                .and_then(|s| s.strip_suffix(']'))
+            {
+                section = "alias";
+                current_alias_name = Some(name.to_string());
+            } else if let Some(name) = trimmed
+                .strip_prefix("[alias.")
+                .and_then(|s| s.strip_suffix(']'))
+            {
+                section = "alias";
+                current_alias_name = Some(name.to_string());
             } else {
                 section = "";
             }
@@ -68,6 +93,11 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                         config.default_thinking = Some(n);
                     }
                 }
+                ("abbreviations", _) => {
+                    config
+                        .abbreviations
+                        .insert(key.to_string(), value.to_string());
+                }
                 ("", "default_runner") => config.default_runner = value.to_string(),
                 ("", "default_provider") => config.default_provider = value.to_string(),
                 ("", "default_model") => config.default_model = value.to_string(),
@@ -76,8 +106,19 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                         config.default_thinking = Some(n);
                     }
                 }
+                ("alias", "runner") => current_alias.runner = Some(value.to_string()),
+                ("alias", "thinking") => {
+                    if let Ok(n) = value.parse::<i32>() {
+                        current_alias.thinking = Some(n);
+                    }
+                }
+                ("alias", "provider") => current_alias.provider = Some(value.to_string()),
+                ("alias", "model") => current_alias.model = Some(value.to_string()),
+                ("alias", "agent") => current_alias.agent = Some(value.to_string()),
                 _ => {}
             }
         }
     }
+
+    flush_alias(config, &mut current_alias_name, &mut current_alias);
 }

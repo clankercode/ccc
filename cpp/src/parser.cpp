@@ -10,7 +10,7 @@ static const std::map<std::string, RunnerInfo>& initRunnerRegistry() {
     static std::map<std::string, RunnerInfo> reg = [] {
         std::map<std::string, RunnerInfo> r;
 
-        RunnerInfo opencode{"opencode", {"run"}, {}, "", ""};
+        RunnerInfo opencode{"opencode", {"run"}, {}, "", "", "--agent"};
         r["opencode"] = opencode;
 
         RunnerInfo claude{"claude", {},
@@ -19,7 +19,7 @@ static const std::map<std::string, RunnerInfo>& initRunnerRegistry() {
                            {2, {"--thinking", "medium"}},
                            {3, {"--thinking", "high"}},
                            {4, {"--thinking", "max"}}},
-                          "", "--model"};
+                          "", "--model", "--agent"};
         r["claude"] = claude;
 
         RunnerInfo kimi{"kimi", {},
@@ -28,13 +28,13 @@ static const std::map<std::string, RunnerInfo>& initRunnerRegistry() {
                          {2, {"--think", "medium"}},
                          {3, {"--think", "high"}},
                          {4, {"--think", "max"}}},
-                        "", "--model"};
+                        "", "--model", "--agent"};
         r["kimi"] = kimi;
 
-        RunnerInfo codex{"codex", {}, {}, "", "--model"};
+        RunnerInfo codex{"codex", {}, {}, "", "--model", ""};
         r["codex"] = codex;
 
-        RunnerInfo crush{"crush", {}, {}, "", ""};
+        RunnerInfo crush{"crush", {}, {}, "", "", ""};
         r["crush"] = crush;
 
         r["oc"] = r["opencode"];
@@ -150,7 +150,7 @@ ParsedArgs parseArgs(const std::vector<std::string>& argv) {
 }
 
 static std::string resolveRunnerName(const std::optional<std::string>& name,
-                                      const CccConfig& config) {
+                                     const CccConfig& config) {
     if (!name.has_value()) {
         return config.default_runner;
     }
@@ -161,7 +161,11 @@ static std::string resolveRunnerName(const std::optional<std::string>& name,
     return *name;
 }
 
-std::pair<std::vector<std::string>, std::map<std::string, std::string>>
+static bool runnerSupportsAgent(const RunnerInfo* info) {
+    return info != nullptr && !info->agent_flag.empty();
+}
+
+std::tuple<std::vector<std::string>, std::map<std::string, std::string>, std::vector<std::string>>
 resolveCommand(const ParsedArgs& parsed, const CccConfig* config_ptr) {
     CccConfig default_config;
     const CccConfig& config = config_ptr ? *config_ptr : default_config;
@@ -184,10 +188,12 @@ resolveCommand(const ParsedArgs& parsed, const CccConfig* config_ptr) {
     }
 
     const AliasDef* alias_def = nullptr;
+    bool alias_is_known = false;
     if (parsed.alias.has_value()) {
         auto alias_it = config.aliases.find(*parsed.alias);
         if (alias_it != config.aliases.end()) {
             alias_def = &alias_it->second;
+            alias_is_known = true;
         }
     }
 
@@ -243,6 +249,28 @@ resolveCommand(const ParsedArgs& parsed, const CccConfig* config_ptr) {
         argv.push_back(*effective_model);
     }
 
+    std::vector<std::string> warnings;
+
+    std::optional<std::string> effective_agent;
+    if (parsed.alias.has_value()) {
+        if (alias_def && alias_def->agent.has_value()) {
+            effective_agent = alias_def->agent;
+        } else if (!alias_is_known) {
+            effective_agent = parsed.alias;
+        }
+    }
+
+    if (effective_agent.has_value()) {
+        if (runnerSupportsAgent(info)) {
+            argv.push_back(info->agent_flag);
+            argv.push_back(*effective_agent);
+        } else {
+            warnings.push_back("warning: runner \"" + effective_runner_name +
+                               "\" does not support agents; ignoring @" +
+                               *effective_agent);
+        }
+    }
+
     std::map<std::string, std::string> env_overrides;
     if (effective_provider.has_value()) {
         env_overrides["CCC_PROVIDER"] = *effective_provider;
@@ -257,5 +285,5 @@ resolveCommand(const ParsedArgs& parsed, const CccConfig* config_ptr) {
     prompt = prompt.substr(start, end - start + 1);
 
     argv.push_back(prompt);
-    return {std::move(argv), std::move(env_overrides)};
+    return {std::move(argv), std::move(env_overrides), std::move(warnings)};
 }

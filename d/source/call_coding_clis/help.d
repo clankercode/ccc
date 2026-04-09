@@ -11,7 +11,7 @@ enum HELP_TEXT =
 `ccc — call coding CLIs
 
 Usage:
-  ccc [runner] [+thinking] [:provider:model] [@alias] "<Prompt>"
+  ccc [runner] [+thinking] [:provider:model] [@name] "<Prompt>"
   ccc --help
   ccc -h
 
@@ -20,18 +20,21 @@ Slots (in order):
                 opencode (oc), claude (cc), kimi (k), codex (rc), crush (cr)
   +thinking     Set thinking level: +0 (off) through +4 (max)
   :provider:model  Override provider and model
-  @alias        Use a named preset from config
+  @name         Use a named preset from config; if no preset exists, treat it as an agent
 
 Examples:
   ccc "Fix the failing tests"
   ccc oc "Refactor auth module"
   ccc cc +2 :anthropic:claude-sonnet-4-20250514 "Add tests"
   ccc k +4 "Debug the parser"
+  ccc @reviewer "Audit the API boundary"
   ccc codex "Write a unit test"
 
 Config:
-  ~/.config/ccc/config.toml  — default runner, aliases, abbreviations
+  ~/.config/ccc/config.toml  — default runner, presets, abbreviations
 `;
+
+enum USAGE_TEXT = `usage: ccc [runner] [+thinking] [:provider:model] [@name] "<Prompt>"`;
 
 private struct RunnerEntry {
     string name;
@@ -93,6 +96,12 @@ void printHelp() {
 }
 
 void printUsage() {
-    stderr.writeln(`usage: ccc [runner] [+thinking] [:provider:model] [@alias] "<Prompt>"`);
+    stderr.writeln(USAGE_TEXT);
     stderr.writeln(runnerChecklist());
+}
+
+unittest {
+    assert(HELP_TEXT.indexOf("@name") >= 0);
+    assert(HELP_TEXT.indexOf("named preset from config; if no preset exists, treat it as an agent") >= 0);
+    assert(USAGE_TEXT.indexOf("[@name]") >= 0);
 }

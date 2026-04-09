@@ -203,7 +203,7 @@ ccc codex "Write a unit test"</code></pre>
 
 <section id="config">
   <h2>Config</h2>
-  <p>Configuration is loaded from <code>~/.config/ccc/config.toml</code>. Supports:</p>
+  <p>Python and Rust load configuration from a project-local <code>.ccc.toml</code> searched upward from the current directory, then <code>XDG_CONFIG_HOME/ccc/config.toml</code>, then <code>~/.config/ccc/config.toml</code>. Supports:</p>
   <table>
     <thead><tr><th>Setting</th><th>Description</th></tr></thead>
     <tbody>

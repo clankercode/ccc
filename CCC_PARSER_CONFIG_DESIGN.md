@@ -54,6 +54,7 @@ This order is not yet committed as final behavior.
 
 Planned config responsibilities:
 
+- project-local `.ccc.toml` discovery by walking upward from CWD
 - custom aliases and presets
 - custom runner abbreviations or names
 - bundled-runner default provider/model values

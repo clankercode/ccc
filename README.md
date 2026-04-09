@@ -114,6 +114,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - `+0..+4` thinking levels
   - `:provider:model` and `:model`
   - `@name` for preset lookup with agent fallback; presets can also define a default prompt
+  - Python and Rust search project-local `.ccc.toml` files upward from the current directory and override the global config chain
   - `--permission-mode safe|auto|yolo|plan`
   - `--show-thinking` / `--no-show-thinking`
   - `--yolo` / `-y`

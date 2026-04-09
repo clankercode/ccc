@@ -69,7 +69,9 @@ Examples:
   ccc -y -- +1 @agent :model
 
 Config:
-  ~/.config/ccc/config.toml  — default runner, output mode, OSC sanitization, presets, abbreviations, show_thinking
+  .ccc.toml (searched upward from CWD)  — project-local presets and defaults
+  XDG_CONFIG_HOME/ccc/config.toml       — global defaults when XDG is set
+  ~/.config/ccc/config.toml             — legacy global fallback
 "#;
 
 fn get_version(binary: &str) -> String {

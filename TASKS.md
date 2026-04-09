@@ -26,7 +26,3 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
 - [ ] Decide whether structured output rendering needs templating or user customization
   - This is the `v2` rendering direction currently noted in `README.md`.
   - Keep the scope narrow unless there is a concrete user-facing need.
-- [ ] Support project-local config (e.g. `.config/ccc/config.toml` or `.ccc.toml` in CWD)
-  - Add a CWD-relative path to `_default_config_paths()` in `config.py`, checked before global paths.
-  - Allows repos to ship ccc presets (aliases, defaults) that apply when working in that repo.
-  - Merge order: project-local → XDG_CONFIG_HOME → ~/.config/ccc/config.toml.

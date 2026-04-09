@@ -28,6 +28,9 @@ fn test_help_mentions_name_slot() {
     assert!(stdout.contains("--permission-mode <safe|auto|yolo|plan>"));
     assert!(stdout.contains("--yolo / -y"));
     assert!(stdout.contains("Treat all remaining args as prompt text"));
+    assert!(stdout.contains(".ccc.toml (searched upward from CWD)"));
+    assert!(stdout.contains("XDG_CONFIG_HOME/ccc/config.toml"));
+    assert!(stdout.contains("~/.config/ccc/config.toml"));
     assert!(stdout.contains("show_thinking"));
     assert!(stdout
         .contains("opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)"));

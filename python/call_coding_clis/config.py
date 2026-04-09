@@ -19,6 +19,7 @@ except ImportError:
 
 CONFIG_DIR_NAME = "ccc"
 CONFIG_FILE_NAME = "config.toml"
+PROJECT_CONFIG_FILE_NAME = ".ccc.toml"
 
 
 def _coerce_bool(value: object) -> bool:
@@ -33,10 +34,22 @@ def _coerce_bool(value: object) -> bool:
 
 def _default_config_paths() -> list[Path]:
     paths: list[Path] = []
+    home_path = Path.home() / ".config" / CONFIG_DIR_NAME / CONFIG_FILE_NAME
+    paths.append(home_path)
     xdg = os.environ.get("XDG_CONFIG_HOME", "")
     if xdg:
-        paths.append(Path(xdg) / CONFIG_DIR_NAME / CONFIG_FILE_NAME)
-    paths.append(Path.home() / ".config" / CONFIG_DIR_NAME / CONFIG_FILE_NAME)
+        xdg_path = Path(xdg) / CONFIG_DIR_NAME / CONFIG_FILE_NAME
+        if xdg_path != home_path:
+            paths.append(xdg_path)
+    try:
+        cwd = Path.cwd()
+    except OSError:
+        return paths
+    for directory in (cwd, *cwd.parents):
+        candidate = directory / PROJECT_CONFIG_FILE_NAME
+        if candidate.exists():
+            paths.append(candidate)
+            break
     return paths
 
 
@@ -45,23 +58,24 @@ def load_config(path: str | Path | None = None) -> CccConfig:
         return CccConfig()
 
     if path is not None:
-        return _load_from_file(Path(path))
+        config = CccConfig()
+        _load_from_file_into(Path(path), config)
+        return config
 
+    config = CccConfig()
     for candidate in _default_config_paths():
         if candidate.exists():
-            return _load_from_file(candidate)
+            _load_from_file_into(candidate, config)
 
-    return CccConfig()
+    return config
 
 
-def _load_from_file(path: Path) -> CccConfig:
+def _load_from_file_into(path: Path, config: CccConfig) -> None:
     try:
         raw = path.read_bytes()
         data = tomllib.loads(raw.decode("utf-8"))
     except (OSError, ValueError):
-        return CccConfig()
-
-    config = CccConfig()
+        return
 
     defaults = data.get("defaults", {})
     if isinstance(defaults, dict):
@@ -101,17 +115,16 @@ def _load_from_file(path: Path) -> CccConfig:
     if isinstance(aliases, dict):
         for name, defn in aliases.items():
             if isinstance(defn, dict):
-                alias = AliasDef(
-                    runner=defn.get("runner"),
-                    thinking=defn.get("thinking"),
-                    show_thinking=defn.get("show_thinking"),
-                    sanitize_osc=defn.get("sanitize_osc"),
-                    output_mode=defn.get("output_mode"),
-                    provider=defn.get("provider"),
-                    model=defn.get("model"),
-                    agent=defn.get("agent"),
-                    prompt=defn.get("prompt"),
-                )
+                alias = config.aliases.get(str(name), AliasDef())
+                alias.runner = defn.get("runner", alias.runner)
+                alias.thinking = defn.get("thinking", alias.thinking)
+                alias.show_thinking = defn.get("show_thinking", alias.show_thinking)
+                alias.sanitize_osc = defn.get("sanitize_osc", alias.sanitize_osc)
+                alias.output_mode = defn.get("output_mode", alias.output_mode)
+                alias.provider = defn.get("provider", alias.provider)
+                alias.model = defn.get("model", alias.model)
+                alias.agent = defn.get("agent", alias.agent)
+                alias.prompt = defn.get("prompt", alias.prompt)
                 if alias.thinking is not None:
                     alias.thinking = int(alias.thinking)
                 if alias.show_thinking is not None:
@@ -119,5 +132,3 @@ def _load_from_file(path: Path) -> CccConfig:
                 if alias.sanitize_osc is not None:
                     alias.sanitize_osc = _coerce_bool(alias.sanitize_osc)
                 config.aliases[str(name)] = alias
-
-    return config

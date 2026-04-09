@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-10
 
+### Project-local config files are now discovered in Python and Rust
+- Change: Python and Rust now search upward from the current directory for a project-local `.ccc.toml` and merge it with the global config chain, with local values overriding XDG and home defaults
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `tests/test_ccc_contract_impl.py`, `tests/test_harness.py`, `rust/src/config.rs`, `rust/tests/help_tests.rs`
+- Notes: `README.md`, `docs/llms.txt`, `docs/index.html`, `python/call_coding_clis/help.py`, `rust/src/help.rs`, and `CCC_PARSER_CONFIG_DESIGN.md` now describe the project-local file and the XDG/home fallback chain
+
 ### Preset prompts now fall back in Python and Rust
 - Change: Python and Rust now parse `aliases.<name>.prompt` and let `@name` fall back to that preset prompt when explicit user prompt text is missing or whitespace-only; explicit prompt text still overrides the preset prompt when present
 - Required implementations: Python and Rust

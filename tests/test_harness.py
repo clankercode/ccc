@@ -74,11 +74,13 @@ class LanguageSpec:
                     self.build_error = f"Build failed for {self.name}: {result.stderr}"
                     return
 
-    def invoke(self, prompt: str, env: Dict[str, str]) -> subprocess.CompletedProcess:
+    def invoke(
+        self, prompt: str, env: Dict[str, str], cwd: Optional[Path] = None
+    ) -> subprocess.CompletedProcess:
         cmd = self.invoke_fn(prompt)
         return subprocess.run(
             cmd,
-            cwd=ROOT,
+            cwd=cwd or ROOT,
             env=self.prepared_env(env),
             capture_output=True,
             text=True,
@@ -86,13 +88,13 @@ class LanguageSpec:
         )
 
     def invoke_extra(
-        self, extra_args: List[str], env: Dict[str, str]
+        self, extra_args: List[str], env: Dict[str, str], cwd: Optional[Path] = None
     ) -> subprocess.CompletedProcess:
         cmd = self.invoke_fn("__placeholder__")
         cmd = cmd[:-1] + extra_args
         return subprocess.run(
             cmd,
-            cwd=ROOT,
+            cwd=cwd or ROOT,
             env=self.prepared_env(env),
             capture_output=True,
             text=True,
@@ -100,13 +102,17 @@ class LanguageSpec:
         )
 
     def invoke_with_args(
-        self, extra_args: List[str], prompt: str, env: Dict[str, str]
+        self,
+        extra_args: List[str],
+        prompt: str,
+        env: Dict[str, str],
+        cwd: Optional[Path] = None,
     ) -> subprocess.CompletedProcess:
         cmd = self.invoke_fn(prompt)
         cmd = cmd[:-1] + extra_args + [prompt]
         return subprocess.run(
             cmd,
-            cwd=ROOT,
+            cwd=cwd or ROOT,
             env=self.prepared_env(env),
             capture_output=True,
             text=True,
@@ -115,7 +121,7 @@ class LanguageSpec:
 
 
 def _py_invoke(prompt):
-    return ["python3", "python/call_coding_clis/cli.py", prompt]
+    return ["python3", str(ROOT / "python" / "call_coding_clis" / "cli.py"), prompt]
 
 
 def _rust_invoke(prompt):

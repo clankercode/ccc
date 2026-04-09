@@ -1,6 +1,8 @@
+import os
 import unittest
 import tempfile
 from pathlib import Path
+from unittest import mock
 
 from call_coding_clis.parser import (
     parse_args,
@@ -727,6 +729,54 @@ prompt = "Commit all changes"
             f.flush()
             config = load_config(f.name)
         self.assertFalse(config.default_sanitize_osc)
+
+    def test_project_local_config_layers_over_global_configs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            home_root = tmp_path / "home"
+            xdg_root = tmp_path / "xdg"
+            workspace_root = tmp_path / "workspace"
+            repo_root = workspace_root / "repo"
+            nested_cwd = repo_root / "nested" / "deeper"
+            nested_cwd.mkdir(parents=True)
+
+            (workspace_root / ".ccc.toml").write_text(
+                '[defaults]\nrunner = "oc"\n[aliases.review]\nagent = "outer-agent"\n'
+            )
+            (repo_root / ".ccc.toml").write_text(
+                '[aliases.review]\nprompt = "Repo prompt"\n'
+            )
+
+            home_config_dir = home_root / ".config" / "ccc"
+            xdg_config_dir = xdg_root / "ccc"
+            home_config_dir.mkdir(parents=True)
+            xdg_config_dir.mkdir(parents=True)
+            (home_config_dir / "config.toml").write_text(
+                '[defaults]\nrunner = "k"\n[aliases.review]\nshow_thinking = true\n'
+            )
+            (xdg_config_dir / "config.toml").write_text(
+                '[defaults]\nmodel = "xdg-model"\n[aliases.review]\nmodel = "xdg-model"\n'
+            )
+
+            old_cwd = Path.cwd()
+            try:
+                os.chdir(nested_cwd)
+                with mock.patch.dict(
+                    os.environ,
+                    {"HOME": str(home_root), "XDG_CONFIG_HOME": str(xdg_root)},
+                    clear=False,
+                ):
+                    config = load_config()
+            finally:
+                os.chdir(old_cwd)
+
+            self.assertEqual(config.default_runner, "k")
+            self.assertEqual(config.default_model, "xdg-model")
+            self.assertIn("review", config.aliases)
+            self.assertEqual(config.aliases["review"].prompt, "Repo prompt")
+            self.assertEqual(config.aliases["review"].model, "xdg-model")
+            self.assertTrue(config.aliases["review"].show_thinking)
+            self.assertIsNone(config.aliases["review"].agent)
 
     def test_empty_toml_returns_defaults(self):
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".toml", delete=False) as f:

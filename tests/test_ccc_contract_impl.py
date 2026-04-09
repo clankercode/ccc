@@ -20,6 +20,7 @@ AGENT_FALLBACK_EXPECTED = f"opencode run --agent reviewer {PROMPT}\n"
 PRESET_AGENT_EXPECTED = f"opencode run --agent specialist {PROMPT}\n"
 PRESET_PROMPT = "Commit all changes"
 PRESET_PROMPT_EXPECTED = f"opencode run {PRESET_PROMPT}\n"
+PROJECT_LOCAL_PROMPT_EXPECTED = "kimi --thinking --model xdg-model --prompt Repo prompt\n"
 CODEX_RUNNER_EXPECTED = f"codex exec {PROMPT}\n"
 CLAUDE_RUNNER_EXPECTED = f"claude -p {PROMPT}\n"
 KIMI_RUNNER_EXPECTED = f"kimi --prompt {PROMPT}\n"
@@ -28,6 +29,9 @@ HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
 )
 HELP_PRESET_PROMPT_LINE = "Presets can also define a default prompt"
+HELP_PROJECT_LOCAL_CONFIG_LINE = ".ccc.toml (searched upward from CWD)"
+HELP_GLOBAL_CONFIG_LINE = "XDG_CONFIG_HOME/ccc/config.toml"
+HELP_HOME_CONFIG_LINE = "~/.config/ccc/config.toml"
 HELP_SHOW_THINKING_SNIPPET = "--show-thinking"
 HELP_SANITIZE_OSC_SNIPPET = "--sanitize-osc / --no-sanitize-osc"
 HELP_OUTPUT_MODE_SNIPPET = "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>"
@@ -38,6 +42,7 @@ HELP_DELIMITER_SNIPPET = "Treat all remaining args as prompt text"
 SHOW_THINKING_IMPLEMENTATIONS = {"Python", "Rust"}
 YOLO_IMPLEMENTATIONS = {"Python", "Rust"}
 PROMPT_PRESET_IMPLEMENTATIONS = {"Python", "Rust"}
+PROJECT_LOCAL_CONFIG_IMPLEMENTATIONS = {"Python", "Rust"}
 
 
 class SingleImplCccContractTests(unittest.TestCase):
@@ -65,11 +70,16 @@ class SingleImplCccContractTests(unittest.TestCase):
         env["XDG_DATA_HOME"] = str(config_root / "xdg-data")
         env["XDG_STATE_HOME"] = str(config_root / "xdg-state")
         env["CCC_CONFIG"] = str(config_root / "missing-config.toml")
+        env["HOME"] = str(config_root / "home")
         env["DOTNET_NOLOGO"] = "1"
         env["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1"
         env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
         for key in ("XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"):
             Path(env[key]).mkdir(parents=True, exist_ok=True)
+        home_config_path = Path(env["HOME"]) / ".config" / "ccc" / "config.toml"
+        home_config_path.parent.mkdir(parents=True, exist_ok=True)
+        if not home_config_path.exists():
+            home_config_path.write_text("", encoding="utf-8")
         config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         if not config_path.exists():
@@ -192,6 +202,32 @@ class SingleImplCccContractTests(unittest.TestCase):
                     else:
                         result = lang.invoke_with_args(["@commit"], prompt, env)
                     assertion(result)
+
+    def _write_project_local_config(self, tmp_path: Path) -> Path:
+        workspace_root = tmp_path / "workspace"
+        repo_root = workspace_root / "repo"
+        nested_cwd = repo_root / "nested" / "deeper"
+        nested_cwd.mkdir(parents=True)
+
+        (workspace_root / ".ccc.toml").write_text(
+            '[defaults]\nrunner = "oc"\n[aliases.review]\nagent = "outer-agent"\n'
+        )
+        (repo_root / ".ccc.toml").write_text(
+            '[aliases.review]\nprompt = "Repo prompt"\n'
+        )
+
+        home_config_dir = tmp_path / ".config" / "ccc"
+        xdg_config_dir = tmp_path / "xdg" / "ccc"
+        home_config_dir.mkdir(parents=True)
+        xdg_config_dir.mkdir(parents=True)
+        (home_config_dir / "config.toml").write_text(
+            '[defaults]\nrunner = "k"\n[aliases.review]\nshow_thinking = true\n'
+        )
+        (xdg_config_dir / "config.toml").write_text(
+            '[defaults]\nmodel = "xdg-model"\n[aliases.review]\nmodel = "xdg-model"\n'
+        )
+
+        return nested_cwd
 
     def test_happy_path(self) -> None:
         self._run_with_prompt_assertion(PROMPT, self.assert_equal_output)
@@ -364,6 +400,49 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["--help"], self._make_env(opencode_path, lang)
                     )
                     self.assert_help_mentions_preset_prompt(result)
+
+    def test_help_surface_mentions_project_local_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in PROJECT_LOCAL_CONFIG_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(HELP_PROJECT_LOCAL_CONFIG_LINE, result.stdout)
+                    self.assertIn(HELP_GLOBAL_CONFIG_LINE, result.stdout)
+                    self.assertIn(HELP_HOME_CONFIG_LINE, result.stdout)
+
+    def test_project_local_config_layers_over_global_configs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            kimi_path = bin_dir / "kimi"
+            self._write_opencode_stub(opencode_path)
+            self._write_runner_stub(kimi_path, "kimi")
+            nested_cwd = self._write_project_local_config(tmp_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in PROJECT_LOCAL_CONFIG_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, config="project-local"):
+                    env = self._make_env(opencode_path, lang)
+                    env["HOME"] = str(tmp_path)
+                    env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+                    result = lang.invoke_extra(["@review"], env, cwd=nested_cwd)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, PROJECT_LOCAL_PROMPT_EXPECTED)
+                    self.assertEqual(result.stderr, "")
 
     def test_permission_mode_maps_to_runner_specific_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -91,6 +91,14 @@ let () =
     model_flag = "--model";
     agent_flag = "";
   } in
+  let roocode = {
+    binary = "roocode";
+    extra_args = [];
+    thinking_flags = [];
+    provider_flag = "";
+    model_flag = "--model";
+    agent_flag = "";
+  } in
   let crush = {
     binary = "crush";
     extra_args = [];
@@ -103,11 +111,13 @@ let () =
   Hashtbl.replace runner_registry "oc" opencode;
   Hashtbl.replace runner_registry "claude" claude;
   Hashtbl.replace runner_registry "cc" claude;
-  Hashtbl.replace runner_registry "c" claude;
+  Hashtbl.replace runner_registry "c" codex;
+  Hashtbl.replace runner_registry "cx" codex;
   Hashtbl.replace runner_registry "kimi" kimi;
   Hashtbl.replace runner_registry "k" kimi;
   Hashtbl.replace runner_registry "codex" codex;
-  Hashtbl.replace runner_registry "rc" codex;
+  Hashtbl.replace runner_registry "rc" roocode;
+  Hashtbl.replace runner_registry "roocode" roocode;
   Hashtbl.replace runner_registry "crush" crush;
   Hashtbl.replace runner_registry "cr" crush
 
@@ -120,7 +130,7 @@ let valid_model_char c = valid_ident_char c || c = '.'
 let is_runner_selector s =
   let lower = String.lowercase_ascii s in
   List.exists (fun v -> lower = v) [
-    "oc"; "cc"; "c"; "k"; "rc"; "cr";
+    "oc"; "cc"; "c"; "cx"; "k"; "rc"; "cr";
     "codex"; "claude"; "opencode"; "kimi";
     "roocode"; "crush"; "pi";
   ]
@@ -226,13 +236,11 @@ let resolve_command parsed config_opt =
     | Some a -> List.assoc_opt a config.aliases
     | None -> None
   in
-  let effective_runner_name = ref runner_name in
   let effective_info = match alias_def with
     | Some ad ->
       begin match ad.ad_runner with
       | Some r when parsed.runner = None ->
         let resolved = resolve_runner_name (Some r) config in
-        effective_runner_name := resolved;
         begin match Hashtbl.find_opt runner_registry resolved with
         | Some i -> i
         | None -> info
@@ -296,7 +304,7 @@ let resolve_command parsed config_opt =
         else begin
           warnings := Printf.sprintf
             "warning: runner \"%s\" does not support agents; ignoring @%s"
-            !effective_runner_name agent :: !warnings;
+            effective_info.binary agent :: !warnings;
           []
         end
       | _ -> []
@@ -309,7 +317,7 @@ let resolve_command parsed config_opt =
         else begin
           warnings := Printf.sprintf
             "warning: runner \"%s\" does not support agents; ignoring @%s"
-            !effective_runner_name agent :: !warnings;
+            effective_info.binary agent :: !warnings;
           []
         end
       | None -> []

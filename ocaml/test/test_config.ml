@@ -78,8 +78,8 @@ let () =
         let legacy_path = Filename.concat base "config" in
         write_file legacy_path
           "default_runner = claude\n\
-           alias reviewer runner=opencode thinking=3 provider=anthropic model=sonnet-4 agent=review-bot\n\
-           abbrev c codex\n";
+           alias = reviewer runner=opencode thinking=3 provider=anthropic model=sonnet-4 agent=review-bot\n\
+           abbrev = c codex\n";
         let config = Config.load_config (Some legacy_path) in
         check string "default runner" "claude" config.Parser.default_runner;
         let reviewer = find_alias "reviewer" config.Parser.aliases in

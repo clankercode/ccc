@@ -21,9 +21,19 @@ let () =
         check string "prompt" "hello world" r.Parser.prompt;
         check (option string) "runner" None r.Parser.runner);
 
-      test_case "runner selector" `Quick (fun () ->
+      test_case "runner selector cc" `Quick (fun () ->
         let r = Parser.parse_args ["cc"; "test"] in
         check (option string) "runner" (Some "cc") r.Parser.runner;
+        check string "prompt" "test" r.Parser.prompt);
+
+      test_case "runner selector c" `Quick (fun () ->
+        let r = Parser.parse_args ["c"; "test"] in
+        check (option string) "runner" (Some "c") r.Parser.runner;
+        check string "prompt" "test" r.Parser.prompt);
+
+      test_case "runner selector cx" `Quick (fun () ->
+        let r = Parser.parse_args ["cx"; "test"] in
+        check (option string) "runner" (Some "cx") r.Parser.runner;
         check string "prompt" "test" r.Parser.prompt);
 
       test_case "runner selector case insensitive" `Quick (fun () ->
@@ -93,6 +103,12 @@ let () =
         check (list string) "argv" ["claude"; "hello"] argv;
         check (list (pair string string)) "env" [] env);
 
+      test_case "claude runner via selector cc" `Quick (fun () ->
+        let parsed = Parser.parse_args ["cc"; "hello"] in
+        let argv, env, _warnings = Parser.resolve_command parsed None in
+        check (list string) "argv" ["claude"; "hello"] argv;
+        check (list (pair string string)) "env" [] env);
+
       test_case "claude thinking +3" `Quick (fun () ->
         let parsed = Parser.parse_args ["claude"; "+3"; "hello"] in
         let argv, env, _warnings = Parser.resolve_command parsed None in
@@ -109,6 +125,18 @@ let () =
         let parsed = Parser.parse_args ["codex"; ":gpt-4"; "hello"] in
         let argv, _, _warnings = Parser.resolve_command parsed None in
         check (list string) "argv" ["codex"; "--model"; "gpt-4"; "hello"] argv);
+
+      test_case "codex runner via selector c" `Quick (fun () ->
+        let parsed = Parser.parse_args ["c"; "hello"] in
+        let argv, env, _warnings = Parser.resolve_command parsed None in
+        check (list string) "argv" ["codex"; "hello"] argv;
+        check (list (pair string string)) "env" [] env);
+
+      test_case "codex runner via selector cx" `Quick (fun () ->
+        let parsed = Parser.parse_args ["cx"; "hello"] in
+        let argv, env, _warnings = Parser.resolve_command parsed None in
+        check (list string) "argv" ["codex"; "hello"] argv;
+        check (list (pair string string)) "env" [] env);
 
       test_case "provider env override" `Quick (fun () ->
         let parsed = Parser.parse_args [":anthropic:sonnet-4"; "hello"] in
@@ -183,23 +211,33 @@ let () =
       test_case "unsupported runner warns and ignores agent" `Quick (fun () ->
         let parsed = Parser.parse_args ["rc"; "@reviewer"; "fix"; "bugs"] in
         let argv, env, warnings = Parser.resolve_command parsed None in
-        check (list string) "argv" ["codex"; "fix bugs"] argv;
+        check (list string) "argv" ["roocode"; "fix bugs"] argv;
         check (list (pair string string)) "env" [] env;
         check (list string) "warnings"
-          ["warning: runner \"rc\" does not support agents; ignoring @reviewer"]
+          ["warning: runner \"roocode\" does not support agents; ignoring @reviewer"]
           warnings);
 
-      test_case "runner registry agent flags" `Quick (fun () ->
-        let agent_flag name =
+      test_case "runner registry binaries and agent flags" `Quick (fun () ->
+        let info name =
           match Hashtbl.find_opt Parser.runner_registry name with
-          | Some info -> info.Parser.agent_flag
+          | Some info -> info
           | None -> failwith name
         in
-        check string "opencode" "--agent" (agent_flag "opencode");
-        check string "claude" "--agent" (agent_flag "claude");
-        check string "kimi" "--agent" (agent_flag "kimi");
-        check string "codex" "" (agent_flag "codex");
-        check string "crush" "" (agent_flag "crush"));
+        check string "opencode binary" "opencode" (info "opencode").Parser.binary;
+        check string "claude binary" "claude" (info "claude").Parser.binary;
+        check string "cc binary" "claude" (info "cc").Parser.binary;
+        check string "c binary" "codex" (info "c").Parser.binary;
+        check string "cx binary" "codex" (info "cx").Parser.binary;
+        check string "codex binary" "codex" (info "codex").Parser.binary;
+        check string "rc binary" "roocode" (info "rc").Parser.binary;
+        check string "roocode binary" "roocode" (info "roocode").Parser.binary;
+        check string "crush binary" "crush" (info "crush").Parser.binary;
+        check string "opencode agent" "--agent" (info "opencode").Parser.agent_flag;
+        check string "claude agent" "--agent" (info "claude").Parser.agent_flag;
+        check string "kimi agent" "--agent" (info "kimi").Parser.agent_flag;
+        check string "codex agent" "" (info "codex").Parser.agent_flag;
+        check string "roocode agent" "" (info "roocode").Parser.agent_flag;
+        check string "crush agent" "" (info "crush").Parser.agent_flag);
 
       test_case "kimi thinking +2" `Quick (fun () ->
         let parsed = Parser.parse_args ["kimi"; "+2"; "test"] in
@@ -229,13 +267,13 @@ let () =
         check (list (pair string string)) "env"
           [("CCC_PROVIDER", "anthropic")] env);
 
-      test_case "abbrev remaps runner name" `Quick (fun () ->
-        let parsed = Parser.parse_args ["c"; "hello"] in
+      test_case "abbrev remaps runner selector cc" `Quick (fun () ->
+        let parsed = Parser.parse_args ["cc"; "hello"] in
         let config = {
           Parser.default_runner = "oc"; Parser.default_provider = "";
           Parser.default_model = ""; Parser.default_thinking = None;
           Parser.aliases = [];
-          Parser.abbreviations = [("c", "codex")];
+          Parser.abbreviations = [("cc", "codex")];
         } in
         let argv, _, _warnings = Parser.resolve_command parsed (Some config) in
         check (list string) "argv" ["codex"; "hello"] argv

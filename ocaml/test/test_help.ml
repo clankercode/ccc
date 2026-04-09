@@ -42,6 +42,8 @@ let () =
       test_case "help text mentions name fallback" `Quick (fun () ->
         check bool "contains [@name]" true
           (contains_sub ~sub:"[@name]" Help.help_text);
+        check bool "contains selector remap" true
+          (contains_sub ~sub:"codex (c/cx), roocode (rc)" Help.help_text);
         check bool "contains preset fallback explanation" true
           (contains_sub
              ~sub:"Use a named preset from config; if no preset exists, treat it as an agent"
@@ -53,6 +55,8 @@ let () =
         Unix.putenv "PATH" "";
         let output = capture_channel stdout (fun () -> Help.print_help ()) in
         check bool "contains [@name]" true (contains_sub ~sub:"[@name]" output);
+        check bool "contains selector remap" true
+          (contains_sub ~sub:"codex (c/cx), roocode (rc)" output);
         check bool "contains fallback explanation" true
           (contains_sub
              ~sub:"Use a named preset from config; if no preset exists, treat it as an agent"

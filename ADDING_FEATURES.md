@@ -86,3 +86,5 @@ When adding a new shared CLI feature, prefer extending `tests/test_ccc_contract_
 ## Practical Rule
 
 Do not start broad multi-language rollout until Python and Rust both express the final intended semantics and have passing targeted tests.
+
+Always run `just install-rs` after updating Rust so the installed local `ccc` binary matches the tested implementation.

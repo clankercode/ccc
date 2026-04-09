@@ -625,6 +625,18 @@ class CrossLanguageHarness(unittest.TestCase):
                 "kimi-code",
                 ["[thinking] Let me think about this...", "[assistant] mock: thinking done"],
             ),
+            (
+                ["oc", ".fmt"],
+                "tool call",
+                "opencode",
+                ["[assistant] mock: tool call executed"],
+            ),
+            (
+                ["oc", "..fmt"],
+                "tool call",
+                "opencode",
+                ["[assistant] mock: tool call executed"],
+            ),
         ]
 
         for lang in self.selected_languages:

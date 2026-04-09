@@ -305,7 +305,7 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
     if key in {"k", "kimi"}:
         return {"text", "stream-text", "stream-json", "formatted", "stream-formatted"}
     if key in {"oc", "opencode"}:
-        return {"text", "stream-text", "json", "formatted"}
+        return {"text", "stream-text", "json", "formatted", "stream-formatted"}
     return {"text", "stream-text"}
 
 
@@ -416,8 +416,8 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
         return OutputPlan(
             runner_name=effective_runner_name,
             mode=mode,
-            stream=False,
-            formatted=mode == "formatted",
+            stream=mode.startswith("stream-"),
+            formatted="formatted" in mode,
             schema="opencode",
             argv_flags=["--format", "json"],
         )

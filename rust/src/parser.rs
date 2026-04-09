@@ -647,7 +647,7 @@ fn supported_output_modes(runner_name: &str) -> &'static [&'static str] {
             "formatted",
             "stream-formatted",
         ],
-        "oc" | "opencode" => &["text", "stream-text", "json", "formatted"],
+        "oc" | "opencode" => &["text", "stream-text", "json", "formatted", "stream-formatted"],
         _ => &["text", "stream-text"],
     }
 }
@@ -758,8 +758,8 @@ pub fn resolve_output_plan(
         return Ok(OutputPlan {
             runner_name,
             mode: mode.clone(),
-            stream: false,
-            formatted: mode == "formatted",
+            stream: mode.starts_with("stream-"),
+            formatted: mode.contains("formatted"),
             schema: Some("opencode".into()),
             argv_flags: vec!["--format".into(), "json".into()],
         });

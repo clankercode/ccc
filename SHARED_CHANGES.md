@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-10
 
+### OpenCode `stream-formatted` is now supported in Python and Rust
+- Change: Python and Rust now treat OpenCode `--format json` as a live JSON-event stream, so `oc ..fmt` is supported alongside `oc .fmt`; `oc ..json` remains unsupported because upstream exposes JSON events through `--format json` rather than a separate NDJSON mode selector
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `tests/test_harness.py`, `tests/test_ccc_contract_impl.py`, `rust/tests/parser_tests.rs`
+- Notes: updated `docs/clis/output-mode-compatibility.md` and `docs/clis/json-event-references.md`; real direct smoke verification used `opencode run --format json 'Reply with exactly hi'`
+
 ### Canonical controls help text now matches across all `ccc` implementations
 - Change: the shared help/usage banner now uses `ccc [controls...] "<Prompt>"` and the core controls section now carries two exhaustive shared examples across the language implementations
 - Required implementations: Python and Rust

@@ -772,6 +772,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                         "[assistant] kimi --print --output-format stream-json --prompt Fix the failing tests\n",
                     ),
                     (["oc", ".fmt"], "[assistant] opencode run --format json Fix the failing tests\n"),
+                    (["oc", "..fmt"], "[assistant] opencode run --format json Fix the failing tests\n"),
                 ],
                 "Rust": [
                     (["cc", ".fmt"], "[assistant] claude -p --verbose --output-format stream-json Fix the failing tests\n"),
@@ -788,6 +789,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                         "[assistant] kimi --print --output-format stream-json --prompt Fix the failing tests\n",
                     ),
                     (["oc", ".fmt"], "[assistant] opencode run --format json Fix the failing tests\n"),
+                    (["oc", "..fmt"], "[assistant] opencode run --format json Fix the failing tests\n"),
                 ],
             }
 
@@ -841,10 +843,6 @@ class SingleImplCccContractTests(unittest.TestCase):
                 env = self._make_env(opencode_path, lang)
                 with self.subTest(language=lang.name):
                     result = lang.invoke_with_args(["oc", "..json"], PROMPT, env)
-                    self.assertEqual(result.returncode, 1)
-                    self.assertEqual(result.stdout, "")
-                    self.assertIn("output mode", result.stderr)
-                    result = lang.invoke_with_args(["oc", "..fmt"], PROMPT, env)
                     self.assertEqual(result.returncode, 1)
                     self.assertEqual(result.stdout, "")
                     self.assertIn("output mode", result.stderr)

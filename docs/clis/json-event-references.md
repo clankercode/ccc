@@ -102,6 +102,7 @@ Current `ccc` integration note:
   - `step_start`
   - `text`
   - `step_finish`
+- Real smoke verification also confirms that `opencode run --format json` emits those events incrementally, so `ccc` uses that same upstream transport for both buffered `formatted` and live `stream-formatted`.
 - Real smoke verification also observed OSC terminal-title control sequences in buffered raw output, so Python and Rust now strip those sequences on the `ccc` side for OpenCode buffered raw modes.
 
 ## How To Use These References

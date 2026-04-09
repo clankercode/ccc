@@ -685,6 +685,14 @@ class ResolveCommandTests(unittest.TestCase):
         self.assertEqual(plan.schema, "opencode")
         self.assertEqual(plan.argv_flags, ["--format", "json"])
 
+    def test_opencode_stream_formatted_output_plan(self):
+        parsed = ParsedArgs(runner="oc", output_mode="stream-formatted", prompt="hello")
+        plan = resolve_output_plan(parsed)
+        self.assertTrue(plan.stream)
+        self.assertTrue(plan.formatted)
+        self.assertEqual(plan.schema, "opencode")
+        self.assertEqual(plan.argv_flags, ["--format", "json"])
+
     def test_show_thinking_resolution_uses_alias(self):
         config = CccConfig(aliases={"review": AliasDef(show_thinking=True)})
         parsed = ParsedArgs(alias="review", prompt="hello")

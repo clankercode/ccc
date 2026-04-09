@@ -12,6 +12,9 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
 - [ ] Review and prune stale roadmap items in per-language `PLAN.md` files
   - Fold completed work into the main docs.
   - Keep the remaining plan items focused on actual open work.
+- [ ] Add a repo-root `VERSION` file and pull it into implementations at build time
+  - Use it as the single source of truth for reported package/CLI version strings where feasible.
+  - Keep the language-specific build/release flow honest about when the baked-in version is refreshed.
 - [ ] Decide whether structured output rendering needs templating or user customization
   - This is the `v2` rendering direction currently noted in `README.md`.
   - Keep the scope narrow unless there is a concrete user-facing need.

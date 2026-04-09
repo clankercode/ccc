@@ -34,6 +34,24 @@ TEST_F(ParseArgsTest, RunnerSelectorOpencode) {
     EXPECT_EQ(p.prompt, "hello");
 }
 
+TEST_F(ParseArgsTest, RunnerSelectorCodexAliasC) {
+    auto p = parseArgs({"c", "fix bug"});
+    EXPECT_EQ(p.runner, "c");
+    EXPECT_EQ(p.prompt, "fix bug");
+}
+
+TEST_F(ParseArgsTest, RunnerSelectorCodexAliasCx) {
+    auto p = parseArgs({"cx", "fix bug"});
+    EXPECT_EQ(p.runner, "cx");
+    EXPECT_EQ(p.prompt, "fix bug");
+}
+
+TEST_F(ParseArgsTest, RunnerSelectorRoocodeAliasRc) {
+    auto p = parseArgs({"rc", "fix bug"});
+    EXPECT_EQ(p.runner, "rc");
+    EXPECT_EQ(p.prompt, "fix bug");
+}
+
 TEST_F(ParseArgsTest, ThinkingLevel) {
     auto p = parseArgs({"+2", "hello"});
     EXPECT_EQ(p.thinking, 2);
@@ -103,6 +121,9 @@ TEST_F(HelpTest, HelpTextUsesNameSlotAndFallback) {
     std::string help = HELP_TEXT;
     EXPECT_NE(help.find("[@name]"), std::string::npos);
     EXPECT_NE(help.find("if no preset exists, treat it as an agent"), std::string::npos);
+    EXPECT_NE(help.find("claude (cc)"), std::string::npos);
+    EXPECT_NE(help.find("codex (c/cx)"), std::string::npos);
+    EXPECT_NE(help.find("roocode (rc)"), std::string::npos);
 }
 
 TEST_F(HelpTest, PrintUsageUsesNameSlot) {
@@ -130,6 +151,33 @@ TEST_F(ResolveCommandTest, ClaudeRunner) {
     auto [argv, env, warnings] = resolveCommand(parsed);
     EXPECT_EQ(argv[0], "claude");
     EXPECT_EQ(std::find(argv.begin(), argv.end(), "run"), argv.end());
+    EXPECT_NE(std::find(argv.begin(), argv.end(), "hello"), argv.end());
+}
+
+TEST_F(ResolveCommandTest, CodexRunnerAliasC) {
+    ParsedArgs parsed;
+    parsed.runner = "c";
+    parsed.prompt = "hello";
+    auto [argv, env, warnings] = resolveCommand(parsed);
+    EXPECT_EQ(argv[0], "codex");
+    EXPECT_NE(std::find(argv.begin(), argv.end(), "hello"), argv.end());
+}
+
+TEST_F(ResolveCommandTest, CodexRunnerAliasCx) {
+    ParsedArgs parsed;
+    parsed.runner = "cx";
+    parsed.prompt = "hello";
+    auto [argv, env, warnings] = resolveCommand(parsed);
+    EXPECT_EQ(argv[0], "codex");
+    EXPECT_NE(std::find(argv.begin(), argv.end(), "hello"), argv.end());
+}
+
+TEST_F(ResolveCommandTest, RoocodeRunnerAliasRc) {
+    ParsedArgs parsed;
+    parsed.runner = "rc";
+    parsed.prompt = "hello";
+    auto [argv, env, warnings] = resolveCommand(parsed);
+    EXPECT_EQ(argv[0], "roocode");
     EXPECT_NE(std::find(argv.begin(), argv.end(), "hello"), argv.end());
 }
 
@@ -295,7 +343,7 @@ TEST_F(ResolveCommandTest, UnsupportedAgentWarnsAndIsIgnored) {
     parsed.alias = "reviewer";
     parsed.prompt = "hello";
     auto [argv, env, warnings] = resolveCommand(parsed);
-    EXPECT_EQ(argv[0], "codex");
+    EXPECT_EQ(argv[0], "roocode");
     EXPECT_EQ(std::find(argv.begin(), argv.end(), "--agent"), argv.end());
     ASSERT_EQ(warnings.size(), 1u);
     EXPECT_NE(warnings[0].find("warning: runner \"rc\" does not support agents; ignoring @reviewer"),
@@ -306,8 +354,8 @@ class RegistryTest : public ::testing::Test {};
 
 TEST_F(RegistryTest, AllSelectorsRegistered) {
     const auto& reg = getRunnerRegistry();
-    for (const auto& sel : {"oc", "cc", "c", "k", "rc", "cr",
-                            "codex", "claude", "opencode", "kimi", "crush"}) {
+    for (const auto& sel : {"oc", "cc", "c", "cx", "k", "rc", "cr",
+                            "codex", "claude", "opencode", "kimi", "roocode", "crush"}) {
         EXPECT_NE(reg.find(sel), reg.end()) << "Missing selector: " << sel;
     }
 }
@@ -316,8 +364,10 @@ TEST_F(RegistryTest, AbbreviationsShareBinary) {
     const auto& reg = getRunnerRegistry();
     EXPECT_EQ(reg.at("oc").binary, reg.at("opencode").binary);
     EXPECT_EQ(reg.at("cc").binary, reg.at("claude").binary);
-    EXPECT_EQ(reg.at("c").binary, reg.at("claude").binary);
+    EXPECT_EQ(reg.at("c").binary, reg.at("codex").binary);
+    EXPECT_EQ(reg.at("cx").binary, reg.at("codex").binary);
     EXPECT_EQ(reg.at("k").binary, reg.at("kimi").binary);
+    EXPECT_EQ(reg.at("rc").binary, reg.at("roocode").binary);
 }
 
 TEST_F(RegistryTest, AgentFlagsAreRegisteredWhereSupported) {
@@ -326,6 +376,7 @@ TEST_F(RegistryTest, AgentFlagsAreRegisteredWhereSupported) {
     EXPECT_EQ(reg.at("claude").agent_flag, "--agent");
     EXPECT_EQ(reg.at("kimi").agent_flag, "--agent");
     EXPECT_TRUE(reg.at("codex").agent_flag.empty());
+    EXPECT_TRUE(reg.at("roocode").agent_flag.empty());
     EXPECT_TRUE(reg.at("crush").agent_flag.empty());
 }
 

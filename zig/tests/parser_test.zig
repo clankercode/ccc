@@ -15,14 +15,25 @@ test "parseArgs prompt-only" {
     try std.testing.expectEqualStrings("hello world", parsed.prompt);
 }
 
-test "parseArgs runner selector" {
+test "parseArgs runner selector c" {
     const allocator = std.testing.allocator;
-    const argv = &[_][]const u8{ "claude", "do stuff" };
+    const argv = &[_][]const u8{ "c", "do stuff" };
     var parsed = try parser.parseArgs(allocator, argv);
     defer parsed.deinit(allocator);
 
     try std.testing.expect(parsed.runner != null);
-    try std.testing.expectEqualStrings("claude", parsed.runner.?);
+    try std.testing.expectEqualStrings("c", parsed.runner.?);
+    try std.testing.expectEqualStrings("do stuff", parsed.prompt);
+}
+
+test "parseArgs runner selector cx" {
+    const allocator = std.testing.allocator;
+    const argv = &[_][]const u8{ "cx", "do stuff" };
+    var parsed = try parser.parseArgs(allocator, argv);
+    defer parsed.deinit(allocator);
+
+    try std.testing.expect(parsed.runner != null);
+    try std.testing.expectEqualStrings("cx", parsed.runner.?);
     try std.testing.expectEqualStrings("do stuff", parsed.prompt);
 }
 
@@ -153,6 +164,36 @@ test "resolveCommand claude runner" {
 
     try std.testing.expect(resolved.argv.len >= 2);
     try std.testing.expectEqualStrings("claude", resolved.argv[0]);
+    try std.testing.expectEqualStrings("prompt", resolved.argv[1]);
+}
+
+test "resolveCommand c runner maps to codex" {
+    const allocator = std.testing.allocator;
+    var config = parser.CccConfig.init(allocator);
+    defer config.deinit();
+
+    var parsed = try parser.parseArgs(allocator, &[_][]const u8{ "c", "prompt" });
+    defer parsed.deinit(allocator);
+
+    var resolved = try parser.resolveCommand(allocator, parsed, &config);
+    defer resolved.deinit(allocator);
+
+    try std.testing.expectEqualStrings("codex", resolved.argv[0]);
+    try std.testing.expectEqualStrings("prompt", resolved.argv[1]);
+}
+
+test "resolveCommand cx runner maps to codex" {
+    const allocator = std.testing.allocator;
+    var config = parser.CccConfig.init(allocator);
+    defer config.deinit();
+
+    var parsed = try parser.parseArgs(allocator, &[_][]const u8{ "cx", "prompt" });
+    defer parsed.deinit(allocator);
+
+    var resolved = try parser.resolveCommand(allocator, parsed, &config);
+    defer resolved.deinit(allocator);
+
+    try std.testing.expectEqualStrings("codex", resolved.argv[0]);
     try std.testing.expectEqualStrings("prompt", resolved.argv[1]);
 }
 
@@ -345,11 +386,11 @@ test "resolveCommand unsupported agent warns" {
     var resolved = try parser.resolveCommand(allocator, parsed, &config);
     defer resolved.deinit(allocator);
 
-    try std.testing.expectEqualStrings("codex", resolved.argv[0]);
+    try std.testing.expectEqualStrings("roocode", resolved.argv[0]);
     try std.testing.expectEqualStrings("prompt", resolved.argv[1]);
     try std.testing.expect(resolved.warnings.len == 1);
     try std.testing.expectEqualStrings(
-        "warning: runner codex does not support agents; ignoring @reviewer",
+        "warning: runner roocode does not support agents; ignoring @reviewer",
         resolved.warnings[0],
     );
 }
@@ -431,10 +472,12 @@ test "runnerRegistry has all entries" {
     try std.testing.expect(registry.get("claude") != null);
     try std.testing.expect(registry.get("kimi") != null);
     try std.testing.expect(registry.get("codex") != null);
+    try std.testing.expect(registry.get("roocode") != null);
     try std.testing.expect(registry.get("crush") != null);
     try std.testing.expect(registry.get("oc") != null);
     try std.testing.expect(registry.get("cc") != null);
     try std.testing.expect(registry.get("c") != null);
+    try std.testing.expect(registry.get("cx") != null);
     try std.testing.expect(registry.get("k") != null);
     try std.testing.expect(registry.get("rc") != null);
     try std.testing.expect(registry.get("cr") != null);
@@ -442,4 +485,14 @@ test "runnerRegistry has all entries" {
     const oc = registry.get("oc").?;
     const opencode = registry.get("opencode").?;
     try std.testing.expectEqualStrings(opencode.binary, oc.binary);
+
+    const codex = registry.get("codex").?;
+    const c = registry.get("c").?;
+    const cx = registry.get("cx").?;
+    try std.testing.expectEqualStrings(codex.binary, c.binary);
+    try std.testing.expectEqualStrings(codex.binary, cx.binary);
+
+    const roocode = registry.get("roocode").?;
+    const rc = registry.get("rc").?;
+    try std.testing.expectEqualStrings(roocode.binary, rc.binary);
 }

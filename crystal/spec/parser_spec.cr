@@ -24,6 +24,12 @@ describe "parse_args" do
     parsed.runner.should eq("cc")
   end
 
+  it "parses codex and roocode selectors" do
+    parse_args(["c", "test"]).runner.should eq("c")
+    parse_args(["cx", "test"]).runner.should eq("cx")
+    parse_args(["rc", "test"]).runner.should eq("rc")
+  end
+
   it "parses case-insensitive runner selector" do
     parsed = parse_args(["Claude", "test"])
     parsed.runner.should eq("claude")
@@ -103,6 +109,22 @@ describe "resolve_command" do
     argv[0].should eq("claude")
   end
 
+  it "resolves codex via c and cx selectors" do
+    ["c", "cx"].each do |selector|
+      parsed = parse_args([selector, "hello"])
+      argv, env = resolve_command(parsed)
+      argv[0].should eq("codex")
+      env.should be_empty
+    end
+  end
+
+  it "resolves roocode via rc selector" do
+    parsed = parse_args(["rc", "hello"])
+    argv, env = resolve_command(parsed)
+    argv.should eq(["roocode", "hello"])
+    env.should be_empty
+  end
+
   it "applies thinking flags for claude" do
     parsed = parse_args(["claude", "+2", "hello"])
     argv, env = resolve_command(parsed)
@@ -148,6 +170,13 @@ describe "resolve_command" do
     argv[0].should eq("claude")
   end
 
+  it "uses remapped config default runner" do
+    parsed = parse_args(["hello"])
+    config = CccConfig.new(default_runner: "c")
+    argv, env = resolve_command(parsed, config)
+    argv[0].should eq("codex")
+  end
+
   it "uses config default thinking" do
     parsed = parse_args(["claude", "hello"])
     config = CccConfig.new(default_thinking: 3)
@@ -186,10 +215,10 @@ describe "resolve_command" do
     parsed = parse_args(["rc", "@reviewer", "hello"])
     warnings = [] of String
     argv, env = resolve_command(parsed, CccConfig.new, warnings)
-    argv.should eq(["codex", "hello"])
+    argv.should eq(["roocode", "hello"])
     env.should be_empty
     warnings.should eq([
-      %(warning: runner "rc" does not support agents; ignoring @reviewer),
+      %(warning: runner "roocode" does not support agents; ignoring @reviewer),
     ])
   end
 

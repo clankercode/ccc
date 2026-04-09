@@ -87,18 +87,23 @@ func init() {
 			Binary:    "codex",
 			ModelFlag: "--model",
 		},
+		"roocode": {
+			Binary:    "roocode",
+			ModelFlag: "--model",
+		},
 		"crush": {
 			Binary: "crush",
 		},
 	}
 	RunnerRegistry["oc"] = RunnerRegistry["opencode"]
 	RunnerRegistry["cc"] = RunnerRegistry["claude"]
-	RunnerRegistry["c"] = RunnerRegistry["claude"]
+	RunnerRegistry["c"] = RunnerRegistry["codex"]
+	RunnerRegistry["cx"] = RunnerRegistry["codex"]
 	RunnerRegistry["k"] = RunnerRegistry["kimi"]
-	RunnerRegistry["rc"] = RunnerRegistry["codex"]
+	RunnerRegistry["rc"] = RunnerRegistry["roocode"]
 	RunnerRegistry["cr"] = RunnerRegistry["crush"]
 
-	runnerSelectorRE = regexp.MustCompile(`(?i)^(?:oc|cc|c|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$`)
+	runnerSelectorRE = regexp.MustCompile(`(?i)^(?:oc|cc|c|cx|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$`)
 	thinkingRE = regexp.MustCompile(`^\+([0-4])$`)
 	providerModelRE = regexp.MustCompile(`^:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)$`)
 	modelRE = regexp.MustCompile(`^:([a-zA-Z0-9._-]+)$`)
@@ -224,7 +229,7 @@ func ResolveCommand(parsed ParsedArgs, config *CccConfig) ([]string, map[string]
 		if info.AgentFlag != "" {
 			argv = append(argv, info.AgentFlag, *effectiveAgent)
 		} else {
-			warnings = append(warnings, fmt.Sprintf("warning: runner %s does not support agents; ignoring @%s", info.Binary, *effectiveAgent))
+			warnings = append(warnings, fmt.Sprintf("warning: runner %q does not support agents; ignoring @%s", info.Binary, *effectiveAgent))
 		}
 	}
 

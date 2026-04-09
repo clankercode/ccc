@@ -55,6 +55,14 @@ sub _register_defaults {
             model_flag     => '--model',
             agent_flag     => '',
         },
+        roocode => {
+            binary         => 'roocode',
+            extra_args     => [],
+            thinking_flags => {},
+            provider_flag  => '',
+            model_flag     => '',
+            agent_flag     => '',
+        },
         crush => {
             binary         => 'crush',
             extra_args     => [],
@@ -67,15 +75,16 @@ sub _register_defaults {
 
     $RUNNER_REGISTRY{oc} = $RUNNER_REGISTRY{opencode};
     $RUNNER_REGISTRY{cc} = $RUNNER_REGISTRY{claude};
-    $RUNNER_REGISTRY{c}  = $RUNNER_REGISTRY{claude};
+    $RUNNER_REGISTRY{c}  = $RUNNER_REGISTRY{codex};
+    $RUNNER_REGISTRY{cx} = $RUNNER_REGISTRY{codex};
     $RUNNER_REGISTRY{k}  = $RUNNER_REGISTRY{kimi};
-    $RUNNER_REGISTRY{rc} = $RUNNER_REGISTRY{codex};
+    $RUNNER_REGISTRY{rc} = $RUNNER_REGISTRY{roocode};
     $RUNNER_REGISTRY{cr} = $RUNNER_REGISTRY{crush};
 }
 
 _register_defaults();
 
-my $RUNNER_SELECTOR_RE = qr/^(?:oc|cc|c|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$/i;
+my $RUNNER_SELECTOR_RE = qr/^(?:oc|cc|c|cx|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$/i;
 my $THINKING_RE        = qr/^\+([0-4])$/;
 my $PROVIDER_MODEL_RE  = qr/^:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)$/;
 my $MODEL_RE           = qr/^:([a-zA-Z0-9._-]+)$/;

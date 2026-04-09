@@ -10,9 +10,11 @@ ok $reg->{oc},       'registry has oc abbreviation';
 ok $reg->{claude},   'registry has claude';
 ok $reg->{cc},       'registry has cc abbreviation';
 ok $reg->{c},        'registry has c abbreviation';
+ok $reg->{cx},       'registry has cx abbreviation';
 ok $reg->{kimi},     'registry has kimi';
 ok $reg->{k},        'registry has k abbreviation';
 ok $reg->{codex},    'registry has codex';
+ok $reg->{roocode},  'registry has roocode';
 ok $reg->{rc},       'registry has rc abbreviation';
 ok $reg->{crush},    'registry has crush';
 ok $reg->{cr},       'registry has cr abbreviation';
@@ -31,6 +33,18 @@ ok $reg->{cr},       'registry has cr abbreviation';
     my $p = parse_args("claude", "do stuff");
     is $p->{runner}, 'claude',   'runner selector: runner';
     is $p->{prompt}, 'do stuff', 'runner selector: prompt';
+}
+
+{
+    my $p = parse_args("c", "do stuff");
+    is $p->{runner}, 'c',        'codex selector c: runner';
+    is $p->{prompt}, 'do stuff',  'codex selector c: prompt';
+}
+
+{
+    my $p = parse_args("cx", "do stuff");
+    is $p->{runner}, 'cx',       'codex selector cx: runner';
+    is $p->{prompt}, 'do stuff', 'codex selector cx: prompt';
 }
 
 {

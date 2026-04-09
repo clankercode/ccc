@@ -29,6 +29,7 @@ class TestCccCli < Minitest::Test
     assert_equal 0, status
     assert_includes output, "[@name]"
     assert_includes output, "if no preset exists, treat it as an agent"
+    assert_includes output, "codex (c/cx), roocode (rc)"
   end
 
   def test_two_args_joined_as_prompt

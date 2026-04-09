@@ -34,14 +34,18 @@ static const std::map<std::string, RunnerInfo>& initRunnerRegistry() {
         RunnerInfo codex{"codex", {}, {}, "", "--model", ""};
         r["codex"] = codex;
 
+        RunnerInfo roocode{"roocode", {}, {}, "", "--model", ""};
+        r["roocode"] = roocode;
+
         RunnerInfo crush{"crush", {}, {}, "", "", ""};
         r["crush"] = crush;
 
         r["oc"] = r["opencode"];
         r["cc"] = r["claude"];
-        r["c"] = r["claude"];
+        r["c"] = r["codex"];
+        r["cx"] = r["codex"];
         r["k"] = r["kimi"];
-        r["rc"] = r["codex"];
+        r["rc"] = r["roocode"];
         r["cr"] = r["crush"];
 
         return r;
@@ -62,7 +66,7 @@ static std::string toLower(const std::string& s) {
 
 static bool isRunnerSelector(const std::string& token) {
     static const std::vector<std::string> selectors = {
-        "oc", "cc", "c", "k", "rc", "cr",
+        "oc", "cc", "c", "cx", "k", "rc", "cr",
         "codex", "claude", "opencode", "kimi", "roocode", "crush", "pi"};
     auto low = toLower(token);
     for (const auto& s : selectors) {

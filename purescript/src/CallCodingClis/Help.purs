@@ -24,7 +24,7 @@ helpText =
     <> "\n"
     <> "Slots (in order):\n"
     <> "  runner        Select which coding CLI to use (default: oc)\n"
-    <> "                opencode (oc), claude (cc), kimi (k), codex (rc), crush (cr)\n"
+    <> "                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)\n"
     <> "  +thinking     Set thinking level: +0 (off) through +4 (max)\n"
     <> "  :provider:model  Override provider and model\n"
     <> "  @name         Use a named preset from config; if no preset exists, treat it as an agent\n"
@@ -54,6 +54,7 @@ runners =
   , { name: "claude", binary: "claude" }
   , { name: "kimi", binary: "kimi" }
   , { name: "codex", binary: "codex" }
+  , { name: "roocode", binary: "roocode" }
   , { name: "crush", binary: "crush" }
   ]
 

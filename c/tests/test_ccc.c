@@ -130,6 +130,10 @@ int main(void) {
         fprintf(stderr, "help output missing @name usage line\n");
         return 1;
     }
+    if (!file_contains("./build/help.txt", "codex (c/cx), roocode (rc)")) {
+        fprintf(stderr, "help output missing remapped runner line\n");
+        return 1;
+    }
     if (!file_contains("./build/help.txt", "Use a named preset from config; if no preset exists, treat it as an agent")) {
         fprintf(stderr, "help output missing fallback explanation\n");
         return 1;
@@ -233,13 +237,13 @@ int main(void) {
 
     // Unsupported agent support should warn and ignore the agent flag.
     int warn_status = run_cmd(
-        "CCC_REAL_OPENCODE=./build/fake-runner ./build/ccc codex '@reviewer' 'Fix the failing tests' > ./build/warn_out.txt 2> ./build/warn.err"
+        "CCC_REAL_OPENCODE=./build/fake-runner ./build/ccc rc '@reviewer' 'Fix the failing tests' > ./build/warn_out.txt 2> ./build/warn.err"
     );
     if (warn_status != 42) {
         fprintf(stderr, "unsupported-agent test: unexpected exit code %d\n", warn_status);
         return 1;
     }
-    if (!file_contains("./build/warn.err", "does not support agents; ignoring @reviewer")) {
+    if (!file_contains("./build/warn.err", "runner \"roocode\" does not support agents; ignoring @reviewer")) {
         fprintf(stderr, "unsupported-agent warning missing: ");
         FILE *warn = fopen("./build/warn.err", "r");
         if (warn != NULL) {

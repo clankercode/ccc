@@ -114,8 +114,16 @@ module RunnerRegistry
       model_flag: "--model",
       agent_flag: "--agent"
     )
-    rc = RunnerInfo.new(
+    codex = RunnerInfo.new(
       binary: "codex",
+      extra_args: [] of String,
+      thinking_flags: Hash(Int32, Array(String)).new,
+      provider_flag: "",
+      model_flag: "--model",
+      agent_flag: ""
+    )
+    roocode = RunnerInfo.new(
+      binary: "roocode",
       extra_args: [] of String,
       thinking_flags: Hash(Int32, Array(String)).new,
       provider_flag: "",
@@ -134,14 +142,16 @@ module RunnerRegistry
     reg["opencode"] = oc
     reg["claude"] = cc
     reg["kimi"] = k
-    reg["codex"] = rc
+    reg["codex"] = codex
+    reg["roocode"] = roocode
     reg["crush"] = cr
 
     reg["oc"] = oc
     reg["cc"] = cc
-    reg["c"] = cc
+    reg["c"] = codex
+    reg["cx"] = codex
     reg["k"] = k
-    reg["rc"] = rc
+    reg["rc"] = roocode
     reg["cr"] = cr
 
     reg
@@ -156,7 +166,7 @@ module RunnerRegistry
   end
 end
 
-RUNNER_SELECTOR_RE = /^(?:oc|cc|c|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$/i
+RUNNER_SELECTOR_RE = /^(?:oc|cc|c|cx|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$/i
 THINKING_RE = /^\+([0-4])$/
 PROVIDER_MODEL_RE = /^:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)$/
 MODEL_RE = /^:([a-zA-Z0-9._-]+)$/
@@ -213,11 +223,11 @@ def resolve_command(parsed : ParsedArgs, config : CccConfig = CccConfig.new, war
     alias_def = ad
   end
 
-  effective_runner_name = runner_name
+  effective_runner_name = info.binary
   if alias_def && (ar = alias_def.runner) && parsed.runner.nil?
-    effective_runner_name = resolve_runner_name(ar, config)
-    if (ri = RunnerRegistry[effective_runner_name]?)
+    if (ri = RunnerRegistry[resolve_runner_name(ar, config)]?)
       info = ri
+      effective_runner_name = info.binary
     end
   end
 

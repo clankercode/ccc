@@ -95,6 +95,7 @@ main = do
   putStrLn "=== Help ==="
 
   assertContains "help usage" "ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"" helpText
+  assertContains "help runner remap" "opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)" helpText
   assertContains "help agent fallback" "if no preset exists, treat it as an agent" helpText
   assertContains "usage line" "[@name]" usageText
 

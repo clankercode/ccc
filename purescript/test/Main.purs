@@ -4,7 +4,7 @@ import Prelude
 
 import CallCodingClis.Config (defaultConfig, parseConfig)
 import CallCodingClis.Help (helpText, usageText)
-import CallCodingClis.Parser (resolveCommand)
+import CallCodingClis.Parser (parseArgs, resolveCommand, resolveRunnerName)
 import CallCodingClis.PromptSpec (buildPromptSpec)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -57,11 +57,27 @@ main = do
       Right spec -> spec.cwd == Nothing
       Left _ -> false
 
-  r8 <- check "usageText uses @name" $
+  r8 <- check "parseArgs recognizes cx as a runner selector" $
+    let parsed = parseArgs [ "cx", "Fix the failing tests" ]
+        resolved = resolveCommand parsed (defaultConfig { defaultRunner = "oc" })
+    in parsed.runner == Just "cx"
+      && parsed.prompt == "Fix the failing tests"
+      && resolved.argv == ["codex", "Fix the failing tests"]
+
+  r9 <- check "resolveRunnerName remaps c/cx/cc/rc" $
+    resolveRunnerName "c" defaultConfig == "codex"
+      && resolveRunnerName "cx" defaultConfig == "codex"
+      && resolveRunnerName "cc" defaultConfig == "claude"
+      && resolveRunnerName "rc" defaultConfig == "roocode"
+
+  r10 <- check "usageText uses @name" $
     usageText == "usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
 
-  r9 <- check "helpText explains preset-then-agent fallback" $
+  r11 <- check "helpText explains selector remap and preset-then-agent fallback" $
     CU.indexOf (Pattern "[@name]") helpText /= Nothing
+      && CU.indexOf (Pattern "claude (cc)") helpText /= Nothing
+      && CU.indexOf (Pattern "codex (c/cx)") helpText /= Nothing
+      && CU.indexOf (Pattern "roocode (rc)") helpText /= Nothing
       && CU.indexOf (Pattern "if no preset exists, treat it as an agent") helpText /= Nothing
 
   let configText =
@@ -82,13 +98,13 @@ main = do
           <> "agent = \"reviewer\"\n"
 
   let parsedConfig = parseConfig configText
-  r10 <- check "parseConfig loads defaults, abbreviations, and agent" $
+  r12 <- check "parseConfig loads defaults, abbreviations, and agent" $
     parsedConfig.defaultRunner == "cc"
       && parsedConfig.defaultProvider == "anthropic"
       && parsedConfig.defaultModel == "claude-4"
       && parsedConfig.defaultThinking == Just 2
-      && Object.lookup "mycc" parsedConfig.abbreviations == Just "cc"
-      && Object.lookup "work" parsedConfig.aliases
+          && Object.lookup "mycc" parsedConfig.abbreviations == Just "cc"
+          && Object.lookup "work" parsedConfig.aliases
         == Just
           { runner: Just "cc"
           , thinking: Just 3
@@ -98,7 +114,7 @@ main = do
           }
 
   let agentFallbackConfig = defaultConfig { defaultRunner = "oc" }
-  r11 <- check "resolveCommand falls back to agent when preset is absent" $
+  r13 <- check "resolveCommand falls back to agent when preset is absent" $
     let resolved =
           resolveCommand
             { runner: Nothing
@@ -127,7 +143,7 @@ main = do
                 }
                 Object.empty
           }
-  r12 <- check "resolveCommand uses preset agent over fallback" $
+  r14 <- check "resolveCommand uses preset agent over fallback" $
     let resolved =
           resolveCommand
             { runner: Nothing
@@ -143,7 +159,7 @@ main = do
         && resolved.warnings == []
 
   let unsupportedAgentConfig = defaultConfig { defaultRunner = "rc" }
-  r13 <- check "resolveCommand warns when runner lacks agent support" $
+  r15 <- check "resolveCommand warns when runner lacks agent support" $
     let resolved =
           resolveCommand
             { runner: Nothing
@@ -154,10 +170,10 @@ main = do
             , prompt: "Fix the failing tests"
             }
             unsupportedAgentConfig
-    in resolved.argv == ["codex", "Fix the failing tests"]
+    in resolved.argv == ["roocode", "Fix the failing tests"]
       && resolved.warnings
-        == [ "warning: runner \"rc\" does not support agents; ignoring @reviewer"
+        == [ "warning: runner \"roocode\" does not support agents; ignoring @reviewer"
            ]
 
-  let allPassed = r1 && r2 && r3 && r4 && r5 && r6 && r7 && r8 && r9 && r10 && r11 && r12 && r13
+  let allPassed = r1 && r2 && r3 && r4 && r5 && r6 && r7 && r8 && r9 && r10 && r11 && r12 && r13 && r14 && r15
   if allPassed then pure unit else exit' 1

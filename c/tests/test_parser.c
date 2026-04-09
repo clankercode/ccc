@@ -39,13 +39,9 @@ static void assert_ptr_null(const void *ptr, const char *label) {
     }
 }
 
-static void assert_ptr_not_null(const void *ptr, const char *label) {
-    test_count++;
-    if (ptr != NULL) {
-        pass_count++;
-    } else {
-        fprintf(stderr, "FAIL %s: expected non-NULL\n", label);
-    }
+static void assert_runner_binary(const char *name, const char *expected, const char *label) {
+    const RunnerInfo *info = ccc_get_runner(name);
+    assert_str(info != NULL ? info->binary : "", expected, label);
 }
 
 static int resolve_command_no_warning(
@@ -100,12 +96,30 @@ static void test_parse_prompt_only(void) {
 }
 
 static void test_parse_runner_selector(void) {
-    char *argv[] = {"ccc", "claude", "fix", "bugs"};
+    char *argv[] = {"ccc", "cc", "fix", "bugs"};
     ParsedArgs pa;
     ccc_parse_args(4, argv, &pa);
     assert_int(pa.has_runner, 1, "runner-sel: has runner");
-    assert_str(pa.runner, "claude", "runner-sel: runner");
+    assert_str(pa.runner, "cc", "runner-sel: runner");
     assert_str(pa.prompt, "fix bugs", "runner-sel: prompt");
+}
+
+static void test_parse_runner_selector_codex(void) {
+    char *argv[] = {"ccc", "CX", "fix", "bugs"};
+    ParsedArgs pa;
+    ccc_parse_args(4, argv, &pa);
+    assert_int(pa.has_runner, 1, "runner-codex: has runner");
+    assert_str(pa.runner, "cx", "runner-codex: runner");
+    assert_str(pa.prompt, "fix bugs", "runner-codex: prompt");
+}
+
+static void test_parse_runner_selector_roocode(void) {
+    char *argv[] = {"ccc", "RC", "fix", "bugs"};
+    ParsedArgs pa;
+    ccc_parse_args(4, argv, &pa);
+    assert_int(pa.has_runner, 1, "runner-roocode: has runner");
+    assert_str(pa.runner, "rc", "runner-roocode: runner");
+    assert_str(pa.prompt, "fix bugs", "runner-roocode: prompt");
 }
 
 static void test_parse_runner_abbrev(void) {
@@ -196,7 +210,7 @@ static void test_resolve_default_runner(void) {
 }
 
 static void test_resolve_claude_runner(void) {
-    char *argv[] = {"ccc", "claude", "hello"};
+    char *argv[] = {"ccc", "cc", "hello"};
     ParsedArgs pa;
     CccConfig cfg;
     ccc_init_config(&cfg);
@@ -208,6 +222,36 @@ static void test_resolve_claude_runner(void) {
     assert_int(c, 2, "resolve-claude: argc");
     assert_str(out[0], "claude", "resolve-claude: binary");
     assert_str(out[1], "hello", "resolve-claude: prompt");
+}
+
+static void test_resolve_codex_runner(void) {
+    char *argv[] = {"ccc", "c", "hello"};
+    ParsedArgs pa;
+    CccConfig cfg;
+    ccc_init_config(&cfg);
+    ccc_parse_args(3, argv, &pa);
+
+    const char *out[CCC_MAX_ARGV];
+    char prov[128] = {0};
+    int c = resolve_command_no_warning(&pa, &cfg, out, prov);
+    assert_int(c, 2, "resolve-codex: argc");
+    assert_str(out[0], "codex", "resolve-codex: binary");
+    assert_str(out[1], "hello", "resolve-codex: prompt");
+}
+
+static void test_resolve_roocode_runner(void) {
+    char *argv[] = {"ccc", "rc", "hello"};
+    ParsedArgs pa;
+    CccConfig cfg;
+    ccc_init_config(&cfg);
+    ccc_parse_args(3, argv, &pa);
+
+    const char *out[CCC_MAX_ARGV];
+    char prov[128] = {0};
+    int c = resolve_command_no_warning(&pa, &cfg, out, prov);
+    assert_int(c, 2, "resolve-roocode: argc");
+    assert_str(out[0], "roocode", "resolve-roocode: binary");
+    assert_str(out[1], "hello", "resolve-roocode: prompt");
 }
 
 static void test_resolve_thinking_flags(void) {
@@ -322,17 +366,19 @@ static void test_resolve_alias_runner(void) {
 }
 
 static void test_get_runner_registry(void) {
-    assert_ptr_not_null(ccc_get_runner("opencode"), "registry: opencode");
-    assert_ptr_not_null(ccc_get_runner("oc"), "registry: oc");
-    assert_ptr_not_null(ccc_get_runner("claude"), "registry: claude");
-    assert_ptr_not_null(ccc_get_runner("cc"), "registry: cc");
-    assert_ptr_not_null(ccc_get_runner("c"), "registry: c");
-    assert_ptr_not_null(ccc_get_runner("kimi"), "registry: kimi");
-    assert_ptr_not_null(ccc_get_runner("k"), "registry: k");
-    assert_ptr_not_null(ccc_get_runner("codex"), "registry: codex");
-    assert_ptr_not_null(ccc_get_runner("rc"), "registry: rc");
-    assert_ptr_not_null(ccc_get_runner("crush"), "registry: crush");
-    assert_ptr_not_null(ccc_get_runner("cr"), "registry: cr");
+    assert_runner_binary("opencode", "opencode", "registry: opencode");
+    assert_runner_binary("oc", "opencode", "registry: oc");
+    assert_runner_binary("claude", "claude", "registry: claude");
+    assert_runner_binary("cc", "claude", "registry: cc");
+    assert_runner_binary("c", "codex", "registry: c");
+    assert_runner_binary("cx", "codex", "registry: cx");
+    assert_runner_binary("kimi", "kimi", "registry: kimi");
+    assert_runner_binary("k", "kimi", "registry: k");
+    assert_runner_binary("codex", "codex", "registry: codex");
+    assert_runner_binary("rc", "roocode", "registry: rc");
+    assert_runner_binary("roocode", "roocode", "registry: roocode");
+    assert_runner_binary("crush", "crush", "registry: crush");
+    assert_runner_binary("cr", "crush", "registry: cr");
     assert_ptr_null(ccc_get_runner("unknown"), "registry: unknown");
     assert_ptr_null(ccc_get_runner(NULL), "registry: null");
 }
@@ -434,7 +480,7 @@ static void test_resolve_preset_agent(void) {
 }
 
 static void test_resolve_unsupported_agent_warning(void) {
-    char *argv[] = {"ccc", "codex", "@reviewer", "hello"};
+    char *argv[] = {"ccc", "rc", "@reviewer", "hello"};
     ParsedArgs pa;
     CccConfig cfg;
     ccc_init_config(&cfg);
@@ -454,11 +500,11 @@ static void test_resolve_unsupported_agent_warning(void) {
         1
     );
     assert_int(c, 2, "resolve-unsupported-agent: argc");
-    assert_str(out[0], "codex", "resolve-unsupported-agent: binary");
+    assert_str(out[0], "roocode", "resolve-unsupported-agent: binary");
     assert_str(out[1], "hello", "resolve-unsupported-agent: prompt");
     assert_str(
         warnings[0],
-        "warning: runner \"codex\" does not support agents; ignoring @reviewer",
+        "warning: runner \"roocode\" does not support agents; ignoring @reviewer",
         "resolve-unsupported-agent: warning"
     );
 }
@@ -568,6 +614,8 @@ static void test_find_config_path_prefers_xdg(void) {
 int main(void) {
     test_parse_prompt_only();
     test_parse_runner_selector();
+    test_parse_runner_selector_codex();
+    test_parse_runner_selector_roocode();
     test_parse_runner_abbrev();
     test_parse_thinking();
     test_parse_thinking_zero();
@@ -578,6 +626,8 @@ int main(void) {
     test_parse_full_combo();
     test_resolve_default_runner();
     test_resolve_claude_runner();
+    test_resolve_codex_runner();
+    test_resolve_roocode_runner();
     test_resolve_thinking_flags();
     test_resolve_thinking_zero();
     test_resolve_model_flag();

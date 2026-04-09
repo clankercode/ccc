@@ -4,6 +4,7 @@ use Test::More;
 use lib 'lib';
 use FindBin qw($Bin);
 use File::Temp qw(tempfile);
+use File::Temp qw(tempdir);
 use IPC::Open3;
 use Symbol 'gensym';
 
@@ -22,7 +23,9 @@ sub run_ccc {
     local $ENV{CCC_REAL_OPENCODE} = $stub_path;
     local $ENV{CCC_CONFIG};
     delete $ENV{CCC_CONFIG};
-    local $ENV{XDG_CONFIG_HOME} = '/tmp/ccc-test-no-config-$$';
+    my $config_home = tempdir(CLEANUP => 1);
+    local $ENV{XDG_CONFIG_HOME} = $config_home;
+    local $ENV{HOME} = $config_home;
     my ($stdout, $stderr);
     $stderr = gensym;
     my $pid = open3(my $in, my $out, $stderr, @cmd);

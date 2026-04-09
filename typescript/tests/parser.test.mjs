@@ -28,6 +28,16 @@ test('parseArgs: runner abbreviation cc', () => {
   assert.equal(parsed.runner, 'cc')
 })
 
+test('parseArgs: runner abbreviation c', () => {
+  const parsed = parseArgs(['c', 'prompt'])
+  assert.equal(parsed.runner, 'c')
+})
+
+test('parseArgs: runner abbreviation cx', () => {
+  const parsed = parseArgs(['cx', 'prompt'])
+  assert.equal(parsed.runner, 'cx')
+})
+
 test('parseArgs: runner abbreviation oc', () => {
   const parsed = parseArgs(['oc', 'prompt'])
   assert.equal(parsed.runner, 'oc')
@@ -112,6 +122,16 @@ test('resolveCommand: default runner (opencode)', () => {
 test('resolveCommand: claude runner', () => {
   const result = resolveCommand({ runner: 'claude', thinking: null, provider: null, model: null, alias: null, prompt: 'prompt' })
   assert.equal(result.argv[0], 'claude')
+})
+
+test('resolveCommand: codex runner via c', () => {
+  const result = resolveCommand({ runner: 'c', thinking: null, provider: null, model: null, alias: null, prompt: 'prompt' })
+  assert.equal(result.argv[0], 'codex')
+})
+
+test('resolveCommand: codex runner via cx', () => {
+  const result = resolveCommand({ runner: 'cx', thinking: null, provider: null, model: null, alias: null, prompt: 'prompt' })
+  assert.equal(result.argv[0], 'codex')
 })
 
 test('resolveCommand: thinking flags for claude +2', () => {
@@ -284,7 +304,7 @@ test('resolveCommand: unsupported agent emits warning and no agent flag', () => 
       abbreviations: {},
     },
   )
-  assert.equal(result.argv[0], 'codex')
+  assert.equal(result.argv[0], 'roocode')
   assert.ok(!result.argv.includes('--agent'))
   assert.deepEqual(result.warnings, ['warning: runner "rc" does not support agents; ignoring @reviewer'])
 })
@@ -327,6 +347,7 @@ test('RUNNER_REGISTRY: has all expected runners', () => {
   assert.ok(RUNNER_REGISTRY.claude)
   assert.ok(RUNNER_REGISTRY.kimi)
   assert.ok(RUNNER_REGISTRY.codex)
+  assert.ok(RUNNER_REGISTRY.roocode)
   assert.ok(RUNNER_REGISTRY.crush)
 })
 
@@ -335,15 +356,17 @@ test('RUNNER_REGISTRY: agent flags for supported runners', () => {
   assert.equal(RUNNER_REGISTRY.claude.agentFlag, '--agent')
   assert.equal(RUNNER_REGISTRY.kimi.agentFlag, '--agent')
   assert.equal(RUNNER_REGISTRY.codex.agentFlag, '')
+  assert.equal(RUNNER_REGISTRY.roocode.agentFlag, '')
   assert.equal(RUNNER_REGISTRY.crush.agentFlag, '')
 })
 
 test('RUNNER_REGISTRY: abbreviations point to same objects', () => {
   assert.equal(RUNNER_REGISTRY.oc, RUNNER_REGISTRY.opencode)
   assert.equal(RUNNER_REGISTRY.cc, RUNNER_REGISTRY.claude)
-  assert.equal(RUNNER_REGISTRY.c, RUNNER_REGISTRY.claude)
+  assert.equal(RUNNER_REGISTRY.c, RUNNER_REGISTRY.codex)
+  assert.equal(RUNNER_REGISTRY.cx, RUNNER_REGISTRY.codex)
   assert.equal(RUNNER_REGISTRY.k, RUNNER_REGISTRY.kimi)
-  assert.equal(RUNNER_REGISTRY.rc, RUNNER_REGISTRY.codex)
+  assert.equal(RUNNER_REGISTRY.rc, RUNNER_REGISTRY.roocode)
   assert.equal(RUNNER_REGISTRY.cr, RUNNER_REGISTRY.crush)
 })
 

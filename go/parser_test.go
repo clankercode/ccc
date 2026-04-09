@@ -41,6 +41,28 @@ func TestParseArgs_RunnerSelector(t *testing.T) {
 	}
 }
 
+func TestParseArgs_RunnerSelectorCodexAliases(t *testing.T) {
+	for _, runner := range []string{"c", "cx"} {
+		p := ParseArgs([]string{runner, "fix bug"})
+		if p.Runner == nil || *p.Runner != runner {
+			t.Fatalf("expected runner=%s, got %v", runner, p.Runner)
+		}
+		if p.Prompt != "fix bug" {
+			t.Fatalf("expected prompt %q, got %q", "fix bug", p.Prompt)
+		}
+	}
+}
+
+func TestParseArgs_RunnerSelectorRooCode(t *testing.T) {
+	p := ParseArgs([]string{"rc", "fix bug"})
+	if p.Runner == nil || *p.Runner != "rc" {
+		t.Fatalf("expected runner=rc, got %v", p.Runner)
+	}
+	if p.Prompt != "fix bug" {
+		t.Fatalf("expected prompt %q, got %q", "fix bug", p.Prompt)
+	}
+}
+
 func TestParseArgs_Thinking(t *testing.T) {
 	p := ParseArgs([]string{"+2", "think hard"})
 	if p.Thinking == nil || *p.Thinking != 2 {
@@ -165,6 +187,32 @@ func TestResolveCommand_ClaudeRunner(t *testing.T) {
 	}
 }
 
+func TestResolveCommand_CodexRunner(t *testing.T) {
+	for _, runner := range []string{"c", "cx"} {
+		argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr(runner), Prompt: "hi"}, nil)
+		if err != nil {
+			t.Fatalf("unexpected error for %s: %v", runner, err)
+		}
+		if argv[0] != "codex" {
+			t.Fatalf("expected codex binary for %s, got %v", runner, argv)
+		}
+		if len(warnings) != 0 {
+			t.Fatalf("expected no warnings for %s, got %v", runner, warnings)
+		}
+	}
+}
+
+func TestResolveCommand_RooCodeRunner(t *testing.T) {
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("rc"), Prompt: "hi"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertArgv(t, []string{"roocode", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
+}
+
 func TestResolveCommand_ThinkingFlags(t *testing.T) {
 	argv, _, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Thinking: intPtr(2), Prompt: "hi"}, nil)
 	if err != nil {
@@ -259,6 +307,37 @@ func TestResolveCommand_NameFallsBackToAgent(t *testing.T) {
 	}
 }
 
+func TestRunnerRegistryAliases(t *testing.T) {
+	if RunnerRegistry["c"].Binary != "codex" {
+		t.Fatalf("expected c to map to codex, got %q", RunnerRegistry["c"].Binary)
+	}
+	if RunnerRegistry["cx"].Binary != "codex" {
+		t.Fatalf("expected cx to map to codex, got %q", RunnerRegistry["cx"].Binary)
+	}
+	if RunnerRegistry["rc"].Binary != "roocode" {
+		t.Fatalf("expected rc to map to roocode, got %q", RunnerRegistry["rc"].Binary)
+	}
+}
+
+func TestResolveCommand_AgentWarningUsesRooCodeName(t *testing.T) {
+	parsed := ParsedArgs{
+		Runner: strPtr("rc"),
+		Alias:  strPtr("reviewer"),
+		Prompt: "hi",
+	}
+	_, _, warnings, err := ResolveCommand(parsed, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("expected one warning, got %v", warnings)
+	}
+	want := `warning: runner "roocode" does not support agents; ignoring @reviewer`
+	if warnings[0] != want {
+		t.Fatalf("expected warning %q, got %q", want, warnings[0])
+	}
+}
+
 func TestResolveCommand_NameFallsBackToAgentForClaude(t *testing.T) {
 	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("claude"), Alias: strPtr("reviewer"), Prompt: "hi"}, nil)
 	if err != nil {
@@ -292,11 +371,11 @@ func TestResolveCommand_AgentUnsupportedWarning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	assertArgv(t, []string{"codex", "hi"}, argv)
+	assertArgv(t, []string{"roocode", "hi"}, argv)
 	if len(warnings) != 1 {
 		t.Fatalf("expected one warning, got %v", warnings)
 	}
-	want := "warning: runner codex does not support agents; ignoring @reviewer"
+	want := `warning: runner "roocode" does not support agents; ignoring @reviewer`
 	if warnings[0] != want {
 		t.Fatalf("expected warning %q, got %q", want, warnings[0])
 	}
@@ -355,17 +434,6 @@ func TestResolveCommand_KimiThinking(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	assertArgv(t, []string{"kimi", "--no-think", "hi"}, argv)
-	if len(warnings) != 0 {
-		t.Fatalf("expected no warnings, got %v", warnings)
-	}
-}
-
-func TestResolveCommand_CodexRunner(t *testing.T) {
-	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("codex"), Model: strPtr("gpt-4"), Prompt: "hi"}, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	assertArgv(t, []string{"codex", "--model", "gpt-4", "hi"}, argv)
 	if len(warnings) != 0 {
 		t.Fatalf("expected no warnings, got %v", warnings)
 	}

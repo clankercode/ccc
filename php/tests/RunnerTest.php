@@ -79,6 +79,14 @@ $tmpFile = tempnam(sys_get_temp_dir(), 'ccc_test_');
 file_put_contents($tmpFile, $stubScript);
 chmod($tmpFile, 0755);
 
+$configRoot = sys_get_temp_dir() . '/ccc_runner_cfg_' . uniqid('', true);
+mkdir($configRoot . '/home', 0777, true);
+mkdir($configRoot . '/xdg', 0777, true);
+file_put_contents($configRoot . '/empty-config.toml', '');
+putenv('HOME=' . $configRoot . '/home');
+putenv('XDG_CONFIG_HOME=' . $configRoot . '/xdg');
+putenv('CCC_CONFIG=' . $configRoot . '/empty-config.toml');
+
 function run_ccc(string $prompt, string $stubPath): array
 {
     $descriptors = [

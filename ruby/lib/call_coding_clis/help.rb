@@ -8,7 +8,8 @@ module CallCodingClis
       ["opencode", "oc"],
       ["claude", "cc"],
       ["kimi", "k"],
-      ["codex", "rc"],
+      ["codex", "c/cx"],
+      ["roocode", "rc"],
       ["crush", "cr"]
     ].freeze
 
@@ -22,7 +23,7 @@ module CallCodingClis
 
       Slots (in order):
         runner        Select which coding CLI to use (default: oc)
-                      opencode (oc), claude (cc), kimi (k), codex (rc), crush (cr)
+                      opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)
         +thinking     Set thinking level: +0 (off) through +4 (max)
         :provider:model  Override provider and model
         @name         Use a named preset from config; if no preset exists, treat it as an agent

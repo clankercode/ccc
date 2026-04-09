@@ -84,6 +84,14 @@ module Parser =
             ModelFlag = "--model"
             AgentFlag = ""
         }
+        let roocodeInfo = {
+            Binary = "roocode"
+            ExtraArgs = []
+            ThinkingFlags = Map.empty
+            ProviderFlag = ""
+            ModelFlag = ""
+            AgentFlag = ""
+        }
         let crushInfo = {
             Binary = "crush"
             ExtraArgs = []
@@ -97,16 +105,18 @@ module Parser =
             "claude", claudeInfo
             "kimi", kimiInfo
             "codex", codexInfo
+            "roocode", roocodeInfo
             "crush", crushInfo
             "oc", openCodeInfo
             "cc", claudeInfo
-            "c", claudeInfo
+            "c", codexInfo
+            "cx", codexInfo
             "k", kimiInfo
-            "rc", codexInfo
+            "rc", roocodeInfo
             "cr", crushInfo
         ]
 
-    let private runnerSelectorRe = Regex(@"^(?:oc|cc|c|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$", RegexOptions.IgnoreCase)
+    let private runnerSelectorRe = Regex(@"^(?:oc|cc|cx|c|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$", RegexOptions.IgnoreCase)
     let private thinkingRe = Regex(@"^\+([0-4])$")
     let private providerModelRe = Regex(@"^:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)$")
     let private modelRe = Regex(@"^:([a-zA-Z0-9._-]+)$")

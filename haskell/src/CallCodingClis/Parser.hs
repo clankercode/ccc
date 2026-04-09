@@ -70,6 +70,7 @@ runnerRegistry = Map.fromList $ baseRunners ++ abbrevs
       , (4, ["--think", "max"])
       ]) "" "--model" "--agent"
     codex = RunnerInfo "codex" [] Map.empty "" "--model" ""
+    roocode = RunnerInfo "roocode" [] Map.empty "" "--model" ""
     crush = RunnerInfo "crush" [] Map.empty "" "" ""
 
     baseRunners =
@@ -77,15 +78,17 @@ runnerRegistry = Map.fromList $ baseRunners ++ abbrevs
       , ("claude", claude)
       , ("kimi", kimi)
       , ("codex", codex)
+      , ("roocode", roocode)
       , ("crush", crush)
       ]
 
     abbrevs =
       [ ("oc", opencode)
       , ("cc", claude)
-      , ("c", claude)
+      , ("c", codex)
+      , ("cx", codex)
       , ("k", kimi)
-      , ("rc", codex)
+      , ("rc", roocode)
       , ("cr", crush)
       ]
 
@@ -94,7 +97,7 @@ defaultConfig = CccConfig "oc" "" "" Nothing Map.empty Map.empty
 
 runnerSelectorSet :: [String]
 runnerSelectorSet =
-  ["oc","cc","c","k","rc","cr","codex","claude","opencode","kimi","roocode","crush","pi"]
+  ["oc","cc","c","cx","k","rc","cr","codex","claude","opencode","kimi","roocode","crush","pi"]
 
 isRunnerSelector :: String -> Bool
 isRunnerSelector t = map toLower t `elem` runnerSelectorSet
@@ -183,9 +186,6 @@ resolveCommand parsed mConfig =
       Map.lookup (ccDefaultRunner config) runnerRegistry
 
     aliasDef = paAlias parsed >>= \a -> Map.lookup a (ccAliases config)
-    effectiveRunnerName = case (aliasDef >>= adRunner, paRunner parsed) of
-      (Just ar, Nothing) -> resolveRunnerName (Just ar) config
-      _                  -> runnerName
 
     effectiveInfo = case (aliasDef >>= adRunner, paRunner parsed) of
       (Just ar, Nothing) ->
@@ -232,7 +232,7 @@ resolveCommand parsed mConfig =
       Just agent | not (null (riAgentFlag effectiveInfo)) ->
         (argvWithModel ++ [riAgentFlag effectiveInfo, agent], warnings)
       Just agent ->
-        let warning = "warning: runner \"" ++ effectiveRunnerName ++ "\" does not support agents; ignoring @" ++ agent
+        let warning = "warning: runner \"" ++ riBinary effectiveInfo ++ "\" does not support agents; ignoring @" ++ agent
         in (argvWithModel, warnings ++ [warning])
       Nothing -> (argvWithModel, warnings)
 

@@ -57,6 +57,13 @@ function registerDefaults() {
     providerFlag: '',
     modelFlag: '--model',
   })
+  RUNNER_REGISTRY.roocode = new RunnerInfo({
+    binary: 'roocode',
+    extraArgs: [],
+    thinkingFlags: {},
+    providerFlag: '',
+    modelFlag: '',
+  })
   RUNNER_REGISTRY.crush = new RunnerInfo({
     binary: 'crush',
     extraArgs: [],
@@ -67,15 +74,16 @@ function registerDefaults() {
 
   RUNNER_REGISTRY.oc = RUNNER_REGISTRY.opencode
   RUNNER_REGISTRY.cc = RUNNER_REGISTRY.claude
-  RUNNER_REGISTRY.c = RUNNER_REGISTRY.claude
+  RUNNER_REGISTRY.c = RUNNER_REGISTRY.codex
+  RUNNER_REGISTRY.cx = RUNNER_REGISTRY.codex
   RUNNER_REGISTRY.k = RUNNER_REGISTRY.kimi
-  RUNNER_REGISTRY.rc = RUNNER_REGISTRY.codex
+  RUNNER_REGISTRY.rc = RUNNER_REGISTRY.roocode
   RUNNER_REGISTRY.cr = RUNNER_REGISTRY.crush
 }
 
 registerDefaults()
 
-const RUNNER_SELECTOR_RE = /^(?:oc|cc|c|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$/i
+const RUNNER_SELECTOR_RE = /^(?:oc|cc|c|cx|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$/i
 const THINKING_RE = /^\+([0-4])$/
 const PROVIDER_MODEL_RE = /^:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)$/
 const MODEL_RE = /^:([a-zA-Z0-9._-]+)$/

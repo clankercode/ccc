@@ -19,7 +19,7 @@ static const char HELP_TEXT[] =
 "\n"
 "Slots (in order):\n"
 "  runner        Select which coding CLI to use (default: oc)\n"
-"                opencode (oc), claude (cc), kimi (k), codex (rc), crush (cr)\n"
+"                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)\n"
 "  +thinking     Set thinking level: +0 (off) through +4 (max)\n"
 "  :provider:model  Override provider and model\n"
 "  @name         Use a named preset from config; if no preset exists, treat it as an agent\n"
@@ -30,32 +30,41 @@ static const char HELP_TEXT[] =
 "  ccc cc +2 :anthropic:claude-sonnet-4-20250514 \"Add tests\"\n"
 "  ccc k +4 \"Debug the parser\"\n"
 "  ccc @reviewer \"Audit the API boundary\"\n"
-"  ccc codex \"Write a unit test\"\n"
+"  ccc c \"Write a unit test\"\n"
+"  ccc rc \"Compare implementations\"\n"
 "\n"
 "Config:\n"
 "  ~/.config/ccc/config.toml  - default runner, presets, abbreviations\n";
 
 static void print_runner_checklist(FILE *stream) {
-    static const char *const runners[][2] = {
-        {"opencode", "oc"},
-        {"claude", "cc"},
-        {"kimi", "k"},
-        {"codex", "rc"},
-        {"crush", "cr"},
+    typedef struct {
+        const char *name;
+        const char *aliases;
+        const char *binary;
+    } RunnerRow;
+
+    static const RunnerRow runners[] = {
+        {"opencode", "oc", "opencode"},
+        {"claude", "cc", "claude"},
+        {"kimi", "k", "kimi"},
+        {"codex", "c/cx", "codex"},
+        {"roocode", "rc", "roocode"},
+        {"crush", "cr", "crush"},
     };
 
     fprintf(stream, "Runners:\n");
     for (size_t i = 0; i < sizeof(runners) / sizeof(runners[0]); i++) {
-        const char *name = runners[i][0];
-        const char *binary = runners[i][1];
+        const char *name = runners[i].name;
+        const char *aliases = runners[i].aliases;
+        const char *binary = runners[i].binary;
         const RunnerInfo *info = ccc_get_runner(name);
         if (info != NULL && info->binary != NULL && info->binary[0] != '\0') {
             binary = info->binary;
         }
         if (access(binary, X_OK) == 0) {
-            fprintf(stream, "  [+] %-10s (%s)  found\n", name, binary);
+            fprintf(stream, "  [+] %-10s (%s)  found\n", name, aliases);
         } else {
-            fprintf(stream, "  [-] %-10s (%s)  not found\n", name, binary);
+            fprintf(stream, "  [-] %-10s (%s)  not found\n", name, aliases);
         }
     }
 }

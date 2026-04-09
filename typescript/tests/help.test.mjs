@@ -39,6 +39,7 @@ test('printHelp mentions @name fallback semantics', () => {
   const output = captureStdout(() => printHelp())
   assert.match(output, /ccc \[runner\] \[\+thinking\] \[:provider:model\] \[@name\] "<Prompt>"/)
   assert.match(output, /@name\s+Use a named preset from config; if no preset exists, treat it as an agent/)
+  assert.match(output, /codex \(c\/cx\), roocode \(rc\)/)
   assert.match(output, /Config:/)
 })
 

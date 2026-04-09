@@ -113,7 +113,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - `ccc @foo-bar "<Prompt>"` to use a named preset, or fall back to agent selection when no preset exists
   - `ccc +0 "<Prompt>"` through `ccc +4 "<Prompt>"` for thinking level selection
   - `ccc :provider:model "<Prompt>"` and `ccc :model "<Prompt>"` for explicit provider/model selection
-  - runner selectors such as `c`, `cc`, `oc`, `k`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `roocode`, `crush`, and `pi`
+  - runner selectors such as `c`, `cx`, `cc`, `oc`, `k`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `roocode`, `crush`, and `pi`
 - planned config support should eventually allow:
   - custom alias definitions and abbreviations
   - default provider selection

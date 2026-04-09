@@ -139,6 +139,15 @@ const codex_info = RunnerInfo{
     .agent_flag = "",
 };
 
+const roocode_info = RunnerInfo{
+    .binary = "roocode",
+    .extra_args = &.{},
+    .thinking_flags = .{ null, null, null, null, null },
+    .provider_flag = "",
+    .model_flag = "",
+    .agent_flag = "",
+};
+
 const crush_info = RunnerInfo{
     .binary = "crush",
     .extra_args = &.{},
@@ -156,13 +165,15 @@ pub fn runnerRegistry(allocator: std.mem.Allocator) !std.StringHashMap(RunnerInf
     try registry.put("claude", claude_info);
     try registry.put("kimi", kimi_info);
     try registry.put("codex", codex_info);
+    try registry.put("roocode", roocode_info);
     try registry.put("crush", crush_info);
 
     try registry.put("oc", opencode_info);
     try registry.put("cc", claude_info);
-    try registry.put("c", claude_info);
+    try registry.put("c", codex_info);
+    try registry.put("cx", codex_info);
     try registry.put("k", kimi_info);
-    try registry.put("rc", codex_info);
+    try registry.put("rc", roocode_info);
     try registry.put("cr", crush_info);
 
     return registry;
@@ -178,10 +189,10 @@ fn eqlIgnoreCase(a: []const u8, b: []const u8) bool {
 
 fn isRunnerSelector(token: []const u8) bool {
     const names = .{
-        "oc",       "cc",   "c",       "k",
-        "rc",       "cr",   "codex",   "claude",
-        "opencode", "kimi", "roocode", "crush",
-        "pi",
+        "oc",       "cc",   "c",       "cx",
+        "k",        "rc",   "cr",      "codex",
+        "claude",   "opencode", "kimi", "roocode",
+        "crush",    "pi",
     };
     inline for (names) |name| {
         if (eqlIgnoreCase(token, name)) return true;

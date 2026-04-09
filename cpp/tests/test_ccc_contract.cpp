@@ -54,6 +54,18 @@ static fs::path write_codex_stub(const fs::path& dir) {
     return stub;
 }
 
+static fs::path write_roocode_stub(const fs::path& dir) {
+    auto stub = dir / "roocode";
+    std::ofstream f(stub);
+    f << "#!/bin/sh\n"
+      << "printf 'roocode %s\\n' \"$1\"\n";
+    f.close();
+    fs::permissions(stub,
+        fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
+        fs::perm_options::add);
+    return stub;
+}
+
 static void write_config_with_agent(const fs::path& root) {
     auto config_dir = root / ".config" / "ccc";
     fs::create_directories(config_dir);
@@ -145,7 +157,9 @@ struct CccContract : ::testing::Test {
 TEST_F(CccContract, HappyPath) {
     auto stub = write_opencode_stub(tmp_dir);
     auto result = run_ccc(ccc_bin, {"Fix the failing tests"}, {
-        {"CCC_REAL_OPENCODE", stub.string()}
+        {"CCC_REAL_OPENCODE", stub.string()},
+        {"HOME", tmp_dir.string()},
+        {"XDG_CONFIG_HOME", (tmp_dir / "xdg").string()},
     });
     EXPECT_EQ(result.exit_code, 0);
     EXPECT_EQ(result.stdout_text, "opencode run Fix the failing tests\n");
@@ -176,8 +190,42 @@ TEST_F(CccContract, PresetAgentWinsOverNameFallback) {
     EXPECT_TRUE(result.stderr_text.empty());
 }
 
+TEST_F(CccContract, RunnerCAliasesToCodex) {
+    write_codex_stub(tmp_dir);
+    std::string path = tmp_dir.string();
+    if (const char* existing_path = std::getenv("PATH")) {
+        path += ":";
+        path += existing_path;
+    }
+    auto result = run_ccc(ccc_bin, {"c", "Fix the failing tests"}, {
+        {"PATH", path},
+        {"HOME", tmp_dir.string()},
+        {"XDG_CONFIG_HOME", (tmp_dir / "xdg").string()},
+    });
+    EXPECT_EQ(result.exit_code, 0);
+    EXPECT_EQ(result.stdout_text, "codex Fix the failing tests\n");
+    EXPECT_TRUE(result.stderr_text.empty());
+}
+
+TEST_F(CccContract, RunnerCxAliasesToCodex) {
+    write_codex_stub(tmp_dir);
+    std::string path = tmp_dir.string();
+    if (const char* existing_path = std::getenv("PATH")) {
+        path += ":";
+        path += existing_path;
+    }
+    auto result = run_ccc(ccc_bin, {"cx", "Fix the failing tests"}, {
+        {"PATH", path},
+        {"HOME", tmp_dir.string()},
+        {"XDG_CONFIG_HOME", (tmp_dir / "xdg").string()},
+    });
+    EXPECT_EQ(result.exit_code, 0);
+    EXPECT_EQ(result.stdout_text, "codex Fix the failing tests\n");
+    EXPECT_TRUE(result.stderr_text.empty());
+}
+
 TEST_F(CccContract, UnsupportedAgentWarnsAndIsIgnored) {
-    auto stub = write_codex_stub(tmp_dir);
+    write_roocode_stub(tmp_dir);
     std::string path = tmp_dir.string();
     if (const char* existing_path = std::getenv("PATH")) {
         path += ":";
@@ -189,7 +237,7 @@ TEST_F(CccContract, UnsupportedAgentWarnsAndIsIgnored) {
         {"XDG_CONFIG_HOME", (tmp_dir / "xdg").string()},
     });
     EXPECT_EQ(result.exit_code, 0);
-    EXPECT_EQ(result.stdout_text, "codex Fix the failing tests\n");
+    EXPECT_EQ(result.stdout_text, "roocode Fix the failing tests\n");
     EXPECT_NE(result.stderr_text.find("warning: runner \"rc\" does not support agents; ignoring @reviewer"),
               std::string::npos);
 }

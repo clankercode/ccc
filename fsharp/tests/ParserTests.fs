@@ -21,6 +21,18 @@ let ``parseArgs runner selector cc`` () =
     Assert.Equal("fix bug", parsed.Prompt)
 
 [<Fact>]
+let ``parseArgs runner selector c`` () =
+    let parsed = Parser.parseArgs [|"c"; "fix bug"|]
+    Assert.Equal(Some "c", parsed.Runner)
+    Assert.Equal("fix bug", parsed.Prompt)
+
+[<Fact>]
+let ``parseArgs runner selector cx`` () =
+    let parsed = Parser.parseArgs [|"cx"; "fix bug"|]
+    Assert.Equal(Some "cx", parsed.Runner)
+    Assert.Equal("fix bug", parsed.Prompt)
+
+[<Fact>]
 let ``parseArgs runner selector opencode`` () =
     let parsed = Parser.parseArgs [|"opencode"; "hello"|]
     Assert.Equal(Some "opencode", parsed.Runner)
@@ -105,6 +117,20 @@ let ``resolveCommand claude runner`` () =
     Assert.Equal("claude", List.head argv)
     Assert.DoesNotContain("run", argv)
     Assert.Contains("hello", argv)
+    Assert.Empty(warnings)
+
+[<Fact>]
+let ``resolveCommand codex runner`` () =
+    let parsed = { Runner = Some "c"; Thinking = None; Provider = None; Model = None; Alias = None; Prompt = "hello" }
+    let argv, env, warnings = Parser.resolveCommand parsed None
+    Assert.Equal("codex", List.head argv)
+    Assert.Empty(warnings)
+
+[<Fact>]
+let ``resolveCommand roocode runner`` () =
+    let parsed = { Runner = Some "rc"; Thinking = None; Provider = None; Model = None; Alias = None; Prompt = "hello" }
+    let argv, env, warnings = Parser.resolveCommand parsed None
+    Assert.Equal("roocode", List.head argv)
     Assert.Empty(warnings)
 
 [<Fact>]
@@ -230,7 +256,7 @@ let ``resolveCommand preset agent wins over name fallback`` () =
 let ``resolveCommand unsupported agent warns`` () =
     let parsed = { Runner = Some "rc"; Thinking = None; Provider = None; Model = None; Alias = Some "reviewer"; Prompt = "hello" }
     let argv, env, warnings = Parser.resolveCommand parsed None
-    Assert.Equal<string list>(["codex"; "hello"], argv)
+    Assert.Equal<string list>(["roocode"; "hello"], argv)
     Assert.Equal<string list>(["warning: runner \"rc\" does not support agents; ignoring @reviewer"], warnings)
 
 [<Fact>]
@@ -290,15 +316,17 @@ let ``loadConfig empty toml returns defaults`` () =
 
 [<Fact>]
 let ``runnerRegistry all selectors registered`` () =
-    for sel in ["oc"; "cc"; "c"; "k"; "rc"; "cr"; "codex"; "claude"; "opencode"; "kimi"; "crush"] do
+    for sel in ["oc"; "cc"; "c"; "cx"; "k"; "rc"; "cr"; "codex"; "claude"; "opencode"; "kimi"; "roocode"; "crush"] do
         Assert.True(Parser.runnerRegistry.ContainsKey(sel), sprintf "Missing selector: %s" sel)
 
 [<Fact>]
 let ``runnerRegistry abbreviations point to same info`` () =
     Assert.Equal(Parser.runnerRegistry.["oc"].Binary, Parser.runnerRegistry.["opencode"].Binary)
     Assert.Equal(Parser.runnerRegistry.["cc"].Binary, Parser.runnerRegistry.["claude"].Binary)
-    Assert.Equal(Parser.runnerRegistry.["c"].Binary, Parser.runnerRegistry.["claude"].Binary)
+    Assert.Equal(Parser.runnerRegistry.["c"].Binary, Parser.runnerRegistry.["codex"].Binary)
+    Assert.Equal(Parser.runnerRegistry.["cx"].Binary, Parser.runnerRegistry.["codex"].Binary)
     Assert.Equal(Parser.runnerRegistry.["k"].Binary, Parser.runnerRegistry.["kimi"].Binary)
+    Assert.Equal(Parser.runnerRegistry.["rc"].Binary, Parser.runnerRegistry.["roocode"].Binary)
 
 [<Fact>]
 let ``runnerRegistry agent flags registered`` () =
@@ -306,10 +334,12 @@ let ``runnerRegistry agent flags registered`` () =
     Assert.Equal("--agent", Parser.runnerRegistry.["claude"].AgentFlag)
     Assert.Equal("--agent", Parser.runnerRegistry.["kimi"].AgentFlag)
     Assert.Equal("", Parser.runnerRegistry.["codex"].AgentFlag)
+    Assert.Equal("", Parser.runnerRegistry.["roocode"].AgentFlag)
     Assert.Equal("", Parser.runnerRegistry.["crush"].AgentFlag)
 
 [<Fact>]
 let ``help text mentions name slot and fallback`` () =
     Assert.Contains("[@name]", Help.helpText)
     Assert.Contains("if no preset exists, treat it as an agent", Help.helpText)
+    Assert.Contains("codex (c/cx), roocode (rc)", Help.helpText)
     Assert.Contains("[@name]", Help.usageText)

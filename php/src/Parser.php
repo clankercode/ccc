@@ -61,7 +61,7 @@ class Parser
 {
     private static ?array $runnerRegistry = null;
 
-    private const RUNNER_SELECTOR_RE = '/^(?:oc|cc|c|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$/i';
+    private const RUNNER_SELECTOR_RE = '/^(?:oc|cc|c|cx|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$/i';
     private const THINKING_RE = '/^\+([0-4])$/';
     private const PROVIDER_MODEL_RE = '/^:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)$/';
     private const MODEL_RE = '/^:([a-zA-Z0-9._-]+)$/';
@@ -122,6 +122,14 @@ class Parser
             '--model'
         );
 
+        self::$runnerRegistry['roocode'] = new RunnerInfo(
+            'roocode',
+            [],
+            [],
+            '',
+            '--model'
+        );
+
         self::$runnerRegistry['crush'] = new RunnerInfo(
             'crush',
             [],
@@ -132,9 +140,10 @@ class Parser
 
         self::$runnerRegistry['oc'] = self::$runnerRegistry['opencode'];
         self::$runnerRegistry['cc'] = self::$runnerRegistry['claude'];
-        self::$runnerRegistry['c'] = self::$runnerRegistry['claude'];
+        self::$runnerRegistry['c'] = self::$runnerRegistry['codex'];
+        self::$runnerRegistry['cx'] = self::$runnerRegistry['codex'];
         self::$runnerRegistry['k'] = self::$runnerRegistry['kimi'];
-        self::$runnerRegistry['rc'] = self::$runnerRegistry['codex'];
+        self::$runnerRegistry['rc'] = self::$runnerRegistry['roocode'];
         self::$runnerRegistry['cr'] = self::$runnerRegistry['crush'];
 
         return self::$runnerRegistry;
@@ -251,7 +260,7 @@ class Parser
             } else {
                 $warnings[] = sprintf(
                     'warning: runner "%s" does not support agents; ignoring @%s',
-                    $effectiveRunnerName,
+                    $info->binary,
                     $effectiveAgent
                 );
             }

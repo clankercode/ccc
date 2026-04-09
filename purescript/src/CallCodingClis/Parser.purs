@@ -78,7 +78,7 @@ parseArgs argv = go argv Nothing Nothing Nothing Nothing Nothing []
 isRunner :: String -> Boolean
 isRunner token =
   any (_ == normalizeRunner token)
-    [ "oc", "cc", "c", "k", "rc", "cr"
+    [ "oc", "cc", "c", "cx", "k", "rc", "cr"
     , "codex", "claude", "opencode", "kimi", "roocode", "crush", "pi"
     ]
 
@@ -87,6 +87,7 @@ normalizeRunner token = case token of
   "OC" -> "oc"
   "CC" -> "cc"
   "C" -> "c"
+  "CX" -> "cx"
   "K" -> "k"
   "RC" -> "rc"
   "CR" -> "cr"
@@ -145,9 +146,10 @@ resolveRunnerName name config =
       case normalizeRunner name of
         "oc" -> "opencode"
         "cc" -> "claude"
-        "c" -> "claude"
+        "c" -> "codex"
+        "cx" -> "codex"
         "k" -> "kimi"
-        "rc" -> "codex"
+        "rc" -> "roocode"
         "cr" -> "crush"
         other -> other
 
@@ -175,6 +177,12 @@ runnerSpec runnerName = case runnerName of
     { binary: "codex"
     , extraArgs: []
     , modelFlag: "--model"
+    , agentFlag: ""
+    }
+  "roocode" ->
+    { binary: "roocode"
+    , extraArgs: []
+    , modelFlag: ""
     , agentFlag: ""
     }
   "crush" ->
@@ -215,7 +223,6 @@ resolveCommand parsed config =
         Nothing -> config.defaultRunner
     runnerName = resolveRunnerName selectedRunnerToken config
     spec = runnerSpec runnerName
-    warningRunnerName = selectedRunnerToken
 
     effectiveThinking = case parsed.thinking of
       Just level -> Just level
@@ -250,7 +257,7 @@ resolveCommand parsed config =
 
     warnings = case effectiveAgent of
       Just agent | spec.agentFlag == "" ->
-        [ "warning: runner \"" <> warningRunnerName <> "\" does not support agents; ignoring @" <> agent ]
+        [ "warning: runner \"" <> runnerName <> "\" does not support agents; ignoring @" <> agent ]
       _ -> []
 
     argvWithAgent = case effectiveAgent of

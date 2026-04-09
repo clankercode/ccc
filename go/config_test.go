@@ -158,6 +158,10 @@ agent = "specialist"
 }
 
 func TestLoadConfig_EmptyPath_SearchesDefaults(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg"))
+
 	cfg := LoadConfig("")
 	if cfg == nil {
 		t.Fatal("expected non-nil config")

@@ -64,6 +64,14 @@ module CallCodingClis
         model_flag: "--model",
         agent_flag: ""
       )
+      RUNNER_REGISTRY["roocode"] = RunnerInfo.new(
+        binary: "roocode",
+        extra_args: [],
+        thinking_flags: {},
+        provider_flag: "",
+        model_flag: "",
+        agent_flag: ""
+      )
       RUNNER_REGISTRY["crush"] = RunnerInfo.new(
         binary: "crush",
         extra_args: [],
@@ -75,15 +83,16 @@ module CallCodingClis
 
       RUNNER_REGISTRY["oc"] = RUNNER_REGISTRY["opencode"]
       RUNNER_REGISTRY["cc"] = RUNNER_REGISTRY["claude"]
-      RUNNER_REGISTRY["c"] = RUNNER_REGISTRY["claude"]
+      RUNNER_REGISTRY["c"] = RUNNER_REGISTRY["codex"]
+      RUNNER_REGISTRY["cx"] = RUNNER_REGISTRY["codex"]
       RUNNER_REGISTRY["k"] = RUNNER_REGISTRY["kimi"]
-      RUNNER_REGISTRY["rc"] = RUNNER_REGISTRY["codex"]
+      RUNNER_REGISTRY["rc"] = RUNNER_REGISTRY["roocode"]
       RUNNER_REGISTRY["cr"] = RUNNER_REGISTRY["crush"]
     end
 
     register_defaults!
 
-    RUNNER_SELECTOR_RE = /\A(?:oc|cc|c|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)\z/i
+    RUNNER_SELECTOR_RE = /\A(?:oc|cc|c|cx|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)\z/i
     THINKING_RE = /\A\+([0-4])\z/
     PROVIDER_MODEL_RE = /\A:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)\z/
     MODEL_RE = /\A:([a-zA-Z0-9._-]+)\z/

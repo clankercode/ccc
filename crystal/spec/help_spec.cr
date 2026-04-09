@@ -7,5 +7,7 @@ describe "help text" do
     HELP_TEXT.should contain("[@name]")
     HELP_TEXT.should contain("if no preset exists, treat it as an agent")
     HELP_TEXT.should contain("presets, abbreviations")
+    HELP_TEXT.should contain("codex (c/cx), roocode (rc), crush (cr)")
+    HELP_TEXT.should contain("ccc c \"Write a unit test\"")
   end
 end

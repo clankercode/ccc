@@ -26,6 +26,18 @@ parserSpec = do
       let r = parseArgs ["cc", "hello"]
       paRunner r `shouldBe` Just "cc"
 
+    it "parses codex selector c" $ do
+      let r = parseArgs ["c", "hello"]
+      paRunner r `shouldBe` Just "c"
+
+    it "parses codex selector cx" $ do
+      let r = parseArgs ["cx", "hello"]
+      paRunner r `shouldBe` Just "cx"
+
+    it "parses roocode selector rc" $ do
+      let r = parseArgs ["rc", "hello"]
+      paRunner r `shouldBe` Just "rc"
+
     it "parses thinking flag" $ do
       let r = parseArgs ["+3", "hello"]
       paThinking r `shouldBe` Just 3
@@ -77,6 +89,26 @@ parserSpec = do
       let parsed = ParsedArgs (Just "claude") Nothing Nothing Nothing Nothing "hello"
           result = resolveCommand parsed Nothing
       result `shouldBe` Right (["claude", "hello"], Map.empty, [])
+
+    it "uses claude abbreviation" $ do
+      let parsed = ParsedArgs (Just "cc") Nothing Nothing Nothing Nothing "hello"
+          result = resolveCommand parsed Nothing
+      result `shouldBe` Right (["claude", "hello"], Map.empty, [])
+
+    it "uses codex runner for c selector" $ do
+      let parsed = ParsedArgs (Just "c") Nothing Nothing Nothing Nothing "hello"
+          result = resolveCommand parsed Nothing
+      result `shouldBe` Right (["codex", "hello"], Map.empty, [])
+
+    it "uses codex runner for cx selector" $ do
+      let parsed = ParsedArgs (Just "cx") Nothing Nothing Nothing Nothing "hello"
+          result = resolveCommand parsed Nothing
+      result `shouldBe` Right (["codex", "hello"], Map.empty, [])
+
+    it "uses roocode runner for rc selector" $ do
+      let parsed = ParsedArgs (Just "rc") Nothing Nothing Nothing Nothing "hello"
+          result = resolveCommand parsed Nothing
+      result `shouldBe` Right (["roocode", "hello"], Map.empty, [])
 
     it "adds thinking flags for claude" $ do
       let parsed = ParsedArgs (Just "claude") (Just 3) Nothing Nothing Nothing "hello"
@@ -132,7 +164,7 @@ parserSpec = do
     it "warns when agent is unsupported" $ do
       let parsed = ParsedArgs (Just "rc") Nothing Nothing Nothing (Just "reviewer") "go"
           result = resolveCommand parsed Nothing
-      result `shouldBe` Right (["codex", "go"], Map.empty, ["warning: runner \"rc\" does not support agents; ignoring @reviewer"])
+      result `shouldBe` Right (["roocode", "go"], Map.empty, ["warning: runner \"roocode\" does not support agents; ignoring @reviewer"])
 
     it "uses config default thinking when not set" $ do
       let config = defaultConfig { ccDefaultThinking = Just 1 }

@@ -72,16 +72,16 @@ describe "ccc cli" do
       Dir.mkdir_p(bin_dir)
       Dir.mkdir_p(xdg_dir)
 
-      stub = File.join(bin_dir, "codex")
+      stub = File.join(bin_dir, "roocode")
       File.write(stub, <<-SH)
         #!/bin/sh
-        printf 'codex %s\\n' "$*"
+        printf 'roocode %s\\n' "$*"
       SH
       File.chmod(stub, 0o755)
 
       File.write(File.join(xdg_dir, "config.toml"), <<-CFG)
         [defaults]
-        runner = codex
+        runner = rc
         CFG
 
       env = {
@@ -92,8 +92,8 @@ describe "ccc cli" do
 
       stdout, stderr, status = run_cli(["@reviewer", "hello"], env)
       status.success?.should be_true
-      stdout.should eq("codex hello\n")
-      stderr.should contain(%(warning: runner "codex" does not support agents; ignoring @reviewer))
+      stdout.should eq("roocode hello\n")
+      stderr.should contain(%(warning: runner "roocode" does not support agents; ignoring @reviewer))
     ensure
       `rm -rf #{Process.quote(tmpdir)}` if Dir.exists?(tmpdir)
     end

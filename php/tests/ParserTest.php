@@ -40,6 +40,15 @@ $p = Parser::parseArgs(['claude', 'fix this']);
 assert_test('runner selector: runner', $p->runner === 'claude');
 assert_test('runner selector: prompt', $p->prompt === 'fix this');
 
+$p = Parser::parseArgs(['c', 'fix this']);
+assert_test('runner selector c: runner', $p->runner === 'c');
+
+$p = Parser::parseArgs(['cx', 'fix this']);
+assert_test('runner selector cx: runner', $p->runner === 'cx');
+
+$p = Parser::parseArgs(['rc', 'fix this']);
+assert_test('runner selector rc: runner', $p->runner === 'rc');
+
 $p = Parser::parseArgs(['+3', 'think hard']);
 assert_test('thinking: level', $p->thinking === 3);
 assert_test('thinking: prompt', $p->prompt === 'think hard');
@@ -77,6 +86,18 @@ assert_test('default runner: env empty', $r['env'] === []);
 
 $r = Parser::resolveCommand(Parser::parseArgs(['claude', 'fix']));
 assert_test('claude runner: argv', $r['argv'] === ['claude', 'fix']);
+
+$r = Parser::resolveCommand(Parser::parseArgs(['cc', 'fix']));
+assert_test('claude selector cc: argv', $r['argv'] === ['claude', 'fix']);
+
+$r = Parser::resolveCommand(Parser::parseArgs(['c', ':my-model', 'go']));
+assert_test('codex selector c: argv', $r['argv'] === ['codex', '--model', 'my-model', 'go']);
+
+$r = Parser::resolveCommand(Parser::parseArgs(['cx', 'fix']));
+assert_test('codex selector cx: argv', $r['argv'] === ['codex', 'fix']);
+
+$r = Parser::resolveCommand(Parser::parseArgs(['rc', 'fix']));
+assert_test('roocode selector rc: argv', $r['argv'] === ['roocode', 'fix']);
 
 $r = Parser::resolveCommand(Parser::parseArgs(['claude', '+3', 'think']));
 assert_test('thinking flags: argv', $r['argv'] === ['claude', '--thinking', 'high', 'think']);
@@ -149,8 +170,8 @@ assert_test('name fallback on kimi has no warnings', $warnings === []);
 
 $warnings = [];
 $r = Parser::resolveCommand(Parser::parseArgs(['rc', '@reviewer', 'hello']), null, $warnings);
-assert_test('name fallback warning on unsupported runner', $r['argv'] === ['codex', 'hello']);
-assert_test('name fallback warning text', $warnings === ['warning: runner "rc" does not support agents; ignoring @reviewer']);
+assert_test('name fallback warning on unsupported runner', $r['argv'] === ['roocode', 'hello']);
+assert_test('name fallback warning text', $warnings === ['warning: runner "roocode" does not support agents; ignoring @reviewer']);
 
 $cfg = new CccConfig();
 $alias = new AliasDef();

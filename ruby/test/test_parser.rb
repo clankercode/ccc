@@ -66,6 +66,16 @@ class TestParser < Minitest::Test
     assert_equal "cc", parsed.runner
   end
 
+  def test_parse_runner_abbreviation_c
+    parsed = CallCodingClis::Parser.parse_args(["c", "prompt"])
+    assert_equal "c", parsed.runner
+  end
+
+  def test_parse_runner_abbreviation_cx
+    parsed = CallCodingClis::Parser.parse_args(["cx", "prompt"])
+    assert_equal "cx", parsed.runner
+  end
+
   def test_parse_runner_case_insensitive
     parsed = CallCodingClis::Parser.parse_args(["Claude", "prompt"])
     assert_equal "claude", parsed.runner
@@ -121,6 +131,18 @@ class TestParser < Minitest::Test
     assert_equal ["codex", "--model", "gpt-4o", "hello"], argv
   end
 
+  def test_resolve_model_flag_codex_via_c
+    parsed = CallCodingClis::Parser.parse_args(["c", ":gpt-4o", "hello"])
+    argv, env = CallCodingClis::Parser.resolve_command(parsed)
+    assert_equal ["codex", "--model", "gpt-4o", "hello"], argv
+  end
+
+  def test_resolve_model_flag_codex_via_cx
+    parsed = CallCodingClis::Parser.parse_args(["cx", ":gpt-4o", "hello"])
+    argv, env = CallCodingClis::Parser.resolve_command(parsed)
+    assert_equal ["codex", "--model", "gpt-4o", "hello"], argv
+  end
+
   def test_resolve_no_model_flag_opencode
     parsed = CallCodingClis::Parser.parse_args(["oc", ":gpt-4o", "hello"])
     argv, env = CallCodingClis::Parser.resolve_command(parsed)
@@ -131,6 +153,12 @@ class TestParser < Minitest::Test
     parsed = CallCodingClis::Parser.parse_args(["crush", ":gpt-4o", "hello"])
     argv, env = CallCodingClis::Parser.resolve_command(parsed)
     assert_equal ["crush", "hello"], argv
+  end
+
+  def test_resolve_no_model_flag_roocode
+    parsed = CallCodingClis::Parser.parse_args(["rc", ":gpt-4o", "hello"])
+    argv, env = CallCodingClis::Parser.resolve_command(parsed)
+    assert_equal ["roocode", "hello"], argv
   end
 
   def test_resolve_name_falls_back_to_agent_for_opencode
@@ -247,12 +275,21 @@ class TestParser < Minitest::Test
   end
 
   def test_resolve_name_warning_for_unsupported_runner
-    parsed = CallCodingClis::Parser.parse_args(["codex", "@reviewer", "hello"])
+    parsed = CallCodingClis::Parser.parse_args(["rc", "@reviewer", "hello"])
+    warnings = []
+    argv, env = CallCodingClis::Parser.resolve_command(parsed, nil, warnings: warnings)
+    assert_equal ["roocode", "hello"], argv
+    assert_equal({}, env)
+    assert_equal ['warning: runner "rc" does not support agents; ignoring @reviewer'], warnings
+  end
+
+  def test_resolve_name_warning_for_codex_runner
+    parsed = CallCodingClis::Parser.parse_args(["c", "@reviewer", "hello"])
     warnings = []
     argv, env = CallCodingClis::Parser.resolve_command(parsed, nil, warnings: warnings)
     assert_equal ["codex", "hello"], argv
     assert_equal({}, env)
-    assert_equal ['warning: runner "codex" does not support agents; ignoring @reviewer'], warnings
+    assert_equal ['warning: runner "c" does not support agents; ignoring @reviewer'], warnings
   end
 
   def test_resolve_abbreviation_via_config
@@ -270,11 +307,13 @@ class TestParser < Minitest::Test
     assert_equal CallCodingClis::Parser::RUNNER_REGISTRY["cc"],
                  CallCodingClis::Parser::RUNNER_REGISTRY["claude"]
     assert_equal CallCodingClis::Parser::RUNNER_REGISTRY["c"],
-                 CallCodingClis::Parser::RUNNER_REGISTRY["claude"]
+                 CallCodingClis::Parser::RUNNER_REGISTRY["codex"]
+    assert_equal CallCodingClis::Parser::RUNNER_REGISTRY["cx"],
+                 CallCodingClis::Parser::RUNNER_REGISTRY["codex"]
     assert_equal CallCodingClis::Parser::RUNNER_REGISTRY["k"],
                  CallCodingClis::Parser::RUNNER_REGISTRY["kimi"]
     assert_equal CallCodingClis::Parser::RUNNER_REGISTRY["rc"],
-                 CallCodingClis::Parser::RUNNER_REGISTRY["codex"]
+                 CallCodingClis::Parser::RUNNER_REGISTRY["roocode"]
     assert_equal CallCodingClis::Parser::RUNNER_REGISTRY["cr"],
                  CallCodingClis::Parser::RUNNER_REGISTRY["crush"]
   end

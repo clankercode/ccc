@@ -20,6 +20,18 @@ use Call::Coding::Clis::Parser qw(parse_args resolve_command);
 }
 
 {
+    my $p   = parse_args("c", "hello");
+    my $cmd = resolve_command($p);
+    is_deeply $cmd->{argv}, ['codex', 'hello'], 'c runner: argv';
+}
+
+{
+    my $p   = parse_args("cx", "hello");
+    my $cmd = resolve_command($p);
+    is_deeply $cmd->{argv}, ['codex', 'hello'], 'cx runner: argv';
+}
+
+{
     my $p   = parse_args("claude", "+3", "think deep");
     my $cmd = resolve_command($p);
     is_deeply $cmd->{argv}, ['claude', '--thinking', 'high', 'think deep'], 'claude thinking flags';
@@ -65,6 +77,12 @@ use Call::Coding::Clis::Parser qw(parse_args resolve_command);
     my $p   = parse_args("codex", ":gpt-4o", "test");
     my $cmd = resolve_command($p);
     is_deeply $cmd->{argv}, ['codex', '--model', 'gpt-4o', 'test'], 'codex model flag';
+}
+
+{
+    my $p   = parse_args("rc", "hello");
+    my $cmd = resolve_command($p);
+    is_deeply $cmd->{argv}, ['roocode', 'hello'], 'rc runner: argv';
 }
 
 {
@@ -122,6 +140,13 @@ use Call::Coding::Clis::Parser qw(parse_args resolve_command);
     my $cmd = resolve_command($p);
     is_deeply $cmd->{argv}, ['codex', 'hello'], 'unsupported agent is ignored';
     is_deeply $cmd->{warnings}, ['warning: runner "codex" does not support agents; ignoring @reviewer'], 'unsupported agent warns';
+}
+
+{
+    my $p   = parse_args('rc', '@reviewer', "hello");
+    my $cmd = resolve_command($p);
+    is_deeply $cmd->{argv}, ['roocode', 'hello'], 'roocode unsupported agent is ignored';
+    is_deeply $cmd->{warnings}, ['warning: runner "rc" does not support agents; ignoring @reviewer'], 'roocode unsupported agent warns';
 }
 
 {

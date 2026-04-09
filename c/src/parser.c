@@ -59,6 +59,16 @@ static const RunnerInfo CODEX_INFO = {
     .agent_flag = "",
 };
 
+static const RunnerInfo ROOCODE_INFO = {
+    .binary = "roocode",
+    .extra_args = {0},
+    .extra_args_count = 0,
+    .thinking = {{{0}}, {{0}}, {{0}}, {{0}}, {{0}}},
+    .provider_flag = "",
+    .model_flag = "",
+    .agent_flag = "",
+};
+
 static const RunnerInfo CRUSH_INFO = {
     .binary = "crush",
     .extra_args = {0},
@@ -77,16 +87,17 @@ void ccc_init_config(CccConfig *config) {
 const RunnerInfo *ccc_get_runner(const char *name) {
     if (name == NULL) return NULL;
     if (strcmp(name, "opencode") == 0 || strcmp(name, "oc") == 0) return &OPENCODE_INFO;
-    if (strcmp(name, "claude") == 0 || strcmp(name, "cc") == 0 || strcmp(name, "c") == 0) return &CLAUDE_INFO;
+    if (strcmp(name, "claude") == 0 || strcmp(name, "cc") == 0) return &CLAUDE_INFO;
     if (strcmp(name, "kimi") == 0 || strcmp(name, "k") == 0) return &KIMI_INFO;
-    if (strcmp(name, "codex") == 0 || strcmp(name, "rc") == 0) return &CODEX_INFO;
+    if (strcmp(name, "codex") == 0 || strcmp(name, "c") == 0 || strcmp(name, "cx") == 0) return &CODEX_INFO;
+    if (strcmp(name, "roocode") == 0 || strcmp(name, "rc") == 0) return &ROOCODE_INFO;
     if (strcmp(name, "crush") == 0 || strcmp(name, "cr") == 0) return &CRUSH_INFO;
     return NULL;
 }
 
 static int is_runner_selector(const char *token) {
     static const char *names[] = {
-        "oc", "cc", "c", "k", "rc", "cr",
+        "oc", "cc", "c", "cx", "k", "rc", "cr",
         "codex", "claude", "opencode", "kimi", "roocode", "crush", "pi", NULL
     };
     for (int i = 0; names[i]; i++) {
@@ -242,7 +253,6 @@ int ccc_resolve_command(
     }
 
     const AliasDef *alias_def = NULL;
-    const char *effective_runner_name = runner_name;
     if (parsed->has_alias) {
         for (int i = 0; i < config->alias_count; i++) {
             if (strcmp(config->aliases[i].name, parsed->alias) == 0) {
@@ -255,7 +265,6 @@ int ccc_resolve_command(
     const RunnerInfo *effective_info = info;
     if (alias_def && alias_def->has_runner && !parsed->has_runner) {
         const char *alias_runner = resolve_runner_name(alias_def->runner, config);
-        effective_runner_name = alias_runner;
         const RunnerInfo *alias_info = ccc_get_runner(alias_runner);
         if (alias_info != NULL) effective_info = alias_info;
     }
@@ -342,7 +351,7 @@ int ccc_resolve_command(
                 warnings[0],
                 CCC_MAX_WARNING_LEN,
                 "warning: runner \"%s\" does not support agents; ignoring @%s",
-                effective_runner_name,
+                effective_info->binary,
                 effective_agent
             );
         }

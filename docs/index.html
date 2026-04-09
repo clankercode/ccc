@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ccc — call coding CLIs</title>
+<style>
+:root {
+  --bg: #0e1117;
+  --surface: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #d29922;
+  --code-bg: #1c2128;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+header { text-align: center; padding: 3rem 0 2rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
+header h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em; }
+header h1 span { color: var(--accent); }
+header p { color: var(--text-muted); font-size: 1.15rem; margin-top: 0.5rem; }
+
+section { margin-bottom: 2.5rem; }
+h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+h3 { font-size: 1.1rem; font-weight: 600; margin: 1.2rem 0 0.6rem; }
+
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0.75rem 0;
+}
+code {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  background: var(--code-bg);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+pre code { background: none; padding: 0; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin: 0.75rem 0;
+}
+th, td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+}
+th { background: var(--surface); font-weight: 600; white-space: nowrap; }
+td { background: var(--bg); }
+
+.slot-table td:first-child { font-family: var(--font-mono); white-space: nowrap; color: var(--accent); }
+
+.badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15em 0.5em;
+  border-radius: 9999px;
+}
+.badge-yes { background: rgba(63, 185, 80, 0.15); color: var(--green); }
+.badge-no { background: rgba(248, 81, 73, 0.15); color: var(--red); }
+.badge-partial { background: rgba(210, 153, 34, 0.15); color: var(--yellow); }
+
+.lang-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+.lang-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.lang-card .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-active { background: var(--green); }
+
+.target-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+.target-list li {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.feature-matrix { overflow-x: auto; }
+.feature-matrix table { min-width: 600px; }
+.feature-matrix td { text-align: center; }
+.feature-matrix td:first-child { text-align: left; }
+
+footer {
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+  margin-top: 2rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1><span>ccc</span> — call coding CLIs</h1>
+  <p>One command to run any coding CLI. 20 language implementations.</p>
+</header>
+
+<section id="usage">
+  <h2>Usage</h2>
+  <pre><code>ccc [runner] [+thinking] [:provider:model] [@alias] "&lt;Prompt&gt;"
+ccc --help
+ccc -h</code></pre>
+  <p>At its simplest:</p>
+  <pre><code>ccc "Fix the failing tests"</code></pre>
+</section>
+
+<section id="slots">
+  <h2>Slots</h2>
+  <p>Arguments are positional slots parsed in order before the prompt:</p>
+  <table class="slot-table">
+    <thead><tr><th>Slot</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>runner</td><td>Select which coding CLI to use (default: <code>oc</code>)<br>
+        <code>opencode</code> (<code>oc</code>), <code>claude</code> (<code>cc</code>), <code>kimi</code> (<code>k</code>), <code>codex</code> (<code>rc</code>), <code>crush</code> (<code>cr</code>)</td></tr>
+      <tr><td>+thinking</td><td>Set thinking level: <code>+0</code> (off) through <code>+4</code> (max)</td></tr>
+      <tr><td>:provider:model</td><td>Override provider and model</td></tr>
+      <tr><td>@alias</td><td>Use a named preset from config</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="examples">
+  <h2>Examples</h2>
+  <pre><code># Default runner (opencode)
+ccc "Fix the failing tests"
+
+# Explicit runner
+ccc oc "Refactor auth module"
+
+# Claude with thinking level and model override
+ccc cc +2 :anthropic:claude-sonnet-4-20250514 "Add tests"
+
+# Kimi with max thinking
+ccc k +4 "Debug the parser"
+
+# Codex
+ccc codex "Write a unit test"</code></pre>
+</section>
+
+<section id="config">
+  <h2>Config</h2>
+  <p>Configuration is loaded from <code>~/.config/ccc/config.toml</code>. Supports:</p>
+  <table>
+    <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Default runner</td><td>Which CLI to use when no runner is specified</td></tr>
+      <tr><td>Aliases</td><td>Named presets referenced with <code>@alias</code></td></tr>
+      <tr><td>Custom abbreviations</td><td>User-defined runner shorthand names</td></tr>
+      <tr><td>Default provider/model</td><td>Fallback provider and model selection</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="runners">
+  <h2>Target CLIs</h2>
+  <ul class="target-list">
+    <li>OpenCode</li>
+    <li>Claude Code</li>
+    <li>Codex</li>
+    <li>Kimi</li>
+    <li>Crush</li>
+  </ul>
+  <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.5rem;">
+    Designed for terminal-first coding agents. The runner registry is extensible via config.
+  </p>
+</section>
+
+<section id="languages">
+  <h2>Language Implementations</h2>
+  <p>Every implementation bundles a <code>ccc</code> CLI with identical behavior:</p>
+  <div class="lang-grid">
+    <div class="lang-card"><span class="dot dot-active"></span> Python</div>
+    <div class="lang-card"><span class="dot dot-active"></span> Rust</div>
+    <div class="lang-card"><span class="dot dot-active"></span> TypeScript</div>
+    <div class="lang-card"><span class="dot dot-active"></span> C</div>
+    <div class="lang-card"><span class="dot dot-active"></span> Go</div>
+    <div class="lang-card"><span class="dot dot-active"></span> Ruby</div>
+    <div class="lang-card"><span class="dot dot-active"></span> Perl</div>
+    <div class="lang-card"><span class="dot dot-active"></span> C++</div>
+    <div class="lang-card"><span class="dot dot-active"></span> Zig</div>
+    <div class="lang-card"><span class="dot dot-active"></span> D</div>
+    <div class="lang-card"><span class="dot dot-active"></span> F#</div>
+    <div class="lang-card"><span class="dot dot-active"></span> Haskell</div>
+    <div class="lang-card"><span class="dot dot-active"></span> Nim</div>
+    <div class="lang-card"><span class="dot dot-active"></span> Crystal</div>
+    <div class="lang-card"><span class="dot dot-active"></span> PHP</div>
+    <div class="lang-card"><span class="dot dot-active"></span> PureScript</div>
+    <div class="lang-card"><span class="dot dot-active"></span> Elixir</div>
+    <div class="lang-card"><span class="dot dot-active"></span> OCaml</div>
+    <div class="lang-card"><span class="dot dot-active"></span> VBScript</div>
+    <div class="lang-card"><span class="dot dot-active"></span> x86-64 ASM</div>
+  </div>
+</section>
+
+<section id="features">
+  <h2>Feature Matrix</h2>
+
+  <h3>Core Features (v1)</h3>
+  <div class="feature-matrix">
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Py</th><th>Rs</th><th>TS</th><th>C</th><th>Go</th>
+          <th>Rb</th><th>Pl</th><th>C++</th><th>Zig</th><th>D</th>
+          <th>F#</th><th>Hs</th><th>Nim</th><th>Cr</th><th>PHP</th>
+          <th>PS</th><th>Ex</th><th>ML</th><th>VB</th><th>ASM</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>build_prompt_spec</td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+        </tr>
+        <tr>
+          <td>Runner.run</td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+        </tr>
+        <tr>
+          <td>Runner.stream</td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-no">N</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-partial">~</span></td>
+          <td><span class="badge badge-partial">~</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-partial">~</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-no">N</span></td>
+        </tr>
+        <tr>
+          <td>ccc CLI</td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+        </tr>
+        <tr>
+          <td>Contract tests</td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-no">N</span></td>
+          <td><span class="badge badge-no">N</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-no">N</span></td>
+          <td><span class="badge badge-no">N</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-yes">Y</span></td>
+          <td><span class="badge badge-no">N</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.25rem;">
+    <span class="badge badge-yes">Y</span> = yes &nbsp;
+    <span class="badge badge-partial">~</span> = fake/passthrough &nbsp;
+    <span class="badge badge-no">N</span> = not implemented
+  </p>
+
+  <h3>Parser &amp; Config (v2)</h3>
+  <p>Runner selector, thinking levels, provider/model override, alias presets, and config file loading are implemented in 18 of 20 languages (all except PureScript and x86-64 ASM).</p>
+
+  <h3>JSON Output (v3)</h3>
+  <p>Structured JSON parsing for OpenCode, Claude Code, and Kimi output schemas is implemented in 18 of 20 languages.</p>
+</section>
+
+<section id="install">
+  <h2>Building &amp; Running</h2>
+  <p>Each language directory contains its own build tooling. Pick whichever language you prefer:</p>
+  <pre><code># Python
+PYTHONPATH=python python3 -m call_coding_clis.cli "Your prompt"
+
+# Rust
+cd rust && cargo run --bin ccc -- "Your prompt"
+
+# Go
+cd go && go run ./cmd/ccc "Your prompt"
+
+# TypeScript
+node typescript/src/ccc.js "Your prompt"
+
+# C
+cd c && make && ./ccc "Your prompt"
+
+# C++
+cmake -B cpp/build -S cpp && cmake --build cpp/build && ./cpp/build/ccc "Your prompt"</code></pre>
+</section>
+
+<section id="testing">
+  <h2>Testing</h2>
+  <pre><code># Run all test suites
+./run_all_tests.sh</code></pre>
+  <p>Individual language tests:</p>
+  <table>
+    <thead><tr><th>Language</th><th>Command</th></tr></thead>
+    <tbody>
+      <tr><td>Python</td><td><code>PYTHONPATH=python python3 -m unittest tests.test_runner tests.test_ccc_contract</code></td></tr>
+      <tr><td>Rust</td><td><code>cd rust && cargo test</code></td></tr>
+      <tr><td>TypeScript</td><td><code>node --test typescript/tests/runner.test.mjs</code></td></tr>
+      <tr><td>C</td><td><code>cd c && make test</code></td></tr>
+      <tr><td>Go</td><td><code>cd go && go test ./...</code></td></tr>
+      <tr><td>Ruby</td><td><code>cd ruby && ruby -Ilib -Itest test/test_*.rb</code></td></tr>
+      <tr><td>Perl</td><td><code>cd perl && prove -v t/</code></td></tr>
+      <tr><td>C++</td><td><code>cmake -B cpp/build -S cpp && cmake --build cpp/build --target ccc_tests && ./cpp/build/tests/ccc_tests</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="license">
+  <h2>License</h2>
+  <p>Unlicense &mdash; public domain. See <a href="https://github.com/xertrov/call-coding-clis/blob/main/UNLICENSE">UNLICENSE</a>.</p>
+</section>
+
+<footer>
+  <p><a href="https://github.com/xertrov/call-coding-clis">GitHub</a></p>
+</footer>
+
+</div>
+</body>
+</html>

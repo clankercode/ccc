@@ -18,12 +18,14 @@ pub fn main() !void {
     }
 
     if (argv.items.len == 0) {
-        help.printUsage(allocator) catch {};
+        const stderr_file = std.fs.File.stderr();
+        stderr_file.writeAll("usage: ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"\n") catch {};
         std.process.exit(1);
     }
 
     if (argv.items.len == 1 and (std.mem.eql(u8, argv.items[0], "--help") or std.mem.eql(u8, argv.items[0], "-h"))) {
-        help.printHelp(allocator) catch {};
+        const stdout_file = std.fs.File.stdout();
+        stdout_file.writeAll("ccc — call coding CLIs\n\nUsage:\n  ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"\n") catch {};
         std.process.exit(0);
     }
 

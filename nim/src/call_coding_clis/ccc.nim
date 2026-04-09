@@ -5,15 +5,20 @@ import std/tables
 import call_coding_clis/runner
 import call_coding_clis/parser
 import call_coding_clis/config
+import call_coding_clis/help
 
 proc main() =
-  if paramCount() == 0:
-    write(stderr, "usage: ccc [runner] [+thinking] [:provider:model] [@alias] <prompt>\n")
-    quit(1)
-
   var argv: seq[string] = @[]
   for i in 1..paramCount():
     argv.add(paramStr(i))
+
+  if argv.len == 0:
+    printUsage()
+    quit(1)
+
+  if argv.len == 1 and (argv[0] == "--help" or argv[0] == "-h"):
+    printHelp()
+    quit(0)
 
   let parsed = parseArgs(argv)
   let cfg = loadConfig(none(string))

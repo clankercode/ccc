@@ -1,6 +1,8 @@
+import argparse
 import os
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -154,7 +156,7 @@ def _haskell_invoke(prompt):
 
 
 def _nim_invoke(prompt):
-    return [str(ROOT / "nim" / "src" / "call_coding_clis" / "ccc"), prompt]
+    return [str(ROOT / "nim" / "call_coding_clis" / "ccc"), prompt]
 
 
 LANGUAGES = [
@@ -282,6 +284,34 @@ LANGUAGES = [
     ),
 ]
 
+LANGUAGE_ALIASES = {
+    "python": "Python",
+    "rust": "Rust",
+    "typescript": "TypeScript",
+    "ts": "TypeScript",
+    "c": "C",
+    "go": "Go",
+    "ruby": "Ruby",
+    "perl": "Perl",
+    "cpp": "C++",
+    "c++": "C++",
+    "zig": "Zig",
+    "d": "D",
+    "fsharp": "F#",
+    "f#": "F#",
+    "php": "PHP",
+    "purescript": "PureScript",
+    "asm": "x86-64 ASM",
+    "x86-64-asm": "x86-64 ASM",
+    "x86-64 asm": "x86-64 ASM",
+    "ocaml": "OCaml",
+    "crystal": "Crystal",
+    "elixir": "Elixir",
+    "nim": "Nim",
+    "haskell": "Haskell",
+    "all": "all",
+}
+
 
 class TestCase:
     def __init__(
@@ -367,6 +397,8 @@ TEST_CASES = [
 
 
 class CrossLanguageHarness(unittest.TestCase):
+    selected_languages = LANGUAGES
+
     @classmethod
     def setUpClass(cls):
         if not MOCK_BIN.exists():
@@ -385,7 +417,7 @@ class CrossLanguageHarness(unittest.TestCase):
         cls.base_env["PATH"] = f"{cls.bin_dir}:{cls.base_env.get('PATH', '')}"
         cls.base_env["PERL_BADLANG"] = "0"
 
-        for lang in LANGUAGES:
+        for lang in cls.selected_languages:
             lang.build(cls.base_env)
 
     def _make_env(self, lang: LanguageSpec) -> Dict[str, str]:
@@ -394,7 +426,7 @@ class CrossLanguageHarness(unittest.TestCase):
         return env
 
     def test_all_languages_against_mock(self):
-        for lang in LANGUAGES:
+        for lang in self.selected_languages:
             env = self._make_env(lang)
             for tc in TEST_CASES:
                 with self.subTest(language=lang.name, case=tc.name):
@@ -422,7 +454,7 @@ class CrossLanguageHarness(unittest.TestCase):
                         self.fail(f"[{lang.name}] {tc.name}:\n" + "\n".join(details))
 
     def test_rejects_extra_arguments(self):
-        for lang in LANGUAGES:
+        for lang in self.selected_languages:
             env = self._make_env(lang)
             with self.subTest(language=lang.name):
                 if not lang.build_ok:
@@ -435,5 +467,51 @@ class CrossLanguageHarness(unittest.TestCase):
                         )
 
 
+def _usage_language_names() -> List[str]:
+    return [lang.name for lang in LANGUAGES]
+
+
+def _resolve_selected_languages(raw_name: str) -> List[LanguageSpec]:
+    key = raw_name.strip().lower()
+    resolved = LANGUAGE_ALIASES.get(key)
+    if resolved is None:
+        raise ValueError(
+            f"Unknown language '{raw_name}'. Expected one of: all, "
+            + ", ".join(_usage_language_names())
+        )
+    if resolved == "all":
+        return LANGUAGES
+    return [lang for lang in LANGUAGES if lang.name == resolved]
+
+
+def main(argv: List[str]) -> int:
+    parser = argparse.ArgumentParser(
+        description="Run the cross-language mock CLI harness for one language or all."
+    )
+    parser.add_argument(
+        "language",
+        help="Language to test, or 'all'.",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Verbose unittest output.",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        CrossLanguageHarness.selected_languages = _resolve_selected_languages(
+            args.language
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(CrossLanguageHarness)
+    runner = unittest.TextTestRunner(verbosity=2 if args.verbose else 1)
+    result = runner.run(suite)
+    return 0 if result.wasSuccessful() else 1
+
+
 if __name__ == "__main__":
-    unittest.main()
+    raise SystemExit(main(sys.argv[1:]))

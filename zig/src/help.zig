@@ -79,23 +79,20 @@ fn hasOnPath(allocator: std.mem.Allocator, name: []const u8) bool {
 }
 
 fn runnerChecklist(allocator: std.mem.Allocator, file: std.fs.File) !void {
-    var writer_buf: [4096]u8 = undefined;
-    var w = std.fs.File.Writer.init(file, &writer_buf);
-    var io_writer = w.initInterface(&writer_buf);
-
-    io_writer.writeAll("Runners:\n") catch return;
+    const writer = file.writer();
+    writer.writeAll("Runners:\n") catch return;
 
     for (CANONICAL_RUNNERS) |entry| {
         const on_path = hasOnPath(allocator, entry.name);
         if (on_path) {
             const version = getVersion(allocator, entry.name);
             if (version.len > 0) {
-                io_writer.print("  [+] {s:<10} ({s})  {s}\n", .{ entry.name, entry.name, version }) catch return;
+                writer.print("  [+] {s:<10} ({s})  {s}\n", .{ entry.name, entry.name, version }) catch return;
             } else {
-                io_writer.print("  [+] {s:<10} ({s})  found\n", .{ entry.name, entry.name }) catch return;
+                writer.print("  [+] {s:<10} ({s})  found\n", .{ entry.name, entry.name }) catch return;
             }
         } else {
-            io_writer.print("  [-] {s:<10} ({s})  not found\n", .{ entry.name, entry.name }) catch return;
+            writer.print("  [-] {s:<10} ({s})  not found\n", .{ entry.name, entry.name }) catch return;
         }
     }
 }

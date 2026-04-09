@@ -6,11 +6,16 @@ module CallCodingClis.Runner
 import CallCodingClis.Types
 import Control.Exception (displayException)
 import Control.Monad (when)
+import Data.ByteString.Lazy (toStrict)
 import Data.Maybe (fromMaybe)
 import System.Environment (getEnvironment)
 import System.Exit (ExitCode(..))
 import System.IO.Error (tryIOError)
-import System.Process (CreateProcess(..), proc, readCreateProcessWithExitCode)
+import System.Process (CreateProcess(..), proc)
+import qualified System.Process.ByteString.Lazy as BL
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
+import qualified Data.Text.Encoding as TE
 
 run :: CommandSpec -> IO CompletedRun
 run spec
@@ -23,12 +28,14 @@ run spec
             { cwd = csCwd spec
             , env = envOverride
             }
-          stdinInput = fromMaybe "" (csStdinText spec)
-      result <- tryIOError $ readCreateProcessWithExitCode procSpec stdinInput
+          stdinBS = toStrict (TLE.encodeUtf8 (TL.pack (fromMaybe "" (csStdinText spec))))
+      result <- tryIOError $ BL.readCreateProcessWithExitCode procSpec stdinBS
       case result of
         Left err -> return $ CompletedRun (csArgv spec) 1 ""
           ("failed to start " ++ cmd ++ ": " ++ displayException err ++ "\n")
-        Right (ec, out, errStr) -> return $ CompletedRun (csArgv spec) (toExitInt ec) out errStr
+        Right (ec, outBS, errBS) -> return $ CompletedRun (csArgv spec) (toExitInt ec)
+          (TL.unpack (TLE.decodeUtf8With (\_ _ -> Just '?') outBS))
+          (TL.unpack (TLE.decodeUtf8With (\_ _ -> Just '?') errBS))
 
 stream :: CommandSpec -> (String -> String -> IO ()) -> IO CompletedRun
 stream spec callback = do

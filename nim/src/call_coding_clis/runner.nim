@@ -1,6 +1,7 @@
 import std/options
 import std/os
 import std/osproc
+import std/posix
 import std/streams
 import std/strtabs
 
@@ -48,11 +49,10 @@ proc defaultRun(spec: CommandSpec): CompletedRun =
       let inp = p.inputStream()
       inp.write(spec.stdinText.get())
       inp.flush()
-    
-    # Close stdin and stderr before reading stdout to prevent hangs
-    # See: https://github.com/nim-lang/Nim/issues/9953
-    close(p.inputStream())
-    close(p.errorStream())
+
+    discard posix.close(cint(p.inputHandle()))
+
+    let stderrData = p.errorStream().readAll()
 
     let outStrm = p.outputStream()
     let stdoutData = outStrm.readAll()
@@ -60,13 +60,16 @@ proc defaultRun(spec: CommandSpec): CompletedRun =
     let rawExit = p.waitForExit()
     let exitCode = if rawExit > 128: 1 else: rawExit
 
-    p.close()
+    try:
+      p.close()
+    except CatchableError:
+      discard
 
     result = CompletedRun(
       argv: spec.argv,
       exitCode: exitCode,
       stdout: stdoutData,
-      stderr: ""
+      stderr: stderrData
     )
   except OSError as e:
     result = CompletedRun(

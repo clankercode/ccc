@@ -9,10 +9,12 @@ import CallCodingClis.Types
 import Data.Map.Strict (toList)
 import System.Environment (getArgs, lookupEnv)
 import System.Exit (ExitCode(..), exitWith)
-import System.IO (hPutStr, hPutStrLn, stderr)
+import System.IO (hPutStr, hPutStrLn, hSetEncoding, stderr, stdout, utf8)
 
 main :: IO ()
 main = do
+  hSetEncoding stdout utf8
+  hSetEncoding stderr utf8
   args <- getArgs
   case args of
     [] -> do

@@ -12,15 +12,15 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/parser.zig"),
     });
 
-    const help_mod = b.createModule(.{
-        .root_source_file = b.path("src/help.zig"),
-    });
-
     const config_mod = b.createModule(.{
         .root_source_file = b.path("src/config.zig"),
         .imports = &.{
             .{ .name = "parser", .module = parser_mod },
         },
+    });
+
+    const help_mod = b.createModule(.{
+        .root_source_file = b.path("src/help.zig"),
     });
 
     const prompt_spec_mod = b.createModule(.{

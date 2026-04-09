@@ -154,7 +154,7 @@ run_test "contract: ccc CLI behavior (16 languages)" \
 
 printf "\n${BOLD}[22/22] Cross-language harness (mock-coding-cli)${RESET}\n"
 run_test "harness: mock binary behavior (16 langs × 9 cases)" \
-    "PYTHONPATH=python python3 -m unittest tests.test_harness -v 2>&1" \
+    "PYTHONPATH=python python3 tests/test_harness.py all -v 2>&1" \
     "$TMPDIR/harness.log"
 
 echo ""

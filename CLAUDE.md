@@ -11,3 +11,11 @@ Examples:
 Use `./run_all_tests.sh` only when you intentionally want the whole repository sweep. `tests/test_harness.py` now requires an explicit language or `all` when run directly.
 
 When adding or modifying CLI command assembly in code, always check the real CLI directly with the actual binary and flags, not just tests or help text. Use direct smoke tests to confirm the argv shape still works end-to-end.
+
+When editing markdown files in this repo, use relative markdown links rather than absolute filesystem paths.
+
+Incomplete work is tracked in [`TASKS.md`](TASKS.md) at the repo root and in each language's `PLAN.md` file for implementation-specific follow-ups.
+
+Shared feature changes that still need rollout to other implementations are noted in [`SHARED_CHANGES.md`](SHARED_CHANGES.md) under `Additional rollout`; use that file as follow-up context, not as the authoritative backlog.
+
+When changing the behavior of `ccc` in any way, including feature work and bug fixes, read [`ADDING_FEATURES.md`](ADDING_FEATURES.md) first.

@@ -7,6 +7,10 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
   - Strip bells, title changes, and other terminal side effects that should not leak into text output.
   - Wire the behavior through Python and Rust first, then propagate it to other implementations where applicable.
   - Add tests for raw-output sanitization and real CLI smoke checks.
+- [ ] Add a default prompt field to preset schema in config
+  - Support presets that inject a prompt automatically when invoked.
+  - Example: a `commit` preset that expands to a commit-all workflow.
+  - Define how this interacts with explicit user prompt text and prompt overrides.
 - [ ] Finish `--allow-tool` / `--deny-tool` support where the upstream CLI can express it
   - Start with Claude and OpenCode.
   - Keep the permission-mapping matrix in `docs/clis/README.md` current.

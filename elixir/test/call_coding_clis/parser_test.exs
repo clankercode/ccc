@@ -28,6 +28,24 @@ defmodule CallCodingClis.ParserTest do
       assert parsed.prompt == "hello"
     end
 
+    test "runner selector c" do
+      parsed = Parser.parse_args(["c", "hello"])
+      assert parsed.runner == "c"
+      assert parsed.prompt == "hello"
+    end
+
+    test "runner selector cx" do
+      parsed = Parser.parse_args(["cx", "hello"])
+      assert parsed.runner == "cx"
+      assert parsed.prompt == "hello"
+    end
+
+    test "runner selector rc" do
+      parsed = Parser.parse_args(["rc", "hello"])
+      assert parsed.runner == "rc"
+      assert parsed.prompt == "hello"
+    end
+
     test "thinking level" do
       parsed = Parser.parse_args(["+2", "hello"])
       assert parsed.thinking == 2
@@ -107,6 +125,30 @@ defmodule CallCodingClis.ParserTest do
       assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
       assert List.first(argv) == "claude"
       refute "run" in argv
+      assert "hello" in argv
+      assert warnings == []
+    end
+
+    test "codex runner via c" do
+      parsed = %ParsedArgs{runner: "c", prompt: "hello"}
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
+      assert List.first(argv) == "codex"
+      assert "hello" in argv
+      assert warnings == []
+    end
+
+    test "codex runner via cx" do
+      parsed = %ParsedArgs{runner: "cx", prompt: "hello"}
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
+      assert List.first(argv) == "codex"
+      assert "hello" in argv
+      assert warnings == []
+    end
+
+    test "roocode runner via rc" do
+      parsed = %ParsedArgs{runner: "rc", prompt: "hello"}
+      assert {:ok, {argv, _env, warnings}} = Parser.resolve_command(parsed)
+      assert List.first(argv) == "roocode"
       assert "hello" in argv
       assert warnings == []
     end
@@ -255,11 +297,11 @@ defmodule CallCodingClis.ParserTest do
     test "unsupported agent returns warning and no agent flag" do
       parsed = %ParsedArgs{runner: "rc", alias: "reviewer", prompt: "hello"}
       assert {:ok, {argv, env, warnings}} = Parser.resolve_command(parsed)
-      assert argv == ["codex", "hello"]
+      assert argv == ["roocode", "hello"]
       assert env == %{}
 
       assert warnings == [
-               "warning: runner \"rc\" does not support agents; ignoring @reviewer"
+               "warning: runner \"roocode\" does not support agents; ignoring @reviewer"
              ]
     end
   end
@@ -300,6 +342,7 @@ defmodule CallCodingClis.ParserTest do
             "oc",
             "cc",
             "c",
+            "cx",
             "k",
             "rc",
             "cr",
@@ -307,6 +350,7 @@ defmodule CallCodingClis.ParserTest do
             "claude",
             "opencode",
             "kimi",
+            "roocode",
             "crush"
           ] do
         assert Map.has_key?(registry, sel), "Missing selector: #{sel}"
@@ -317,8 +361,10 @@ defmodule CallCodingClis.ParserTest do
       registry = Parser.runner_registry()
       assert registry["oc"] == registry["opencode"]
       assert registry["cc"] == registry["claude"]
-      assert registry["c"] == registry["claude"]
+      assert registry["c"] == registry["codex"]
+      assert registry["cx"] == registry["codex"]
       assert registry["k"] == registry["kimi"]
+      assert registry["rc"] == registry["roocode"]
     end
 
     test "agent flags are registered where supported" do
@@ -327,6 +373,7 @@ defmodule CallCodingClis.ParserTest do
       assert registry["claude"].agent_flag == "--agent"
       assert registry["kimi"].agent_flag == "--agent"
       assert registry["codex"].agent_flag == ""
+      assert registry["roocode"].agent_flag == ""
       assert registry["crush"].agent_flag == ""
     end
   end

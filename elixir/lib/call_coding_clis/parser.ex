@@ -25,7 +25,7 @@ defmodule CallCodingClis.Parser do
               abbreviations: %{}
   end
 
-  @runner_selector_re ~r/^(?:oc|cc|c|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$/i
+  @runner_selector_re ~r/^(?:oc|cc|c|cx|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$/i
   @thinking_re ~r/^\+([0-4])$/
   @provider_model_re ~r/^:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)$/
   @model_re ~r/^:([a-zA-Z0-9._-]+)$/
@@ -80,6 +80,15 @@ defmodule CallCodingClis.Parser do
       agent_flag: ""
     }
 
+    roocode = %RunnerInfo{
+      binary: "roocode",
+      extra_args: [],
+      thinking_flags: %{},
+      provider_flag: "",
+      model_flag: "",
+      agent_flag: ""
+    }
+
     crush = %RunnerInfo{
       binary: "crush",
       extra_args: [],
@@ -94,12 +103,14 @@ defmodule CallCodingClis.Parser do
       "claude" => claude,
       "kimi" => kimi,
       "codex" => codex,
+      "roocode" => roocode,
       "crush" => crush,
       "oc" => opencode,
       "cc" => claude,
-      "c" => claude,
+      "c" => codex,
+      "cx" => codex,
       "k" => kimi,
-      "rc" => codex,
+      "rc" => roocode,
       "cr" => crush
     }
   end
@@ -155,9 +166,10 @@ defmodule CallCodingClis.Parser do
     {effective_runner_name, info} =
       if alias_def != nil and alias_def.runner != nil and parsed.runner == nil do
         ern = resolve_runner_name(alias_def.runner, config)
-        {ern, Map.get(registry, ern, info)}
+        info = Map.get(registry, ern, info)
+        {info.binary, info}
       else
-        {runner_name, info}
+        {info.binary, info}
       end
 
     argv = [info.binary | info.extra_args]

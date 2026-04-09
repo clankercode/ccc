@@ -61,11 +61,11 @@ def _register_defaults() -> None:
         binary="claude",
         extra_args=[],
         thinking_flags={
-            0: ["--no-thinking"],
-            1: ["--thinking", "low"],
-            2: ["--thinking", "medium"],
-            3: ["--thinking", "high"],
-            4: ["--thinking", "max"],
+            0: ["--thinking", "disabled"],
+            1: ["--thinking", "enabled", "--effort", "low"],
+            2: ["--thinking", "enabled", "--effort", "medium"],
+            3: ["--thinking", "enabled", "--effort", "high"],
+            4: ["--thinking", "enabled", "--effort", "max"],
         },
         provider_flag="",
         model_flag="--model",
@@ -92,6 +92,13 @@ def _register_defaults() -> None:
         provider_flag="",
         model_flag="--model",
     )
+    RUNNER_REGISTRY["roocode"] = RunnerInfo(
+        binary="roocode",
+        extra_args=[],
+        thinking_flags={},
+        provider_flag="",
+        model_flag="",
+    )
     RUNNER_REGISTRY["crush"] = RunnerInfo(
         binary="crush",
         extra_args=[],
@@ -102,16 +109,17 @@ def _register_defaults() -> None:
 
     RUNNER_REGISTRY["oc"] = RUNNER_REGISTRY["opencode"]
     RUNNER_REGISTRY["cc"] = RUNNER_REGISTRY["claude"]
-    RUNNER_REGISTRY["c"] = RUNNER_REGISTRY["claude"]
+    RUNNER_REGISTRY["c"] = RUNNER_REGISTRY["codex"]
+    RUNNER_REGISTRY["cx"] = RUNNER_REGISTRY["codex"]
     RUNNER_REGISTRY["k"] = RUNNER_REGISTRY["kimi"]
-    RUNNER_REGISTRY["rc"] = RUNNER_REGISTRY["codex"]
+    RUNNER_REGISTRY["rc"] = RUNNER_REGISTRY["roocode"]
     RUNNER_REGISTRY["cr"] = RUNNER_REGISTRY["crush"]
 
 
 _register_defaults()
 
 RUNNER_SELECTOR_RE = re.compile(
-    r"^(?:oc|cc|c|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$", re.IGNORECASE
+    r"^(?:oc|cc|c|cx|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$", re.IGNORECASE
 )
 THINKING_RE = re.compile(
     r"^\+(0|1|2|3|4|none|low|med|mid|medium|high|max|xhigh)$",

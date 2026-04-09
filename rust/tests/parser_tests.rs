@@ -146,7 +146,30 @@ fn test_resolve_thinking_flags() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert!(argv.contains(&"--thinking".to_string()));
+    assert!(argv.contains(&"enabled".to_string()));
+    assert!(argv.contains(&"--effort".to_string()));
     assert!(argv.contains(&"medium".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_thinking_zero_for_claude() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        thinking: Some(0),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv[..3],
+        [
+            "claude".to_string(),
+            "--thinking".to_string(),
+            "disabled".to_string()
+        ]
+    );
+    assert!(!argv.contains(&"--effort".to_string()));
     assert!(warnings.is_empty());
 }
 
@@ -204,6 +227,31 @@ fn test_resolve_config_default_runner() {
 }
 
 #[test]
+fn test_resolve_config_default_thinking_for_claude() {
+    let config = CccConfig {
+        default_runner: "cc".into(),
+        default_thinking: Some(1),
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(
+        argv[..5],
+        [
+            "claude".to_string(),
+            "--thinking".to_string(),
+            "enabled".to_string(),
+            "--effort".to_string(),
+            "low".to_string()
+        ]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
 fn test_resolve_alias_preset_agent() {
     let config = CccConfig {
         aliases: {
@@ -230,6 +278,8 @@ fn test_resolve_alias_preset_agent() {
     let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
     assert_eq!(argv[0], "claude");
     assert!(argv.contains(&"--thinking".to_string()));
+    assert!(argv.contains(&"enabled".to_string()));
+    assert!(argv.contains(&"--effort".to_string()));
     assert!(argv.contains(&"high".to_string()));
     assert!(argv.contains(&"--agent".to_string()));
     assert!(argv.contains(&"reviewer".to_string()));

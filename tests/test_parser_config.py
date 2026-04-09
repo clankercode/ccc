@@ -28,6 +28,16 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(parsed.runner, "cc")
         self.assertEqual(parsed.prompt, "fix bug")
 
+    def test_runner_selector_c(self):
+        parsed = parse_args(["c", "fix bug"])
+        self.assertEqual(parsed.runner, "c")
+        self.assertEqual(parsed.prompt, "fix bug")
+
+    def test_runner_selector_cx(self):
+        parsed = parse_args(["cx", "fix bug"])
+        self.assertEqual(parsed.runner, "cx")
+        self.assertEqual(parsed.prompt, "fix bug")
+
     def test_runner_selector_opencode(self):
         parsed = parse_args(["opencode", "hello"])
         self.assertEqual(parsed.runner, "opencode")
@@ -121,22 +131,39 @@ class ResolveCommandTests(unittest.TestCase):
         self.assertIn("hello", argv)
         self.assertEqual(warnings, [])
 
+    def test_codex_runner_via_c(self):
+        parsed = ParsedArgs(runner="c", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[0], "codex")
+        self.assertEqual(warnings, [])
+
+    def test_codex_runner_via_cx(self):
+        parsed = ParsedArgs(runner="cx", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(argv[0], "codex")
+        self.assertEqual(warnings, [])
+
     def test_thinking_flags_for_claude(self):
         parsed = ParsedArgs(runner="cc", thinking=2, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
-        self.assertIn("--thinking", argv)
-        self.assertIn("medium", argv)
+        self.assertEqual(
+            argv[:5],
+            ["claude", "--thinking", "enabled", "--effort", "medium"],
+        )
 
     def test_thinking_zero_for_claude(self):
         parsed = ParsedArgs(runner="cc", thinking=0, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
-        self.assertIn("--no-thinking", argv)
+        self.assertEqual(argv[:3], ["claude", "--thinking", "disabled"])
+        self.assertNotIn("--effort", argv)
 
     def test_xhigh_for_claude_uses_max_flag(self):
         parsed = parse_args(["cc", "+xhigh", "hello"])
         argv, _env, _warnings = resolve_command(parsed)
-        self.assertIn("--thinking", argv)
-        self.assertIn("max", argv)
+        self.assertEqual(
+            argv[:5],
+            ["claude", "--thinking", "enabled", "--effort", "max"],
+        )
 
     def test_max_for_kimi_uses_max_flag(self):
         parsed = parse_args(["k", "+max", "hello"])
@@ -170,8 +197,10 @@ class ResolveCommandTests(unittest.TestCase):
         config = CccConfig(default_runner="cc", default_thinking=1)
         parsed = ParsedArgs(prompt="hello")
         argv, env, _warnings = resolve_command(parsed, config)
-        self.assertIn("--thinking", argv)
-        self.assertIn("low", argv)
+        self.assertEqual(
+            argv[:5],
+            ["claude", "--thinking", "enabled", "--effort", "low"],
+        )
 
     def test_config_default_model(self):
         config = CccConfig(default_runner="cc", default_model="claude-3.5")
@@ -193,8 +222,10 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(alias="work", prompt="hello")
         argv, env, warnings = resolve_command(parsed, config)
         self.assertEqual(argv[0], "claude")
-        self.assertIn("--thinking", argv)
-        self.assertIn("high", argv)
+        self.assertEqual(
+            argv[:5],
+            ["claude", "--thinking", "enabled", "--effort", "high"],
+        )
         self.assertIn("--model", argv)
         self.assertIn("claude-4", argv)
         self.assertEqual(warnings, [])
@@ -237,7 +268,7 @@ class ResolveCommandTests(unittest.TestCase):
     def test_alias_falls_back_to_agent_with_warning_when_runner_lacks_support(self):
         parsed = ParsedArgs(runner="rc", alias="reviewer", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
-        self.assertEqual(argv[0], "codex")
+        self.assertEqual(argv[0], "roocode")
         self.assertNotIn("--agent", argv)
         self.assertEqual(
             warnings,
@@ -309,6 +340,7 @@ class RegistryTests(unittest.TestCase):
             "oc",
             "cc",
             "c",
+            "cx",
             "k",
             "rc",
             "cr",
@@ -316,6 +348,7 @@ class RegistryTests(unittest.TestCase):
             "claude",
             "opencode",
             "kimi",
+            "roocode",
             "crush",
         ]:
             self.assertIn(sel, RUNNER_REGISTRY, f"Missing selector: {sel}")
@@ -323,8 +356,10 @@ class RegistryTests(unittest.TestCase):
     def test_abbreviations_point_to_same_info(self):
         self.assertIs(RUNNER_REGISTRY["oc"], RUNNER_REGISTRY["opencode"])
         self.assertIs(RUNNER_REGISTRY["cc"], RUNNER_REGISTRY["claude"])
-        self.assertIs(RUNNER_REGISTRY["c"], RUNNER_REGISTRY["claude"])
+        self.assertIs(RUNNER_REGISTRY["c"], RUNNER_REGISTRY["codex"])
+        self.assertIs(RUNNER_REGISTRY["cx"], RUNNER_REGISTRY["codex"])
         self.assertIs(RUNNER_REGISTRY["k"], RUNNER_REGISTRY["kimi"])
+        self.assertIs(RUNNER_REGISTRY["rc"], RUNNER_REGISTRY["roocode"])
 
 
 if __name__ == "__main__":

@@ -49,7 +49,7 @@ func TestHelpText_UsesNameSlot(t *testing.T) {
 
 func TestPrintUsage_UsesNameSlot(t *testing.T) {
 	out := captureOutput(t, PrintUsage)
-	if !strings.Contains(out, "usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"") {
+	if !strings.Contains(out, "usage: ccc [controls...] \"<Prompt>\"") {
 		t.Fatalf("expected usage to mention [@name], got:\n%s", out)
 	}
 }

@@ -13,7 +13,7 @@ static const char* const kHelpText =
     "ccc \xe2\x80\x94 call coding CLIs\n"
     "\n"
     "Usage:\n"
-    "  ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"\n"
+    "  ccc [controls...] \"<Prompt>\"\n"
     "  ccc --help\n"
     "  ccc -h\n"
     "\n"
@@ -27,7 +27,8 @@ static const char* const kHelpText =
     "Examples:\n"
     "  ccc \"Fix the failing tests\"\n"
     "  ccc oc \"Refactor auth module\"\n"
-    "  ccc cc +2 :anthropic:claude-sonnet-4-20250514 \"Add tests\"\n"
+    "  ccc cc +2 :anthropic:claude-sonnet-4-20250514 @reviewer \"Add tests\"\n"
+    "  ccc c +4 :openai:gpt-5.4-mini @agent \"Debug the parser\"\n"
     "  ccc k +4 \"Debug the parser\"\n"
     "  ccc @reviewer \"Audit the API boundary\"\n"
     "  ccc c \"Write a unit test\"\n"
@@ -105,6 +106,6 @@ void printHelp() {
 }
 
 void printUsage() {
-    std::cerr << "usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"\n";
+    std::cerr << "usage: ccc [controls...] \"<Prompt>\"\n";
     std::cerr << runnerChecklist();
 }

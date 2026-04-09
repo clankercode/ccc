@@ -25,6 +25,16 @@ Current files:
 - [model-capabilities.json](model-capabilities.json)
 - [updating-model-capabilities.md](updating-model-capabilities.md)
 
+## Canonical Usage Block
+
+All implementations now share the same help surface under the usage line:
+
+- `ccc [controls...] "<Prompt>"`
+- the shared core controls block for runner, `+thinking`, `:provider:model`, and `@name`
+- two dense examples that exercise the shared syntax
+
+Implementation-specific extras can still follow after that shared block where a runtime supports them.
+
 ## Permission Matrix
 
 This table describes the current `ccc` mapping and the likely future shape for finer-grained controls.

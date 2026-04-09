@@ -71,7 +71,7 @@ main = do
       && resolveRunnerName "rc" defaultConfig == "roocode"
 
   r10 <- check "usageText uses @name" $
-    usageText == "usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
+    usageText == "usage: ccc [controls...] \"<Prompt>\""
 
   r11 <- check "helpText explains selector remap and preset-then-agent fallback" $
     CU.indexOf (Pattern "[@name]") helpText /= Nothing

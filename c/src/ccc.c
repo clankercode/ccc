@@ -13,7 +13,7 @@ static const char HELP_TEXT[] =
 "ccc - call coding CLIs\n"
 "\n"
 "Usage:\n"
-"  ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"\n"
+"  ccc [controls...] \"<Prompt>\"\n"
 "  ccc --help\n"
 "  ccc -h\n"
 "\n"
@@ -27,7 +27,8 @@ static const char HELP_TEXT[] =
 "Examples:\n"
 "  ccc \"Fix the failing tests\"\n"
 "  ccc oc \"Refactor auth module\"\n"
-"  ccc cc +2 :anthropic:claude-sonnet-4-20250514 \"Add tests\"\n"
+"  ccc cc +2 :anthropic:claude-sonnet-4-20250514 @reviewer \"Add tests\"\n"
+"  ccc c +4 :openai:gpt-5.4-mini @agent \"Debug the parser\"\n"
 "  ccc k +4 \"Debug the parser\"\n"
 "  ccc @reviewer \"Audit the API boundary\"\n"
 "  ccc c \"Write a unit test\"\n"
@@ -75,7 +76,7 @@ static void print_help(void) {
 }
 
 static void print_usage(void) {
-    fputs("usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"\n", stderr);
+    fputs("usage: ccc [controls...] \"<Prompt>\"\n", stderr);
     print_runner_checklist(stderr);
 }
 

@@ -4,7 +4,7 @@ import call_coding_clis/help
 
 suite "help text":
   test "usage mentions name fallback":
-    check usageText() == "usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
+    check usageText() == "usage: ccc [controls...] \"<Prompt>\""
 
   test "help explains preset then agent fallback":
     check "@name         Use a named preset from config; if no preset exists, treat it as an agent" in helpText()

@@ -30,6 +30,10 @@ HELP_SLOT_LINE = (
 )
 HELP_PRINT_CONFIG_SNIPPET = "--print-config"
 HELP_PRESET_PROMPT_LINE = "Presets can also define a default prompt"
+HELP_EXHAUSTIVE_EXAMPLE_1 = (
+    'ccc cc +2 :anthropic:claude-sonnet-4-20250514 @reviewer "Add tests"'
+)
+HELP_EXHAUSTIVE_EXAMPLE_2 = 'ccc c +4 :openai:gpt-5.4-mini @agent "Debug the parser"'
 HELP_PROJECT_LOCAL_CONFIG_LINE = ".ccc.toml (searched upward from CWD)"
 HELP_GLOBAL_CONFIG_LINE = "XDG_CONFIG_HOME/ccc/config.toml"
 HELP_HOME_CONFIG_LINE = "~/.config/ccc/config.toml"
@@ -965,6 +969,7 @@ class SingleImplCccContractTests(unittest.TestCase):
             'ccc "<Prompt>"' in result.stderr or "ccc" in result.stderr.lower(),
             f"Expected usage message in stderr, got: {result.stderr!r}",
         )
+        self.assertIn(HELP_USAGE_LINE, result.stderr)
 
     def assert_uses_configured_default_runner(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -992,6 +997,8 @@ class SingleImplCccContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(expected_usage_line, result.stdout)
         self.assertIn(HELP_SLOT_LINE, result.stdout)
+        self.assertIn(HELP_EXHAUSTIVE_EXAMPLE_1, result.stdout)
+        self.assertIn(HELP_EXHAUSTIVE_EXAMPLE_2, result.stdout)
 
     def assert_help_mentions_show_thinking_flag(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)

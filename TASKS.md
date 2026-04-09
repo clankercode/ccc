@@ -15,9 +15,6 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
 - [ ] Add a repo-root `VERSION` file and pull it into implementations at build time
   - Use it as the single source of truth for reported package/CLI version strings where feasible.
   - Keep the language-specific build/release flow honest about when the baked-in version is refreshed.
-- [ ] Add a canonical controls section under the usage line and reuse it across all implementations
-  - The usage line should be followed by a shared controls explanation section with examples.
-  - Keep one canonical copy of that section and copy it into every implementation so the usage output stays consistent.
 - [ ] Speed up runner version discovery by reading versions from install files when possible
   - Prefer direct inspection of expected metadata locations such as `package.json` instead of spawning `<runner> --version`.
   - Fall back to the current version command when direct discovery fails.

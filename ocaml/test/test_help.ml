@@ -69,7 +69,7 @@ let () =
         let output = capture_channel stderr (fun () -> Help.print_usage ()) in
         check bool "contains usage line" true
           (contains_sub
-             ~sub:"usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
+             ~sub:"usage: ccc [controls...] \"<Prompt>\""
              output));
     ]);
   ]

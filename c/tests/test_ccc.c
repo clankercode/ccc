@@ -148,8 +148,16 @@ int main(void) {
         fprintf(stderr, "--help should exit 0, got %d\n", help_status);
         return 1;
     }
-    if (!file_contains("./build/help.txt", "ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"")) {
+    if (!file_contains("./build/help.txt", "ccc [controls...] \"<Prompt>\"")) {
         fprintf(stderr, "help output missing @name usage line\n");
+        return 1;
+    }
+    if (!file_contains("./build/help.txt", "ccc cc +2 :anthropic:claude-sonnet-4-20250514 @reviewer \"Add tests\"")) {
+        fprintf(stderr, "help output missing exhaustive shared example\n");
+        return 1;
+    }
+    if (!file_contains("./build/help.txt", "ccc c +4 :openai:gpt-5.4-mini @agent \"Debug the parser\"")) {
+        fprintf(stderr, "help output missing second exhaustive shared example\n");
         return 1;
     }
     if (!file_contains("./build/help.txt", "codex (c/cx), roocode (rc)")) {
@@ -179,7 +187,7 @@ int main(void) {
         fprintf(stderr, "missing prompt should exit 1, got %d\n", usage_status);
         return 1;
     }
-    if (!file_contains("./build/usage.err", "ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"")) {
+    if (!file_contains("./build/usage.err", "ccc [controls...] \"<Prompt>\"")) {
         fprintf(stderr, "usage output missing @name usage line\n");
         return 1;
     }

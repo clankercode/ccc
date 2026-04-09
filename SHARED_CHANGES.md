@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-10
 
+### Canonical controls help text now matches across all `ccc` implementations
+- Change: the shared help/usage banner now uses `ccc [controls...] "<Prompt>"` and the core controls section now carries two exhaustive shared examples across the language implementations
+- Required implementations: Python and Rust
+- Additional rollout: rolled out to C, C++, TypeScript, Go, Ruby, Perl, D, Nim, F#, Haskell, OCaml, Crystal, PHP, PureScript, Elixir, Zig, and x86-64 ASM
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `go/help_test.go`, `typescript/tests/help.test.mjs`, `nim/tests/test_help.nim`, `purescript/test/Main.purs`, `ocaml/test/test_help.ml`, `crystal/spec/help_spec.cr`, `zig/tests/help_test.zig`
+- Notes: updated `docs/clis/README.md`, `docs/llms.txt`, `docs/index.html`, and `_dispatch_help.sh`; removed the backlog item from `TASKS.md`
+
 ### Permission-mode mappings were narrowed to honest upstream controls in Python and Rust
 - Change: Python and Rust now treat `--permission-mode safe` as an explicit OpenCode ask override, keep Claude on `--permission-mode default`, leave coarse default-only runners unchanged, and warn for unverified RooCode safe-mode requests instead of implying broader parity
 - Required implementations: Python and Rust

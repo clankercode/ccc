@@ -17,7 +17,7 @@ module CallCodingClis
       ccc — call coding CLIs
 
       Usage:
-        ccc [runner] [+thinking] [:provider:model] [@name] "<Prompt>"
+        ccc [controls...] "<Prompt>"
         ccc --help
         ccc -h
 
@@ -31,7 +31,8 @@ module CallCodingClis
       Examples:
         ccc "Fix the failing tests"
         ccc oc "Refactor auth module"
-        ccc cc +2 :anthropic:claude-sonnet-4-20250514 "Add tests"
+        ccc cc +2 :anthropic:claude-sonnet-4-20250514 @reviewer "Add tests"
+        ccc c +4 :openai:gpt-5.4-mini @agent "Debug the parser"
         ccc k +4 "Debug the parser"
         ccc @reviewer "Audit the API boundary"
         ccc codex "Write a unit test"
@@ -76,7 +77,7 @@ module CallCodingClis
     end
 
     def self.print_usage
-      $stderr.puts 'usage: ccc [runner] [+thinking] [:provider:model] [@name] "<Prompt>"'
+      $stderr.puts 'usage: ccc [controls...] "<Prompt>"'
       $stderr.puts runner_checklist
     end
   end

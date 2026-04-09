@@ -18,7 +18,7 @@ helpText =
   "ccc — call coding CLIs\n"
     <> "\n"
     <> "Usage:\n"
-    <> "  ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\"\n"
+    <> "  ccc [controls...] \"<Prompt>\"\n"
     <> "  ccc --help\n"
     <> "  ccc -h\n"
     <> "\n"
@@ -32,7 +32,8 @@ helpText =
     <> "Examples:\n"
     <> "  ccc \"Fix the failing tests\"\n"
     <> "  ccc oc \"Refactor auth module\"\n"
-    <> "  ccc cc +2 :anthropic:claude-sonnet-4-20250514 \"Add tests\"\n"
+    <> "  ccc cc +2 :anthropic:claude-sonnet-4-20250514 @reviewer \"Add tests\"\n"
+    <> "  ccc c +4 :openai:gpt-5.4-mini @agent \"Debug the parser\"\n"
     <> "  ccc k +4 \"Debug the parser\"\n"
     <> "  ccc @reviewer \"Audit the API boundary\"\n"
     <> "  ccc codex \"Write a unit test\"\n"
@@ -41,7 +42,7 @@ helpText =
     <> "  ~/.config/ccc/config.toml  — default runner, presets, abbreviations\n"
 
 usageText :: String
-usageText = "usage: ccc [runner] [+thinking] [:provider:model] [@name] \"<Prompt>\""
+usageText = "usage: ccc [controls...] \"<Prompt>\""
 
 type RunnerEntry =
   { name :: String

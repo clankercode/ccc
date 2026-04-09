@@ -8,10 +8,28 @@ import Data.Char (isSpace)
 import Data.List (isPrefixOf)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import System.Directory (getHomeDirectory)
+import System.Environment (lookupEnv)
+import System.FilePath ((</>))
 import System.IO.Error (tryIOError)
 
+configFileName :: FilePath
+configFileName = "config.toml"
+
+configDirName :: FilePath
+configDirName = "ccc"
+
+defaultConfigPaths :: IO [FilePath]
+defaultConfigPaths = do
+  xdg <- lookupEnv "XDG_CONFIG_HOME"
+  home <- getHomeDirectory
+  let xdgPath = case xdg of
+        Just d  -> [d </> configDirName </> configFileName]
+        Nothing -> []
+      homePath = [home </> ".config" </> configDirName </> configFileName]
+  return (xdgPath ++ homePath)
+
 loadConfig :: Maybe FilePath -> IO CccConfig
-loadConfig Nothing    = return defaultConfig
 loadConfig (Just path) = do
   result <- tryIOError (readFile path)
   case result of
@@ -20,6 +38,19 @@ loadConfig (Just path) = do
       case parseConfig contents of
         Left _    -> return defaultConfig
         Right cfg -> return cfg
+loadConfig Nothing = do
+  paths <- defaultConfigPaths
+  loadFirst paths
+  where
+    loadFirst [] = return defaultConfig
+    loadFirst (p:ps) = do
+      result <- tryIOError (readFile p)
+      case result of
+        Left _ -> loadFirst ps
+        Right contents ->
+          case parseConfig contents of
+            Left _    -> loadFirst ps
+            Right cfg -> return cfg
 
 parseConfig :: String -> Either String CccConfig
 parseConfig contents = Right finalCfg

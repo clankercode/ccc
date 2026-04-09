@@ -423,6 +423,7 @@ class CrossLanguageHarness(unittest.TestCase):
     def _make_env(self, lang: LanguageSpec) -> Dict[str, str]:
         env = self.base_env.copy()
         env.update(lang.env_extra)
+        env["PATH"] = self.base_env.get("PATH", env.get("PATH", ""))
         return env
 
     def test_all_languages_against_mock(self):

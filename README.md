@@ -25,6 +25,24 @@ This runs all 10 test suites (8 language-specific + 2 cross-language) and prints
   Total: 10  Passed: 10  Failed: 0  Skipped: 0
 ```
 
+## Running One Implementation
+
+When working on a single language, use the targeted wrapper instead of the full repo sweep:
+
+```bash
+./test_impl.sh <language>
+```
+
+Examples:
+
+```bash
+./test_impl.sh c
+./test_impl.sh rust
+./test_impl.sh typescript
+```
+
+This runs that implementation's unit tests plus the targeted cross-language contract and mock harness checks for the same language only. Use `./run_all_tests.sh` only when you intentionally want the whole repository run.
+
 ### Individual Test Commands
 
 | Language | Command |
@@ -37,7 +55,7 @@ This runs all 10 test suites (8 language-specific + 2 cross-language) and prints
 | Ruby | `cd ruby && ruby -Ilib -Itest test/test_*.rb` |
 | Perl | `cd perl && prove -v t/` |
 | C++ | `cmake -B cpp/build -S cpp && cmake --build cpp/build --target ccc_tests && ./cpp/build/tests/ccc_tests` |
-| Cross-language | `PYTHONPATH=python python3 -m unittest tests.test_ccc_contract tests.test_harness` |
+| Cross-language | `PYTHONPATH=python python3 -m unittest tests.test_ccc_contract && PYTHONPATH=python python3 tests/test_harness.py all -v` |
 
 ## Implementation Status
 

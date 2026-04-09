@@ -6,16 +6,12 @@ module CallCodingClis.Runner
 import CallCodingClis.Types
 import Control.Exception (displayException)
 import Control.Monad (when)
-import Data.ByteString.Lazy (toStrict)
 import Data.Maybe (fromMaybe)
 import System.Environment (getEnvironment)
 import System.Exit (ExitCode(..))
+import System.IO (hClose, hGetContents, hPutStr, hSetEncoding, utf8)
 import System.IO.Error (tryIOError)
-import System.Process (CreateProcess(..), proc)
-import qualified System.Process.ByteString.Lazy as BL
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TLE
-import qualified Data.Text.Encoding as TE
+import System.Process (CreateProcess(..), StdStream(..), createProcess, proc, waitForProcess)
 
 run :: CommandSpec -> IO CompletedRun
 run spec
@@ -27,15 +23,25 @@ run spec
       let procSpec = (proc cmd args)
             { cwd = csCwd spec
             , env = envOverride
+            , std_in  = CreatePipe
+            , std_out = CreatePipe
+            , std_err = CreatePipe
             }
-          stdinBS = toStrict (TLE.encodeUtf8 (TL.pack (fromMaybe "" (csStdinText spec))))
-      result <- tryIOError $ BL.readCreateProcessWithExitCode procSpec stdinBS
+      result <- tryIOError $ do
+        (Just hIn, Just hOut, Just hErr, ph) <- createProcess procSpec
+        hSetEncoding hIn utf8
+        hSetEncoding hOut utf8
+        hSetEncoding hErr utf8
+        hPutStr hIn (fromMaybe "" (csStdinText spec))
+        hClose hIn
+        out <- hGetContents hOut
+        errStr <- hGetContents hErr
+        ec <- waitForProcess ph
+        return (ec, out, errStr)
       case result of
         Left err -> return $ CompletedRun (csArgv spec) 1 ""
           ("failed to start " ++ cmd ++ ": " ++ displayException err ++ "\n")
-        Right (ec, outBS, errBS) -> return $ CompletedRun (csArgv spec) (toExitInt ec)
-          (TL.unpack (TLE.decodeUtf8With (\_ _ -> Just '?') outBS))
-          (TL.unpack (TLE.decodeUtf8With (\_ _ -> Just '?') errBS))
+        Right (ec, out, errStr) -> return $ CompletedRun (csArgv spec) (toExitInt ec) out errStr
 
 stream :: CommandSpec -> (String -> String -> IO ()) -> IO CompletedRun
 stream spec callback = do

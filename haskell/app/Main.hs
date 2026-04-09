@@ -3,7 +3,6 @@ module Main where
 import CallCodingClis.Config (loadConfig)
 import CallCodingClis.Help (printHelp, printUsage)
 import CallCodingClis.Parser (parseArgs, resolveCommand)
-import CallCodingClis.PromptSpec (buildPromptSpec)
 import CallCodingClis.Runner (run)
 import CallCodingClis.Types
 import Data.Map.Strict (toList)
@@ -26,24 +25,9 @@ main = do
     ["-h"] -> do
       printHelp
       exitWith ExitSuccess
-    [prompt] -> case buildPromptSpec prompt of
-      Left err -> do
-        hPutStrLn stderr err
-        exitWith (ExitFailure 1)
-      Right spec -> do
-        mOverride <- lookupEnv "CCC_REAL_OPENCODE"
-        let spec' = case mOverride of
-              Nothing  -> spec
-              Just bin -> spec { csArgv = bin : tail (csArgv spec) }
-        result <- run spec'
-        putStr (crStdout result)
-        hPutStr stderr (crStderr result)
-        exitWith (case crExitCode result of
-                    0 -> ExitSuccess
-                    n -> ExitFailure n)
     _ -> do
-      let parsed = parseArgs args
       config <- loadConfig Nothing
+      let parsed = parseArgs args
       case resolveCommand parsed (Just config) of
         Left err -> do
           hPutStrLn stderr err

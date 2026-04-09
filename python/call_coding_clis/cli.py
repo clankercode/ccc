@@ -32,24 +32,17 @@ def main(argv: list[str] | None = None) -> int:
         print_help()
         return 0
 
-    if len(args) == 1:
-        try:
-            spec = build_prompt_spec(args[0])
-        except ValueError as exc:
-            print(str(exc), file=sys.stderr)
-            return 1
-    else:
-        parsed = parse_args(args)
-        if not parsed.prompt.strip():
-            print("prompt must not be empty", file=sys.stderr)
-            return 1
-        config = load_config()
-        try:
-            argv_list, env_overrides = resolve_command(parsed, config)
-        except ValueError as exc:
-            print(str(exc), file=sys.stderr)
-            return 1
-        spec = CommandSpec(argv=argv_list, env=env_overrides)
+    parsed = parse_args(args)
+    if not parsed.prompt.strip():
+        print("prompt must not be empty", file=sys.stderr)
+        return 1
+    config = load_config()
+    try:
+        argv_list, env_overrides = resolve_command(parsed, config)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    spec = CommandSpec(argv=argv_list, env=env_overrides)
 
     real_opencode = os.environ.get("CCC_REAL_OPENCODE", "")
     if real_opencode:

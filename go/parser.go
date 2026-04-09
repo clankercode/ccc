@@ -85,6 +85,7 @@ func init() {
 		},
 		"codex": {
 			Binary:    "codex",
+			ExtraArgs: []string{"exec"},
 			ModelFlag: "--model",
 		},
 		"roocode": {

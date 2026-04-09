@@ -193,12 +193,21 @@ func TestResolveCommand_CodexRunner(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error for %s: %v", runner, err)
 		}
-		if argv[0] != "codex" {
-			t.Fatalf("expected codex binary for %s, got %v", runner, argv)
-		}
+		assertArgv(t, []string{"codex", "exec", "hi"}, argv)
 		if len(warnings) != 0 {
 			t.Fatalf("expected no warnings for %s, got %v", runner, warnings)
 		}
+	}
+}
+
+func TestResolveCommand_CodexRunnerModel(t *testing.T) {
+	argv, _, warnings, err := ResolveCommand(ParsedArgs{Runner: strPtr("c"), Model: strPtr("gpt-5.4-mini"), Prompt: "hi"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertArgv(t, []string{"codex", "exec", "--model", "gpt-5.4-mini", "hi"}, argv)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
 	}
 }
 

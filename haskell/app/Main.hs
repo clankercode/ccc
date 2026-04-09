@@ -1,6 +1,7 @@
 module Main where
 
 import CallCodingClis.Config (loadConfig)
+import CallCodingClis.Help (printHelp, printUsage)
 import CallCodingClis.Parser (parseArgs, resolveCommand)
 import CallCodingClis.PromptSpec (buildPromptSpec)
 import CallCodingClis.Runner (run)
@@ -14,6 +15,15 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
+    [] -> do
+      printUsage
+      exitWith (ExitFailure 1)
+    ["--help"] -> do
+      printHelp
+      exitWith ExitSuccess
+    ["-h"] -> do
+      printHelp
+      exitWith ExitSuccess
     [prompt] -> case buildPromptSpec prompt of
       Left err -> do
         hPutStrLn stderr err
@@ -29,9 +39,6 @@ main = do
         exitWith (case crExitCode result of
                     0 -> ExitSuccess
                     n -> ExitFailure n)
-    [] -> do
-      hPutStrLn stderr "usage: ccc \"<Prompt>\""
-      exitWith (ExitFailure 1)
     _ -> do
       let parsed = parseArgs args
       config <- loadConfig Nothing

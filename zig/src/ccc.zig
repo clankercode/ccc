@@ -1,6 +1,7 @@
 const std = @import("std");
 const runner = @import("runner");
 const parser = @import("parser");
+const help = @import("help");
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -17,8 +18,13 @@ pub fn main() !void {
     }
 
     if (argv.items.len == 0) {
-        std.debug.print("usage: ccc [runner] [+thinking] [:provider:model] [:model] [@alias] <prompt>\n", .{});
+        help.printUsage(allocator) catch {};
         std.process.exit(1);
+    }
+
+    if (argv.items.len == 1 and (std.mem.eql(u8, argv.items[0], "--help") or std.mem.eql(u8, argv.items[0], "-h"))) {
+        help.printHelp(allocator) catch {};
+        std.process.exit(0);
     }
 
     if (argv.items.len == 1) {

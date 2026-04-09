@@ -60,7 +60,7 @@ class CccContractTests(unittest.TestCase):
             subprocess.run(
                 ["make", "-C", "c", "build/ccc"],
                 cwd=ROOT,
-                env=env,
+                env={**env, "PATH": f"/usr/bin:{env.get('PATH', '')}"},
                 capture_output=True,
                 text=True,
                 check=True,
@@ -357,7 +357,7 @@ class CccContractTests(unittest.TestCase):
             subprocess.run(
                 ["make", "-C", "c", "build/ccc"],
                 cwd=ROOT,
-                env=env,
+                env={**env, "PATH": f"/usr/bin:{env.get('PATH', '')}"},
                 capture_output=True,
                 text=True,
                 check=True,
@@ -547,6 +547,14 @@ class CccContractTests(unittest.TestCase):
                 )
             )
 
+            subprocess.run(
+                ["cabal", "build", "ccc"],
+                cwd=ROOT / "haskell",
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
             self.assert_rejects_empty(
                 subprocess.run(
                     ["cabal", "run", "ccc", "--", ""],
@@ -606,7 +614,7 @@ class CccContractTests(unittest.TestCase):
             subprocess.run(
                 ["make", "-C", "c", "build/ccc"],
                 cwd=ROOT,
-                env=env,
+                env={**env, "PATH": f"/usr/bin:{env.get('PATH', '')}"},
                 capture_output=True,
                 text=True,
                 check=True,
@@ -792,6 +800,14 @@ class CccContractTests(unittest.TestCase):
                 )
             )
 
+            subprocess.run(
+                ["cabal", "build", "ccc"],
+                cwd=ROOT / "haskell",
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
             self.assert_rejects_missing_prompt(
                 subprocess.run(
                     ["cabal", "run", "ccc"],
@@ -860,7 +876,7 @@ class CccContractTests(unittest.TestCase):
             subprocess.run(
                 ["make", "-C", "c", "build/ccc"],
                 cwd=ROOT,
-                env=env,
+                env={**env, "PATH": f"/usr/bin:{env.get('PATH', '')}"},
                 capture_output=True,
                 text=True,
                 check=True,
@@ -1054,6 +1070,14 @@ class CccContractTests(unittest.TestCase):
                 )
             )
 
+            subprocess.run(
+                ["cabal", "build", "ccc"],
+                cwd=ROOT / "haskell",
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
             self.assert_rejects_empty(
                 subprocess.run(
                     ["cabal", "run", "ccc", "--", whitespace_prompt],

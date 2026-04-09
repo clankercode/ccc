@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(ccc_lib
   src/build_prompt.cpp
   src/config.cpp
+  src/help.cpp
   src/parser.cpp
   src/runner.cpp
 )

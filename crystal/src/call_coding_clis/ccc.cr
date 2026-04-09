@@ -2,10 +2,16 @@ require "./runner"
 require "./prompt_spec"
 require "./parser"
 require "./config"
+require "./help"
 
 if ARGV.empty?
-  STDERR.puts %(usage: ccc [<runner>] [+<thinking>] [:<provider>:<model>] [@<alias>] <Prompt>)
+  print_usage
   exit 1
+end
+
+if ARGV == ["--help"] || ARGV == ["-h"]
+  print_help
+  exit 0
 end
 
 begin

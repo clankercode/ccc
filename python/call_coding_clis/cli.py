@@ -7,10 +7,12 @@ try:
     from .runner import CommandSpec, Runner
     from .parser import parse_args, resolve_command
     from .config import load_config
+    from .help import print_help, print_usage
 except ImportError:
     from runner import CommandSpec, Runner
     from parser import parse_args, resolve_command
     from config import load_config
+    from help import print_help, print_usage
 
 
 def build_prompt_spec(prompt: str) -> CommandSpec:
@@ -23,12 +25,12 @@ def build_prompt_spec(prompt: str) -> CommandSpec:
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
 
-    if not args:
-        print(
-            'usage: ccc [runner] [+thinking] [:provider:model] [@alias] "<Prompt>"',
-            file=sys.stderr,
-        )
-        return 1
+    if not args or args == ["--help"] or args == ["-h"]:
+        if not args:
+            print_usage()
+            return 1
+        print_help()
+        return 0
 
     if len(args) == 1:
         try:

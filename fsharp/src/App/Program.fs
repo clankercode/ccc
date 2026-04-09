@@ -4,8 +4,11 @@ open CallCodingClis
 [<EntryPoint>]
 let main args =
     if Array.length args = 0 then
-        eprintfn "usage: ccc [runner] [+thinking] [:provider:model] [:model] [@alias] <prompt>"
+        Help.printUsage ()
         1
+    elif args = [|"--help"|] || args = [|"-h"|] then
+        Help.printHelp ()
+        0
     else
         let binaryOverride =
             match Environment.GetEnvironmentVariable "CCC_REAL_OPENCODE" with
@@ -25,8 +28,8 @@ let main args =
             let runner = Runner()
             let result = runner.Stream(spec, fun channel chunk ->
                 match channel with
-                | "stdout" -> printf "%s" chunk
-                | _ -> eprintf "%s" chunk)
+                | "stdout" -> printf "%s" chunk; Console.Out.Flush()
+                | _ -> eprintf "%s" chunk; Console.Error.Flush())
             result.ExitCode
         with ex ->
             eprintfn "%s" ex.Message

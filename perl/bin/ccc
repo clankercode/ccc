@@ -8,11 +8,16 @@ use Call::Coding::Clis qw(build_prompt_spec);
 use Call::Coding::Clis::Parser qw(parse_args resolve_command);
 use Call::Coding::Clis::Runner;
 use Call::Coding::Clis::CommandSpec;
+use Call::Coding::Clis::Help qw(print_help print_usage);
 
 if (!@ARGV) {
-    print STDERR 'usage: ccc "<Prompt>"', "\n";
-    print STDERR '       ccc [runner] [+N] [:provider:model] [@alias] <prompt>', "\n";
+    print_usage();
     exit 1;
+}
+
+if (@ARGV == 1 && ($ARGV[0] eq '--help' || $ARGV[0] eq '-h')) {
+    print_help();
+    exit 0;
 }
 
 my $spec;

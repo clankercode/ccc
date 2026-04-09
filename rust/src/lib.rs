@@ -5,13 +5,20 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-mod parser;
 mod config;
+mod help;
 mod json_output;
+mod parser;
 
-pub use parser::{ParsedArgs, CccConfig, AliasDef, RunnerInfo, parse_args, resolve_command, RUNNER_REGISTRY};
 pub use config::load_config;
-pub use json_output::{TextContent, ThinkingContent, ToolCall, ToolResult, JsonEvent, ParsedJsonOutput, parse_opencode_json, parse_claude_code_json, parse_kimi_json, parse_json_output, render_parsed};
+pub use help::{print_help, print_usage};
+pub use json_output::{
+    parse_claude_code_json, parse_json_output, parse_kimi_json, parse_opencode_json, render_parsed,
+    JsonEvent, ParsedJsonOutput, TextContent, ThinkingContent, ToolCall, ToolResult,
+};
+pub use parser::{
+    parse_args, resolve_command, AliasDef, CccConfig, ParsedArgs, RunnerInfo, RUNNER_REGISTRY,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommandSpec {

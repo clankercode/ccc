@@ -12,6 +12,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/parser.zig"),
     });
 
+    const help_mod = b.createModule(.{
+        .root_source_file = b.path("src/help.zig"),
+    });
+
     const config_mod = b.createModule(.{
         .root_source_file = b.path("src/config.zig"),
         .imports = &.{
@@ -35,6 +39,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "prompt_spec", .module = prompt_spec_mod },
             .{ .name = "parser", .module = parser_mod },
             .{ .name = "config", .module = config_mod },
+            .{ .name = "help", .module = help_mod },
         },
     });
 

@@ -1,4 +1,6 @@
-use call_coding_clis::{build_prompt_spec, load_config, parse_args, resolve_command, Runner};
+use call_coding_clis::{
+    build_prompt_spec, load_config, parse_args, print_help, print_usage, resolve_command, Runner,
+};
 use std::env;
 use std::process::ExitCode;
 
@@ -6,8 +8,13 @@ fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
 
     if args.is_empty() {
-        eprintln!("usage: ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"");
+        print_usage();
         return ExitCode::from(1);
+    }
+
+    if args.len() == 1 && (args[0] == "--help" || args[0] == "-h") {
+        print_help();
+        return ExitCode::from(0);
     }
 
     let spec = if args.len() == 1 {

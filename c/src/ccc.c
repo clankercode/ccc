@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,8 +11,8 @@
 #include "runner.h"
 
 int main(int argc, char **argv) {
-    if (argc < 2) {
-        fprintf(stderr, "usage: ccc [<runner>] [+<thinking>] [:<model>] [@<alias>] <prompt...>\n");
+    if (argc != 2) {
+        fprintf(stderr, "usage: ccc \"<Prompt>\"\n");
         return 1;
     }
 

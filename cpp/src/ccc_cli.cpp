@@ -1,5 +1,6 @@
 #include <ccc/build_prompt.hpp>
 #include <ccc/config.hpp>
+#include <ccc/help.hpp>
 #include <ccc/parser.hpp>
 #include <ccc/runner.hpp>
 
@@ -10,8 +11,14 @@
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "usage: ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"\n";
+        printUsage();
         return 1;
+    }
+
+    std::string arg1 = argv[1];
+    if (arg1 == "--help" || arg1 == "-h") {
+        printHelp();
+        return 0;
     }
 
     CommandSpec spec;

@@ -30,7 +30,7 @@ defmodule CallCodingClis.Runner do
       escaped = [resolved | args] |> Enum.map(&shell_escape/1) |> Enum.join(" ")
 
       shell_cmd =
-        "#{stdin_prefix}#{escaped} 2>#{shell_escape(stderr_path)} </dev/null"
+        "#{stdin_prefix}#{escaped} 2>#{shell_escape(stderr_path)}"
 
       opts =
         [into: ""]

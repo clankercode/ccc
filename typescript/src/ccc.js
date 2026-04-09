@@ -3,12 +3,18 @@
 import { buildPromptSpec, Runner } from './index.js'
 import { parseArgs, resolveCommand } from './parser.js'
 import { loadConfig } from './config.js'
+import { printHelp, printUsage } from './help.js'
 
 const args = process.argv.slice(2)
 
 if (args.length === 0) {
-  console.error('usage: ccc [runner] [+thinking] [:provider:model] [@alias] "<Prompt>"')
+  printUsage()
   process.exit(1)
+}
+
+if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
+  printHelp()
+  process.exit(0)
 }
 
 let spec

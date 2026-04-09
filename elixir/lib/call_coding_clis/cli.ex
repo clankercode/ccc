@@ -1,16 +1,20 @@
 defmodule CallCodingClis.CLI do
-  alias CallCodingClis.{CommandSpec, Config, PromptSpec, Runner}
+  alias CallCodingClis.{CommandSpec, Config, Help, PromptSpec, Runner}
   alias CallCodingClis.Parser
 
   def main(argv) do
     case argv do
       [] ->
-        IO.write(
-          :stderr,
-          "usage: ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"\n"
-        )
-
+        Help.print_usage()
         System.halt(1)
+
+      ["--help" | _] ->
+        Help.print_help()
+        System.halt(0)
+
+      ["-h" | _] ->
+        Help.print_help()
+        System.halt(0)
 
       [prompt] ->
         spec =

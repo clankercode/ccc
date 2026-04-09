@@ -7,11 +7,17 @@ import std.string : strip;
 import call_coding_clis.runner : Runner, CommandSpec;
 import call_coding_clis.parser : parseArgs, resolveCommand, CccConfig, ResolvedCommand;
 import call_coding_clis.config : loadConfig;
+import call_coding_clis.help : printHelp, printUsage;
 
 int main(string[] args) {
     if (args.length < 2) {
-        stderr.writeln(`usage: ccc [runner] [+thinking] [:provider:model] [:model] [@alias] "<Prompt>"`);
+        printUsage();
         return 1;
+    }
+
+    if (args.length == 2 && (args[1] == "--help" || args[1] == "-h")) {
+        printHelp();
+        return 0;
     }
 
     CccConfig config;

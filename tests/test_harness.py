@@ -153,6 +153,10 @@ def _haskell_invoke(prompt):
     return [str(ROOT / "haskell" / "ccc"), prompt]
 
 
+def _nim_invoke(prompt):
+    return [str(ROOT / "nim" / "src" / "call_coding_clis" / "ccc"), prompt]
+
+
 LANGUAGES = [
     LanguageSpec(
         "Python",
@@ -271,6 +275,10 @@ LANGUAGES = [
         ],
         build_cwd=ROOT / "haskell",
         invoke_fn=_haskell_invoke,
+    ),
+    LanguageSpec(
+        "Nim",
+        invoke_fn=_nim_invoke,
     ),
 ]
 

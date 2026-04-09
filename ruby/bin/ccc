@@ -6,8 +6,13 @@ require_relative "../lib/call_coding_clis"
 args = ARGV
 
 if args.empty?
-  warn 'usage: ccc "<Prompt>"'
+  CallCodingClis::Help.print_usage
   exit 1
+end
+
+if args == ["--help"] || args == ["-h"]
+  CallCodingClis::Help.print_help
+  exit 0
 end
 
 begin

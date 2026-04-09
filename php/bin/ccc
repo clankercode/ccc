@@ -6,17 +6,26 @@ require_once __DIR__ . '/../src/CompletedRun.php';
 require_once __DIR__ . '/../src/Runner.php';
 require_once __DIR__ . '/../src/Parser.php';
 require_once __DIR__ . '/../src/Config.php';
+require_once __DIR__ . '/../src/Help.php';
 require_once __DIR__ . '/../src/build_prompt_spec.php';
 
 use Call\Coding\Clis\Runner;
 use Call\Coding\Clis\Parser;
 use Call\Coding\Clis\Config;
 use Call\Coding\Clis\CommandSpec;
+use Call\Coding\Clis\Help;
 use function Call\Coding\Clis\build_prompt_spec;
 
-if ($argc < 2) {
-    fwrite(STDERR, "usage: ccc \"<prompt>\" | ccc [runner] [+thinking] [:provider:model] [:model] [@alias] <prompt...>\n");
+$args = array_slice($argv, 1);
+
+if (count($args) === 0) {
+    Help::printUsage();
     exit(1);
+}
+
+if ($args === ['--help'] || $args === ['-h']) {
+    Help::printHelp();
+    exit(0);
 }
 
 $config = Config::loadConfig();

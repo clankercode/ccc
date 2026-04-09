@@ -48,13 +48,14 @@ proc defaultRun(spec: CommandSpec): CompletedRun =
       let inp = p.inputStream()
       inp.write(spec.stdinText.get())
       inp.flush()
-      close(inp)
+    
+    # Close stdin and stderr before reading stdout to prevent hangs
+    # See: https://github.com/nim-lang/Nim/issues/9953
+    close(p.inputStream())
+    close(p.errorStream())
 
     let outStrm = p.outputStream()
-    let errStrm = p.errorStream()
-
     let stdoutData = outStrm.readAll()
-    let stderrData = errStrm.readAll()
 
     let rawExit = p.waitForExit()
     let exitCode = if rawExit > 128: 1 else: rawExit
@@ -65,7 +66,7 @@ proc defaultRun(spec: CommandSpec): CompletedRun =
       argv: spec.argv,
       exitCode: exitCode,
       stdout: stdoutData,
-      stderr: stderrData
+      stderr: ""
     )
   except OSError as e:
     result = CompletedRun(

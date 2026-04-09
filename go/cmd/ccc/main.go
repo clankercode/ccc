@@ -10,8 +10,12 @@ import (
 func main() {
 	args := os.Args[1:]
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "usage: ccc [runner] [+thinking] [:provider:model] [@alias] <prompt>\n")
+		ccc.PrintUsage()
 		os.Exit(1)
+	}
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
+		ccc.PrintHelp()
+		os.Exit(0)
 	}
 
 	parsed := ccc.ParseArgs(args)

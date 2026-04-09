@@ -14,6 +14,26 @@ suite "parseArgs":
     check p.runner == some("claude")
     check p.prompt == "do stuff"
 
+  test "runner selector cc":
+    let p = parseArgs(@["cc", "do stuff"])
+    check p.runner == some("cc")
+    check p.prompt == "do stuff"
+
+  test "runner selector c":
+    let p = parseArgs(@["c", "do stuff"])
+    check p.runner == some("c")
+    check p.prompt == "do stuff"
+
+  test "runner selector cx":
+    let p = parseArgs(@["cx", "do stuff"])
+    check p.runner == some("cx")
+    check p.prompt == "do stuff"
+
+  test "runner selector rc":
+    let p = parseArgs(@["rc", "do stuff"])
+    check p.runner == some("rc")
+    check p.prompt == "do stuff"
+
   test "thinking":
     let p = parseArgs(@["+2", "think hard"])
     check p.thinking == some(2)
@@ -81,6 +101,27 @@ suite "resolveCommand":
     check res.env.len == 0
     check res.warnings.len == 0
 
+  test "claude runner via cc":
+    let p = parseArgs(@["cc", "hello"])
+    let res = resolveCommand(p, none(CccConfig))
+    check res.argv == @["claude", "hello"]
+    check res.env.len == 0
+    check res.warnings.len == 0
+
+  test "codex runner via c":
+    let p = parseArgs(@["c", "hello"])
+    let res = resolveCommand(p, none(CccConfig))
+    check res.argv == @["codex", "hello"]
+    check res.env.len == 0
+    check res.warnings.len == 0
+
+  test "codex runner via cx":
+    let p = parseArgs(@["cx", "hello"])
+    let res = resolveCommand(p, none(CccConfig))
+    check res.argv == @["codex", "hello"]
+    check res.env.len == 0
+    check res.warnings.len == 0
+
   test "claude thinking +3":
     let p = parseArgs(@["claude", "+3", "hello"])
     let res = resolveCommand(p, none(CccConfig))
@@ -95,6 +136,13 @@ suite "resolveCommand":
     let p = parseArgs(@["codex", ":gpt-4", "hello"])
     let res = resolveCommand(p, none(CccConfig))
     check res.argv == @["codex", "--model", "gpt-4", "hello"]
+
+  test "roocode runner via rc":
+    let p = parseArgs(@["rc", "hello"])
+    let res = resolveCommand(p, none(CccConfig))
+    check res.argv == @["roocode", "hello"]
+    check res.env.len == 0
+    check res.warnings.len == 0
 
   test "provider sets env":
     let p = parseArgs(@[":anthropic:opus", "hello"])
@@ -164,7 +212,7 @@ suite "resolveCommand":
     check res.argv == @["opencode", "run", "--agent", "specialist", "hello"]
     check res.warnings.len == 0
 
-  test "unsupported runner warns about agent":
+  test "roocode runner warns about agent":
     var cfg = defaultConfig()
     cfg.aliases["work"] = AliasDef(
       runner: some("rc"),
@@ -175,7 +223,7 @@ suite "resolveCommand":
     )
     let p = parseArgs(@["@work", "hello"])
     let res = resolveCommand(p, some(cfg))
-    check res.argv == @["codex", "hello"]
+    check res.argv == @["roocode", "hello"]
     check res.warnings == @[
       "warning: runner \"rc\" does not support agents; ignoring @reviewer"
     ]

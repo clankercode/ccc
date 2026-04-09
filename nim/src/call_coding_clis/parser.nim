@@ -35,8 +35,8 @@ type
     abbreviations*: Table[string, string]
 
 const RUNNER_NAMES = [
-  "opencode", "claude", "kimi", "codex", "crush",
-  "oc", "cc", "c", "k", "rc", "cr", "roocode", "pi"
+  "opencode", "claude", "kimi", "codex", "roocode", "crush",
+  "oc", "cc", "c", "cx", "k", "rc", "cr", "pi"
 ]
 
 proc defaultConfig*(): CccConfig =
@@ -149,6 +149,14 @@ proc runnerRegistry*(): Table[string, RunnerInfo] =
     modelFlag: "--model",
     agentFlag: ""
   )
+  let roocodeInfo = RunnerInfo(
+    binary: "roocode",
+    extraArgs: @[],
+    thinkingFlags: emptyThinking,
+    providerFlag: "",
+    modelFlag: "--model",
+    agentFlag: ""
+  )
   let crushInfo = RunnerInfo(
     binary: "crush",
     extraArgs: @[],
@@ -162,12 +170,14 @@ proc runnerRegistry*(): Table[string, RunnerInfo] =
   result["claude"] = claudeInfo
   result["kimi"] = kimiInfo
   result["codex"] = codexInfo
+  result["roocode"] = roocodeInfo
   result["crush"] = crushInfo
   result["oc"] = opencodeInfo
   result["cc"] = claudeInfo
-  result["c"] = claudeInfo
+  result["c"] = codexInfo
+  result["cx"] = codexInfo
   result["k"] = kimiInfo
-  result["rc"] = codexInfo
+  result["rc"] = roocodeInfo
   result["cr"] = crushInfo
 
 proc parseArgs*(argv: seq[string]): ParsedArgs =

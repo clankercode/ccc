@@ -8,3 +8,6 @@ suite "help text":
 
   test "help explains preset then agent fallback":
     check "@name         Use a named preset from config; if no preset exists, treat it as an agent" in helpText()
+
+  test "help lists selector remaps":
+    check "opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)" in helpText()

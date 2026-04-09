@@ -28,8 +28,10 @@ proc writePresetConfig(path: string) =
 suite "cli":
   test "fallback agent uses opencode flag":
     let stubPath = getTempDir() / "ccc-nim-cli-opencode"
+    let configPath = getTempDir() / "ccc-nim-cli-empty-config.toml"
     writeStubRunner(stubPath)
-    let result = runCli(@["@reviewer", PROMPT], none(string), stubPath)
+    writeFile(configPath, "")
+    let result = runCli(@["@reviewer", PROMPT], some(configPath), stubPath)
     check result.exitCode == 0
     check result.stdout == "run --agent reviewer Fix the failing tests\n"
     check result.stderr == ""
@@ -49,7 +51,7 @@ suite "cli":
     let configPath = getTempDir() / "ccc-nim-cli-config.toml"
     writeStubRunner(stubPath)
     writePresetConfig(configPath)
-    let result = runCli(@["codex", "@reviewer", PROMPT], some(configPath), stubPath)
+    let result = runCli(@["rc", "@reviewer", PROMPT], some(configPath), stubPath)
     check result.exitCode == 0
     check result.stdout == "Fix the failing tests\n"
-    check result.stderr == "warning: runner \"codex\" does not support agents; ignoring @specialist\n"
+    check result.stderr == "warning: runner \"rc\" does not support agents; ignoring @specialist\n"

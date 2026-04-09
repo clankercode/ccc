@@ -234,9 +234,28 @@ static void test_resolve_codex_runner(void) {
     const char *out[CCC_MAX_ARGV];
     char prov[128] = {0};
     int c = resolve_command_no_warning(&pa, &cfg, out, prov);
-    assert_int(c, 2, "resolve-codex: argc");
+    assert_int(c, 3, "resolve-codex: argc");
     assert_str(out[0], "codex", "resolve-codex: binary");
-    assert_str(out[1], "hello", "resolve-codex: prompt");
+    assert_str(out[1], "exec", "resolve-codex: extra");
+    assert_str(out[2], "hello", "resolve-codex: prompt");
+}
+
+static void test_resolve_codex_runner_with_model(void) {
+    char *argv[] = {"ccc", "cx", ":gpt-5.4-mini", "hello"};
+    ParsedArgs pa;
+    CccConfig cfg;
+    ccc_init_config(&cfg);
+    ccc_parse_args(4, argv, &pa);
+
+    const char *out[CCC_MAX_ARGV];
+    char prov[128] = {0};
+    int c = resolve_command_no_warning(&pa, &cfg, out, prov);
+    assert_int(c, 5, "resolve-codex-model: argc");
+    assert_str(out[0], "codex", "resolve-codex-model: binary");
+    assert_str(out[1], "exec", "resolve-codex-model: extra");
+    assert_str(out[2], "--model", "resolve-codex-model: model flag");
+    assert_str(out[3], "gpt-5.4-mini", "resolve-codex-model: model");
+    assert_str(out[4], "hello", "resolve-codex-model: prompt");
 }
 
 static void test_resolve_roocode_runner(void) {
@@ -636,6 +655,7 @@ int main(void) {
     test_resolve_default_runner();
     test_resolve_claude_runner();
     test_resolve_codex_runner();
+    test_resolve_codex_runner_with_model();
     test_resolve_roocode_runner();
     test_resolve_thinking_flags();
     test_resolve_thinking_zero();

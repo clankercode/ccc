@@ -51,8 +51,8 @@ static const RunnerInfo KIMI_INFO = {
 
 static const RunnerInfo CODEX_INFO = {
     .binary = "codex",
-    .extra_args = {0},
-    .extra_args_count = 0,
+    .extra_args = {"exec"},
+    .extra_args_count = 1,
     .thinking = {{{0}}, {{0}}, {{0}}, {{0}}, {{0}}},
     .provider_flag = "",
     .model_flag = "--model",

@@ -71,6 +71,23 @@ static void write_fake_runner(const char *path) {
     chmod(path, 0755);
 }
 
+static void write_fake_codex(const char *path) {
+    FILE *fake_codex = fopen(path, "w");
+    if (fake_codex == NULL) {
+        fprintf(stderr, "failed to create fake codex\n");
+        exit(1);
+    }
+    fprintf(fake_codex, "#!/bin/sh\n");
+    fprintf(fake_codex, "if [ \"$1\" != \"exec\" ]; then\n");
+    fprintf(fake_codex, "  exit 9\n");
+    fprintf(fake_codex, "fi\n");
+    fprintf(fake_codex, "shift\n");
+    fprintf(fake_codex, "printf 'fake-codex: %%s\\n' \"$1\"\n");
+    fprintf(fake_codex, "exit 0\n");
+    fclose(fake_codex);
+    chmod(path, 0755);
+}
+
 static void join_path(char *out, size_t out_max, const char *left, const char *right) {
     size_t left_len = strlen(left);
     size_t right_len = strlen(right);
@@ -141,6 +158,18 @@ int main(void) {
     }
     if (!file_contains("./build/help.txt", "Use a named preset from config; if no preset exists, treat it as an agent")) {
         fprintf(stderr, "help output missing fallback explanation\n");
+        return 1;
+    }
+
+    // Codex selector should insert the non-interactive exec subcommand.
+    write_fake_codex("./build/codex");
+    int codex_status = run_cmd("PATH=./build:$PATH ./build/ccc c 'Fix the failing tests' > ./build/codex_output.txt 2> ./build/codex.err");
+    if (codex_status != 0) {
+        fprintf(stderr, "codex exec test: unexpected exit code %d\n", codex_status);
+        return 1;
+    }
+    if (!file_contains("./build/codex_output.txt", "fake-codex: Fix the failing tests")) {
+        fprintf(stderr, "codex exec test: prompt not forwarded correctly\n");
         return 1;
     }
 

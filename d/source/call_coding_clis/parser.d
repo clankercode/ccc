@@ -64,19 +64,22 @@ private void ensureRegistry() {
         4: ["--think", "max"],
     ], "", "--model", "--agent");
     auto codex = RunnerInfo("codex", null, null, "", "--model", "");
+    auto roocode = RunnerInfo("roocode", null, null, "", "--model", "");
     auto crush = RunnerInfo("crush", null, null, "", "", "");
 
     registry_["opencode"] = opencode;
     registry_["claude"] = claude;
     registry_["kimi"] = kimi;
     registry_["codex"] = codex;
+    registry_["roocode"] = roocode;
     registry_["crush"] = crush;
 
     registry_["oc"] = opencode;
     registry_["cc"] = claude;
-    registry_["c"] = claude;
+    registry_["c"] = codex;
+    registry_["cx"] = codex;
     registry_["k"] = kimi;
-    registry_["rc"] = codex;
+    registry_["rc"] = roocode;
     registry_["cr"] = crush;
 }
 
@@ -87,7 +90,7 @@ RunnerInfo[string] getRunnerRegistry() {
 
 private auto runnerSelectorRe() {
     static auto re = regex(
-        `^(?:oc|cc|c|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$`, "i");
+        `^(?:oc|cc|c|cx|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$`, "i");
     return re;
 }
 
@@ -200,14 +203,15 @@ ResolvedCommand resolveCommand(ref ParsedArgs parsed, CccConfig config) {
         }
     }
 
-    auto effectiveRunnerName = runnerName;
     if (aliasDef !is null && !aliasDef.runner.isNull && parsed.runner.isNull) {
-        effectiveRunnerName = resolveRunnerName(aliasDef.runner, config);
-        auto ep = effectiveRunnerName in registry_;
+        auto aliasRunnerName = resolveRunnerName(aliasDef.runner, config);
+        auto ep = aliasRunnerName in registry_;
         if (ep !is null) {
             info = *ep;
         }
     }
+
+    auto effectiveRunnerName = info.binary;
 
     auto argv = appender!(string[]);
     argv ~= info.binary;
@@ -306,8 +310,8 @@ unittest {
 unittest {
     auto parsed = parseArgs(["rc", "@reviewer", "task"]);
     auto r = resolveCommand(parsed, CccConfig());
-    assert(r.argv[0] == "codex");
+    assert(r.argv[0] == "roocode");
     assert(r.argv[$ - 1] == "task");
     assert(r.warnings.length == 1);
-    assert(r.warnings[0] == "warning: runner \"rc\" does not support agents; ignoring @reviewer");
+    assert(r.warnings[0] == "warning: runner \"roocode\" does not support agents; ignoring @reviewer");
 }

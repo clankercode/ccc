@@ -81,23 +81,62 @@ unittest {
 }
 
 unittest {
+    auto parsed = parseArgs(["cc", "still claude"]);
+    auto r = resolveCommand(parsed, defaultConfig());
+    assert(r.argv[0] == "claude");
+    assert(r.argv[$ - 1] == "still claude");
+}
+
+unittest {
+    auto parsed = parseArgs(["c", "use codex"]);
+    auto r = resolveCommand(parsed, defaultConfig());
+    assert(r.argv[0] == "codex");
+    assert(r.argv[$ - 1] == "use codex");
+}
+
+unittest {
+    auto parsed = parseArgs(["cx", "use codex"]);
+    auto r = resolveCommand(parsed, defaultConfig());
+    assert(r.argv[0] == "codex");
+    assert(r.argv[$ - 1] == "use codex");
+}
+
+unittest {
+    auto parsed = parseArgs(["rc", "use roocode"]);
+    auto r = resolveCommand(parsed, defaultConfig());
+    assert(r.argv[0] == "roocode");
+    assert(r.argv[$ - 1] == "use roocode");
+}
+
+unittest {
     auto reg = getRunnerRegistry();
     assert("opencode" in reg);
     assert("claude" in reg);
     assert("kimi" in reg);
     assert("codex" in reg);
+    assert("roocode" in reg);
     assert("crush" in reg);
     assert("oc" in reg);
     assert("cc" in reg);
     assert("c" in reg);
+    assert("cx" in reg);
     assert("k" in reg);
     assert("rc" in reg);
     assert("cr" in reg);
+    assert(reg["opencode"].binary == "opencode");
+    assert(reg["claude"].binary == "claude");
+    assert(reg["codex"].binary == "codex");
+    assert(reg["roocode"].binary == "roocode");
     assert(reg["opencode"].agentFlag == "--agent");
     assert(reg["claude"].agentFlag == "--agent");
     assert(reg["kimi"].agentFlag == "--agent");
     assert(reg["codex"].agentFlag.length == 0);
+    assert(reg["roocode"].agentFlag.length == 0);
     assert(reg["crush"].agentFlag.length == 0);
+    assert(reg["c"].binary == "codex");
+    assert(reg["cx"].binary == "codex");
+    assert(reg["rc"].binary == "roocode");
+    assert(reg["cc"].binary == "claude");
 }
 
 unittest {
@@ -215,10 +254,10 @@ unittest {
 unittest {
     auto parsed = parseArgs(["rc", "@reviewer", "task"]);
     auto r = resolveCommand(parsed, CccConfig());
-    assert(r.argv[0] == "codex");
+    assert(r.argv[0] == "roocode");
     assert(r.argv[$ - 1] == "task");
     assert(r.warnings.length == 1);
-    assert(r.warnings[0] == "warning: runner \"rc\" does not support agents; ignoring @reviewer");
+    assert(r.warnings[0] == "warning: runner \"roocode\" does not support agents; ignoring @reviewer");
 }
 
 unittest {

@@ -17,7 +17,7 @@ Usage:
 
 Slots (in order):
   runner        Select which coding CLI to use (default: oc)
-                opencode (oc), claude (cc), kimi (k), codex (rc), crush (cr)
+                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)
   +thinking     Set thinking level: +0 (off) through +4 (max)
   :provider:model  Override provider and model
   @name         Use a named preset from config; if no preset exists, treat it as an agent
@@ -48,6 +48,7 @@ private RunnerEntry[] canonicalRunners() {
         RunnerEntry("claude", registry["claude"].binary),
         RunnerEntry("kimi", registry["kimi"].binary),
         RunnerEntry("codex", registry["codex"].binary),
+        RunnerEntry("roocode", registry["roocode"].binary),
         RunnerEntry("crush", registry["crush"].binary),
     ];
 }
@@ -103,5 +104,6 @@ void printUsage() {
 unittest {
     assert(HELP_TEXT.indexOf("@name") >= 0);
     assert(HELP_TEXT.indexOf("named preset from config; if no preset exists, treat it as an agent") >= 0);
+    assert(HELP_TEXT.indexOf("codex (c/cx), roocode (rc), crush (cr)") >= 0);
     assert(USAGE_TEXT.indexOf("[@name]") >= 0);
 }

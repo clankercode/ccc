@@ -19,6 +19,9 @@ sub run_ccc {
     my $ccc = 'bin/ccc';
     my @cmd = ($^X, '-Ilib', $ccc, $prompt);
     local $ENV{CCC_REAL_OPENCODE} = $stub_path;
+    local $ENV{CCC_CONFIG};
+    delete $ENV{CCC_CONFIG};
+    local $ENV{XDG_CONFIG_HOME} = '/tmp/ccc-test-no-config-$$';
     my ($stdout, $stderr);
     $stderr = gensym;
     my $pid = open3(my $in, my $out, $stderr, @cmd);

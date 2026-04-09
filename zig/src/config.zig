@@ -1,5 +1,5 @@
 const std = @import("std");
-const parser = @import("parser.zig");
+const parser = @import("parser");
 
 pub fn loadConfig(allocator: std.mem.Allocator, path: []const u8) !parser.CccConfig {
     var config = parser.CccConfig.init(allocator);
@@ -11,24 +11,14 @@ pub fn loadConfig(allocator: std.mem.Allocator, path: []const u8) !parser.CccCon
     };
     defer file.close();
 
-    var buf_reader = std.io.bufferedReader(file.reader());
-    const reader = buf_reader.reader();
-
-    var line_buf = std.ArrayList(u8).init(allocator);
-    defer line_buf.deinit();
-
     var current_section: enum { none, alias, abbrev } = .none;
     var current_alias_name: ?[]const u8 = null;
     var current_alias_def: parser.AliasDef = .{};
+    const contents = try file.readToEndAlloc(allocator, 64 * 1024);
 
-    while (true) {
-        line_buf.clearRetainingCapacity();
-        reader.readUntilDelimiterArrayList(&line_buf, '\n', 4096) catch |err| {
-            if (err == error.EndOfStream) break;
-            return err;
-        };
-
-        const line = std.mem.trim(u8, line_buf.items, " \t\r");
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |raw_line| {
+        const line = std.mem.trim(u8, raw_line, " \t\r");
         if (line.len == 0 or line[0] == '#') continue;
 
         if (line[0] == '[') {
@@ -94,4 +84,38 @@ pub fn loadConfig(allocator: std.mem.Allocator, path: []const u8) !parser.CccCon
     }
 
     return config;
+}
+
+pub fn loadDefaultConfig(allocator: std.mem.Allocator) !parser.CccConfig {
+    if (std.process.getEnvVarOwned(allocator, "CCC_CONFIG")) |path| {
+        defer allocator.free(path);
+        return loadConfig(allocator, path);
+    } else |_| {}
+
+    if (std.process.getEnvVarOwned(allocator, "XDG_CONFIG_HOME")) |xdg| {
+        defer allocator.free(xdg);
+        if (try tryLoadJoinedPath(allocator, &.{ xdg, "ccc", "config" })) |config| return config;
+        if (try tryLoadJoinedPath(allocator, &.{ xdg, "ccc", "config.toml" })) |config| return config;
+    } else |_| {}
+
+    if (std.process.getEnvVarOwned(allocator, "HOME")) |home| {
+        defer allocator.free(home);
+        if (try tryLoadJoinedPath(allocator, &.{ home, ".config", "ccc", "config" })) |config| return config;
+        if (try tryLoadJoinedPath(allocator, &.{ home, ".config", "ccc", "config.toml" })) |config| return config;
+    } else |_| {}
+
+    return parser.CccConfig.init(allocator);
+}
+
+fn tryLoadJoinedPath(
+    allocator: std.mem.Allocator,
+    parts: []const []const u8,
+) !?parser.CccConfig {
+    const path = try std.fs.path.join(allocator, parts);
+    defer allocator.free(path);
+
+    return loadConfig(allocator, path) catch |err| switch (err) {
+        error.FileNotFound => null,
+        else => return err,
+    };
 }

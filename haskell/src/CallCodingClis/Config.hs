@@ -6,28 +6,32 @@ module CallCodingClis.Config
 import CallCodingClis.Parser (AliasDef(..), CccConfig(..), defaultConfig)
 import Data.Char (isSpace)
 import Data.List (isPrefixOf)
-import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import System.Directory (getHomeDirectory)
 import System.Environment (lookupEnv)
 import System.FilePath ((</>))
 import System.IO.Error (tryIOError)
 
-configFileName :: FilePath
-configFileName = "config.toml"
-
 configDirName :: FilePath
 configDirName = "ccc"
 
 defaultConfigPaths :: IO [FilePath]
 defaultConfigPaths = do
+  explicit <- lookupEnv "CCC_CONFIG"
   xdg <- lookupEnv "XDG_CONFIG_HOME"
   home <- getHomeDirectory
-  let xdgPath = case xdg of
-        Just d  -> [d </> configDirName </> configFileName]
+  let explicitPaths = maybe [] pure explicit
+      xdgPaths = case xdg of
+        Just d  ->
+          [ d </> configDirName </> "config.toml"
+          , d </> configDirName </> "config"
+          ]
         Nothing -> []
-      homePath = [home </> ".config" </> configDirName </> configFileName]
-  return (xdgPath ++ homePath)
+      homePaths =
+        [ home </> ".config" </> configDirName </> "config.toml"
+        , home </> ".config" </> configDirName </> "config"
+        ]
+  return (explicitPaths ++ xdgPaths ++ homePaths)
 
 loadConfig :: Maybe FilePath -> IO CccConfig
 loadConfig (Just path) = do
@@ -68,8 +72,12 @@ parseConfig contents = Right finalCfg
         '[':rest ->
           case break (== ']') rest of
             (secName, "]")
+              | secName == "defaults" ->
+                  (cfg, Just ("defaults", ""))
               | "alias." `isPrefixOf` secName ->
                   (cfg, Just ("alias", drop 6 secName))
+              | "aliases." `isPrefixOf` secName ->
+                  (cfg, Just ("alias", drop 8 secName))
               | secName == "abbreviations" ->
                   (cfg, Just ("abbreviations", ""))
               | otherwise -> (cfg, Nothing)
@@ -83,31 +91,43 @@ parseConfig contents = Right finalCfg
             _ -> (cfg, section)
 
     applySetting cfg Nothing key val = case key of
-      "default_runner"   -> (cfg { ccDefaultRunner = val }, Nothing)
-      "default_provider" -> (cfg { ccDefaultProvider = val }, Nothing)
-      "default_model"    -> (cfg { ccDefaultModel = val }, Nothing)
+      "default_runner"   -> (cfg { ccDefaultRunner = parseStringValue val }, Nothing)
+      "default_provider" -> (cfg { ccDefaultProvider = parseStringValue val }, Nothing)
+      "default_model"    -> (cfg { ccDefaultModel = parseStringValue val }, Nothing)
       "default_thinking" -> (cfg { ccDefaultThinking = readMaybeInt val }, Nothing)
       _                  -> (cfg, Nothing)
+
+    applySetting cfg (Just ("defaults", _)) key val = case key of
+      "runner"   -> (cfg { ccDefaultRunner = parseStringValue val }, Just ("defaults", ""))
+      "provider" -> (cfg { ccDefaultProvider = parseStringValue val }, Just ("defaults", ""))
+      "model"    -> (cfg { ccDefaultModel = parseStringValue val }, Just ("defaults", ""))
+      "thinking" -> (cfg { ccDefaultThinking = readMaybeInt val }, Just ("defaults", ""))
+      _          -> (cfg, Just ("defaults", ""))
 
     applySetting cfg (Just ("alias", name)) key val =
       let aliases = ccAliases cfg
           existing = Map.findWithDefault (AliasDef Nothing Nothing Nothing Nothing) name aliases
           updated = case key of
-            "runner"   -> existing { adRunner = nonEmpty val }
+            "runner"   -> existing { adRunner = nonEmpty (parseStringValue val) }
             "thinking" -> existing { adThinking = readMaybeInt val }
-            "provider" -> existing { adProvider = nonEmpty val }
-            "model"    -> existing { adModel = nonEmpty val }
+            "provider" -> existing { adProvider = nonEmpty (parseStringValue val) }
+            "model"    -> existing { adModel = nonEmpty (parseStringValue val) }
             _          -> existing
       in (cfg { ccAliases = Map.insert name updated aliases }, Just ("alias", name))
 
     applySetting cfg (Just ("abbreviations", _)) key val
       | not (null key) && not (null val) =
-          (cfg { ccAbbreviations = Map.insert key val (ccAbbreviations cfg) }, Just ("abbreviations", ""))
+          (cfg { ccAbbreviations = Map.insert key (parseStringValue val) (ccAbbreviations cfg) }, Just ("abbreviations", ""))
     applySetting cfg section _ _ = (cfg, section)
 
     readMaybeInt s = case reads s of
       [(n, "")] -> Just n
       _         -> Nothing
+
+    parseStringValue s =
+      case stripLine s of
+        '"':rest | not (null rest) && last rest == '"' -> init rest
+        other -> other
 
     nonEmpty "" = Nothing
     nonEmpty s  = Just s

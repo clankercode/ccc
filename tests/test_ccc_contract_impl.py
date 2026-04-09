@@ -33,10 +33,10 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def _make_env(self, opencode_path: Path, lang: LanguageSpec) -> Dict[str, str]:
         env = os.environ.copy()
-        env.update(lang.env_extra)
-        env["PATH"] = f"{opencode_path.parent}:{env.get('PATH', '')}"
         env["LC_ALL"] = "C"
         env["PERL_BADLANG"] = "0"
+        env.update(lang.env_extra)
+        env["PATH"] = f"{opencode_path.parent}:{env.get('PATH', '')}"
         if lang.name in {"x86-64 ASM", "OCaml"}:
             env["CCC_REAL_OPENCODE"] = str(opencode_path)
         return env
@@ -66,10 +66,20 @@ class SingleImplCccContractTests(unittest.TestCase):
             self._write_config(tmp_path)
 
             for lang in self.selected_languages:
-                with self.subTest(language=lang.name, config="default_runner=cc"):
+                with self.subTest(language=lang.name, config="default_runner=claude"):
                     env = self._make_env(opencode_path, lang)
                     env["HOME"] = str(tmp_path)
                     env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+                    env["CCC_CONFIG"] = str(tmp_path / "legacy-config")
+                    env.pop("CCC_REAL_OPENCODE", None)
+                    if lang.name == "x86-64 ASM":
+                        asm_config_path = tmp_path / "asm-config"
+                        asm_config_path.write_text(
+                            f"default_runner = {claude_path}\n"
+                        )
+                        env["CCC_CONFIG"] = str(asm_config_path)
+                    elif lang.name == "OCaml":
+                        env["CCC_REAL_OPENCODE"] = str(claude_path)
                     result = lang.invoke(PROMPT, env)
                     assertion(result)
 
@@ -141,25 +151,21 @@ class SingleImplCccContractTests(unittest.TestCase):
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def _write_runner_stub(self, path: Path, runner_name: str) -> None:
-        path.write_text(
-            "#!/bin/sh\n"
-            f"printf '{runner_name} %s\\n' \"$1\"\n"
-        )
+        path.write_text(f"#!/bin/sh\nprintf '{runner_name} %s\\n' \"$1\"\n")
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def _write_config(self, tmp_path: Path) -> None:
-        config_text = (
-            "default_runner = cc\n"
-            "\n"
-            "[defaults]\n"
-            'runner = "cc"\n'
-        )
+        toml_config_text = '[defaults]\nrunner = "claude"\n'
+        legacy_config_text = "default_runner = claude\n"
         home_config_dir = tmp_path / ".config" / "ccc"
         xdg_config_dir = tmp_path / "xdg" / "ccc"
         home_config_dir.mkdir(parents=True)
         xdg_config_dir.mkdir(parents=True)
-        (home_config_dir / "config.toml").write_text(config_text)
-        (xdg_config_dir / "config.toml").write_text(config_text)
+        (home_config_dir / "config.toml").write_text(toml_config_text)
+        (home_config_dir / "config").write_text(legacy_config_text)
+        (xdg_config_dir / "config.toml").write_text(toml_config_text)
+        (xdg_config_dir / "config").write_text(legacy_config_text)
+        (tmp_path / "legacy-config").write_text(legacy_config_text)
 
 
 def main(argv: List[str]) -> int:

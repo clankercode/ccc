@@ -7,7 +7,8 @@ import Data.Array (drop)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Node.Process (argv, lookupEnv)
-import CallCodingClis.PromptSpec (buildPromptSpec)
+import CallCodingClis.Config (loadConfig)
+import CallCodingClis.Parser (parseArgs, resolveCommand)
 import CallCodingClis.Runner (run)
 import CallCodingClis.Help (helpText, runnerChecklist)
 
@@ -33,20 +34,19 @@ main = do
       checklist <- runnerChecklist
       writeStdout $ helpText <> "\n" <> checklist <> "\n"
       processExit 0
-    [prompt] ->
-      case buildPromptSpec prompt of
-        Left err -> do
-          error err
-          processExit 1
-        Right spec -> do
-          runnerBin <- lookupEnv "CCC_REAL_OPENCODE"
-          let adjustedSpec = case runnerBin of
-                Nothing -> spec
-                Just bin -> spec { argv = [bin] <> drop 1 spec.argv }
-          result <- run adjustedSpec
-          when (result.stdout /= "") $ writeStdout result.stdout
-          when (result.stderr /= "") $ writeStderr result.stderr
-          processExit result.exitCode
     _ -> do
-      writeStderr $ "usage: ccc [runner] [+thinking] [:provider:model] [@alias] \"<Prompt>\"\n"
-      processExit 1
+      let parsed = parseArgs args
+      if parsed.prompt == "" then do
+        writeStderr "prompt must not be empty\n"
+        processExit 1
+      else do
+        config <- loadConfig
+        let spec = resolveCommand parsed config
+        runnerBin <- lookupEnv "CCC_REAL_OPENCODE"
+        let adjustedSpec = case runnerBin of
+              Nothing -> spec
+              Just bin -> spec { argv = [bin] <> drop 1 spec.argv }
+        result <- run adjustedSpec
+        when (result.stdout /= "") $ writeStdout result.stdout
+        when (result.stderr /= "") $ writeStderr result.stderr
+        processExit result.exitCode

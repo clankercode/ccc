@@ -21,8 +21,22 @@ int main(string[] args) {
     }
 
     CccConfig config;
-    auto configPath = environment.get("CCC_CONFIG");
-    if (configPath !is null && configPath.length > 0) {
+    string configPath;
+    auto cccConfig = environment.get("CCC_CONFIG");
+    if (cccConfig !is null && cccConfig.length > 0) {
+        configPath = cccConfig.idup;
+    } else {
+        auto xdg = environment.get("XDG_CONFIG_HOME");
+        if (xdg !is null && xdg.length > 0) {
+            configPath = (xdg ~ "/ccc/config.toml").idup;
+        } else {
+            auto home = environment.get("HOME");
+            if (home !is null && home.length > 0) {
+                configPath = (home ~ "/.config/ccc/config.toml").idup;
+            }
+        }
+    }
+    if (configPath.length > 0) {
         config = loadConfig(configPath);
     }
 

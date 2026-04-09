@@ -51,7 +51,24 @@ CccConfig loadConfig(string path) {
                 val = val[1 .. $ - 1].idup;
             }
 
-            if (section == "defaults") {
+            if (section == "") {
+                switch (key) {
+                    case "default_runner":
+                        config.defaultRunner = val;
+                        break;
+                    case "default_provider":
+                        config.defaultProvider = val;
+                        break;
+                    case "default_model":
+                        config.defaultModel = val;
+                        break;
+                    case "default_thinking":
+                        config.defaultThinking = Nullable!int(to!int(val));
+                        break;
+                    default:
+                        break;
+                }
+            } else if (section == "defaults") {
                 switch (key) {
                     case "runner":
                         config.defaultRunner = val;

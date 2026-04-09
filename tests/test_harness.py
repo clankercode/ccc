@@ -30,10 +30,36 @@ class LanguageSpec:
         self.build_ok = True
         self.build_error = ""
 
+    def _ensure_env_dirs(self, prepared: Dict[str, str]) -> Dict[str, str]:
+        dir_vars = [
+            "HOME",
+            "XDG_CONFIG_HOME",
+            "XDG_DATA_HOME",
+            "XDG_CACHE_HOME",
+            "XDG_STATE_HOME",
+            "CARGO_HOME",
+            "GOCACHE",
+            "DOTNET_CLI_HOME",
+            "NUGET_PACKAGES",
+            "CRYSTAL_CACHE_DIR",
+            "CABAL_DIR",
+        ]
+        for key in dir_vars:
+            path = prepared.get(key)
+            if path:
+                Path(path).mkdir(parents=True, exist_ok=True)
+        return prepared
+
+    def build_env(self, env: Dict[str, str]) -> Dict[str, str]:
+        return self._ensure_env_dirs({**env, **self.env_extra})
+
+    def prepared_env(self, env: Dict[str, str]) -> Dict[str, str]:
+        return self._ensure_env_dirs({**self.env_extra, **env})
+
     def build(self, env: Dict[str, str]) -> None:
         self.build_ok = True
         if self.build_cmds:
-            build_env = {**env, **self.env_extra}
+            build_env = self.build_env(env)
             for cmd in self.build_cmds:
                 result = subprocess.run(
                     cmd,
@@ -53,7 +79,7 @@ class LanguageSpec:
         return subprocess.run(
             cmd,
             cwd=ROOT,
-            env=env,
+            env=self.prepared_env(env),
             capture_output=True,
             text=True,
             check=False,
@@ -67,7 +93,7 @@ class LanguageSpec:
         return subprocess.run(
             cmd,
             cwd=ROOT,
-            env=env,
+            env=self.prepared_env(env),
             capture_output=True,
             text=True,
             check=False,
@@ -79,7 +105,7 @@ def _py_invoke(prompt):
 
 
 def _rust_invoke(prompt):
-    return ["cargo", "run", "--quiet", "--bin", "ccc", "--", prompt]
+    return [str(ROOT / "rust" / "target" / "debug" / "ccc"), prompt]
 
 
 def _ts_invoke(prompt):
@@ -155,6 +181,18 @@ def _haskell_invoke(prompt):
     return [str(ROOT / "haskell" / "ccc"), prompt]
 
 
+def _elixir_invoke(prompt):
+    return [
+        "elixir",
+        "-pa",
+        str(ROOT / "elixir" / "ebin"),
+        "-e",
+        "CallCodingClis.CLI.main(System.argv())",
+        "--",
+        prompt,
+    ]
+
+
 def _nim_invoke(prompt):
     return [str(ROOT / "nim" / "call_coding_clis" / "ccc"), prompt]
 
@@ -185,6 +223,7 @@ LANGUAGES = [
         build_cmds=[["go", "build", "-o", str(ROOT / "go" / "ccc"), "./cmd/ccc"]],
         build_cwd=ROOT / "go",
         invoke_fn=_go_invoke,
+        env_extra={"GOCACHE": "/tmp/ccc-go-cache"},
     ),
     LanguageSpec(
         "Ruby",
@@ -230,6 +269,13 @@ LANGUAGES = [
     LanguageSpec(
         "F#",
         invoke_fn=_fsharp_invoke,
+        env_extra={
+            "DOTNET_NOLOGO": "1",
+            "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1",
+            "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+            "DOTNET_CLI_HOME": "/tmp/ccc-dotnet-home",
+            "NUGET_PACKAGES": "/tmp/ccc-nuget",
+        },
     ),
     LanguageSpec(
         "PHP",
@@ -237,7 +283,15 @@ LANGUAGES = [
     ),
     LanguageSpec(
         "PureScript",
+        build_cmds=[["spago", "build"]],
+        build_cwd=ROOT / "purescript",
         invoke_fn=_purescript_invoke,
+        env_extra={
+            "HOME": "/tmp/ccc-home-ps",
+            "XDG_DATA_HOME": "/tmp/ccc-xdg-data-ps",
+            "XDG_CACHE_HOME": "/tmp/ccc-xdg-cache-ps",
+            "XDG_STATE_HOME": "/tmp/ccc-xdg-state-ps",
+        },
     ),
     LanguageSpec(
         "x86-64 ASM",
@@ -247,6 +301,14 @@ LANGUAGES = [
     ),
     LanguageSpec(
         "OCaml",
+        build_cmds=[
+            [
+                "sh",
+                "-c",
+                'eval "$(opam env)" && dune build bin/ccc.exe',
+            ],
+        ],
+        build_cwd=ROOT / "ocaml",
         invoke_fn=_ocaml_invoke,
         env_extra={"CCC_REAL_OPENCODE": str(MOCK_BIN)},
     ),
@@ -257,13 +319,17 @@ LANGUAGES = [
                 "crystal",
                 "build",
                 "src/call_coding_clis/ccc.cr",
-                "-o",
+                "--output",
                 str(ROOT / "crystal" / "ccc"),
             ]
         ],
         build_cwd=ROOT / "crystal",
         invoke_fn=_crystal_invoke,
-        env_extra={"PATH": f"/usr/bin:{os.environ.get('PATH', '')}"},
+        env_extra={
+            "PATH": f"/usr/bin:{os.environ.get('PATH', '')}",
+            "HOME": "/tmp/ccc-home-crystal",
+            "CRYSTAL_CACHE_DIR": "/tmp/ccc-crystal-cache",
+        },
     ),
     LanguageSpec(
         "Haskell",
@@ -277,6 +343,32 @@ LANGUAGES = [
         ],
         build_cwd=ROOT / "haskell",
         invoke_fn=_haskell_invoke,
+        env_extra={
+            "HOME": "/tmp/ccc-home-hs",
+            "XDG_CONFIG_HOME": "/tmp/ccc-xdg-hs",
+            "CABAL_DIR": "/tmp/ccc-cabal",
+        },
+    ),
+    LanguageSpec(
+        "Elixir",
+        build_cmds=[
+            [
+                "elixirc",
+                "-o",
+                "ebin",
+                "lib/call_coding_clis/command_spec.ex",
+                "lib/call_coding_clis/completed_run.ex",
+                "lib/call_coding_clis/runner.ex",
+                "lib/call_coding_clis/prompt_spec.ex",
+                "lib/call_coding_clis/parser.ex",
+                "lib/call_coding_clis/config.ex",
+                "lib/call_coding_clis/help.ex",
+                "lib/call_coding_clis/cli.ex",
+            ],
+        ],
+        build_cwd=ROOT / "elixir",
+        invoke_fn=_elixir_invoke,
+        env_extra={"LC_ALL": "C.UTF-8"},
     ),
     LanguageSpec(
         "Nim",

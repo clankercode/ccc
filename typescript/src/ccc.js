@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { buildPromptSpec, Runner } from './index.js'
+import { Runner } from './index.js'
 import { parseArgs, resolveCommand } from './parser.js'
 import { loadConfig } from './config.js'
 import { printHelp, printUsage } from './help.js'
@@ -18,27 +18,18 @@ if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
 }
 
 let spec
-if (args.length === 1) {
-  try {
-    spec = buildPromptSpec(args[0])
-  } catch (err) {
-    console.error(err.message)
-    process.exit(1)
-  }
-} else {
-  const parsed = parseArgs(args)
-  if (!parsed.prompt.trim()) {
-    console.error('prompt must not be empty')
-    process.exit(1)
-  }
-  const config = loadConfig()
-  try {
-    const resolved = resolveCommand(parsed, config)
-    spec = { argv: resolved.argv, env: resolved.env }
-  } catch (err) {
-    console.error(err.message)
-    process.exit(1)
-  }
+const parsed = parseArgs(args)
+if (!parsed.prompt.trim()) {
+  console.error('prompt must not be empty')
+  process.exit(1)
+}
+const config = loadConfig()
+try {
+  const resolved = resolveCommand(parsed, config)
+  spec = { argv: resolved.argv, env: resolved.env }
+} catch (err) {
+  console.error(err.message)
+  process.exit(1)
 }
 
 const realOpencode = process.env.CCC_REAL_OPENCODE

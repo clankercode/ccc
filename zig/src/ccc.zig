@@ -2,6 +2,7 @@ const std = @import("std");
 const runner = @import("runner");
 const parser = @import("parser");
 const help = @import("help");
+const config_loader = @import("config");
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -29,32 +30,7 @@ pub fn main() !void {
         std.process.exit(0);
     }
 
-    if (argv.items.len == 1) {
-        const prompt = std.mem.trim(u8, argv.items[0], " \t\n\r");
-        if (prompt.len == 0) {
-            std.debug.print("prompt must not be empty\n", .{});
-            std.process.exit(1);
-        }
-        var spec = runner.CommandSpec{ .argv = &.{ "opencode", "run", prompt } };
-        const real_opencode = std.process.getEnvVarOwned(allocator, "CCC_REAL_OPENCODE") catch null;
-        if (real_opencode) |opencode_path| {
-            var new_argv = try allocator.alloc([]const u8, 3);
-            new_argv[0] = opencode_path;
-            new_argv[1] = "run";
-            new_argv[2] = prompt;
-            spec.argv = new_argv;
-        }
-        const result = try runner.Runner.run(allocator, .{ .argv = spec.argv });
-        if (result.stdout_data.len > 0) {
-            try std.fs.File.stdout().writeAll(result.stdout_data);
-        }
-        if (result.stderr_data.len > 0) {
-            try std.fs.File.stderr().writeAll(result.stderr_data);
-        }
-        std.process.exit(result.exit_code);
-    }
-
-    var config = parser.CccConfig.init(allocator);
+    var config = try config_loader.loadDefaultConfig(allocator);
     defer config.deinit();
 
     var parsed = parser.parseArgs(allocator, argv.items) catch {

@@ -29,8 +29,10 @@ defmodule CallCodingClis.Runner do
     try do
       escaped = [resolved | args] |> Enum.map(&shell_escape/1) |> Enum.join(" ")
 
+      stdin_redirect = if stdin_path, do: "", else: " </dev/null"
+
       shell_cmd =
-        "#{stdin_prefix}#{escaped} 2>#{shell_escape(stderr_path)}"
+        "#{stdin_prefix}#{escaped} 2>#{shell_escape(stderr_path)}#{stdin_redirect}"
 
       opts =
         [into: ""]

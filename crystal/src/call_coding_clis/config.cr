@@ -7,10 +7,13 @@ def load_config(path : String? = nil) : CccConfig
   if p = path
     search_paths << p
   else
-    if xdg = ENV["XDG_CONFIG_HOME"]?
-      search_paths << File.join(xdg, "ccc", "config")
+    if ccc = ENV["CCC_CONFIG"]?
+      search_paths << ccc
     end
-    search_paths << File.join(Path.home, ".config", "ccc", "config")
+    if xdg = ENV["XDG_CONFIG_HOME"]?
+      search_paths << File.join(xdg, "ccc", "config.toml")
+    end
+    search_paths << File.join(Path.home, ".config", "ccc", "config.toml")
   end
 
   config_path : String? = nil
@@ -53,7 +56,7 @@ def load_config(path : String? = nil) : CccConfig
     kv = line.split("=", 2)
     next unless kv.size == 2
     key = kv[0].strip
-    val = kv[1].strip
+    val = kv[1].strip.gsub(/^"|"$/, "")
 
     case current_section
     when "defaults"
@@ -71,6 +74,13 @@ def load_config(path : String? = nil) : CccConfig
       when "thinking" then current_alias.thinking = val.to_i32?
       when "provider" then current_alias.provider = val.empty? ? nil : val
       when "model"    then current_alias.model = val.empty? ? nil : val
+      end
+    when ""
+      case key
+      when "default_runner"   then config.default_runner = val
+      when "default_provider" then config.default_provider = val
+      when "default_model"    then config.default_model = val
+      when "default_thinking" then config.default_thinking = val.to_i32?
       end
     end
   end

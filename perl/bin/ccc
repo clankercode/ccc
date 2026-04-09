@@ -4,8 +4,8 @@ use warnings;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 
-use Call::Coding::Clis qw(build_prompt_spec);
 use Call::Coding::Clis::Parser qw(parse_args resolve_command);
+use Call::Coding::Clis::Config qw(load_config);
 use Call::Coding::Clis::Runner;
 use Call::Coding::Clis::CommandSpec;
 use Call::Coding::Clis::Help qw(print_help print_usage);
@@ -20,44 +20,28 @@ if (@ARGV == 1 && ($ARGV[0] eq '--help' || $ARGV[0] eq '-h')) {
     exit 0;
 }
 
-my $spec;
-
-if (@ARGV > 1) {
-    my $parsed = parse_args(@ARGV);
-    my $cmd    = eval { resolve_command($parsed) };
-    if ($@) {
-        print STDERR $@;
-        exit 1;
-    }
-
-    my @argv = @{$cmd->{argv}};
-    if ($ENV{CCC_REAL_OPENCODE}) {
-        $argv[0] = $ENV{CCC_REAL_OPENCODE};
-    }
-
-    $spec = Call::Coding::Clis::CommandSpec->new(
-        argv => \@argv,
-        env  => $cmd->{env},
-    );
+my $parsed = parse_args(@ARGV);
+if (!$parsed->{prompt} || $parsed->{prompt} !~ /\S/) {
+    print STDERR "prompt must not be empty\n";
+    exit 1;
 }
-else {
-    $spec = eval { build_prompt_spec($ARGV[0]) };
-    if ($@) {
-        print STDERR $@;
-        exit 1;
-    }
 
-    if ($ENV{CCC_REAL_OPENCODE}) {
-        my @argv = @{$spec->argv};
-        $argv[0] = $ENV{CCC_REAL_OPENCODE};
-        $spec = Call::Coding::Clis::CommandSpec->new(
-            argv      => \@argv,
-            stdin_text => $spec->stdin_text,
-            cwd       => $spec->cwd,
-            env       => $spec->env,
-        );
-    }
+my $config = load_config();
+my $cmd    = eval { resolve_command($parsed, $config) };
+if ($@) {
+    print STDERR $@;
+    exit 1;
 }
+
+my @argv = @{$cmd->{argv}};
+if ($ENV{CCC_REAL_OPENCODE}) {
+    $argv[0] = $ENV{CCC_REAL_OPENCODE};
+}
+
+my $spec = Call::Coding::Clis::CommandSpec->new(
+    argv => \@argv,
+    env  => $cmd->{env},
+);
 
 my $runner = Call::Coding::Clis::Runner->new;
 my $result = $runner->run($spec);

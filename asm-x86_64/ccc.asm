@@ -20,7 +20,9 @@ _start:
     lea r12, [rsp + r8*8 + 16]
 
     mov rdi, r12
-    call find_env_var
+    lea rsi, [env_key]
+    mov rdx, env_key_len
+    call find_env_var_named
     test rax, rax
     jz .default_runner
 
@@ -28,19 +30,49 @@ _start:
     mov rsi, rax
     call strcpy_256
     lea r14, [runner_buf]
+    mov r13, 1
     jmp .do_fork
 
 .default_runner:
+    mov rdi, r12
+    lea rsi, [config_env_key]
+    mov rdx, config_env_key_len
+    call find_env_var_named
+    test rax, rax
+    jz .use_builtin_default
+
+    mov rdi, rax
+    call load_runner_from_config
+    test eax, eax
+    jz .use_builtin_default
+
+    lea r14, [runner_buf]
+    xor r13, r13
+    jmp .do_fork
+
+.use_builtin_default:
     lea r14, [str_opencode]
+    mov r13, 1
 
 .do_fork:
     mov [exec_argv], r14
+    test r13, r13
+    jz .argv_without_run
+
     lea rax, [str_run]
     mov [exec_argv + 8], rax
     mov rax, [rsp + 16]
     mov [exec_argv + 16], rax
     mov qword [exec_argv + 24], 0
+    jmp .fork_exec
 
+.argv_without_run:
+    mov rax, [rsp + 16]
+    mov [exec_argv + 8], rax
+    mov qword [exec_argv + 16], 0
+    mov qword [exec_argv + 24], 0
+
+.fork_exec:
     mov rax, 57
     syscall
     test rax, rax
@@ -192,14 +224,14 @@ trim_trailing:
     mov byte [rdi], 0
     ret
 
-find_env_var:
+find_env_var_named:
     mov r8, rdi
 .fev_loop:
     mov r9, [r8]
     test r9, r9
     jz .fev_not_found
-    lea r10, [env_key]
-    mov rcx, 18
+    mov r10, rsi
+    mov rcx, rdx
 .fev_cmp:
     mov al, [r9]
     cmp al, [r10]
@@ -209,13 +241,111 @@ find_env_var:
     dec rcx
     jnz .fev_cmp
     mov rax, [r8]
-    add rax, 18
+    add rax, rdx
     ret
 .fev_next:
     add r8, 8
     jmp .fev_loop
 .fev_not_found:
     xor rax, rax
+    ret
+
+load_runner_from_config:
+    mov rax, 2
+    xor rsi, rsi
+    xor rdx, rdx
+    syscall
+    test rax, rax
+    js .lrc_fail
+
+    mov r8, rax
+    xor rax, rax
+    mov rdi, r8
+    lea rsi, [config_buf]
+    mov rdx, 255
+    syscall
+    test rax, rax
+    jle .lrc_close_fail
+
+    lea rdi, [config_buf]
+    add rdi, rax
+    mov byte [rdi], 0
+
+    mov rax, 3
+    mov rdi, r8
+    syscall
+
+    lea r9, [config_buf]
+.lrc_outer:
+    cmp byte [r9], 0
+    je .lrc_fail
+    mov rdi, r9
+    lea rsi, [config_key]
+.lrc_search:
+    mov al, [rsi]
+    test al, al
+    jz .lrc_key_matched
+    mov dl, [rdi]
+    test dl, dl
+    jz .lrc_fail
+    cmp dl, al
+    jne .lrc_next_pos
+    inc rdi
+    inc rsi
+    jmp .lrc_search
+
+.lrc_next_pos:
+    inc r9
+    jmp .lrc_outer
+
+.lrc_key_matched:
+.lrc_skip_space1:
+    cmp byte [rdi], ' '
+    jne .lrc_expect_eq
+    inc rdi
+    jmp .lrc_skip_space1
+
+.lrc_expect_eq:
+    cmp byte [rdi], '='
+    jne .lrc_fail
+    inc rdi
+
+.lrc_skip_space2:
+    cmp byte [rdi], ' '
+    jne .lrc_copy
+    inc rdi
+    jmp .lrc_skip_space2
+
+.lrc_copy:
+    lea rsi, [runner_buf]
+    mov rcx, 255
+.lrc_copy_loop:
+    mov al, [rdi]
+    cmp al, 0
+    je .lrc_done
+    cmp al, 10
+    je .lrc_done
+    cmp al, 13
+    je .lrc_done
+    mov [rsi], al
+    inc rsi
+    inc rdi
+    dec rcx
+    jnz .lrc_copy_loop
+
+.lrc_done:
+    mov byte [rsi], 0
+    cmp byte [runner_buf], 0
+    je .lrc_fail
+    mov eax, 1
+    ret
+
+.lrc_close_fail:
+    mov rax, 3
+    mov rdi, r8
+    syscall
+.lrc_fail:
+    xor eax, eax
     ret
 
 strcpy_256:
@@ -247,10 +377,15 @@ msg_exec_suffix_len equ $ - msg_exec_suffix
 str_run: db 'run', 0
 str_opencode: db 'opencode', 0
 env_key: db 'CCC_REAL_OPENCODE=', 0
+env_key_len equ $ - env_key - 1
+config_env_key: db 'CCC_CONFIG=', 0
+config_env_key_len equ $ - config_env_key - 1
+config_key: db 'default_runner', 0
 
 section .bss
 exec_argv: resq 4
 status_buf: resd 1
 runner_buf: resb 256
+config_buf: resb 256
 
 section .note.GNU-stack noalloc noexec nowrite progbits

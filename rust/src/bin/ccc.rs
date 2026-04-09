@@ -1,6 +1,4 @@
-use call_coding_clis::{
-    build_prompt_spec, load_config, parse_args, print_help, print_usage, resolve_command, Runner,
-};
+use call_coding_clis::{load_config, parse_args, print_help, print_usage, resolve_command, Runner};
 use std::env;
 use std::process::ExitCode;
 
@@ -17,33 +15,23 @@ fn main() -> ExitCode {
         return ExitCode::from(0);
     }
 
-    let spec = if args.len() == 1 {
-        match build_prompt_spec(&args[0]) {
-            Ok(spec) => spec,
-            Err(message) => {
-                eprintln!("{message}");
-                return ExitCode::from(1);
+    let parsed = parse_args(&args);
+    if parsed.prompt.trim().is_empty() {
+        eprintln!("prompt must not be empty");
+        return ExitCode::from(1);
+    }
+    let config = load_config(None);
+    let spec = match resolve_command(&parsed, Some(&config)) {
+        Ok((argv, env_overrides)) => {
+            let mut spec = call_coding_clis::CommandSpec::new(argv);
+            for (k, v) in env_overrides {
+                spec = spec.with_env(k, v);
             }
+            spec
         }
-    } else {
-        let parsed = parse_args(&args);
-        if parsed.prompt.trim().is_empty() {
-            eprintln!("prompt must not be empty");
+        Err(msg) => {
+            eprintln!("{msg}");
             return ExitCode::from(1);
-        }
-        let config = load_config(None);
-        match resolve_command(&parsed, Some(&config)) {
-            Ok((argv, env_overrides)) => {
-                let mut spec = call_coding_clis::CommandSpec::new(argv);
-                for (k, v) in env_overrides {
-                    spec = spec.with_env(k, v);
-                }
-                spec
-            }
-            Err(msg) => {
-                eprintln!("{msg}");
-                return ExitCode::from(1);
-            }
         }
     };
 

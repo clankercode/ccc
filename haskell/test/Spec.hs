@@ -1,7 +1,9 @@
 module Main where
 
+import CallCodingClis.Config (parseConfig)
 import CallCodingClis.PromptSpec (buildPromptSpec)
 import CallCodingClis.Runner (run, stream)
+import CallCodingClis.Parser (ccDefaultRunner)
 import CallCodingClis.Types
 import Control.Monad (when)
 import Data.IORef (modifyIORef', newIORef, readIORef)
@@ -67,6 +69,14 @@ main = do
     Right spec -> assertEqual "mixed whitespace argv" ["opencode", "run", "bar"] (csArgv spec)
     Left err   -> do
       putStrLn $ "FAIL: mixed whitespace prompt returned Left: " ++ err
+      exitFailure
+
+  putStrLn "=== Config ==="
+
+  case parseConfig "[defaults]\nrunner = \"claude\"\n" of
+    Right cfg -> assertEqual "defaults section runner" "claude" (ccDefaultRunner cfg)
+    Left err -> do
+      putStrLn $ "FAIL: parseConfig defaults section returned Left: " ++ err
       exitFailure
 
   putStrLn "=== Runner ==="

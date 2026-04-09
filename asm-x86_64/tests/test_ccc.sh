@@ -5,6 +5,10 @@ CCC="$SCRIPT_DIR/../ccc"
 
 MOCK_DIR=$(mktemp -d)
 trap 'rm -rf "$MOCK_DIR"' EXIT
+mkdir -p "$MOCK_DIR/home" "$MOCK_DIR/xdg"
+export HOME="$MOCK_DIR/home"
+export XDG_CONFIG_HOME="$MOCK_DIR/xdg"
+export CCC_CONFIG="$MOCK_DIR/missing-config.toml"
 
 cat > "$MOCK_DIR/opencode" << 'MOCK'
 #!/bin/sh
@@ -36,6 +40,12 @@ cat > "$MOCK_DIR/codex" << 'MOCK'
 printf "codex %s\n" "$1"
 MOCK
 chmod +x "$MOCK_DIR/codex"
+
+cat > "$MOCK_DIR/roocode" << 'MOCK'
+#!/bin/sh
+printf "roocode %s\n" "$1"
+MOCK
+chmod +x "$MOCK_DIR/roocode"
 
 PASS=0
 FAIL=0
@@ -79,7 +89,7 @@ fi
 
 echo "help surface..."
 out=$("$CCC" --help 2>&1); rc=$?
-if [ "$rc" = 0 ] && echo "$out" | grep -q '\[@name\]' && echo "$out" | grep -q 'preset/agent fallback' && echo "$out" | grep -q 'Runner/thinking/provider CLI slots are not parsed here.'; then
+if [ "$rc" = 0 ] && echo "$out" | grep -q '\[@name\]' && echo "$out" | grep -q 'codex (c/cx)' && echo "$out" | grep -q 'roocode (rc)' && echo "$out" | grep -q 'claude (cc)' && echo "$out" | grep -q 'selector remapping' && echo "$out" | grep -q 'Runner/thinking/provider CLI slots are not parsed here.'; then
     pass "help surface"
 else
     fail "help surface (rc=$rc, out=$out)"
@@ -91,6 +101,34 @@ if [ "$rc" = 0 ] && [ "$out" = "opencode run hello world" ]; then
     pass "happy path"
 else
     fail "happy path (rc=$rc, out=$out)"
+fi
+
+for selector in c cx; do
+    echo "runner $selector maps to codex..."
+    mkdir -p "$MOCK_DIR/xdg_$selector/ccc"
+    cat > "$MOCK_DIR/xdg_$selector/ccc/config.toml" << MOCK
+[defaults]
+runner = "$selector"
+MOCK
+    out=$(PATH="$MOCK_DIR:$PATH" XDG_CONFIG_HOME="$MOCK_DIR/xdg_$selector" CCC_REAL_OPENCODE="$MOCK_DIR/opencode" "$CCC" "hello world" 2>&1); rc=$?
+    if [ "$rc" = 0 ] && [ "$out" = "codex hello world" ]; then
+        pass "runner $selector maps to codex"
+    else
+        fail "runner $selector maps to codex (rc=$rc, out=$out)"
+    fi
+done
+
+echo "runner cc remains claude..."
+mkdir -p "$MOCK_DIR/xdg_cc/ccc"
+cat > "$MOCK_DIR/xdg_cc/ccc/config.toml" << 'MOCK'
+[defaults]
+runner = "cc"
+MOCK
+out=$(PATH="$MOCK_DIR:$PATH" XDG_CONFIG_HOME="$MOCK_DIR/xdg_cc" CCC_REAL_OPENCODE="$MOCK_DIR/opencode" "$CCC" "hello world" 2>&1); rc=$?
+if [ "$rc" = 0 ] && [ "$out" = "claude hello world" ]; then
+    pass "runner cc remains claude"
+else
+    fail "runner cc remains claude (rc=$rc, out=$out)"
 fi
 
 echo "@name falls back to agent..."
@@ -126,7 +164,7 @@ echo "unsupported agent warning..."
 mkdir -p "$MOCK_DIR/xdg_warn/ccc"
 cat > "$MOCK_DIR/xdg_warn/ccc/config.toml" << 'MOCK'
 [defaults]
-runner = "codex"
+runner = "rc"
 MOCK
 stdout_file="$MOCK_DIR/stdout"
 stderr_file="$MOCK_DIR/stderr"
@@ -135,7 +173,7 @@ stderr_file="$MOCK_DIR/stderr"
 PATH="$MOCK_DIR:$PATH" XDG_CONFIG_HOME="$MOCK_DIR/xdg_warn" "$CCC" "@reviewer" "warn me" >"$stdout_file" 2>"$stderr_file"; rc=$?
 stdout=$(cat "$stdout_file")
 stderr=$(cat "$stderr_file")
-if [ "$rc" = 0 ] && [ "$stdout" = "codex warn me" ] && echo "$stderr" | grep -q 'warning: runner "codex" does not support agents; ignoring @reviewer'; then
+if [ "$rc" = 0 ] && [ "$stdout" = "roocode warn me" ] && echo "$stderr" | grep -q 'warning: runner "rc" does not support agents; ignoring @reviewer'; then
     pass "unsupported agent warning"
 else
     fail "unsupported agent warning (rc=$rc, stdout=$stdout, stderr=$stderr)"

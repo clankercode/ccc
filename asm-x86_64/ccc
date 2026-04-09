@@ -18,7 +18,7 @@ Usage:
 
 Slots (in order):
   runner        Select which coding CLI to use (default: oc)
-                opencode (oc), claude (cc), kimi (k), codex (rc), crush (cr)
+                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)
   +thinking     Set thinking level: +0 (off) through +4 (max)
   :provider:model  Override provider and model
   @name         Use a named preset from config; if no preset exists, treat it as an agent
@@ -35,7 +35,7 @@ Config:
   ~/.config/ccc/config.toml  — default runner, presets, abbreviations
 
 Note:
-  This x86-64 ASM shim currently implements prompt-only execution, config-driven default runner selection, and @name preset/agent fallback.
+  This x86-64 ASM shim currently implements prompt-only execution, config-driven default runner selection, selector remapping, and @name preset/agent fallback.
   Runner/thinking/provider CLI slots are not parsed here.
 EOF
 }
@@ -203,7 +203,7 @@ run_runner() {
       fi
       exec "$bin" run "$prompt"
       ;;
-    claude|cc|c)
+    claude|cc)
       if [ -n "$agent" ]; then
         exec claude --agent "$agent" "$prompt"
       fi
@@ -215,11 +215,17 @@ run_runner() {
       fi
       exec kimi "$prompt"
       ;;
-    codex|rc)
+    codex|c|cx)
       if [ -n "$agent" ]; then
         printf 'warning: runner "%s" does not support agents; ignoring @%s\n' "$runner" "$agent" >&2
       fi
       exec codex "$prompt"
+      ;;
+    roocode|rc)
+      if [ -n "$agent" ]; then
+        printf 'warning: runner "%s" does not support agents; ignoring @%s\n' "$runner" "$agent" >&2
+      fi
+      exec roocode "$prompt"
       ;;
     crush|cr)
       if [ -n "$agent" ]; then

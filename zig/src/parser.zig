@@ -88,11 +88,11 @@ const opencode_info = RunnerInfo{
     .agent_flag = "--agent",
 };
 
-const claude_thinking_0 = &[_][]const u8{"--no-thinking"};
-const claude_thinking_1 = &[_][]const u8{ "--thinking", "low" };
-const claude_thinking_2 = &[_][]const u8{ "--thinking", "medium" };
-const claude_thinking_3 = &[_][]const u8{ "--thinking", "high" };
-const claude_thinking_4 = &[_][]const u8{ "--thinking", "max" };
+const claude_thinking_0 = &[_][]const u8{ "--thinking", "disabled" };
+const claude_thinking_1 = &[_][]const u8{ "--thinking", "enabled", "--effort", "low" };
+const claude_thinking_2 = &[_][]const u8{ "--thinking", "enabled", "--effort", "medium" };
+const claude_thinking_3 = &[_][]const u8{ "--thinking", "enabled", "--effort", "high" };
+const claude_thinking_4 = &[_][]const u8{ "--thinking", "enabled", "--effort", "max" };
 
 const claude_info = RunnerInfo{
     .binary = "claude",
@@ -109,11 +109,11 @@ const claude_info = RunnerInfo{
     .agent_flag = "--agent",
 };
 
-const kimi_thinking_0 = &[_][]const u8{"--no-think"};
-const kimi_thinking_1 = &[_][]const u8{ "--think", "low" };
-const kimi_thinking_2 = &[_][]const u8{ "--think", "medium" };
-const kimi_thinking_3 = &[_][]const u8{ "--think", "high" };
-const kimi_thinking_4 = &[_][]const u8{ "--think", "max" };
+const kimi_thinking_0 = &[_][]const u8{"--no-thinking"};
+const kimi_thinking_1 = &[_][]const u8{"--thinking"};
+const kimi_thinking_2 = &[_][]const u8{"--thinking"};
+const kimi_thinking_3 = &[_][]const u8{"--thinking"};
+const kimi_thinking_4 = &[_][]const u8{"--thinking"};
 
 const kimi_info = RunnerInfo{
     .binary = "kimi",

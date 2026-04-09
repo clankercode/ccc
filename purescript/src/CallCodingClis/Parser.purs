@@ -200,16 +200,16 @@ runnerSpec runnerName = case runnerName of
 
 thinkingArgs :: String -> Maybe Int -> Array String
 thinkingArgs runnerName thinking = case Tuple runnerName thinking of
-  Tuple "claude" (Just 0) -> ["--no-thinking"]
-  Tuple "claude" (Just 1) -> ["--thinking", "low"]
-  Tuple "claude" (Just 2) -> ["--thinking", "medium"]
-  Tuple "claude" (Just 3) -> ["--thinking", "high"]
-  Tuple "claude" (Just 4) -> ["--thinking", "max"]
-  Tuple "kimi" (Just 0) -> ["--no-think"]
-  Tuple "kimi" (Just 1) -> ["--think", "low"]
-  Tuple "kimi" (Just 2) -> ["--think", "medium"]
-  Tuple "kimi" (Just 3) -> ["--think", "high"]
-  Tuple "kimi" (Just 4) -> ["--think", "max"]
+  Tuple "claude" (Just 0) -> ["--thinking", "disabled"]
+  Tuple "claude" (Just 1) -> ["--thinking", "enabled", "--effort", "low"]
+  Tuple "claude" (Just 2) -> ["--thinking", "enabled", "--effort", "medium"]
+  Tuple "claude" (Just 3) -> ["--thinking", "enabled", "--effort", "high"]
+  Tuple "claude" (Just 4) -> ["--thinking", "enabled", "--effort", "max"]
+  Tuple "kimi" (Just 0) -> ["--no-thinking"]
+  Tuple "kimi" (Just 1) -> ["--thinking"]
+  Tuple "kimi" (Just 2) -> ["--thinking"]
+  Tuple "kimi" (Just 3) -> ["--thinking"]
+  Tuple "kimi" (Just 4) -> ["--thinking"]
   Tuple _ _ -> []
 
 resolveCommand :: ParsedArgs -> CccConfig -> ResolvedCommand

@@ -136,17 +136,17 @@ test('resolveCommand: codex runner via cx', () => {
 
 test('resolveCommand: thinking flags for claude +2', () => {
   const result = resolveCommand({ runner: 'claude', thinking: 2, provider: null, model: null, alias: null, prompt: 'prompt' })
-  assert.deepEqual(result.argv.slice(1, 3), ['--thinking', 'medium'])
+  assert.deepEqual(result.argv.slice(1, 5), ['--thinking', 'enabled', '--effort', 'medium'])
 })
 
 test('resolveCommand: thinking flags for claude +0', () => {
   const result = resolveCommand({ runner: 'claude', thinking: 0, provider: null, model: null, alias: null, prompt: 'prompt' })
-  assert.deepEqual(result.argv.slice(1, 2), ['--no-thinking'])
+  assert.deepEqual(result.argv.slice(1, 3), ['--thinking', 'disabled'])
 })
 
 test('resolveCommand: thinking flags for kimi +3', () => {
   const result = resolveCommand({ runner: 'kimi', thinking: 3, provider: null, model: null, alias: null, prompt: 'prompt' })
-  assert.deepEqual(result.argv.slice(1, 3), ['--think', 'high'])
+  assert.deepEqual(result.argv.slice(1, 2), ['--thinking'])
 })
 
 test('resolveCommand: model flag for claude', () => {
@@ -196,6 +196,8 @@ test('resolveCommand: config default thinking', () => {
   }
   const result = resolveCommand({ runner: null, thinking: null, provider: null, model: null, alias: null, prompt: 'prompt' }, config)
   assert.ok(result.argv.includes('--thinking'))
+  assert.ok(result.argv.includes('enabled'))
+  assert.ok(result.argv.includes('--effort'))
   assert.ok(result.argv.includes('low'))
 })
 
@@ -256,6 +258,8 @@ test('resolveCommand: alias thinking override', () => {
   }
   const result = resolveCommand({ runner: null, thinking: null, provider: null, model: null, alias: 'deep', prompt: 'prompt' }, config)
   assert.ok(result.argv.includes('--thinking'))
+  assert.ok(result.argv.includes('enabled'))
+  assert.ok(result.argv.includes('--effort'))
   assert.ok(result.argv.includes('max'))
   assert.deepEqual(result.warnings, [])
 })

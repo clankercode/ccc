@@ -113,13 +113,13 @@ let () =
         let parsed = Parser.parse_args ["claude"; "+3"; "hello"] in
         let argv, env, _warnings = Parser.resolve_command parsed None in
         check (list string) "argv"
-          ["claude"; "--thinking"; "high"; "hello"] argv;
+          ["claude"; "--thinking"; "enabled"; "--effort"; "high"; "hello"] argv;
         check (list (pair string string)) "env" [] env);
 
       test_case "claude thinking 0 (no-thinking)" `Quick (fun () ->
         let parsed = Parser.parse_args ["claude"; "+0"; "hello"] in
         let argv, _, _warnings = Parser.resolve_command parsed None in
-        check (list string) "argv" ["claude"; "--no-thinking"; "hello"] argv);
+        check (list string) "argv" ["claude"; "--thinking"; "disabled"; "hello"] argv);
 
       test_case "codex model flag" `Quick (fun () ->
         let parsed = Parser.parse_args ["codex"; ":gpt-4"; "hello"] in
@@ -175,7 +175,7 @@ let () =
         } in
         let argv, env, _warnings = Parser.resolve_command parsed (Some config) in
         check (list string) "argv"
-          ["claude"; "--thinking"; "high"; "fix bugs"] argv;
+          ["claude"; "--thinking"; "enabled"; "--effort"; "high"; "fix bugs"] argv;
         check (list (pair string string)) "env" [] env);
 
       test_case "name without preset falls back to agent" `Quick (fun () ->
@@ -242,8 +242,7 @@ let () =
       test_case "kimi thinking +2" `Quick (fun () ->
         let parsed = Parser.parse_args ["kimi"; "+2"; "test"] in
         let argv, _, _warnings = Parser.resolve_command parsed None in
-        check (list string) "argv"
-          ["kimi"; "--think"; "medium"; "test"] argv);
+        check (list string) "argv" ["kimi"; "--thinking"; "test"] argv);
 
       test_case "crush ignores model flag" `Quick (fun () ->
         let parsed = Parser.parse_args ["crush"; ":model-1"; "hello"] in
@@ -262,7 +261,7 @@ let () =
         } in
         let argv, env, _warnings = Parser.resolve_command parsed (Some config) in
         check (list string) "argv"
-          ["claude"; "--thinking"; "medium";
+          ["claude"; "--thinking"; "enabled"; "--effort"; "medium";
            "--model"; "sonnet-4"; "hello"] argv;
         check (list (pair string string)) "env"
           [("CCC_PROVIDER", "anthropic")] env);
@@ -289,7 +288,7 @@ let () =
         } in
         let argv, _, _warnings = Parser.resolve_command parsed (Some config) in
         check (list string) "argv"
-          ["claude"; "--thinking"; "low"; "hello"] argv);
+          ["claude"; "--thinking"; "enabled"; "--effort"; "low"; "hello"] argv);
 
       test_case "opencode thinking ignored (no flags)" `Quick (fun () ->
         let parsed = Parser.parse_args ["oc"; "+2"; "hello"] in

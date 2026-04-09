@@ -43,8 +43,13 @@ static void write_fake_runner(const char *path) {
     fprintf(fake_opencode, "      shift\n");
     fprintf(fake_opencode, "      agent=$1\n");
     fprintf(fake_opencode, "      ;;\n");
-    fprintf(fake_opencode, "    --model|--thinking|--think)\n");
+    fprintf(fake_opencode, "    --model|--effort|--think)\n");
     fprintf(fake_opencode, "      shift\n");
+    fprintf(fake_opencode, "      ;;\n");
+    fprintf(fake_opencode, "    --thinking)\n");
+    fprintf(fake_opencode, "      if [ \"$2\" = \"enabled\" ] || [ \"$2\" = \"disabled\" ] || [ \"$2\" = \"adaptive\" ]; then\n");
+    fprintf(fake_opencode, "        shift\n");
+    fprintf(fake_opencode, "      fi\n");
     fprintf(fake_opencode, "      ;;\n");
     fprintf(fake_opencode, "    --no-thinking|--no-think|run)\n");
     fprintf(fake_opencode, "      ;;\n");

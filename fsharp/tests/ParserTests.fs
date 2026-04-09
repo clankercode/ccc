@@ -138,6 +138,8 @@ let ``resolveCommand thinking flags for claude`` () =
     let parsed = { Runner = Some "cc"; Thinking = Some 2; Provider = None; Model = None; Alias = None; Prompt = "hello" }
     let argv, env, warnings = Parser.resolveCommand parsed None
     Assert.Contains("--thinking", argv)
+    Assert.Contains("enabled", argv)
+    Assert.Contains("--effort", argv)
     Assert.Contains("medium", argv)
     Assert.Empty(warnings)
 
@@ -145,7 +147,8 @@ let ``resolveCommand thinking flags for claude`` () =
 let ``resolveCommand thinking zero for claude`` () =
     let parsed = { Runner = Some "cc"; Thinking = Some 0; Provider = None; Model = None; Alias = None; Prompt = "hello" }
     let argv, env, warnings = Parser.resolveCommand parsed None
-    Assert.Contains("--no-thinking", argv)
+    Assert.Contains("--thinking", argv)
+    Assert.Contains("disabled", argv)
     Assert.Empty(warnings)
 
 [<Fact>]
@@ -182,6 +185,8 @@ let ``resolveCommand config default thinking`` () =
     let parsed = { Runner = None; Thinking = None; Provider = None; Model = None; Alias = None; Prompt = "hello" }
     let argv, env, warnings = Parser.resolveCommand parsed (Some config)
     Assert.Contains("--thinking", argv)
+    Assert.Contains("enabled", argv)
+    Assert.Contains("--effort", argv)
     Assert.Contains("low", argv)
     Assert.Empty(warnings)
 
@@ -210,6 +215,8 @@ let ``resolveCommand alias provides defaults`` () =
     let argv, env, warnings = Parser.resolveCommand parsed (Some config)
     Assert.Equal("claude", List.head argv)
     Assert.Contains("--thinking", argv)
+    Assert.Contains("enabled", argv)
+    Assert.Contains("--effort", argv)
     Assert.Contains("high", argv)
     Assert.Contains("--model", argv)
     Assert.Contains("claude-4", argv)
@@ -222,8 +229,7 @@ let ``resolveCommand explicit overrides alias`` () =
     let parsed = { Runner = Some "k"; Thinking = Some 1; Provider = None; Model = None; Alias = Some "work"; Prompt = "hello" }
     let argv, env, warnings = Parser.resolveCommand parsed (Some config)
     Assert.Equal("kimi", List.head argv)
-    Assert.Contains("--think", argv)
-    Assert.Contains("low", argv)
+    Assert.Contains("--thinking", argv)
     Assert.Contains("--agent", argv)
     Assert.Contains("specialist", argv)
     Assert.Empty(warnings)
@@ -232,8 +238,16 @@ let ``resolveCommand explicit overrides alias`` () =
 let ``resolveCommand kimi thinking flags`` () =
     let parsed = { Runner = Some "k"; Thinking = Some 4; Provider = None; Model = None; Alias = None; Prompt = "hello" }
     let argv, env, warnings = Parser.resolveCommand parsed None
-    Assert.Contains("--think", argv)
-    Assert.Contains("max", argv)
+    Assert.Contains("--thinking", argv)
+    Assert.DoesNotContain("--think", argv)
+    Assert.DoesNotContain("max", argv)
+    Assert.Empty(warnings)
+
+[<Fact>]
+let ``resolveCommand kimi thinking zero`` () =
+    let parsed = { Runner = Some "k"; Thinking = Some 0; Provider = None; Model = None; Alias = None; Prompt = "hello" }
+    let argv, env, warnings = Parser.resolveCommand parsed None
+    Assert.Contains("--no-thinking", argv)
     Assert.Empty(warnings)
 
 [<Fact>]

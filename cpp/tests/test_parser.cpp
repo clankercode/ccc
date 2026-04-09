@@ -187,8 +187,10 @@ TEST_F(ResolveCommandTest, ThinkingFlagsForClaude) {
     parsed.thinking = 2;
     parsed.prompt = "hello";
     auto [argv, env, warnings] = resolveCommand(parsed);
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "--thinking"), argv.end());
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "medium"), argv.end());
+    EXPECT_EQ(argv[1], "--thinking");
+    EXPECT_EQ(argv[2], "enabled");
+    EXPECT_EQ(argv[3], "--effort");
+    EXPECT_EQ(argv[4], "medium");
 }
 
 TEST_F(ResolveCommandTest, ThinkingZeroForClaude) {
@@ -197,7 +199,8 @@ TEST_F(ResolveCommandTest, ThinkingZeroForClaude) {
     parsed.thinking = 0;
     parsed.prompt = "hello";
     auto [argv, env, warnings] = resolveCommand(parsed);
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "--no-thinking"), argv.end());
+    EXPECT_EQ(argv[1], "--thinking");
+    EXPECT_EQ(argv[2], "disabled");
 }
 
 TEST_F(ResolveCommandTest, ModelFlagForClaude) {
@@ -240,8 +243,10 @@ TEST_F(ResolveCommandTest, ConfigDefaultThinking) {
     ParsedArgs parsed;
     parsed.prompt = "hello";
     auto [argv, env, warnings] = resolveCommand(parsed, &config);
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "--thinking"), argv.end());
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "low"), argv.end());
+    EXPECT_EQ(argv[1], "--thinking");
+    EXPECT_EQ(argv[2], "enabled");
+    EXPECT_EQ(argv[3], "--effort");
+    EXPECT_EQ(argv[4], "low");
 }
 
 TEST_F(ResolveCommandTest, ConfigDefaultModel) {
@@ -277,8 +282,10 @@ TEST_F(ResolveCommandTest, AliasProvidesDefaults) {
     parsed.prompt = "hello";
     auto [argv, env, warnings] = resolveCommand(parsed, &config);
     EXPECT_EQ(argv[0], "claude");
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "--thinking"), argv.end());
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "high"), argv.end());
+    EXPECT_EQ(argv[1], "--thinking");
+    EXPECT_EQ(argv[2], "enabled");
+    EXPECT_EQ(argv[3], "--effort");
+    EXPECT_EQ(argv[4], "high");
     EXPECT_NE(std::find(argv.begin(), argv.end(), "--model"), argv.end());
     EXPECT_NE(std::find(argv.begin(), argv.end(), "claude-4"), argv.end());
 }
@@ -297,8 +304,11 @@ TEST_F(ResolveCommandTest, ExplicitOverridesAlias) {
     parsed.prompt = "hello";
     auto [argv, env, warnings] = resolveCommand(parsed, &config);
     EXPECT_EQ(argv[0], "kimi");
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "--think"), argv.end());
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "low"), argv.end());
+    EXPECT_EQ(argv[1], "--thinking");
+    EXPECT_NE(std::find(argv.begin(), argv.end(), "--model"), argv.end());
+    EXPECT_NE(std::find(argv.begin(), argv.end(), "claude-4"), argv.end());
+    EXPECT_EQ(std::find(argv.begin(), argv.end(), "--agent"), argv.end());
+    EXPECT_EQ(std::find(argv.begin(), argv.end(), "specialist"), argv.end());
 }
 
 TEST_F(ResolveCommandTest, KimiThinkingFlags) {
@@ -307,8 +317,17 @@ TEST_F(ResolveCommandTest, KimiThinkingFlags) {
     parsed.thinking = 4;
     parsed.prompt = "hello";
     auto [argv, env, warnings] = resolveCommand(parsed);
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "--think"), argv.end());
-    EXPECT_NE(std::find(argv.begin(), argv.end(), "max"), argv.end());
+    EXPECT_EQ(argv[1], "--thinking");
+}
+
+TEST_F(ResolveCommandTest, KimiThinkingZero) {
+    ParsedArgs parsed;
+    parsed.runner = "k";
+    parsed.thinking = 0;
+    parsed.prompt = "hello";
+    auto [argv, env, warnings] = resolveCommand(parsed);
+    EXPECT_EQ(argv[0], "kimi");
+    EXPECT_EQ(argv[1], "--no-thinking");
 }
 
 TEST_F(ResolveCommandTest, UnknownNameFallsBackToAgentOnOpencode) {

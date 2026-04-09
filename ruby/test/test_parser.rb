@@ -109,14 +109,13 @@ class TestParser < Minitest::Test
   def test_resolve_thinking_flags_claude
     parsed = CallCodingClis::Parser.parse_args(["claude", "+2", "hello"])
     argv, env = CallCodingClis::Parser.resolve_command(parsed)
-    assert_includes argv, "--thinking"
-    assert_includes argv, "medium"
+    assert_equal ["claude", "--thinking", "enabled", "--effort", "medium", "hello"], argv
   end
 
   def test_resolve_thinking_flags_kimi
     parsed = CallCodingClis::Parser.parse_args(["kimi", "+0", "hello"])
     argv, env = CallCodingClis::Parser.resolve_command(parsed)
-    assert_includes argv, "--no-think"
+    assert_equal ["kimi", "--no-thinking", "hello"], argv
   end
 
   def test_resolve_model_flag_claude
@@ -214,6 +213,8 @@ class TestParser < Minitest::Test
     argv, env = CallCodingClis::Parser.resolve_command(parsed, config)
     assert_equal "claude", argv[0]
     assert_includes argv, "--thinking"
+    assert_includes argv, "enabled"
+    assert_includes argv, "--effort"
     assert_includes argv, "high"
     assert_includes argv, "--model"
     assert_includes argv, "opus"
@@ -235,6 +236,8 @@ class TestParser < Minitest::Test
     argv, env = CallCodingClis::Parser.resolve_command(parsed, config)
     assert_equal "claude", argv[0]
     assert_includes argv, "--thinking"
+    assert_includes argv, "enabled"
+    assert_includes argv, "--effort"
     assert_includes argv, "max"
     assert_includes argv, "--model"
     assert_includes argv, "opus"

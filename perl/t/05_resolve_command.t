@@ -34,7 +34,7 @@ use Call::Coding::Clis::Parser qw(parse_args resolve_command);
 {
     my $p   = parse_args("claude", "+3", "think deep");
     my $cmd = resolve_command($p);
-    is_deeply $cmd->{argv}, ['claude', '--thinking', 'high', 'think deep'], 'claude thinking flags';
+    is_deeply $cmd->{argv}, ['claude', '--thinking', 'enabled', '--effort', 'high', 'think deep'], 'claude thinking flags';
 }
 
 {
@@ -64,13 +64,13 @@ use Call::Coding::Clis::Parser qw(parse_args resolve_command);
 {
     my $p   = parse_args("cc", "+1", "hello");
     my $cmd = resolve_command($p);
-    is_deeply $cmd->{argv}, ['claude', '--thinking', 'low', 'hello'], 'cc abbreviation resolves to claude';
+    is_deeply $cmd->{argv}, ['claude', '--thinking', 'enabled', '--effort', 'low', 'hello'], 'cc abbreviation resolves to claude';
 }
 
 {
     my $p   = parse_args("k", "+0", "hello");
     my $cmd = resolve_command($p);
-    is_deeply $cmd->{argv}, ['kimi', '--no-think', 'hello'], 'k abbreviation resolves to kimi';
+    is_deeply $cmd->{argv}, ['kimi', '--no-thinking', 'hello'], 'k abbreviation resolves to kimi';
 }
 
 {
@@ -114,7 +114,7 @@ use Call::Coding::Clis::Parser qw(parse_args resolve_command);
     };
     my $p   = parse_args('@fast', "hello");
     my $cmd = resolve_command($p, $config);
-    is_deeply $cmd->{argv}, ['claude', '--thinking', 'low', 'hello'], 'alias overrides runner+thinking';
+    is_deeply $cmd->{argv}, ['claude', '--thinking', 'enabled', '--effort', 'low', 'hello'], 'alias overrides runner+thinking';
 }
 
 {
@@ -155,7 +155,7 @@ use Call::Coding::Clis::Parser qw(parse_args resolve_command);
     };
     my $p   = parse_args("claude", "hello");
     my $cmd = resolve_command($p, $config);
-    is_deeply $cmd->{argv}, ['claude', '--thinking', 'medium', 'hello'], 'config default_thinking';
+    is_deeply $cmd->{argv}, ['claude', '--thinking', 'enabled', '--effort', 'medium', 'hello'], 'config default_thinking';
 }
 
 {

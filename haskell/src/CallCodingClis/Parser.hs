@@ -56,18 +56,18 @@ runnerRegistry = Map.fromList $ baseRunners ++ abbrevs
   where
     opencode = RunnerInfo "opencode" ["run"] Map.empty "" "" "--agent"
     claude = RunnerInfo "claude" [] (Map.fromList
-      [ (0, ["--no-thinking"])
-      , (1, ["--thinking", "low"])
-      , (2, ["--thinking", "medium"])
-      , (3, ["--thinking", "high"])
-      , (4, ["--thinking", "max"])
+      [ (0, ["--thinking", "disabled"])
+      , (1, ["--thinking", "enabled", "--effort", "low"])
+      , (2, ["--thinking", "enabled", "--effort", "medium"])
+      , (3, ["--thinking", "enabled", "--effort", "high"])
+      , (4, ["--thinking", "enabled", "--effort", "max"])
       ]) "" "--model" "--agent"
     kimi = RunnerInfo "kimi" [] (Map.fromList
-      [ (0, ["--no-think"])
-      , (1, ["--think", "low"])
-      , (2, ["--think", "medium"])
-      , (3, ["--think", "high"])
-      , (4, ["--think", "max"])
+      [ (0, ["--no-thinking"])
+      , (1, ["--thinking"])
+      , (2, ["--thinking"])
+      , (3, ["--thinking"])
+      , (4, ["--thinking"])
       ]) "" "--model" "--agent"
     codex = RunnerInfo "codex" [] Map.empty "" "--model" ""
     roocode = RunnerInfo "roocode" [] Map.empty "" "--model" ""

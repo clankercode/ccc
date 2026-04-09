@@ -218,7 +218,7 @@ func TestResolveCommand_ThinkingFlags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	assertArgv(t, []string{"claude", "--thinking", "medium", "hi"}, argv)
+	assertArgv(t, []string{"claude", "--thinking", "enabled", "--effort", "medium", "hi"}, argv)
 }
 
 func TestResolveCommand_ModelFlag(t *testing.T) {
@@ -276,7 +276,7 @@ func TestResolveCommand_ConfigDefaultsThinking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	assertArgv(t, []string{"claude", "--thinking", "high", "hi"}, argv)
+	assertArgv(t, []string{"claude", "--thinking", "enabled", "--effort", "high", "hi"}, argv)
 }
 
 func TestResolveCommand_AliasResolution(t *testing.T) {
@@ -290,10 +290,18 @@ func TestResolveCommand_AliasResolution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	assertArgv(t, []string{"claude", "--thinking", "medium", "hi"}, argv)
+	assertArgv(t, []string{"claude", "--thinking", "enabled", "--effort", "medium", "hi"}, argv)
 	if len(warnings) != 0 {
 		t.Fatalf("expected no warnings, got %v", warnings)
 	}
+}
+
+func TestResolveCommand_KimiThinkingZero(t *testing.T) {
+	argv, _, _, err := ResolveCommand(ParsedArgs{Runner: strPtr("kimi"), Thinking: intPtr(0), Prompt: "hi"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertArgv(t, []string{"kimi", "--no-thinking", "hi"}, argv)
 }
 
 func TestResolveCommand_NameFallsBackToAgent(t *testing.T) {
@@ -433,7 +441,7 @@ func TestResolveCommand_KimiThinking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	assertArgv(t, []string{"kimi", "--no-think", "hi"}, argv)
+	assertArgv(t, []string{"kimi", "--no-thinking", "hi"}, argv)
 	if len(warnings) != 0 {
 		t.Fatalf("expected no warnings, got %v", warnings)
 	}

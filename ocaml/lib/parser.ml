@@ -59,11 +59,11 @@ let () =
     binary = "claude";
     extra_args = [];
     thinking_flags = [
-      (0, ["--no-thinking"]);
-      (1, ["--thinking"; "low"]);
-      (2, ["--thinking"; "medium"]);
-      (3, ["--thinking"; "high"]);
-      (4, ["--thinking"; "max"]);
+      (0, ["--thinking"; "disabled"]);
+      (1, ["--thinking"; "enabled"; "--effort"; "low"]);
+      (2, ["--thinking"; "enabled"; "--effort"; "medium"]);
+      (3, ["--thinking"; "enabled"; "--effort"; "high"]);
+      (4, ["--thinking"; "enabled"; "--effort"; "max"]);
     ];
     provider_flag = "";
     model_flag = "--model";
@@ -73,11 +73,11 @@ let () =
     binary = "kimi";
     extra_args = [];
     thinking_flags = [
-      (0, ["--no-think"]);
-      (1, ["--think"; "low"]);
-      (2, ["--think"; "medium"]);
-      (3, ["--think"; "high"]);
-      (4, ["--think"; "max"]);
+      (0, ["--no-thinking"]);
+      (1, ["--thinking"]);
+      (2, ["--thinking"]);
+      (3, ["--thinking"]);
+      (4, ["--thinking"]);
     ];
     provider_flag = "";
     model_flag = "--model";

@@ -210,8 +210,10 @@ test "resolveCommand thinking flags claude" {
 
     try std.testing.expectEqualStrings("claude", resolved.argv[0]);
     try std.testing.expectEqualStrings("--thinking", resolved.argv[1]);
-    try std.testing.expectEqualStrings("high", resolved.argv[2]);
-    try std.testing.expectEqualStrings("prompt", resolved.argv[3]);
+    try std.testing.expectEqualStrings("enabled", resolved.argv[2]);
+    try std.testing.expectEqualStrings("--effort", resolved.argv[3]);
+    try std.testing.expectEqualStrings("high", resolved.argv[4]);
+    try std.testing.expectEqualStrings("prompt", resolved.argv[5]);
 }
 
 test "resolveCommand thinking flags kimi" {
@@ -226,7 +228,7 @@ test "resolveCommand thinking flags kimi" {
     defer resolved.deinit(allocator);
 
     try std.testing.expectEqualStrings("kimi", resolved.argv[0]);
-    try std.testing.expectEqualStrings("--no-think", resolved.argv[1]);
+    try std.testing.expectEqualStrings("--no-thinking", resolved.argv[1]);
     try std.testing.expectEqualStrings("prompt", resolved.argv[2]);
 }
 
@@ -293,8 +295,10 @@ test "resolveCommand alias runner override" {
 
     try std.testing.expectEqualStrings("claude", resolved.argv[0]);
     try std.testing.expectEqualStrings("--thinking", resolved.argv[1]);
-    try std.testing.expectEqualStrings("low", resolved.argv[2]);
-    try std.testing.expectEqualStrings("prompt", resolved.argv[3]);
+    try std.testing.expectEqualStrings("enabled", resolved.argv[2]);
+    try std.testing.expectEqualStrings("--effort", resolved.argv[3]);
+    try std.testing.expectEqualStrings("low", resolved.argv[4]);
+    try std.testing.expectEqualStrings("prompt", resolved.argv[5]);
 }
 
 test "resolveCommand name falls back to agent" {

@@ -100,7 +100,7 @@ $r = Parser::resolveCommand(Parser::parseArgs(['rc', 'fix']));
 assert_test('roocode selector rc: argv', $r['argv'] === ['roocode', 'fix']);
 
 $r = Parser::resolveCommand(Parser::parseArgs(['claude', '+3', 'think']));
-assert_test('thinking flags: argv', $r['argv'] === ['claude', '--thinking', 'high', 'think']);
+assert_test('thinking flags: argv', $r['argv'] === ['claude', '--thinking', 'enabled', '--effort', 'high', 'think']);
 
 $r = Parser::resolveCommand(Parser::parseArgs(['claude', ':claude-3.5', 'go']));
 assert_test('model flag: argv', $r['argv'] === ['claude', '--model', 'claude-3.5', 'go']);
@@ -116,7 +116,7 @@ try {
 }
 
 $r = Parser::resolveCommand(Parser::parseArgs(['kimi', '+4', 'max think']));
-assert_test('kimi max thinking', $r['argv'] === ['kimi', '--think', 'max', 'max think']);
+assert_test('kimi max thinking', $r['argv'] === ['kimi', '--thinking', 'max think']);
 
 $r = Parser::resolveCommand(Parser::parseArgs(['oc', 'via abbrev']));
 assert_test('oc abbreviation: argv', $r['argv'] === ['opencode', 'run', 'via abbrev']);
@@ -124,7 +124,7 @@ assert_test('oc abbreviation: argv', $r['argv'] === ['opencode', 'run', 'via abb
 $cfg = new CccConfig();
 $cfg->defaultThinking = 1;
 $r = Parser::resolveCommand(Parser::parseArgs(['claude', 'think']), $cfg);
-assert_test('config default thinking', $r['argv'] === ['claude', '--thinking', 'low', 'think']);
+assert_test('config default thinking', $r['argv'] === ['claude', '--thinking', 'enabled', '--effort', 'low', 'think']);
 
 $cfg = new CccConfig();
 $alias = new AliasDef();
@@ -134,7 +134,7 @@ $alias->model = 'opus-4';
 $cfg->aliases['work'] = $alias;
 $r = Parser::resolveCommand(Parser::parseArgs(['@work', 'hello']), $cfg);
 assert_test('alias: runner from alias', $r['argv'][0] === 'claude');
-assert_test('alias: thinking from alias', in_array('--thinking', $r['argv']) && in_array('medium', $r['argv']));
+assert_test('alias: thinking from alias', in_array('--thinking', $r['argv']) && in_array('enabled', $r['argv']) && in_array('--effort', $r['argv']) && in_array('medium', $r['argv']));
 assert_test('alias: model from alias', in_array('opus-4', $r['argv']));
 
 $cfg = new CccConfig();

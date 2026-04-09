@@ -128,13 +128,13 @@ describe "resolve_command" do
   it "applies thinking flags for claude" do
     parsed = parse_args(["claude", "+2", "hello"])
     argv, env = resolve_command(parsed)
-    argv.should eq(["claude", "--thinking", "medium", "hello"])
+    argv.should eq(["claude", "--thinking", "enabled", "--effort", "medium", "hello"])
   end
 
   it "applies thinking=0 flags for claude" do
     parsed = parse_args(["claude", "+0", "hello"])
     argv, env = resolve_command(parsed)
-    argv.should eq(["claude", "--no-thinking", "hello"])
+    argv.should eq(["claude", "--thinking", "disabled", "hello"])
   end
 
   it "applies model flag for claude" do
@@ -181,8 +181,7 @@ describe "resolve_command" do
     parsed = parse_args(["claude", "hello"])
     config = CccConfig.new(default_thinking: 3)
     argv, env = resolve_command(parsed, config)
-    argv.should contain("--thinking")
-    argv.should contain("high")
+    argv.should eq(["claude", "--thinking", "enabled", "--effort", "high", "hello"])
   end
 
   it "uses alias from config" do
@@ -192,6 +191,8 @@ describe "resolve_command" do
     argv, env = resolve_command(parsed, config)
     argv[0].should eq("claude")
     argv.should contain("--thinking")
+    argv.should contain("enabled")
+    argv.should contain("--effort")
     argv.should contain("medium")
   end
 

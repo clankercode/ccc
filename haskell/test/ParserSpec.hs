@@ -113,7 +113,7 @@ parserSpec = do
     it "adds thinking flags for claude" $ do
       let parsed = ParsedArgs (Just "claude") (Just 3) Nothing Nothing Nothing "hello"
           result = resolveCommand parsed Nothing
-      result `shouldBe` Right (["claude", "--thinking", "high", "hello"], Map.empty, [])
+      result `shouldBe` Right (["claude", "--thinking", "enabled", "--effort", "high", "hello"], Map.empty, [])
 
     it "adds model flag for claude" $ do
       let parsed = ParsedArgs (Just "claude") Nothing Nothing (Just "opus") Nothing "hello"
@@ -140,14 +140,14 @@ parserSpec = do
           config = defaultConfig { ccAliases = Map.singleton "fast" aliasDef }
           parsed = ParsedArgs Nothing Nothing Nothing Nothing (Just "fast") "go"
           result = resolveCommand parsed (Just config)
-      result `shouldBe` Right (["claude", "--thinking", "medium", "go"], Map.empty, [])
+      result `shouldBe` Right (["claude", "--thinking", "enabled", "--effort", "medium", "go"], Map.empty, [])
 
     it "explicit runner overrides alias runner but alias thinking still applies" $ do
       let aliasDef = AliasDef (Just "claude") (Just 2) Nothing Nothing Nothing
           config = defaultConfig { ccAliases = Map.singleton "fast" aliasDef }
           parsed = ParsedArgs (Just "kimi") Nothing Nothing Nothing (Just "fast") "go"
           result = resolveCommand parsed (Just config)
-      result `shouldBe` Right (["kimi", "--think", "medium", "go"], Map.empty, [])
+      result `shouldBe` Right (["kimi", "--thinking", "go"], Map.empty, [])
 
     it "uses name fallback as agent when preset is missing" $ do
       let parsed = ParsedArgs Nothing Nothing Nothing Nothing (Just "reviewer") "go"
@@ -176,7 +176,7 @@ parserSpec = do
       let config = defaultConfig { ccDefaultThinking = Just 1 }
           parsed = ParsedArgs (Just "claude") Nothing Nothing Nothing Nothing "go"
           result = resolveCommand parsed (Just config)
-      result `shouldBe` Right (["claude", "--thinking", "low", "go"], Map.empty, [])
+      result `shouldBe` Right (["claude", "--thinking", "enabled", "--effort", "low", "go"], Map.empty, [])
 
     it "uses config default model and provider" $ do
       let config = defaultConfig { ccDefaultModel = "claude-3", ccDefaultProvider = "anthropic" }
@@ -187,4 +187,4 @@ parserSpec = do
     it "handles kimi runner with thinking 0" $ do
       let parsed = ParsedArgs (Just "kimi") (Just 0) Nothing Nothing Nothing "hello"
           result = resolveCommand parsed Nothing
-      result `shouldBe` Right (["kimi", "--no-think", "hello"], Map.empty, [])
+      result `shouldBe` Right (["kimi", "--no-thinking", "hello"], Map.empty, [])

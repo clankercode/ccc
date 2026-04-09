@@ -5,7 +5,7 @@
 
 #define CCC_MAX_PROMPT 4096
 #define CCC_MAX_ARGV 20
-#define CCC_MAX_THINKING_ARGS 3
+#define CCC_MAX_THINKING_ARGS 4
 #define CCC_MAX_WARNING_LEN 256
 
 typedef struct {

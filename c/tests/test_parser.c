@@ -264,11 +264,13 @@ static void test_resolve_thinking_flags(void) {
     const char *out[CCC_MAX_ARGV];
     char prov[128] = {0};
     int c = resolve_command_no_warning(&pa, &cfg, out, prov);
-    assert_int(c, 4, "resolve-thinking: argc");
+    assert_int(c, 6, "resolve-thinking: argc");
     assert_str(out[0], "claude", "resolve-thinking: binary");
     assert_str(out[1], "--thinking", "resolve-thinking: flag");
-    assert_str(out[2], "medium", "resolve-thinking: level");
-    assert_str(out[3], "hello", "resolve-thinking: prompt");
+    assert_str(out[2], "enabled", "resolve-thinking: mode");
+    assert_str(out[3], "--effort", "resolve-thinking: effort flag");
+    assert_str(out[4], "medium", "resolve-thinking: level");
+    assert_str(out[5], "hello", "resolve-thinking: prompt");
 }
 
 static void test_resolve_thinking_zero(void) {
@@ -281,8 +283,15 @@ static void test_resolve_thinking_zero(void) {
     const char *out[CCC_MAX_ARGV];
     char prov[128] = {0};
     int c = resolve_command_no_warning(&pa, &cfg, out, prov);
-    assert_int(c, 3, "resolve-thinking0: argc");
-    assert_str(out[1], "--no-thinking", "resolve-thinking0: flag");
+    assert_int(c, 4, "resolve-thinking0: argc");
+    assert_str(out[1], "--thinking", "resolve-thinking0: flag");
+    assert_str(out[2], "disabled", "resolve-thinking0: mode");
+
+    char *kimi_argv[] = {"ccc", "kimi", "+0", "hello"};
+    ccc_parse_args(4, kimi_argv, &pa);
+    c = resolve_command_no_warning(&pa, &cfg, out, prov);
+    assert_int(c, 3, "resolve-kimi-thinking0: argc");
+    assert_str(out[1], "--no-thinking", "resolve-kimi-thinking0: flag");
 }
 
 static void test_resolve_model_flag(void) {

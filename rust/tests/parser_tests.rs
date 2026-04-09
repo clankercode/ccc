@@ -183,6 +183,10 @@ fn test_resolve_kimi_thinking_flags() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(argv[..2], ["kimi".to_string(), "--thinking".to_string()]);
+    assert_eq!(
+        argv[argv.len() - 2..],
+        ["--prompt".to_string(), "hello".to_string()]
+    );
     assert!(!argv.contains(&"--think".to_string()));
     assert!(!argv.contains(&"max".to_string()));
     assert!(warnings.is_empty());
@@ -198,7 +202,30 @@ fn test_resolve_kimi_thinking_zero() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(argv[..2], ["kimi".to_string(), "--no-thinking".to_string()]);
+    assert_eq!(
+        argv[argv.len() - 2..],
+        ["--prompt".to_string(), "hello".to_string()]
+    );
     assert!(!argv.contains(&"--thinking".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_kimi_uses_prompt_flag() {
+    let parsed = ParsedArgs {
+        runner: Some("k".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv,
+        [
+            "kimi".to_string(),
+            "--prompt".to_string(),
+            "hello".to_string()
+        ]
+    );
     assert!(warnings.is_empty());
 }
 

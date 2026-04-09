@@ -10,6 +10,7 @@ pub struct RunnerInfo {
     pub provider_flag: String,
     pub model_flag: String,
     pub agent_flag: String,
+    pub prompt_flag: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -75,6 +76,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         provider_flag: String::new(),
         model_flag: String::new(),
         agent_flag: "--agent".into(),
+        prompt_flag: String::new(),
     };
     let claude = RunnerInfo {
         binary: "claude".into(),
@@ -123,6 +125,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         provider_flag: String::new(),
         model_flag: "--model".into(),
         agent_flag: "--agent".into(),
+        prompt_flag: String::new(),
     };
     let kimi = RunnerInfo {
         binary: "kimi".into(),
@@ -139,6 +142,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         provider_flag: String::new(),
         model_flag: "--model".into(),
         agent_flag: "--agent".into(),
+        prompt_flag: "--prompt".into(),
     };
     let codex = RunnerInfo {
         binary: "codex".into(),
@@ -147,6 +151,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         provider_flag: String::new(),
         model_flag: "--model".into(),
         agent_flag: String::new(),
+        prompt_flag: String::new(),
     };
     let roocode = RunnerInfo {
         binary: "roocode".into(),
@@ -155,6 +160,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         provider_flag: String::new(),
         model_flag: String::new(),
         agent_flag: String::new(),
+        prompt_flag: String::new(),
     };
     let crush = RunnerInfo {
         binary: "crush".into(),
@@ -163,6 +169,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         provider_flag: String::new(),
         model_flag: String::new(),
         agent_flag: String::new(),
+        prompt_flag: String::new(),
     };
 
     let claude_clone = claude.clone();
@@ -400,7 +407,12 @@ pub fn resolve_command(
     if prompt.is_empty() {
         return Err("prompt must not be empty");
     }
-    argv.push(prompt.to_string());
+    if effective_runner.prompt_flag.is_empty() {
+        argv.push(prompt.to_string());
+    } else {
+        argv.push(effective_runner.prompt_flag.clone());
+        argv.push(prompt.to_string());
+    }
 
     Ok((argv, env_overrides, warnings))
 }

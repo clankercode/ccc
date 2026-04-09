@@ -169,6 +169,7 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = parse_args(["k", "+max", "hello"])
         argv, _env, _warnings = resolve_command(parsed)
         self.assertEqual(argv[:2], ["kimi", "--thinking"])
+        self.assertEqual(argv[-2:], ["--prompt", "hello"])
         self.assertNotIn("max", argv)
         self.assertNotIn("--think", argv)
 
@@ -245,6 +246,7 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(runner="k", thinking=4, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
         self.assertEqual(argv[:2], ["kimi", "--thinking"])
+        self.assertEqual(argv[-2:], ["--prompt", "hello"])
         self.assertNotIn("max", argv)
         self.assertNotIn("--think", argv)
 
@@ -252,7 +254,13 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(runner="k", thinking=0, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
         self.assertEqual(argv[:2], ["kimi", "--no-thinking"])
+        self.assertEqual(argv[-2:], ["--prompt", "hello"])
         self.assertNotIn("--thinking", argv)
+
+    def test_kimi_uses_prompt_flag(self):
+        parsed = ParsedArgs(runner="k", prompt="hello")
+        argv, _env, _warnings = resolve_command(parsed)
+        self.assertEqual(argv, ["kimi", "--prompt", "hello"])
 
     def test_alias_falls_back_to_agent_for_opencode(self):
         parsed = ParsedArgs(alias="reviewer", prompt="hello")
@@ -271,6 +279,7 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(runner="k", alias="reviewer", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
         self.assertEqual(argv[:3], ["kimi", "--agent", "reviewer"])
+        self.assertEqual(argv[-2:], ["--prompt", "hello"])
         self.assertEqual(warnings, [])
 
     def test_alias_falls_back_to_agent_with_warning_when_runner_lacks_support(self):

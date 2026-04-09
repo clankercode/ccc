@@ -15,6 +15,7 @@ class RunnerInfo:
     provider_flag: str = ""
     model_flag: str = ""
     agent_flag: str = ""
+    prompt_flag: str = ""
 
 
 @dataclass(slots=True)
@@ -56,6 +57,7 @@ def _register_defaults() -> None:
         provider_flag="",
         model_flag="",
         agent_flag="--agent",
+        prompt_flag="",
     )
     RUNNER_REGISTRY["claude"] = RunnerInfo(
         binary="claude",
@@ -70,6 +72,7 @@ def _register_defaults() -> None:
         provider_flag="",
         model_flag="--model",
         agent_flag="--agent",
+        prompt_flag="",
     )
     RUNNER_REGISTRY["kimi"] = RunnerInfo(
         binary="kimi",
@@ -84,6 +87,7 @@ def _register_defaults() -> None:
         provider_flag="",
         model_flag="--model",
         agent_flag="--agent",
+        prompt_flag="--prompt",
     )
     RUNNER_REGISTRY["codex"] = RunnerInfo(
         binary="codex",
@@ -91,6 +95,7 @@ def _register_defaults() -> None:
         thinking_flags={},
         provider_flag="",
         model_flag="--model",
+        prompt_flag="",
     )
     RUNNER_REGISTRY["roocode"] = RunnerInfo(
         binary="roocode",
@@ -98,6 +103,7 @@ def _register_defaults() -> None:
         thinking_flags={},
         provider_flag="",
         model_flag="",
+        prompt_flag="",
     )
     RUNNER_REGISTRY["crush"] = RunnerInfo(
         binary="crush",
@@ -105,6 +111,7 @@ def _register_defaults() -> None:
         thinking_flags={},
         provider_flag="",
         model_flag="",
+        prompt_flag="",
     )
 
     RUNNER_REGISTRY["oc"] = RUNNER_REGISTRY["opencode"]
@@ -251,5 +258,8 @@ def resolve_command(
     if not prompt:
         raise ValueError("prompt must not be empty")
 
-    argv.append(prompt)
+    if info.prompt_flag:
+        argv.extend([info.prompt_flag, prompt])
+    else:
+        argv.append(prompt)
     return argv, env_overrides, warnings

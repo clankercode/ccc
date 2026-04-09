@@ -1,7 +1,11 @@
 import subprocess
 import unittest
 from unittest import mock
-from call_coding_clis.cli import _filtered_human_stderr, _sanitize_raw_output
+from call_coding_clis.cli import (
+    _filtered_human_stderr,
+    _sanitize_human_output,
+    _sanitize_raw_output,
+)
 
 
 class RunnerTests(unittest.TestCase):
@@ -26,6 +30,18 @@ class RunnerTests(unittest.TestCase):
     def test_sanitize_raw_output_keeps_other_runners(self) -> None:
         stdout = "plain output\n"
         self.assertEqual(_sanitize_raw_output(stdout, "cc"), stdout)
+
+    def test_sanitize_human_output_strips_title_and_bell(self) -> None:
+        text = "hello\x1b]9;title here\x07world\a!\n"
+        self.assertEqual(_sanitize_human_output(text, True), "helloworld!\n")
+
+    def test_sanitize_human_output_preserves_osc8_hyperlink(self) -> None:
+        link = "\x1b]8;;https://example.com\x07click\x1b]8;;\x07"
+        self.assertEqual(_sanitize_human_output(link, True), link)
+
+    def test_sanitize_human_output_can_be_disabled(self) -> None:
+        text = "hello\x1b]9;title here\x07world\a!\n"
+        self.assertEqual(_sanitize_human_output(text, False), text)
 
     def test_imports_public_api(self) -> None:
         from call_coding_clis import CommandSpec, CompletedRun, Runner
@@ -140,6 +156,7 @@ class RunnerTests(unittest.TestCase):
         from call_coding_clis.help import HELP_TEXT
 
         self.assertIn("--show-thinking", HELP_TEXT)
+        self.assertIn("--sanitize-osc", HELP_TEXT)
         self.assertIn("--output-mode", HELP_TEXT)
         self.assertIn("--forward-unknown-json", HELP_TEXT)
         self.assertIn(".json / ..json", HELP_TEXT)

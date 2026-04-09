@@ -47,6 +47,9 @@ Controls (free order before the prompt):
 Flags:
   --show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it
                                         (default: off; config key: show_thinking)
+  --sanitize-osc / --no-sanitize-osc    Strip disruptive OSC control output in human-facing modes
+                                        while preserving OSC 8 hyperlinks
+                                        (config key: defaults.sanitize_osc / default_sanitize_osc)
   --output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>
                                         Select raw, streamed, or formatted output handling
                                         (config key: defaults.output_mode / default_output_mode)
@@ -67,7 +70,7 @@ Examples:
   ccc -y -- +1 @agent :model
 
 Config:
-  ~/.config/ccc/config.toml  — default runner, output mode, presets, abbreviations, show_thinking
+  ~/.config/ccc/config.toml  — default runner, output mode, OSC sanitization, presets, abbreviations, show_thinking
 """
 
 

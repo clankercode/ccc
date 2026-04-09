@@ -26,6 +26,7 @@ class ParsedArgs:
     runner: str | None = None
     thinking: int | None = None
     show_thinking: bool | None = None
+    sanitize_osc: bool | None = None
     output_mode: str | None = None
     forward_unknown_json: bool = False
     yolo: bool = False
@@ -41,6 +42,7 @@ class AliasDef:
     runner: str | None = None
     thinking: int | None = None
     show_thinking: bool | None = None
+    sanitize_osc: bool | None = None
     output_mode: str | None = None
     provider: str | None = None
     model: str | None = None
@@ -54,6 +56,7 @@ class CccConfig:
     default_model: str = ""
     default_thinking: int | None = None
     default_show_thinking: bool = False
+    default_sanitize_osc: bool | None = None
     default_output_mode: str = "text"
     aliases: dict[str, AliasDef] = field(default_factory=dict)
     abbreviations: dict[str, str] = field(default_factory=dict)
@@ -213,6 +216,8 @@ def parse_args(argv: list[str]) -> ParsedArgs:
             ]
         elif token in {"--show-thinking", "--no-show-thinking"}:
             parsed.show_thinking = token == "--show-thinking"
+        elif token in {"--sanitize-osc", "--no-sanitize-osc"}:
+            parsed.sanitize_osc = token == "--sanitize-osc"
         elif token in {"--output-mode", "-o"}:
             if index + 1 >= len(argv):
                 parsed.output_mode = ""
@@ -330,6 +335,20 @@ def resolve_show_thinking(parsed: ParsedArgs, config: CccConfig | None = None) -
         value = alias_def.show_thinking
     if value is None:
         value = config.default_show_thinking
+    return bool(value)
+
+
+def resolve_sanitize_osc(parsed: ParsedArgs, config: CccConfig | None = None) -> bool:
+    if config is None:
+        config = CccConfig()
+    _, _, alias_def = resolve_effective_runner(parsed, config)
+    value = parsed.sanitize_osc
+    if value is None and alias_def and alias_def.sanitize_osc is not None:
+        value = alias_def.sanitize_osc
+    if value is None:
+        value = config.default_sanitize_osc
+    if value is None:
+        value = "formatted" in resolve_output_mode(parsed, config)
     return bool(value)
 
 

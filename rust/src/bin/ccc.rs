@@ -1,7 +1,7 @@
 use call_coding_clis::{
     load_config, parse_args, parse_json_output, print_help, print_usage, render_parsed,
-    resolve_command, resolve_output_plan, resolve_show_thinking, FormattedRenderer, Runner,
-    StructuredStreamProcessor,
+    resolve_command, resolve_output_plan, resolve_sanitize_osc, resolve_show_thinking,
+    FormattedRenderer, Runner, StructuredStreamProcessor,
 };
 use std::env;
 use std::io::IsTerminal;
@@ -50,9 +50,47 @@ fn sanitize_raw_output(text: &str, runner_name: &str) -> String {
     output
 }
 
+fn sanitize_human_output(text: &str, sanitize_osc: bool) -> String {
+    if !sanitize_osc || text.is_empty() {
+        return text.to_string();
+    }
+    let mut output = String::new();
+    let mut preserved = Vec::new();
+    let mut remaining = text;
+    while let Some(start) = remaining.find("\u{1b}]") {
+        output.push_str(&remaining[..start]);
+        let osc = &remaining[start..];
+        let end = if let Some(index) = osc[2..].find('\u{7}') {
+            Some(start + 2 + index + 1)
+        } else if let Some(index) = osc[2..].find("\u{1b}\\") {
+            Some(start + 2 + index + 2)
+        } else {
+            None
+        };
+        let Some(end) = end else {
+            remaining = &remaining[..start];
+            break;
+        };
+        let full = &remaining[start..end];
+        if full.starts_with("\u{1b}]8;") {
+            let marker = format!("\0OSC8{}\0", preserved.len());
+            preserved.push(full.to_string());
+            output.push_str(&marker);
+        }
+        remaining = &remaining[end..];
+    }
+    output.push_str(remaining);
+    let mut sanitized: String = output.chars().filter(|ch| *ch != '\u{7}').collect();
+    for (index, value) in preserved.iter().enumerate() {
+        let marker = format!("\0OSC8{}\0", index);
+        sanitized = sanitized.replace(&marker, value);
+    }
+    sanitized
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{filtered_human_stderr, sanitize_raw_output};
+    use super::{filtered_human_stderr, sanitize_human_output, sanitize_raw_output};
 
     #[test]
     fn strips_kimi_resume_hint() {
@@ -82,6 +120,24 @@ mod tests {
     fn keeps_other_runner_raw_output() {
         let stdout = "plain output\n";
         assert_eq!(sanitize_raw_output(stdout, "cc"), stdout);
+    }
+
+    #[test]
+    fn sanitize_human_output_strips_title_and_bell() {
+        let text = "hello\u{1b}]9;title here\u{7}world\u{7}!\n";
+        assert_eq!(sanitize_human_output(text, true), "helloworld!\n");
+    }
+
+    #[test]
+    fn sanitize_human_output_preserves_osc8_hyperlink() {
+        let text = "\u{1b}]8;;https://example.com\u{7}click\u{1b}]8;;\u{7}";
+        assert_eq!(sanitize_human_output(text, true), text);
+    }
+
+    #[test]
+    fn sanitize_human_output_can_be_disabled() {
+        let text = "hello\u{1b}]9;title here\u{7}world\u{7}!\n";
+        assert_eq!(sanitize_human_output(text, false), text);
     }
 }
 
@@ -137,6 +193,7 @@ fn main() -> ExitCode {
 
     let runner = Runner::new();
     let show_thinking = resolve_show_thinking(&parsed, Some(&config));
+    let sanitize_osc = resolve_sanitize_osc(&parsed, Some(&config));
     let forward_unknown_json = parsed.forward_unknown_json;
 
     match output_plan.mode.as_str() {
@@ -166,7 +223,7 @@ fn main() -> ExitCode {
             let result = runner.run(spec);
             let stderr = filtered_human_stderr(&result.stderr, &output_plan.runner_name);
             if !stderr.is_empty() {
-                eprint!("{}", stderr);
+                eprint!("{}", sanitize_human_output(&stderr, sanitize_osc));
             }
             let rendered = render_parsed(
                 &parse_json_output(&result.stdout, output_plan.schema.as_deref().unwrap_or("")),
@@ -174,7 +231,7 @@ fn main() -> ExitCode {
                 std::io::stdout().is_terminal(),
             );
             if !rendered.is_empty() {
-                println!("{}", rendered);
+                println!("{}", sanitize_human_output(&rendered, sanitize_osc));
             }
             if forward_unknown_json {
                 for raw_line in parse_json_output(
@@ -199,14 +256,14 @@ fn main() -> ExitCode {
                 if channel == "stderr" {
                     let filtered = filtered_human_stderr(chunk, &stream_runner_name);
                     if !filtered.is_empty() {
-                        eprint!("{}", filtered);
+                        eprint!("{}", sanitize_human_output(&filtered, sanitize_osc));
                     }
                     return;
                 }
                 if let Ok(mut processor) = callback_processor.lock() {
                     let rendered = processor.feed(chunk);
                     if !rendered.is_empty() {
-                        println!("{}", rendered);
+                        println!("{}", sanitize_human_output(&rendered, sanitize_osc));
                     }
                     if forward_unknown_json {
                         for raw_line in processor.take_unknown_json_lines() {
@@ -218,7 +275,7 @@ fn main() -> ExitCode {
             if let Ok(mut processor) = processor.lock() {
                 let trailing = processor.finish();
                 if !trailing.is_empty() {
-                    println!("{}", trailing);
+                    println!("{}", sanitize_human_output(&trailing, sanitize_osc));
                 }
                 if forward_unknown_json {
                     for raw_line in processor.take_unknown_json_lines() {

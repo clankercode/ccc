@@ -10,19 +10,19 @@ They intentionally mix:
 
 Current files:
 
-- [opencode.md](/home/xertrov/src/call-coding-clis/docs/clis/opencode.md)
-- [claude.md](/home/xertrov/src/call-coding-clis/docs/clis/claude.md)
-- [codex.md](/home/xertrov/src/call-coding-clis/docs/clis/codex.md)
-- [kimi.md](/home/xertrov/src/call-coding-clis/docs/clis/kimi.md)
-- [crush.md](/home/xertrov/src/call-coding-clis/docs/clis/crush.md)
-- [roocode.md](/home/xertrov/src/call-coding-clis/docs/clis/roocode.md)
-- [allow-deny-tool-plan.md](/home/xertrov/src/call-coding-clis/docs/clis/allow-deny-tool-plan.md)
-- [output-mode-compatibility.md](/home/xertrov/src/call-coding-clis/docs/clis/output-mode-compatibility.md)
-- [stream-output-visual-systems.md](/home/xertrov/src/call-coding-clis/docs/clis/stream-output-visual-systems.md)
-- [output-mode-porting.md](/home/xertrov/src/call-coding-clis/docs/clis/output-mode-porting.md)
-- [json-event-references.md](/home/xertrov/src/call-coding-clis/docs/clis/json-event-references.md)
-- [model-capabilities.json](/home/xertrov/src/call-coding-clis/docs/clis/model-capabilities.json)
-- [updating-model-capabilities.md](/home/xertrov/src/call-coding-clis/docs/clis/updating-model-capabilities.md)
+- [opencode.md](opencode.md)
+- [claude.md](claude.md)
+- [codex.md](codex.md)
+- [kimi.md](kimi.md)
+- [crush.md](crush.md)
+- [roocode.md](roocode.md)
+- [allow-deny-tool-plan.md](allow-deny-tool-plan.md)
+- [output-mode-compatibility.md](output-mode-compatibility.md)
+- [stream-output-visual-systems.md](stream-output-visual-systems.md)
+- [output-mode-porting.md](output-mode-porting.md)
+- [json-event-references.md](json-event-references.md)
+- [model-capabilities.json](model-capabilities.json)
+- [updating-model-capabilities.md](updating-model-capabilities.md)
 
 ## Permission Matrix
 
@@ -53,7 +53,7 @@ Kimi does not expose the same numeric ladder; `ccc` currently maps `+0` to `--no
 
 ## Model Thinking Capability Source Of Truth
 
-The shared source of truth is [model-capabilities.json](/home/xertrov/src/call-coding-clis/docs/clis/model-capabilities.json), not this markdown file.
+The shared source of truth is [model-capabilities.json](model-capabilities.json), not this markdown file.
 
 Use it for:
 
@@ -73,7 +73,7 @@ Current structured coverage summary:
 | Moonshot | `kimi-k2` | `k` | binary | yes | `+1..+4` collapse to `--thinking` |
 | OpenCode | unverified | `oc` | unknown | yes | visible-thinking support known, tier mapping not yet verified |
 
-If you update thinking-capability notes, follow [updating-model-capabilities.md](/home/xertrov/src/call-coding-clis/docs/clis/updating-model-capabilities.md) and update the JSON first.
+If you update thinking-capability notes, follow [updating-model-capabilities.md](updating-model-capabilities.md) and update the JSON first.
 
 ## Current Cross-Runner Permission Modes
 
@@ -115,11 +115,36 @@ Python and Rust now share these output modes:
 | `formatted` | `.fmt` | buffered human transcript |
 | `stream-formatted` | `..fmt` | live human transcript |
 
-See [output-mode-compatibility.md](/home/xertrov/src/call-coding-clis/docs/clis/output-mode-compatibility.md) for the runner matrix and [stream-output-visual-systems.md](/home/xertrov/src/call-coding-clis/docs/clis/stream-output-visual-systems.md) for the current TTY rendering design.
+See [output-mode-compatibility.md](output-mode-compatibility.md) for the runner matrix and [stream-output-visual-systems.md](stream-output-visual-systems.md) for the current TTY rendering design.
 
-Implementation notes for future language ports live in [output-mode-porting.md](/home/xertrov/src/call-coding-clis/docs/clis/output-mode-porting.md).
+Implementation notes for future language ports live in [output-mode-porting.md](output-mode-porting.md).
 
-Upstream structured-output references live in [json-event-references.md](/home/xertrov/src/call-coding-clis/docs/clis/json-event-references.md).
+Upstream structured-output references live in [json-event-references.md](json-event-references.md).
+
+## OSC Sanitization
+
+Python and Rust now support:
+
+- `--sanitize-osc`
+- `--no-sanitize-osc`
+
+Config support matches the flag:
+
+- `[defaults].sanitize_osc = true|false`
+- legacy `default_sanitize_osc = true|false`
+- `[aliases.<name>].sanitize_osc = true|false`
+
+Default behavior:
+
+- `formatted` and `stream-formatted` sanitize disruptive OSC/control output by default
+- `text`, `stream-text`, `json`, and `stream-json` keep their existing raw behavior
+- OpenCode raw JSON cleanup remains always on so `oc json` stays machine-clean
+
+Sanitization rules:
+
+- preserve OSC 8 hyperlinks
+- strip title-setting OSC sequences
+- strip stray bell characters and other disruptive OSC side effects from human-facing output
 
 Manual smoke checks:
 

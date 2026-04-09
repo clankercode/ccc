@@ -7,13 +7,25 @@ import re
 try:
     from .json_output import FormattedRenderer, StructuredStreamProcessor, parse_json_output, render_parsed
     from .runner import CommandSpec, Runner
-    from .parser import parse_args, resolve_command, resolve_output_plan, resolve_show_thinking
+    from .parser import (
+        parse_args,
+        resolve_command,
+        resolve_output_plan,
+        resolve_sanitize_osc,
+        resolve_show_thinking,
+    )
     from .config import load_config
     from .help import print_help, print_usage
 except ImportError:
     from json_output import FormattedRenderer, StructuredStreamProcessor, parse_json_output, render_parsed
     from runner import CommandSpec, Runner
-    from parser import parse_args, resolve_command, resolve_output_plan, resolve_show_thinking
+    from parser import (
+        parse_args,
+        resolve_command,
+        resolve_output_plan,
+        resolve_sanitize_osc,
+        resolve_show_thinking,
+    )
     from config import load_config
     from help import print_help, print_usage
 
@@ -57,6 +69,7 @@ def main(argv: list[str] | None = None) -> int:
 
     runner = Runner()
     show_thinking = resolve_show_thinking(parsed, config)
+    sanitize_osc = resolve_sanitize_osc(parsed, config)
     forward_unknown_json = parsed.forward_unknown_json
 
     if output_plan.mode in {"text", "json"}:
@@ -84,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
         result = runner.run(spec)
         stderr = _filtered_human_stderr(result.stderr, output_plan.runner_name)
         if stderr:
-            print(stderr, end="", file=sys.stderr)
+            print(_sanitize_human_output(stderr, sanitize_osc), end="", file=sys.stderr)
         parsed_output = parse_json_output(result.stdout, output_plan.schema or "")
         rendered = render_parsed(
             parsed_output,
@@ -92,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
             tty=sys.stdout.isatty(),
         )
         if rendered:
-            print(rendered)
+            print(_sanitize_human_output(rendered, sanitize_osc))
         if forward_unknown_json:
             for raw_line in parsed_output.unknown_json_lines:
                 print(raw_line, file=sys.stderr)
@@ -112,14 +125,15 @@ def main(argv: list[str] | None = None) -> int:
             processor,
             forward_unknown_json,
             stderr_filter,
+            sanitize_osc,
         ),
     )
     trailing = processor.finish()
     if trailing:
-        print(trailing)
+        print(_sanitize_human_output(trailing, sanitize_osc))
     trailing_stderr = stderr_filter.finish()
     if trailing_stderr:
-        print(trailing_stderr, end="", file=sys.stderr)
+        print(_sanitize_human_output(trailing_stderr, sanitize_osc), end="", file=sys.stderr)
     if forward_unknown_json:
         for raw_line in processor.take_unknown_json_lines():
             print(raw_line, file=sys.stderr)
@@ -132,15 +146,16 @@ def _handle_structured_chunk(
     processor: StructuredStreamProcessor,
     forward_unknown_json: bool,
     stderr_filter: "_HumanStderrFilter",
+    sanitize_osc: bool,
 ) -> None:
     if channel == "stderr":
         filtered = stderr_filter.feed(chunk)
         if filtered:
-            print(filtered, end="", file=sys.stderr)
+            print(_sanitize_human_output(filtered, sanitize_osc), end="", file=sys.stderr)
         return
     rendered = processor.feed(chunk)
     if rendered:
-        print(rendered)
+        print(_sanitize_human_output(rendered, sanitize_osc))
     if forward_unknown_json:
         for raw_line in processor.take_unknown_json_lines():
             print(raw_line, file=sys.stderr)
@@ -148,6 +163,7 @@ def _handle_structured_chunk(
 
 _KIMI_RESUME_RE = re.compile(r"^To resume this session: kimi -r [0-9a-f-]+\s*$", re.MULTILINE)
 _OSC_RE = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
+_OSC_8_PREFIX_RE = re.compile(r"^\x1b]8;")
 
 
 def _filtered_human_stderr(stderr: str, runner_name: str) -> str:
@@ -162,6 +178,26 @@ def _sanitize_raw_output(text: str, runner_name: str) -> str:
     if not text or runner_name.lower() not in {"oc", "opencode"}:
         return text
     return _OSC_RE.sub("", text)
+
+
+def _sanitize_human_output(text: str, sanitize_osc: bool) -> str:
+    if not text or not sanitize_osc:
+        return text
+
+    preserved: list[str] = []
+
+    def _preserve_osc8(match: re.Match[str]) -> str:
+        value = match.group(0)
+        if _OSC_8_PREFIX_RE.match(value):
+            preserved.append(value)
+            return f"\0OSC8{len(preserved) - 1}\0"
+        return ""
+
+    sanitized = _OSC_RE.sub(_preserve_osc8, text)
+    sanitized = sanitized.replace("\a", "")
+    for index, value in enumerate(preserved):
+        sanitized = sanitized.replace(f"\0OSC8{index}\0", value)
+    return sanitized
 
 
 class _HumanStderrFilter:

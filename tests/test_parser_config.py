@@ -7,6 +7,7 @@ from call_coding_clis.parser import (
     resolve_command,
     resolve_output_mode,
     resolve_output_plan,
+    resolve_sanitize_osc,
     resolve_show_thinking,
     ParsedArgs,
     CccConfig,
@@ -23,6 +24,7 @@ class ParseArgsTests(unittest.TestCase):
         self.assertIsNone(parsed.runner)
         self.assertIsNone(parsed.thinking)
         self.assertIsNone(parsed.show_thinking)
+        self.assertIsNone(parsed.sanitize_osc)
         self.assertFalse(parsed.yolo)
         self.assertIsNone(parsed.permission_mode)
         self.assertIsNone(parsed.provider)
@@ -143,6 +145,16 @@ class ParseArgsTests(unittest.TestCase):
     def test_no_show_thinking_flag(self):
         parsed = parse_args(["--no-show-thinking", "hello"])
         self.assertFalse(parsed.show_thinking)
+        self.assertEqual(parsed.prompt, "hello")
+
+    def test_sanitize_osc_flag(self):
+        parsed = parse_args(["--sanitize-osc", "hello"])
+        self.assertTrue(parsed.sanitize_osc)
+        self.assertEqual(parsed.prompt, "hello")
+
+    def test_no_sanitize_osc_flag(self):
+        parsed = parse_args(["--no-sanitize-osc", "hello"])
+        self.assertFalse(parsed.sanitize_osc)
         self.assertEqual(parsed.prompt, "hello")
 
     def test_yolo_flags(self):
@@ -575,6 +587,24 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(prompt="hello")
         self.assertEqual(resolve_output_mode(parsed, config), "stream-formatted")
 
+    def test_sanitize_osc_defaults_on_for_formatted_modes(self):
+        parsed = ParsedArgs(output_mode="formatted", prompt="hello")
+        self.assertTrue(resolve_sanitize_osc(parsed))
+
+    def test_sanitize_osc_defaults_off_for_raw_modes(self):
+        parsed = ParsedArgs(output_mode="json", prompt="hello")
+        self.assertFalse(resolve_sanitize_osc(parsed))
+
+    def test_sanitize_osc_uses_alias_default(self):
+        config = CccConfig(aliases={"review": AliasDef(sanitize_osc=False)})
+        parsed = ParsedArgs(alias="review", output_mode="formatted", prompt="hello")
+        self.assertFalse(resolve_sanitize_osc(parsed, config))
+
+    def test_config_default_sanitize_osc(self):
+        config = CccConfig(default_sanitize_osc=False)
+        parsed = ParsedArgs(output_mode="formatted", prompt="hello")
+        self.assertFalse(resolve_sanitize_osc(parsed, config))
+
     def test_unsupported_output_mode_raises(self):
         parsed = ParsedArgs(runner="oc", output_mode="stream-json", prompt="hello")
         with self.assertRaises(ValueError):
@@ -627,6 +657,7 @@ model = "claude-4"
 output_mode = "stream-formatted"
 thinking = 2
 show_thinking = true
+sanitize_osc = false
 
 [abbreviations]
 mycc = "cc"
@@ -635,6 +666,7 @@ mycc = "cc"
 runner = "cc"
 thinking = 3
 show_thinking = true
+sanitize_osc = false
 output_mode = "formatted"
 model = "claude-4"
 agent = "reviewer"
@@ -651,6 +683,7 @@ runner = "oc"
         self.assertEqual(config.default_output_mode, "stream-formatted")
         self.assertEqual(config.default_thinking, 2)
         self.assertTrue(config.default_show_thinking)
+        self.assertFalse(config.default_sanitize_osc)
         self.assertEqual(config.abbreviations, {"mycc": "cc"})
         self.assertIn("work", config.aliases)
         self.assertEqual(config.aliases["work"].runner, "cc")
@@ -658,6 +691,7 @@ runner = "oc"
         self.assertEqual(config.aliases["work"].model, "claude-4")
         self.assertEqual(config.aliases["work"].agent, "reviewer")
         self.assertTrue(config.aliases["work"].show_thinking)
+        self.assertFalse(config.aliases["work"].sanitize_osc)
         self.assertEqual(config.aliases["work"].output_mode, "formatted")
         self.assertIn("quick", config.aliases)
         self.assertEqual(config.aliases["quick"].runner, "oc")
@@ -668,6 +702,13 @@ runner = "oc"
             f.flush()
             config = load_config(f.name)
         self.assertEqual(config.default_output_mode, "json")
+
+    def test_legacy_default_sanitize_osc(self):
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".toml", delete=False) as f:
+            f.write(b"default_sanitize_osc = false\n")
+            f.flush()
+            config = load_config(f.name)
+        self.assertFalse(config.default_sanitize_osc)
 
     def test_empty_toml_returns_defaults(self):
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".toml", delete=False) as f:

@@ -21,6 +21,7 @@ model = "claude-4"
 output_mode = "stream-formatted"
 thinking = 2
 show_thinking = true
+sanitize_osc = false
 
 [abbreviations]
 mycc = "cc"
@@ -29,6 +30,7 @@ mycc = "cc"
 runner = "cc"
 thinking = 3
 show_thinking = true
+sanitize_osc = false
 output_mode = "formatted"
 model = "claude-4"
 agent = "reviewer"
@@ -47,6 +49,7 @@ runner = "oc"
     assert_eq!(config.default_output_mode, "stream-formatted");
     assert_eq!(config.default_thinking, Some(2));
     assert!(config.default_show_thinking);
+    assert_eq!(config.default_sanitize_osc, Some(false));
     assert_eq!(
         config.abbreviations.get("mycc").map(|s| s.as_str()),
         Some("cc")
@@ -55,6 +58,7 @@ runner = "oc"
     assert_eq!(work.runner.as_deref(), Some("cc"));
     assert_eq!(work.thinking, Some(3));
     assert_eq!(work.show_thinking, Some(true));
+    assert_eq!(work.sanitize_osc, Some(false));
     assert_eq!(work.output_mode.as_deref(), Some("formatted"));
     assert_eq!(work.model.as_deref(), Some("claude-4"));
     assert_eq!(work.agent.as_deref(), Some("reviewer"));

@@ -18,8 +18,9 @@ pub use json_output::{
     ThinkingContent, ToolCall, ToolResult,
 };
 pub use parser::{
-    parse_args, resolve_command, resolve_output_mode, resolve_output_plan, resolve_show_thinking,
-    AliasDef, CccConfig, OutputPlan, ParsedArgs, RunnerInfo, RUNNER_REGISTRY,
+    parse_args, resolve_command, resolve_output_mode, resolve_output_plan, resolve_sanitize_osc,
+    resolve_show_thinking, AliasDef, CccConfig, OutputPlan, ParsedArgs, RunnerInfo,
+    RUNNER_REGISTRY,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -22,6 +22,9 @@ Support these config keys:
 - `[defaults].output_mode = "formatted"`
 - legacy `default_output_mode = "formatted"`
 - `[aliases.<name>].output_mode = "stream-formatted"`
+- `[defaults].sanitize_osc = true`
+- legacy `default_sanitize_osc = true`
+- `[aliases.<name>].sanitize_osc = false`
 
 Config precedence:
 
@@ -29,6 +32,13 @@ Config precedence:
 2. alias `output_mode`
 3. config default
 4. fallback `text`
+
+OSC sanitization precedence:
+
+1. explicit `--sanitize-osc` / `--no-sanitize-osc`
+2. alias `sanitize_osc`
+3. config `default_sanitize_osc`
+4. built-in default: `true` for `formatted` and `stream-formatted`, otherwise `false`
 
 ## Runner Capability Resolution
 
@@ -68,6 +78,23 @@ OpenCode-specific note:
 
 - upstream uses `--format json`
 - `-f` is the file flag
+
+## OSC Sanitization
+
+Human-facing output paths should support OSC sanitization separately from raw output transport.
+
+Rules:
+
+- preserve OSC 8 hyperlinks exactly
+- strip title-setting OSC sequences
+- strip stray bell characters
+- keep raw machine modes unchanged unless there is a runner-specific compatibility bug
+
+Current Python and Rust behavior:
+
+- `formatted` and `stream-formatted` sanitize by default
+- `text`, `stream-text`, `json`, and `stream-json` do not opt into the generic sanitizer
+- OpenCode raw JSON cleanup remains always on as a compatibility fix so terminal-title escape sequences do not leak into `oc json`
 
 ## Formatted Renderer
 

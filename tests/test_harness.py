@@ -637,6 +637,44 @@ class CrossLanguageHarness(unittest.TestCase):
                         self.assertIn(fragment, result.stdout)
                     self.assertEqual(result.stderr, "")
 
+    def test_formatted_output_sanitizes_disruptive_osc_but_preserves_hyperlinks(self):
+        for lang in self.selected_languages:
+            if lang.name not in self.formatted_languages:
+                continue
+            if not lang.build_ok:
+                self.skipTest(lang.build_error)
+
+            env = self._make_env(lang)
+            env["MOCK_JSON_SCHEMA"] = "claude-code"
+            with self.subTest(language=lang.name):
+                result = lang.invoke_with_args(["cc", ".fmt"], "osc test", env)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("\x1b]8;;https://example.com\x07", result.stdout)
+                self.assertIn("\x1b]8;;\x07", result.stdout)
+                self.assertNotIn("\x1b]9;mock title\x07", result.stdout)
+                self.assertNotIn("\x07", result.stdout.replace("\x1b]8;;https://example.com\x07", "").replace("\x1b]8;;\x07", ""))
+
+    def test_formatted_output_can_disable_osc_sanitization(self):
+        for lang in self.selected_languages:
+            if lang.name not in self.formatted_languages:
+                continue
+            if not lang.build_ok:
+                self.skipTest(lang.build_error)
+
+            env = self._make_env(lang)
+            env["MOCK_JSON_SCHEMA"] = "claude-code"
+            with self.subTest(language=lang.name):
+                result = lang.invoke_with_args(
+                    ["cc", ".fmt", "--no-sanitize-osc"],
+                    "osc test",
+                    env,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("\x1b]8;;https://example.com\x07", result.stdout)
+                self.assertIn("\x1b]8;;\x07", result.stdout)
+                self.assertIn("\x1b]9;mock title\x07", result.stdout)
+                self.assertIn("\x07", result.stdout)
+
 
 def _usage_language_names() -> List[str]:
     return [lang.name for lang in LANGUAGES]

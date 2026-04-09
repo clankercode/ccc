@@ -15,6 +15,10 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
   - Support presets that inject a prompt automatically when invoked.
   - Example: a `commit` preset that expands to a commit-all workflow.
   - Define how this interacts with explicit user prompt text and prompt overrides.
+- [ ] Add a command that generates a complete example `config.toml` and/or the full config schema
+  - Make it easy to discover every supported config field in one place.
+  - Prefer a generated source of truth over hand-maintained examples.
+  - Keep any output format stable enough to use in docs and tests.
 - [ ] Finish `--allow-tool` / `--deny-tool` support where the upstream CLI can express it
   - Start with Claude and OpenCode.
   - Keep the permission-mapping matrix in `docs/clis/README.md` current.

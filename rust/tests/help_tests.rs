@@ -16,6 +16,7 @@ fn test_help_mentions_name_slot() {
     assert!(stdout.contains(
         "--show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it"
     ));
+    assert!(stdout.contains("--sanitize-osc / --no-sanitize-osc"));
     assert!(stdout.contains(
         "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>"
     ));

@@ -276,6 +276,31 @@ emit_thinking() {
     exit 0
 }
 
+emit_osc_test() {
+    case "$SCHEMA" in
+        claude-code)
+            json_claude_init
+            printf '{"type":"assistant","message":{"id":"msg_mock","type":"message","role":"assistant","model":"mock","content":[{"type":"text","text":"pre \\u001b]8;;https://example.com\\u0007link\\u001b]8;;\\u0007 post \\u001b]9;mock title\\u0007\\u0007"}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":5}},"session_id":"mock-session"}\n'
+            printf '{"type":"result","subtype":"success","cost_usd":0.0,"duration_ms":100,"duration_api_ms":80,"num_turns":1,"result":"pre \\u001b]8;;https://example.com\\u0007link\\u001b]8;;\\u0007 post \\u001b]9;mock title\\u0007\\u0007","session_id":"mock-session","usage":{"input_tokens":10,"output_tokens":5}}\n'
+            ;;
+        kimi-code)
+            printf '{"role":"assistant","content":"pre \\u001b]8;;https://example.com\\u0007link\\u001b]8;;\\u0007 post \\u001b]9;mock title\\u0007\\u0007"}\n'
+            ;;
+        opencode)
+            printf '{"response":"pre \\u001b]8;;https://example.com\\u0007link\\u001b]8;;\\u0007 post \\u001b]9;mock title\\u0007\\u0007"}\n'
+            ;;
+        *)
+            _hyperlink=$(printf '\033]8;;https://example.com\a')
+            _hyperlink_close=$(printf '\033]8;;\a')
+            _title=$(printf '\033]9;mock title\a')
+            _bell=$(printf '\a')
+            _text=$(printf 'pre %slink%s post %s%s' "$_hyperlink" "$_hyperlink_close" "$_title" "$_bell")
+            printf '%s\n' "$_text"
+            ;;
+    esac
+    exit 0
+}
+
 # --- stdin check (takes priority) ---
 stdin_data=""
 if [ -t 0 ] 2>/dev/null; then
@@ -360,6 +385,9 @@ case "$prompt" in
         ;;
     "thinking")
         emit_thinking
+        ;;
+    "osc test")
+        emit_osc_test
         ;;
     "")
         emit_usage_error

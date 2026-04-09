@@ -105,6 +105,9 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                         config.default_show_thinking = flag;
                     }
                 }
+                ("defaults", "sanitize_osc") => {
+                    config.default_sanitize_osc = parse_bool(value);
+                }
                 ("abbreviations", _) => {
                     config
                         .abbreviations
@@ -124,6 +127,9 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                         config.default_show_thinking = flag;
                     }
                 }
+                ("", "default_sanitize_osc") => {
+                    config.default_sanitize_osc = parse_bool(value);
+                }
                 ("alias", "runner") => current_alias.runner = Some(value.to_string()),
                 ("alias", "thinking") => {
                     if let Ok(n) = value.parse::<i32>() {
@@ -132,6 +138,9 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                 }
                 ("alias", "show_thinking") => {
                     current_alias.show_thinking = parse_bool(value);
+                }
+                ("alias", "sanitize_osc") => {
+                    current_alias.sanitize_osc = parse_bool(value);
                 }
                 ("alias", "output_mode") => current_alias.output_mode = Some(value.to_string()),
                 ("alias", "provider") => current_alias.provider = Some(value.to_string()),

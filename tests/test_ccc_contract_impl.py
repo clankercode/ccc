@@ -24,6 +24,7 @@ HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
 )
 HELP_SHOW_THINKING_SNIPPET = "--show-thinking"
+HELP_SANITIZE_OSC_SNIPPET = "--sanitize-osc / --no-sanitize-osc"
 HELP_OUTPUT_MODE_SNIPPET = "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>"
 HELP_OUTPUT_SUGAR_SNIPPET = ".text / ..text, .json / ..json, .fmt / ..fmt"
 HELP_PERMISSION_MODE_SNIPPET = "--permission-mode <safe|auto|yolo|plan>"
@@ -219,6 +220,23 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["--help"], self._make_env(opencode_path, lang)
                     )
                     self.assert_help_mentions_show_thinking_flag(result)
+
+    def test_help_surface_mentions_sanitize_osc_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in SHOW_THINKING_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assert_help_mentions_sanitize_osc_flag(result)
 
     def test_help_surface_mentions_output_modes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -708,6 +726,11 @@ class SingleImplCccContractTests(unittest.TestCase):
         if any(lang.name in {"Python", "Rust"} for lang in self.selected_languages):
             self.assertIn(HELP_SHOW_THINKING_SNIPPET, result.stdout)
             self.assertIn("show_thinking", result.stdout)
+
+    def assert_help_mentions_sanitize_osc_flag(self, result) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(HELP_SANITIZE_OSC_SNIPPET, result.stdout)
+        self.assertIn("sanitize_osc", result.stdout)
 
     def assert_help_mentions_output_modes(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)

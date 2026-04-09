@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-09
 
+### Human-facing OSC sanitization is configurable in Python and Rust
+- Change: Python and Rust add `--sanitize-osc` / `--no-sanitize-osc` plus config and alias support for stripping disruptive OSC output from human-facing rendering while preserving OSC 8 hyperlinks
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `tests/test_runner.py`, `tests/test_harness.py`, `tests/test_ccc_contract_impl.py`, `rust/tests/parser_tests.rs`, `rust/tests/help_tests.rs`
+- Notes: formatted modes default to OSC sanitization on; raw machine modes stay unchanged except for the existing always-on OpenCode raw-output cleanup that keeps `oc json` machine-clean
+
 ### Output modes and formatted streaming added to Python and Rust
 - Change: Python and Rust now support `--output-mode`, dot-sugar output selectors, raw streaming, and formatted transcript rendering with shared output-mode semantics
 - Required implementations: Python and Rust

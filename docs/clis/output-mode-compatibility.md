@@ -27,7 +27,9 @@ This matrix is the current Python and Rust contract for `ccc --output-mode` and 
 ## Notes
 
 - Explicit unsupported modes are hard errors. `ccc` does not silently downgrade.
-- Claude `stream-json` requires `--verbose` upstream. `ccc` adds that only for formatted streaming, not for raw passthrough.
+- Claude `stream-json` requires `--verbose` upstream. `ccc` adds it for Claude `stream-json` and `stream-formatted`.
 - OpenCode uses `--format json`, not `-f json`. `-f` is the file-attach flag upstream.
 - `formatted` and `stream-formatted` are normalized transcript modes, not raw passthrough.
 - `stream-text` is intentionally separate from `stream-formatted`: it prints native runner output as it arrives.
+- `formatted` and `stream-formatted` sanitize disruptive OSC output by default while preserving OSC 8 hyperlinks.
+- `--no-sanitize-osc` disables that human-facing cleanup; raw machine modes stay unchanged apart from the always-on OpenCode raw JSON cleanup.

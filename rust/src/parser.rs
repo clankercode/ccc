@@ -30,6 +30,7 @@ pub struct ParsedArgs {
     pub runner: Option<String>,
     pub thinking: Option<i32>,
     pub show_thinking: Option<bool>,
+    pub sanitize_osc: Option<bool>,
     pub output_mode: Option<String>,
     pub forward_unknown_json: bool,
     pub yolo: bool,
@@ -45,6 +46,7 @@ pub struct AliasDef {
     pub runner: Option<String>,
     pub thinking: Option<i32>,
     pub show_thinking: Option<bool>,
+    pub sanitize_osc: Option<bool>,
     pub output_mode: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
@@ -57,6 +59,7 @@ impl Default for AliasDef {
             runner: None,
             thinking: None,
             show_thinking: None,
+            sanitize_osc: None,
             output_mode: None,
             provider: None,
             model: None,
@@ -72,6 +75,7 @@ pub struct CccConfig {
     pub default_model: String,
     pub default_thinking: Option<i32>,
     pub default_show_thinking: bool,
+    pub default_sanitize_osc: Option<bool>,
     pub default_output_mode: String,
     pub aliases: BTreeMap<String, AliasDef>,
     pub abbreviations: BTreeMap<String, String>,
@@ -85,6 +89,7 @@ impl Default for CccConfig {
             default_model: String::new(),
             default_thinking: None,
             default_show_thinking: false,
+            default_sanitize_osc: None,
             default_output_mode: "text".to_string(),
             aliases: BTreeMap::new(),
             abbreviations: BTreeMap::new(),
@@ -360,6 +365,8 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
             parsed.thinking = Some(level);
         } else if token == "--show-thinking" || token == "--no-show-thinking" {
             parsed.show_thinking = Some(token == "--show-thinking");
+        } else if token == "--sanitize-osc" || token == "--no-sanitize-osc" {
+            parsed.sanitize_osc = Some(token == "--sanitize-osc");
         } else if token == "--output-mode" || token == "-o" {
             if index + 1 >= argv.len() {
                 parsed.output_mode = Some(String::new());
@@ -655,6 +662,19 @@ pub fn resolve_show_thinking(parsed: &ParsedArgs, config: Option<&CccConfig>) ->
         .show_thinking
         .or_else(|| resolve_alias_def(parsed, &config).and_then(|alias| alias.show_thinking))
         .unwrap_or(config.default_show_thinking)
+}
+
+pub fn resolve_sanitize_osc(parsed: &ParsedArgs, config: Option<&CccConfig>) -> bool {
+    let config = config.cloned().unwrap_or_default();
+    parsed
+        .sanitize_osc
+        .or_else(|| resolve_alias_def(parsed, &config).and_then(|alias| alias.sanitize_osc))
+        .or(config.default_sanitize_osc)
+        .unwrap_or_else(|| {
+            resolve_output_mode(parsed, Some(&config))
+                .map(|mode| mode.contains("formatted"))
+                .unwrap_or(false)
+        })
 }
 
 pub fn resolve_output_plan(

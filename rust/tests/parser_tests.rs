@@ -8,6 +8,7 @@ fn test_parse_prompt_only() {
     assert!(parsed.runner.is_none());
     assert!(parsed.thinking.is_none());
     assert!(parsed.show_thinking.is_none());
+    assert!(parsed.sanitize_osc.is_none());
     assert!(!parsed.yolo);
     assert!(parsed.permission_mode.is_none());
     assert!(parsed.alias.is_none());
@@ -94,6 +95,22 @@ fn test_parse_no_show_thinking_flag() {
     let args: Vec<String> = vec!["--no-show-thinking".into(), "hello".into()];
     let parsed = parse_args(&args);
     assert_eq!(parsed.show_thinking, Some(false));
+    assert_eq!(parsed.prompt, "hello");
+}
+
+#[test]
+fn test_parse_sanitize_osc_flag() {
+    let args: Vec<String> = vec!["--sanitize-osc".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.sanitize_osc, Some(true));
+    assert_eq!(parsed.prompt, "hello");
+}
+
+#[test]
+fn test_parse_no_sanitize_osc_flag() {
+    let args: Vec<String> = vec!["--no-sanitize-osc".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.sanitize_osc, Some(false));
     assert_eq!(parsed.prompt, "hello");
 }
 
@@ -399,6 +416,65 @@ fn test_resolve_show_thinking_for_opencode() {
     );
     assert_eq!(argv.last().map(|s| s.as_str()), Some("hello"));
     assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_sanitize_osc_defaults_on_for_formatted_modes() {
+    let parsed = ParsedArgs {
+        output_mode: Some("formatted".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    assert!(resolve_sanitize_osc(&parsed, None));
+}
+
+#[test]
+fn test_resolve_sanitize_osc_defaults_off_for_raw_modes() {
+    let parsed = ParsedArgs {
+        output_mode: Some("json".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    assert!(!resolve_sanitize_osc(&parsed, None));
+}
+
+#[test]
+fn test_resolve_sanitize_osc_uses_alias_default() {
+    let config = CccConfig {
+        aliases: {
+            let mut m = std::collections::BTreeMap::new();
+            m.insert(
+                "review".into(),
+                AliasDef {
+                    sanitize_osc: Some(false),
+                    ..Default::default()
+                },
+            );
+            m
+        },
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        alias: Some("review".into()),
+        output_mode: Some("formatted".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    assert!(!resolve_sanitize_osc(&parsed, Some(&config)));
+}
+
+#[test]
+fn test_resolve_config_default_sanitize_osc() {
+    let config = CccConfig {
+        default_sanitize_osc: Some(false),
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        output_mode: Some("formatted".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    assert!(!resolve_sanitize_osc(&parsed, Some(&config)));
 }
 
 #[test]

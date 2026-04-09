@@ -19,3 +19,5 @@ Incomplete work is tracked in [`TASKS.md`](TASKS.md) at the repo root and in eac
 Shared feature changes that still need rollout to other implementations are noted in [`SHARED_CHANGES.md`](SHARED_CHANGES.md) under `Additional rollout`; use that file as follow-up context, not as the authoritative backlog.
 
 When changing the behavior of `ccc` in any way, including feature work and bug fixes, read [`ADDING_FEATURES.md`](ADDING_FEATURES.md) first.
+
+When adding config fields, update any generated config example/schema output and the related docs at the same time.

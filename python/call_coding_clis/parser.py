@@ -305,7 +305,14 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
     if key in {"k", "kimi"}:
         return {"text", "stream-text", "stream-json", "formatted", "stream-formatted"}
     if key in {"oc", "opencode"}:
-        return {"text", "stream-text", "json", "formatted", "stream-formatted"}
+        return {
+            "text",
+            "stream-text",
+            "json",
+            "stream-json",
+            "formatted",
+            "stream-formatted",
+        }
     return {"text", "stream-text"}
 
 

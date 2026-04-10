@@ -1231,14 +1231,18 @@ fn test_resolve_opencode_stream_formatted_output_plan() {
 }
 
 #[test]
-fn test_resolve_unsupported_output_mode_errors() {
+fn test_resolve_opencode_stream_json_output_plan() {
     let parsed = ParsedArgs {
         runner: Some("oc".into()),
         output_mode: Some("stream-json".into()),
         prompt: "hello".into(),
         ..Default::default()
     };
-    assert!(resolve_output_plan(&parsed, None).is_err());
+    let plan = resolve_output_plan(&parsed, None).unwrap();
+    assert!(plan.stream);
+    assert!(!plan.formatted);
+    assert_eq!(plan.schema.as_deref(), Some("opencode"));
+    assert_eq!(plan.argv_flags, vec!["--format", "json"]);
 }
 
 #[test]

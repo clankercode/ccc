@@ -29,6 +29,7 @@ HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
 )
 HELP_PRINT_CONFIG_SNIPPET = "--print-config"
+HELP_MIXED_HELP_SNIPPET = "--help / -h"
 HELP_PRESET_PROMPT_LINE = "Presets can also define a default prompt"
 HELP_EXHAUSTIVE_EXAMPLE_1 = (
     'ccc cc +2 :anthropic:claude-sonnet-4-20250514 @reviewer "Add tests"'
@@ -326,6 +327,50 @@ class SingleImplCccContractTests(unittest.TestCase):
                     )
                     self.assert_help_mentions_standard_name_slot(result, HELP_USAGE_LINE)
 
+    def test_help_surface_reads_opencode_package_metadata_when_version_command_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            package_root = tmp_path / "node_modules" / "opencode-ai"
+            package_bin = package_root / "bin"
+            package_bin.mkdir(parents=True)
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            opencode_path.symlink_to(package_bin / "opencode")
+            (package_root / "package.json").write_text(
+                '{"name":"opencode-ai","version":"1.3.17"}',
+                encoding="utf-8",
+            )
+            (package_bin / "opencode").write_text(
+                "#!/bin/sh\n"
+                'if [ "$1" = "--version" ]; then\n'
+                "  exit 99\n"
+                "fi\n"
+                'if [ "$1" != "run" ]; then\n'
+                "  exit 9\n"
+                "fi\n"
+                "shift\n"
+                "printf 'opencode run %s\\n' \"$1\"\n",
+                encoding="utf-8",
+            )
+            (package_bin / "opencode").chmod(
+                (package_bin / "opencode").stat().st_mode
+                | stat.S_IXUSR
+                | stat.S_IXGRP
+                | stat.S_IXOTH
+            )
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn("[+] opencode", result.stdout)
+                    self.assertIn("1.3.17", result.stdout)
+
     def test_help_surface_mentions_show_thinking_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -359,6 +404,31 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["--help"], self._make_env(opencode_path, lang)
                     )
                     self.assert_help_mentions_print_config(result)
+
+    def test_help_wins_when_mixed_with_other_args(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            cases = [
+                ["@reviewer", "--help"],
+                [PROMPT, "--help"],
+                ["--", "--help"],
+            ]
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                for extra_args in cases:
+                    with self.subTest(language=lang.name, extra_args=extra_args):
+                        result = lang.invoke_extra(extra_args, env)
+                        self.assert_help_mentions_standard_name_slot(
+                            result, HELP_USAGE_LINE
+                        )
 
     def test_help_surface_mentions_sanitize_osc_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -834,15 +904,15 @@ class SingleImplCccContractTests(unittest.TestCase):
             tmp_path = Path(tmp)
             bin_dir = tmp_path / "bin"
             bin_dir.mkdir()
-            opencode_path = bin_dir / "opencode"
-            self._write_argv_echo_stub(opencode_path, "opencode")
+            codex_path = bin_dir / "codex"
+            self._write_argv_echo_stub(codex_path, "codex")
 
             for lang in self.selected_languages:
                 if lang.name not in {"Python", "Rust"}:
                     continue
-                env = self._make_env(opencode_path, lang)
+                env = self._make_env(bin_dir / "opencode", lang)
                 with self.subTest(language=lang.name):
-                    result = lang.invoke_with_args(["oc", "..json"], PROMPT, env)
+                    result = lang.invoke_with_args(["c", "..json"], PROMPT, env)
                     self.assertEqual(result.returncode, 1)
                     self.assertEqual(result.stdout, "")
                     self.assertIn("output mode", result.stderr)
@@ -1007,6 +1077,7 @@ class SingleImplCccContractTests(unittest.TestCase):
     def assert_help_mentions_print_config(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(HELP_PRINT_CONFIG_SNIPPET, result.stdout)
+        self.assertIn(HELP_MIXED_HELP_SNIPPET, result.stdout)
 
     def assert_help_mentions_sanitize_osc_flag(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)

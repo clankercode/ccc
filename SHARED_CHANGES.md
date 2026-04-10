@@ -22,12 +22,26 @@ Entry format:
 
 ## 2026-04-10
 
-### OpenCode `stream-formatted` is now supported in Python and Rust
-- Change: Python and Rust now treat OpenCode `--format json` as a live JSON-event stream, so `oc ..fmt` is supported alongside `oc .fmt`; `oc ..json` remains unsupported because upstream exposes JSON events through `--format json` rather than a separate NDJSON mode selector
+### Help flags now win anywhere in argv in Python and Rust
+- Change: Python and Rust now treat a standalone `-h` or `--help` token as an immediate help request anywhere in argv, so `ccc @reviewer --help`, `ccc "prompt" --help`, and `ccc -- --help` all print help instead of being parsed as prompt text or normal controls
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `rust/tests/help_tests.rs`
+- Notes: updated `README.md`, `docs/llms.txt`, `docs/index.html`, and the Python/Rust help text; removed the completed backlog item from `TASKS.md`
+
+### Runner version discovery now prefers install metadata in Python and Rust
+- Change: Python and Rust now read trusted install metadata for OpenCode, Codex, Kimi, and Claude when rendering the help runner checklist, and only fall back to spawning `<runner> --version` when that direct lookup is unavailable
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_runner.py`, `tests/test_ccc_contract_impl.py`, `rust/src/help.rs`, `rust/tests/help_tests.rs`
+- Notes: OpenCode and Codex use package metadata, Kimi uses Python dist-info metadata, Claude uses the versioned local install path, and Crush/RooCode remain on command fallback; removed the completed backlog item from `TASKS.md`
+
+### OpenCode structured streaming now supports both `stream-formatted` and `stream-json` in Python and Rust
+- Change: Python and Rust now treat OpenCode `--format json` as a live JSON-event stream, so both `oc ..fmt` and `oc ..json` are supported alongside `oc .fmt` and `oc .json`, using the same upstream event stream rather than a separate NDJSON mode selector
 - Required implementations: Python and Rust
 - Additional rollout: deferred
 - Shared tests updated: `tests/test_parser_config.py`, `tests/test_harness.py`, `tests/test_ccc_contract_impl.py`, `rust/tests/parser_tests.rs`
-- Notes: updated `docs/clis/output-mode-compatibility.md` and `docs/clis/json-event-references.md`; real direct smoke verification used `opencode run --format json 'Reply with exactly hi'`
+- Notes: updated `docs/clis/output-mode-compatibility.md` and `docs/clis/json-event-references.md`; the original `oc ..fmt` rollout left the OpenCode capability gate too narrow, and this follow-up aligns the parser contract with the existing `--format json` event-stream implementation in both languages
 
 ### Canonical controls help text now matches across all `ccc` implementations
 - Change: the shared help/usage banner now uses `ccc [controls...] "<Prompt>"` and the core controls section now carries two exhaustive shared examples across the language implementations

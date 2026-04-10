@@ -647,7 +647,14 @@ fn supported_output_modes(runner_name: &str) -> &'static [&'static str] {
             "formatted",
             "stream-formatted",
         ],
-        "oc" | "opencode" => &["text", "stream-text", "json", "formatted", "stream-formatted"],
+        "oc" | "opencode" => &[
+            "text",
+            "stream-text",
+            "json",
+            "stream-json",
+            "formatted",
+            "stream-formatted",
+        ],
         _ => &["text", "stream-text"],
     }
 }

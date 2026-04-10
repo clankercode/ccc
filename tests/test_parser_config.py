@@ -655,10 +655,13 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(output_mode="formatted", prompt="hello")
         self.assertFalse(resolve_sanitize_osc(parsed, config))
 
-    def test_unsupported_output_mode_raises(self):
+    def test_opencode_stream_json_output_plan(self):
         parsed = ParsedArgs(runner="oc", output_mode="stream-json", prompt="hello")
-        with self.assertRaises(ValueError):
-            resolve_output_plan(parsed)
+        plan = resolve_output_plan(parsed)
+        self.assertTrue(plan.stream)
+        self.assertFalse(plan.formatted)
+        self.assertEqual(plan.schema, "opencode")
+        self.assertEqual(plan.argv_flags, ["--format", "json"])
 
     def test_claude_stream_formatted_output_plan(self):
         parsed = ParsedArgs(runner="cc", output_mode="stream-formatted", prompt="hello")

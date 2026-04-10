@@ -29,6 +29,7 @@ HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
 )
 HELP_PRINT_CONFIG_SNIPPET = "--print-config"
+HELP_CONFIG_COMMAND_SNIPPET = "ccc config"
 HELP_MIXED_HELP_SNIPPET = "--help / -h"
 HELP_PRESET_PROMPT_LINE = "Presets can also define a default prompt"
 HELP_EXHAUSTIVE_EXAMPLE_1 = (
@@ -50,6 +51,7 @@ SHOW_THINKING_IMPLEMENTATIONS = {"Python", "Rust"}
 YOLO_IMPLEMENTATIONS = {"Python", "Rust"}
 PROMPT_PRESET_IMPLEMENTATIONS = {"Python", "Rust"}
 PRINT_CONFIG_IMPLEMENTATIONS = {"Python", "Rust"}
+CONFIG_COMMAND_IMPLEMENTATIONS = {"Python", "Rust"}
 EXAMPLE_CONFIG_EXPECTED = (
     ROOT / "tests" / "fixtures" / "config-example.toml"
 ).read_text(encoding="utf-8")
@@ -531,6 +533,102 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["--print-config"], self._make_env(opencode_path, lang)
                     )
                     self.assert_print_config_output(result)
+
+    def test_config_command_outputs_resolved_default_config(self) -> None:
+        config_body = '[defaults]\nrunner = "cc"\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in CONFIG_COMMAND_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, command="config"):
+                    env = self._make_env(opencode_path, lang)
+                    env.pop("CCC_CONFIG", None)
+                    env["HOME"] = str(tmp_path / "home")
+                    env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+                    config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                    config_path.parent.mkdir(parents=True, exist_ok=True)
+                    config_path.write_text(config_body, encoding="utf-8")
+                    result = lang.invoke_extra(["config"], env)
+                    self.assert_config_command_output(result, config_path, config_body)
+
+    def test_config_command_prefers_ccc_config_override(self) -> None:
+        fallback_body = '[defaults]\nrunner = "k"\n'
+        override_body = '[defaults]\nrunner = "cc"\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in CONFIG_COMMAND_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, command="config-override"):
+                    env = self._make_env(opencode_path, lang)
+                    env["HOME"] = str(tmp_path / "home")
+                    env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+                    fallback_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                    fallback_path.parent.mkdir(parents=True, exist_ok=True)
+                    fallback_path.write_text(fallback_body, encoding="utf-8")
+                    override_path = tmp_path / "custom-config.toml"
+                    override_path.write_text(override_body, encoding="utf-8")
+                    env["CCC_CONFIG"] = str(override_path)
+                    result = lang.invoke_extra(["config"], env)
+                    self.assert_config_command_output(result, override_path, override_body)
+
+    def test_config_command_falls_back_when_ccc_config_is_missing(self) -> None:
+        fallback_body = '[defaults]\nrunner = "k"\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in CONFIG_COMMAND_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, command="config-missing-override"):
+                    env = self._make_env(opencode_path, lang)
+                    env["HOME"] = str(tmp_path / "home")
+                    env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+                    fallback_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                    fallback_path.parent.mkdir(parents=True, exist_ok=True)
+                    fallback_path.write_text(fallback_body, encoding="utf-8")
+                    env["CCC_CONFIG"] = str(tmp_path / "missing-config.toml")
+                    result = lang.invoke_extra(["config"], env)
+                    self.assert_config_command_output(result, fallback_path, fallback_body)
+
+    def test_config_command_reports_missing_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in CONFIG_COMMAND_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, command="config-missing"):
+                    env = self._make_env(opencode_path, lang)
+                    env["HOME"] = str(tmp_path / "home")
+                    env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+                    env["CCC_CONFIG"] = str(tmp_path / "missing-config.toml")
+                    home_config_path = Path(env["HOME"]) / ".config" / "ccc" / "config.toml"
+                    xdg_config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                    for existing in (home_config_path, xdg_config_path):
+                        if existing.exists():
+                            existing.unlink()
+                    result = lang.invoke_extra(["config"], env)
+                    self.assert_missing_config_command(result, env["CCC_CONFIG"])
 
     def test_help_surface_mentions_project_local_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1077,6 +1175,7 @@ class SingleImplCccContractTests(unittest.TestCase):
     def assert_help_mentions_print_config(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(HELP_PRINT_CONFIG_SNIPPET, result.stdout)
+        self.assertIn(HELP_CONFIG_COMMAND_SNIPPET, result.stdout)
         self.assertIn(HELP_MIXED_HELP_SNIPPET, result.stdout)
 
     def assert_help_mentions_sanitize_osc_flag(self, result) -> None:
@@ -1109,6 +1208,22 @@ class SingleImplCccContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, EXAMPLE_CONFIG_EXPECTED)
         self.assertEqual(result.stderr, "")
+
+    def assert_config_command_output(
+        self, result, config_path: Path, config_body: str
+    ) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout,
+            f"Config path: {config_path}\n{config_body}",
+        )
+        self.assertEqual(result.stderr, "")
+
+    def assert_missing_config_command(self, result, missing_path: str) -> None:
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("No config file found", result.stderr)
+        self.assertIn(missing_path, result.stderr)
 
     def assert_uses_codex_exec_runner(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)

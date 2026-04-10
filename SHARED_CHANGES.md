@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-10
 
+### `ccc config` now prints the resolved config file in Python and Rust
+- Change: Python and Rust now support `ccc config`, which prints the resolved config file path plus that file's raw contents; `CCC_CONFIG` wins when it points at an existing file, otherwise the command falls back to the project-local `.ccc.toml`, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`, and exits non-zero with a helpful error if nothing is found
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/test_parser_config.py`, `rust/tests/config_tests.rs`, `rust/tests/help_tests.rs`
+- Notes: updated `README.md`, `docs/llms.txt`, `docs/index.html`, the Python/Rust help text, and removed the completed backlog item from `TASKS.md`
+
 ### Help flags now win anywhere in argv in Python and Rust
 - Change: Python and Rust now treat a standalone `-h` or `--help` token as an immediate help request anywhere in argv, so `ccc @reviewer --help`, `ccc "prompt" --help`, and `ccc -- --help` all print help instead of being parsed as prompt text or normal controls
 - Required implementations: Python and Rust

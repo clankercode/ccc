@@ -3,7 +3,7 @@
 > One command to run any coding CLI. A unified interface implemented in 20 programming languages.
 
 ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Claude Code, Codex, Kimi, Crush) behind a single consistent interface. Each of the 20 language implementations bundles an identical `ccc` CLI binary and a reusable library with `CommandSpec`, `CompletedRun`, and `Runner` types.
-Python and Rust also expose `ccc --print-config`, which prints the canonical example config with the current supported keys.
+Python and Rust also expose `ccc --print-config`, which prints the canonical example config with the current supported keys, and `ccc config`, which prints the resolved config file path and contents.
 
 ## Usage
 
@@ -22,6 +22,7 @@ Slots are parsed in free order before the prompt, except that `-h` / `--help` wi
 - @name: Use a named preset from the loaded config layers, or treat it as an agent when no preset exists; in Python and Rust, presets can also provide a default prompt when the user leaves prompt text blank
 - Config: in Python and Rust, project-local `.ccc.toml` files are searched upward from the current directory, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`
 - Generated config: `ccc --print-config` prints the canonical schema using `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
+- Resolved config: `ccc config` prints the active config file path and its raw contents; `CCC_CONFIG` wins when it points at an existing file
 
 Examples:
 - ccc "Fix the failing tests"
@@ -32,6 +33,7 @@ Examples:
 - ccc c +4 :openai:gpt-5.4-mini @agent "Debug the parser"
 - ccc k +4 "Debug the parser"
 - ccc --print-config
+- ccc config
 
 ## Languages
 

@@ -80,6 +80,38 @@ def _default_config_paths() -> list[Path]:
     return paths
 
 
+def find_config_command_path() -> Path | None:
+    explicit = os.environ.get("CCC_CONFIG", "").strip()
+    if explicit:
+        candidate = Path(explicit)
+        if candidate.is_file():
+            return candidate
+
+    try:
+        cwd = Path.cwd()
+    except OSError:
+        cwd = None
+
+    project_path = None
+    if cwd is not None:
+        for directory in (cwd, *cwd.parents):
+            candidate = directory / PROJECT_CONFIG_FILE_NAME
+            if candidate.is_file():
+                project_path = candidate
+                break
+
+    xdg = os.environ.get("XDG_CONFIG_HOME", "").strip()
+    xdg_path = Path(xdg) / CONFIG_DIR_NAME / CONFIG_FILE_NAME if xdg else None
+    if project_path is not None:
+        return project_path
+    if xdg_path is not None and xdg_path.is_file():
+        return xdg_path
+    home_path = Path.home() / ".config" / CONFIG_DIR_NAME / CONFIG_FILE_NAME
+    if home_path.is_file():
+        return home_path
+    return None
+
+
 def render_example_config() -> str:
     return EXAMPLE_CONFIG
 

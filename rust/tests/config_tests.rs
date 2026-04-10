@@ -1,4 +1,4 @@
-use call_coding_clis::{load_config, render_example_config};
+use call_coding_clis::{find_config_command_path, load_config, render_example_config};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -138,4 +138,126 @@ runner = "cc"
     let config = load_config(Some(&config_path));
 
     assert!(config.aliases.is_empty());
+}
+
+#[test]
+fn test_find_config_command_path_prefers_explicit_ccc_config() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-config-command-explicit-{unique}"));
+    let explicit_path = base_dir.join("explicit.toml");
+    fs::create_dir_all(&base_dir).unwrap();
+    fs::write(&explicit_path, "[defaults]\nrunner = \"cc\"\n").unwrap();
+
+    let old_env = std::env::var("CCC_CONFIG").ok();
+    unsafe { std::env::set_var("CCC_CONFIG", &explicit_path) };
+    let resolved = find_config_command_path();
+    if let Some(value) = old_env {
+        unsafe { std::env::set_var("CCC_CONFIG", value) };
+    } else {
+        unsafe { std::env::remove_var("CCC_CONFIG") };
+    }
+
+    assert_eq!(resolved, Some(explicit_path));
+}
+
+#[test]
+fn test_find_config_command_path_prefers_project_local_then_xdg_then_home() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-config-command-order-{unique}"));
+    let home_root = base_dir.join("home");
+    let xdg_root = base_dir.join("xdg");
+    let repo_root = base_dir.join("repo");
+    let nested_cwd = repo_root.join("nested");
+    fs::create_dir_all(&nested_cwd).unwrap();
+
+    let project_path = repo_root.join(".ccc.toml");
+    let xdg_path = xdg_root.join("ccc/config.toml");
+    let home_path = home_root.join(".config/ccc/config.toml");
+    fs::write(&project_path, "[defaults]\nrunner = \"cc\"\n").unwrap();
+    fs::create_dir_all(xdg_path.parent().unwrap()).unwrap();
+    fs::write(&xdg_path, "[defaults]\nrunner = \"k\"\n").unwrap();
+    fs::create_dir_all(home_path.parent().unwrap()).unwrap();
+    fs::write(&home_path, "[defaults]\nrunner = \"oc\"\n").unwrap();
+
+    let old_cwd = std::env::current_dir().unwrap();
+    let old_home = std::env::var("HOME").ok();
+    let old_xdg = std::env::var("XDG_CONFIG_HOME").ok();
+    let old_explicit = std::env::var("CCC_CONFIG").ok();
+
+    std::env::set_current_dir(&nested_cwd).unwrap();
+    unsafe { std::env::set_var("HOME", &home_root) };
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &xdg_root) };
+    unsafe { std::env::remove_var("CCC_CONFIG") };
+
+    let resolved = find_config_command_path();
+
+    std::env::set_current_dir(old_cwd).unwrap();
+    if let Some(value) = old_home {
+        unsafe { std::env::set_var("HOME", value) };
+    } else {
+        unsafe { std::env::remove_var("HOME") };
+    }
+    if let Some(value) = old_xdg {
+        unsafe { std::env::set_var("XDG_CONFIG_HOME", value) };
+    } else {
+        unsafe { std::env::remove_var("XDG_CONFIG_HOME") };
+    }
+    if let Some(value) = old_explicit {
+        unsafe { std::env::set_var("CCC_CONFIG", value) };
+    } else {
+        unsafe { std::env::remove_var("CCC_CONFIG") };
+    }
+
+    assert_eq!(resolved, Some(project_path));
+}
+
+#[test]
+fn test_find_config_command_path_falls_back_when_ccc_config_is_missing() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir =
+        std::env::temp_dir().join(format!("ccc-rust-config-command-fallback-{unique}"));
+    let home_root = base_dir.join("home");
+    let xdg_root = base_dir.join("xdg");
+    let xdg_path = xdg_root.join("ccc/config.toml");
+    let missing_path = base_dir.join("missing.toml");
+
+    fs::create_dir_all(xdg_path.parent().unwrap()).unwrap();
+    fs::write(&xdg_path, "[defaults]\nrunner = \"k\"\n").unwrap();
+
+    let old_home = std::env::var("HOME").ok();
+    let old_xdg = std::env::var("XDG_CONFIG_HOME").ok();
+    let old_explicit = std::env::var("CCC_CONFIG").ok();
+
+    unsafe { std::env::set_var("HOME", &home_root) };
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &xdg_root) };
+    unsafe { std::env::set_var("CCC_CONFIG", &missing_path) };
+
+    let resolved = find_config_command_path();
+
+    if let Some(value) = old_home {
+        unsafe { std::env::set_var("HOME", value) };
+    } else {
+        unsafe { std::env::remove_var("HOME") };
+    }
+    if let Some(value) = old_xdg {
+        unsafe { std::env::set_var("XDG_CONFIG_HOME", value) };
+    } else {
+        unsafe { std::env::remove_var("XDG_CONFIG_HOME") };
+    }
+    if let Some(value) = old_explicit {
+        unsafe { std::env::set_var("CCC_CONFIG", value) };
+    } else {
+        unsafe { std::env::remove_var("CCC_CONFIG") };
+    }
+
+    assert_eq!(resolved, Some(xdg_path));
 }

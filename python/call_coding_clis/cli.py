@@ -15,7 +15,7 @@ try:
         resolve_sanitize_osc,
         resolve_show_thinking,
     )
-    from .config import load_config, render_example_config
+    from .config import find_config_command_path, load_config, render_example_config
     from .help import print_help, print_usage
 except ImportError:
     from json_output import FormattedRenderer, StructuredStreamProcessor, parse_json_output, render_parsed
@@ -28,7 +28,7 @@ except ImportError:
         resolve_sanitize_osc,
         resolve_show_thinking,
     )
-    from config import load_config, render_example_config
+    from config import find_config_command_path, load_config, render_example_config
     from help import print_help, print_usage
 
 
@@ -64,6 +64,30 @@ def main(argv: list[str] | None = None) -> int:
 
     if any(token in {"--help", "-h"} for token in args):
         print_help()
+        return 0
+
+    if args == ["config"]:
+        config_path = find_config_command_path()
+        if config_path is None:
+            explicit = os.environ.get("CCC_CONFIG", "").strip()
+            if explicit:
+                print(
+                    f"No config file found at {explicit}",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    "No config file found in .ccc.toml, XDG_CONFIG_HOME/ccc/config.toml, or ~/.config/ccc/config.toml",
+                    file=sys.stderr,
+                )
+            return 1
+        try:
+            content = config_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"Failed to read config file {config_path}: {exc}", file=sys.stderr)
+            return 1
+        print(f"Config path: {config_path}")
+        print(content, end="")
         return 0
 
     parsed = parse_args(args)

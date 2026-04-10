@@ -35,6 +35,41 @@ pub fn render_example_config() -> String {
     EXAMPLE_CONFIG.to_string()
 }
 
+pub fn find_config_command_path() -> Option<PathBuf> {
+    if let Ok(explicit) = std::env::var("CCC_CONFIG") {
+        let trimmed = explicit.trim();
+        if !trimmed.is_empty() {
+            let candidate = PathBuf::from(trimmed);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+
+    let current_dir = std::env::current_dir().ok();
+    let home_path = std::env::var("HOME")
+        .ok()
+        .map(|home| PathBuf::from(home).join(".config/ccc/config.toml"));
+    let xdg_path = std::env::var("XDG_CONFIG_HOME").ok().and_then(|xdg| {
+        if xdg.trim().is_empty() {
+            None
+        } else {
+            Some(PathBuf::from(xdg).join("ccc/config.toml"))
+        }
+    });
+
+    let project_path = current_dir
+        .as_deref()
+        .and_then(find_project_config_path_from);
+    if project_path.is_some() {
+        return project_path;
+    }
+    if let Some(xdg) = xdg_path.filter(|path| path.is_file()) {
+        return Some(xdg);
+    }
+    home_path.filter(|path| path.is_file())
+}
+
 pub fn load_config(path: Option<&Path>) -> CccConfig {
     let mut config = CccConfig::default();
 
@@ -110,6 +145,16 @@ fn default_config_paths_from(
     }
 
     paths
+}
+
+fn find_project_config_path_from(current_dir: &Path) -> Option<PathBuf> {
+    for directory in current_dir.ancestors() {
+        let candidate = directory.join(".ccc.toml");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
 fn merge_alias(target: &mut crate::parser::AliasDef, overlay: &crate::parser::AliasDef) {

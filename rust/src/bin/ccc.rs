@@ -1,6 +1,7 @@
 use call_coding_clis::{
-    load_config, parse_args, parse_json_output, print_help, print_usage, render_parsed,
-    render_example_config, resolve_command, resolve_human_tty, resolve_output_plan,
+    find_config_command_path, load_config, parse_args, parse_json_output, print_help,
+    print_usage, render_parsed, render_example_config, resolve_command, resolve_human_tty,
+    resolve_output_plan,
     resolve_sanitize_osc, resolve_show_thinking,
     FormattedRenderer, Runner, StructuredStreamProcessor,
 };
@@ -204,6 +205,36 @@ fn main() -> ExitCode {
 
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         print_help();
+        return ExitCode::from(0);
+    }
+
+    if args == ["config"] {
+        let Some(config_path) = find_config_command_path() else {
+            if let Ok(explicit) = env::var("CCC_CONFIG") {
+                let trimmed = explicit.trim();
+                if !trimmed.is_empty() {
+                    eprintln!("No config file found at {trimmed}");
+                } else {
+                    eprintln!(
+                        "No config file found in .ccc.toml, XDG_CONFIG_HOME/ccc/config.toml, or ~/.config/ccc/config.toml"
+                    );
+                }
+            } else {
+                eprintln!(
+                    "No config file found in .ccc.toml, XDG_CONFIG_HOME/ccc/config.toml, or ~/.config/ccc/config.toml"
+                );
+            }
+            return ExitCode::from(1);
+        };
+        let content = match std::fs::read_to_string(&config_path) {
+            Ok(content) => content,
+            Err(error) => {
+                eprintln!("Failed to read config file {}: {error}", config_path.display());
+                return ExitCode::from(1);
+            }
+        };
+        println!("Config path: {}", config_path.display());
+        print!("{content}");
         return ExitCode::from(0);
     }
 

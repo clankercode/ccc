@@ -24,6 +24,7 @@ fn test_help_mentions_name_slot() {
     assert!(stdout.contains(
         "Presets can also define a default prompt when the user leaves prompt text blank"
     ));
+    assert!(stdout.contains("ccc config"));
     assert!(stdout.contains("--print-config"));
     assert!(stdout.contains("--help / -h"));
     assert!(stdout.contains(

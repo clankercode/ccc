@@ -29,6 +29,7 @@ const HELP_TEXT: &str = r#"ccc — call coding CLIs
 Usage:
   ccc [controls...] "<Prompt>"
   ccc [controls...] -- "<Prompt starting with control-like tokens>"
+  ccc config
   ccc --print-config
   ccc --help
   ccc -h
@@ -84,6 +85,7 @@ Examples:
   ccc --print-config
 
 Config:
+  ccc config                            — print the resolved config file path and contents
   ccc --print-config                    — print the canonical example config.toml
   .ccc.toml (searched upward from CWD)  — project-local presets and defaults
   XDG_CONFIG_HOME/ccc/config.toml       — global defaults when XDG is set

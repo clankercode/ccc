@@ -116,6 +116,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - `@name` for preset lookup with agent fallback; presets can also define a default prompt
   - `-h` / `--help` wins anywhere in argv and prints help immediately
   - Python and Rust search project-local `.ccc.toml` files upward from the current directory and override the global config chain
+  - `ccc config` prints the resolved config file path and raw contents, preferring `CCC_CONFIG`, then project-local `.ccc.toml`, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`
   - `formatted` and `stream-formatted` honor `FORCE_COLOR` / `NO_COLOR` before falling back to TTY detection
   - `--print-config` to print the canonical example `config.toml`
   - `--permission-mode safe|auto|yolo|plan`
@@ -124,6 +125,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - `--` forces the rest of argv to be treated as prompt text, even if it starts with control-like tokens
 - Python and Rust currently use `claude -p`, `codex exec`, and `crush run` for non-interactive invocation
 - `ccc --print-config` is the source of truth for the current canonical config schema: `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
+- `ccc config` is the source of truth for which config file currently resolves in the active shell
 
 ## Planned `ccc` Syntax Growth (design notes only, not fully rolled out yet)
 

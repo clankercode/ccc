@@ -204,13 +204,16 @@ ccc k +4 "Debug the parser"
 # Print the canonical example config
 ccc --print-config
 
+# Print the resolved config file path and contents
+ccc config
+
 # Codex
 ccc codex "Write a unit test"</code></pre>
 </section>
 
 <section id="config">
   <h2>Config</h2>
-  <p>Python and Rust load configuration from a project-local <code>.ccc.toml</code> searched upward from the current directory, then <code>XDG_CONFIG_HOME/ccc/config.toml</code>, then <code>~/.config/ccc/config.toml</code>. Run <code>ccc --print-config</code> to print the canonical example config with the current supported keys.</p>
+  <p>Python and Rust load configuration from a project-local <code>.ccc.toml</code> searched upward from the current directory, then <code>XDG_CONFIG_HOME/ccc/config.toml</code>, then <code>~/.config/ccc/config.toml</code>. Run <code>ccc --print-config</code> to print the canonical example config with the current supported keys, or <code>ccc config</code> to print the resolved config file path and raw contents. When <code>CCC_CONFIG</code> points at an existing file, that path wins for <code>ccc config</code>.</p>
   <p>Human-formatted output honors <code>FORCE_COLOR</code> and <code>NO_COLOR</code> before falling back to TTY detection; raw output modes are unchanged.</p>
   <table>
     <thead><tr><th>Setting</th><th>Description</th></tr></thead>

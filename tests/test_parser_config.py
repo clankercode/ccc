@@ -16,7 +16,11 @@ from call_coding_clis.parser import (
     AliasDef,
     RUNNER_REGISTRY,
 )
-from call_coding_clis.config import load_config, render_example_config
+from call_coding_clis.config import (
+    find_config_command_path,
+    load_config,
+    render_example_config,
+)
 
 
 FIXTURE_CONFIG_PATH = Path(__file__).parent / "fixtures" / "config-example.toml"
@@ -903,6 +907,69 @@ prompt = "Commit all changes"
             self.assertEqual(config.default_runner, "cc")
             self.assertEqual(config.aliases, {})
             self.assertEqual(config.abbreviations, {})
+
+    def test_find_config_command_path_prefers_explicit_ccc_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            explicit_path = tmp_path / "explicit.toml"
+            explicit_path.write_text('[defaults]\nrunner = "cc"\n')
+            with mock.patch.dict(os.environ, {"CCC_CONFIG": str(explicit_path)}, clear=False):
+                self.assertEqual(find_config_command_path(), explicit_path)
+
+    def test_find_config_command_path_prefers_project_local_then_xdg_then_home(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            home_root = tmp_path / "home"
+            xdg_root = tmp_path / "xdg"
+            repo_root = tmp_path / "repo"
+            nested_cwd = repo_root / "nested"
+            nested_cwd.mkdir(parents=True)
+
+            project_path = repo_root / ".ccc.toml"
+            xdg_path = xdg_root / "ccc" / "config.toml"
+            home_path = home_root / ".config" / "ccc" / "config.toml"
+            project_path.write_text('[defaults]\nrunner = "cc"\n')
+            xdg_path.parent.mkdir(parents=True)
+            xdg_path.write_text('[defaults]\nrunner = "k"\n')
+            home_path.parent.mkdir(parents=True)
+            home_path.write_text('[defaults]\nrunner = "oc"\n')
+
+            old_cwd = Path.cwd()
+            try:
+                os.chdir(nested_cwd)
+                with mock.patch.dict(
+                    os.environ,
+                    {
+                        "HOME": str(home_root),
+                        "XDG_CONFIG_HOME": str(xdg_root),
+                        "CCC_CONFIG": "",
+                    },
+                    clear=False,
+                ):
+                    self.assertEqual(find_config_command_path(), project_path)
+            finally:
+                os.chdir(old_cwd)
+
+    def test_find_config_command_path_falls_back_when_ccc_config_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            home_root = tmp_path / "home"
+            xdg_root = tmp_path / "xdg"
+            xdg_path = xdg_root / "ccc" / "config.toml"
+            xdg_path.parent.mkdir(parents=True)
+            xdg_path.write_text('[defaults]\nrunner = "k"\n')
+            missing_path = tmp_path / "missing.toml"
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "HOME": str(home_root),
+                    "XDG_CONFIG_HOME": str(xdg_root),
+                    "CCC_CONFIG": str(missing_path),
+                },
+                clear=False,
+            ):
+                self.assertEqual(find_config_command_path(), xdg_path)
 
     def test_empty_toml_returns_defaults(self):
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".toml", delete=False) as f:

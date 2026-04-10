@@ -2,6 +2,10 @@
 
 Living backlog of unfinished work. Completed items should move to `SHARED_CHANGES.md`, `FEATURES.md`, or the relevant feature docs.
 
+- [ ] Support a `ccc config` command that prints the local user config's location and contents
+  - Print the resolved config file path (respecting `CCC_CONFIG` env var and default locations).
+  - Output the full config contents (raw or pretty-printed JSON) to stdout.
+  - Exit non-zero if no config file is found, with a helpful message.
 - [ ] Finish `--allow-tool` / `--deny-tool` support where the upstream CLI can express it
   - Start with Claude and OpenCode.
   - Keep the permission-mapping matrix in `docs/clis/README.md` current.
@@ -12,15 +16,9 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
 - [ ] Review and prune stale roadmap items in per-language `PLAN.md` files
   - Fold completed work into the main docs.
   - Keep the remaining plan items focused on actual open work.
-- [ ] Make `-h` / `--help` trigger help even when mixed in with other args
-  - `ccc @blah --help` should still open help instead of treating `--help` as a prompt token.
-  - Check for `-h` or `--help` anywhere in the argv, not just in the first slot.
 - [ ] Add a repo-root `VERSION` file and pull it into implementations at build time
   - Use it as the single source of truth for reported package/CLI version strings where feasible.
   - Keep the language-specific build/release flow honest about when the baked-in version is refreshed.
-- [ ] Speed up runner version discovery by reading versions from install files when possible
-  - Prefer direct inspection of expected metadata locations such as `package.json` instead of spawning `<runner> --version`.
-  - Fall back to the current version command when direct discovery fails.
 - [ ] Decide whether structured output rendering needs templating or user customization
   - This is the `v2` rendering direction currently noted in `README.md`.
   - Keep the scope narrow unless there is a concrete user-facing need.

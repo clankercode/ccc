@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
@@ -29,6 +32,7 @@ Usage:
   ccc --print-config
   ccc --help
   ccc -h
+  ccc @reviewer --help
 
 Controls (free order before the prompt):
   runner        Select which coding CLI to use (default: oc)
@@ -48,6 +52,7 @@ Controls (free order before the prompt):
 
 Flags:
   --print-config                         Print the canonical example config.toml and exit
+  --help / -h                           Print help and exit, even when mixed with other args
   --show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it
                                         (default: off; config key: show_thinking)
   --sanitize-osc / --no-sanitize-osc    Strip disruptive OSC control output in human-facing modes
@@ -101,14 +106,78 @@ def _get_version(binary: str) -> str:
     return ""
 
 
+def _read_json_version(package_json_path: Path, expected_name: str) -> str:
+    try:
+        payload = json.loads(package_json_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    if payload.get("name") != expected_name:
+        return ""
+    version = payload.get("version")
+    return version if isinstance(version, str) else ""
+
+
+def _discover_opencode_version(binary_path: str) -> str:
+    package_json = Path(os.path.realpath(binary_path)).parent.parent / "package.json"
+    return _read_json_version(package_json, "opencode-ai")
+
+
+def _discover_codex_version(binary_path: str) -> str:
+    package_json = Path(os.path.realpath(binary_path)).parent.parent / "package.json"
+    version = _read_json_version(package_json, "@openai/codex")
+    return f"codex-cli {version}" if version else ""
+
+
+def _discover_claude_version(binary_path: str) -> str:
+    parts = Path(os.path.realpath(binary_path)).parts
+    if len(parts) < 3 or parts[-3:-1] != ("claude", "versions"):
+        return ""
+    return f"{parts[-1]} (Claude Code)" if parts[-1] else ""
+
+
+def _discover_kimi_version(binary_path: str) -> str:
+    real_path = Path(os.path.realpath(binary_path))
+    if real_path.parent.name != "bin":
+        return ""
+    site_packages_root = real_path.parent.parent / "lib"
+    if not site_packages_root.is_dir():
+        return ""
+    for metadata_path in sorted(site_packages_root.glob("python*/site-packages/kimi_cli-*.dist-info/METADATA")):
+        try:
+            for line in metadata_path.read_text(encoding="utf-8").splitlines():
+                if line.startswith("Version: "):
+                    version = line.partition(": ")[2].strip()
+                    if version:
+                        return f"kimi, version {version}"
+                    return ""
+        except OSError:
+            continue
+    return ""
+
+
+def _get_runner_version(runner_name: str, binary: str, binary_path: str) -> str:
+    if runner_name == "opencode":
+        version = _discover_opencode_version(binary_path)
+    elif runner_name == "codex":
+        version = _discover_codex_version(binary_path)
+    elif runner_name == "claude":
+        version = _discover_claude_version(binary_path)
+    elif runner_name == "kimi":
+        version = _discover_kimi_version(binary_path)
+    else:
+        version = ""
+    return version if version else _get_version(binary)
+
+
 def runner_checklist() -> str:
     lines = ["Runners:"]
     for name, alias in CANONICAL_RUNNERS:
         info = RUNNER_REGISTRY.get(name)
         binary = info.binary if info else name
-        found = shutil.which(binary) is not None
+        binary_path = shutil.which(binary)
+        found = binary_path is not None
         if found:
-            version = _get_version(binary)
+            version = _get_runner_version(name, binary, binary_path)
             tag = version if version else "found"
             lines.append(f"  [+] {name:10s} ({binary})  {tag}")
         else:

@@ -202,7 +202,7 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
 
-    if args.len() == 1 && (args[0] == "--help" || args[0] == "-h") {
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         print_help();
         return ExitCode::from(0);
     }

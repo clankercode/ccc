@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 from unittest import mock
 from call_coding_clis.cli import (
@@ -9,6 +10,7 @@ from call_coding_clis.cli import (
     _sanitize_human_output,
     _sanitize_raw_output,
 )
+from call_coding_clis.help import _get_runner_version
 
 
 FIXTURE_CONFIG_PATH = Path(__file__).parent / "fixtures" / "config-example.toml"
@@ -19,6 +21,76 @@ def read_example_config_fixture() -> str:
 
 
 class RunnerTests(unittest.TestCase):
+    def test_runner_version_reads_opencode_package_json_before_command(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_root = root / "node_modules" / "opencode-ai"
+            binary_path = package_root / "bin" / "opencode"
+            binary_path.parent.mkdir(parents=True)
+            (package_root / "package.json").write_text(
+                '{"name":"opencode-ai","version":"1.2.3"}',
+                encoding="utf-8",
+            )
+            binary_path.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")
+
+            with mock.patch("call_coding_clis.help._get_version") as fallback:
+                version = _get_runner_version("opencode", "opencode", str(binary_path))
+
+            self.assertEqual(version, "1.2.3")
+            fallback.assert_not_called()
+
+    def test_runner_version_reads_codex_package_json_before_command(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_root = root / "node_modules" / "@openai" / "codex"
+            binary_path = package_root / "bin" / "codex.js"
+            binary_path.parent.mkdir(parents=True)
+            (package_root / "package.json").write_text(
+                '{"name":"@openai/codex","version":"0.118.0"}',
+                encoding="utf-8",
+            )
+            binary_path.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")
+
+            with mock.patch("call_coding_clis.help._get_version") as fallback:
+                version = _get_runner_version("codex", "codex", str(binary_path))
+
+            self.assertEqual(version, "codex-cli 0.118.0")
+            fallback.assert_not_called()
+
+    def test_runner_version_reads_claude_version_from_install_path(self) -> None:
+        with mock.patch("os.path.realpath", return_value="/tmp/.local/share/claude/versions/2.1.98"):
+            with mock.patch("call_coding_clis.help._get_version") as fallback:
+                version = _get_runner_version("claude", "claude", "/tmp/bin/claude")
+
+        self.assertEqual(version, "2.1.98 (Claude Code)")
+        fallback.assert_not_called()
+
+    def test_runner_version_reads_kimi_metadata_before_command(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            binary_path = root / "bin" / "kimi"
+            metadata_dir = root / "lib" / "python3.13" / "site-packages" / "kimi_cli-1.30.0.dist-info"
+            binary_path.parent.mkdir(parents=True)
+            metadata_dir.mkdir(parents=True)
+            binary_path.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+            (metadata_dir / "METADATA").write_text(
+                "Metadata-Version: 2.3\nName: kimi-cli\nVersion: 1.30.0\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch("call_coding_clis.help._get_version") as fallback:
+                version = _get_runner_version("kimi", "kimi", str(binary_path))
+
+            self.assertEqual(version, "kimi, version 1.30.0")
+            fallback.assert_not_called()
+
+    def test_runner_version_falls_back_when_metadata_is_missing(self) -> None:
+        with mock.patch("call_coding_clis.help._get_version", return_value="fallback 9.9.9") as fallback:
+            version = _get_runner_version("opencode", "opencode", "/tmp/missing/opencode")
+
+        self.assertEqual(version, "fallback 9.9.9")
+        fallback.assert_called_once_with("opencode")
+
     def test_filtered_human_stderr_strips_kimi_resume_hint(self) -> None:
         stderr = "\nTo resume this session: kimi -r 123e4567-e89b-12d3-a456-426614174000\n"
         self.assertEqual(_filtered_human_stderr(stderr, "k"), "")

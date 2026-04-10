@@ -9,7 +9,7 @@ Python and Rust also expose `ccc --print-config`, which prints the canonical exa
 
 ccc [controls...] "<Prompt>"
 
-Slots are positional and parsed in order before the prompt:
+Slots are parsed in free order before the prompt, except that `-h` / `--help` wins anywhere in argv and prints help immediately:
 - runner: Select which coding CLI (default: oc). Options: opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)
 - +thinking: Set thinking level from +0 (off) to +4 (max)
   Claude keeps the same `ccc` scale: `+0` becomes `--thinking disabled`, and `+1..+4` become `--thinking enabled` with matching `--effort`.

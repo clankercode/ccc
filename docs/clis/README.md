@@ -113,6 +113,8 @@ If a CLI changes upstream, the fastest refresh path is:
 
 Then update the corresponding file here before changing `ccc` runner assembly.
 
+For the Python and Rust help checklist, runner version discovery now prefers trusted install metadata when the local layout is known, then falls back to `<cli> --version`. Current fast paths cover OpenCode and Codex `package.json`, Kimi `dist-info/METADATA`, and Claude versioned local install paths.
+
 ## Output Modes
 
 Python and Rust now share these output modes:

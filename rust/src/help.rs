@@ -1,4 +1,9 @@
 use crate::RUNNER_REGISTRY;
+use serde_json::Value;
+use std::fs;
+use std::path::Path;
+#[cfg(test)]
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 struct RunnerStatus {
@@ -27,6 +32,7 @@ Usage:
   ccc --print-config
   ccc --help
   ccc -h
+  ccc @reviewer --help
 
 Controls (free order before the prompt):
   runner        Select which coding CLI to use (default: oc)
@@ -46,6 +52,7 @@ Controls (free order before the prompt):
 
 Flags:
   --print-config                         Print the canonical example config.toml and exit
+  --help / -h                           Print help and exit, even when mixed with other args
   --show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it
                                         (default: off; config key: show_thinking)
   --sanitize-osc / --no-sanitize-osc    Strip disruptive OSC control output in human-facing modes
@@ -99,14 +106,140 @@ fn get_version(binary: &str) -> String {
     }
 }
 
+fn read_json_version(package_json_path: &Path, expected_name: &str) -> String {
+    let payload = match fs::read_to_string(package_json_path) {
+        Ok(text) => text,
+        Err(_) => return String::new(),
+    };
+    let parsed: Value = match serde_json::from_str(&payload) {
+        Ok(value) => value,
+        Err(_) => return String::new(),
+    };
+    if parsed.get("name").and_then(Value::as_str) != Some(expected_name) {
+        return String::new();
+    }
+    parsed
+        .get("version")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string()
+}
+
+fn discover_opencode_version(binary_path: &Path) -> String {
+    read_json_version(&binary_path.parent().unwrap_or(binary_path).parent().unwrap_or(binary_path).join("package.json"), "opencode-ai")
+}
+
+fn discover_codex_version(binary_path: &Path) -> String {
+    let version = read_json_version(
+        &binary_path.parent().unwrap_or(binary_path).parent().unwrap_or(binary_path).join("package.json"),
+        "@openai/codex",
+    );
+    if version.is_empty() {
+        String::new()
+    } else {
+        format!("codex-cli {version}")
+    }
+}
+
+fn discover_claude_version(binary_path: &Path) -> String {
+    let parts: Vec<_> = binary_path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    if parts.len() < 3 || parts[parts.len() - 3] != "claude" || parts[parts.len() - 2] != "versions" {
+        return String::new();
+    }
+    let version = &parts[parts.len() - 1];
+    if version.is_empty() {
+        String::new()
+    } else {
+        format!("{version} (Claude Code)")
+    }
+}
+
+fn discover_kimi_version(binary_path: &Path) -> String {
+    if binary_path.parent().and_then(Path::file_name).and_then(|value| value.to_str()) != Some("bin") {
+        return String::new();
+    }
+    let lib_dir = match binary_path.parent().and_then(Path::parent) {
+        Some(parent) => parent.join("lib"),
+        None => return String::new(),
+    };
+    let lib_entries = match fs::read_dir(&lib_dir) {
+        Ok(entries) => entries,
+        Err(_) => return String::new(),
+    };
+    for lib_entry in lib_entries.flatten() {
+        let python_dir = lib_entry.path();
+        let site_packages = python_dir.join("site-packages");
+        let dist_entries = match fs::read_dir(&site_packages) {
+            Ok(entries) => entries,
+            Err(_) => continue,
+        };
+        for dist_entry in dist_entries.flatten() {
+            let dist_path = dist_entry.path();
+            let Some(name) = dist_path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+            if !name.starts_with("kimi_cli-") || !name.ends_with(".dist-info") {
+                continue;
+            }
+            let metadata_path = dist_path.join("METADATA");
+            let Ok(metadata) = fs::read_to_string(metadata_path) else {
+                continue;
+            };
+            for line in metadata.lines() {
+                if let Some(version) = line.strip_prefix("Version: ") {
+                    if !version.trim().is_empty() {
+                        return format!("kimi, version {}", version.trim());
+                    }
+                    return String::new();
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn get_runner_version(runner_name: &str, binary: &str, binary_path: &Path) -> String {
+    let real_path = match fs::canonicalize(binary_path) {
+        Ok(path) => path,
+        Err(_) => binary_path.to_path_buf(),
+    };
+    let version = match runner_name {
+        "opencode" => discover_opencode_version(&real_path),
+        "codex" => discover_codex_version(&real_path),
+        "claude" => discover_claude_version(&real_path),
+        "kimi" => discover_kimi_version(&real_path),
+        _ => String::new(),
+    };
+    if version.is_empty() {
+        get_version(binary)
+    } else {
+        version
+    }
+}
+
 fn is_on_path(binary: &str) -> bool {
+    resolve_binary_path(binary).is_some()
+}
+
+fn resolve_binary_path(binary: &str) -> Option<String> {
     Command::new("which")
         .arg(binary)
-        .stdout(Stdio::null())
+        .stdout(Stdio::piped())
         .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                String::from_utf8(output.stdout).ok()
+            } else {
+                None
+            }
+        })
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
 }
 
 fn runner_checklist() -> Vec<RunnerStatus> {
@@ -121,7 +254,11 @@ fn runner_checklist() -> Vec<RunnerStatus> {
 
         let found = is_on_path(&binary);
         let version = if found {
-            get_version(&binary)
+            let binary_path = resolve_binary_path(&binary);
+            match binary_path {
+                Some(path) => get_runner_version(name, &binary, Path::new(&path)),
+                None => get_version(&binary),
+            }
         } else {
             String::new()
         };
@@ -163,4 +300,104 @@ pub fn print_usage() {
         "usage: ccc [controls...] \"<Prompt>\""
     );
     eprint!("{}", format_runner_checklist());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(label: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("ccc-help-{label}-{unique}"));
+        fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_get_runner_version_reads_opencode_package_json_before_command() {
+        let root = unique_temp_dir("opencode");
+        let package_root = root.join("node_modules").join("opencode-ai");
+        let binary_path = package_root.join("bin").join("opencode");
+        fs::create_dir_all(binary_path.parent().unwrap()).unwrap();
+        fs::write(
+            package_root.join("package.json"),
+            r#"{"name":"opencode-ai","version":"1.2.3"}"#,
+        )
+        .unwrap();
+        fs::write(&binary_path, "#!/bin/sh\nexit 99\n").unwrap();
+
+        assert_eq!(
+            get_runner_version("opencode", "definitely-missing-binary", &binary_path),
+            "1.2.3"
+        );
+    }
+
+    #[test]
+    fn test_get_runner_version_reads_codex_package_json_before_command() {
+        let root = unique_temp_dir("codex");
+        let package_root = root.join("node_modules").join("@openai").join("codex");
+        let binary_path = package_root.join("bin").join("codex.js");
+        fs::create_dir_all(binary_path.parent().unwrap()).unwrap();
+        fs::write(
+            package_root.join("package.json"),
+            r#"{"name":"@openai/codex","version":"0.118.0"}"#,
+        )
+        .unwrap();
+        fs::write(&binary_path, "#!/usr/bin/env node\n").unwrap();
+
+        assert_eq!(
+            get_runner_version("codex", "definitely-missing-binary", &binary_path),
+            "codex-cli 0.118.0"
+        );
+    }
+
+    #[test]
+    fn test_get_runner_version_reads_claude_version_from_install_path() {
+        let root = unique_temp_dir("claude");
+        let versions_dir = root.join("claude").join("versions");
+        fs::create_dir_all(&versions_dir).unwrap();
+        let binary_path = versions_dir.join("2.1.98");
+        fs::write(&binary_path, "").unwrap();
+
+        assert_eq!(
+            get_runner_version("claude", "definitely-missing-binary", &binary_path),
+            "2.1.98 (Claude Code)"
+        );
+    }
+
+    #[test]
+    fn test_get_runner_version_reads_kimi_metadata_before_command() {
+        let root = unique_temp_dir("kimi");
+        let binary_path = root.join("bin").join("kimi");
+        let metadata_dir = root
+            .join("lib")
+            .join("python3.13")
+            .join("site-packages")
+            .join("kimi_cli-1.30.0.dist-info");
+        fs::create_dir_all(binary_path.parent().unwrap()).unwrap();
+        fs::create_dir_all(&metadata_dir).unwrap();
+        fs::write(&binary_path, "#!/usr/bin/env python3\n").unwrap();
+        fs::write(
+            metadata_dir.join("METADATA"),
+            "Metadata-Version: 2.3\nName: kimi-cli\nVersion: 1.30.0\n",
+        )
+        .unwrap();
+
+        assert_eq!(
+            get_runner_version("kimi", "definitely-missing-binary", &binary_path),
+            "kimi, version 1.30.0"
+        );
+    }
+
+    #[test]
+    fn test_get_runner_version_falls_back_when_metadata_is_missing() {
+        assert_eq!(
+            get_runner_version("opencode", "definitely-missing-binary", Path::new("/tmp/missing/opencode")),
+            ""
+        );
+    }
 }

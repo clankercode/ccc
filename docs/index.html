@@ -159,14 +159,15 @@ footer {
   <h2>Usage</h2>
   <pre><code>ccc [controls...] "&lt;Prompt&gt;"
 ccc --help
-ccc -h</code></pre>
+ccc -h
+ccc @reviewer --help</code></pre>
   <p>At its simplest:</p>
   <pre><code>ccc "Fix the failing tests"</code></pre>
 </section>
 
 <section id="slots">
   <h2>Slots</h2>
-  <p>Arguments are positional slots parsed in order before the prompt:</p>
+  <p>Arguments are free-order control slots before the prompt; <code>-h</code> and <code>--help</code> win anywhere in argv.</p>
   <table class="slot-table">
     <thead><tr><th>Slot</th><th>Description</th></tr></thead>
     <tbody>

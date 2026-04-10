@@ -25,6 +25,7 @@ fn test_help_mentions_name_slot() {
         "Presets can also define a default prompt when the user leaves prompt text blank"
     ));
     assert!(stdout.contains("--print-config"));
+    assert!(stdout.contains("--help / -h"));
     assert!(stdout.contains(
         "--show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it"
     ));
@@ -70,4 +71,16 @@ fn test_print_config_rejects_mixed_usage() {
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("--print-config"));
+}
+
+#[test]
+fn test_help_wins_when_mixed_with_other_args() {
+    let output = Command::new(ccc_bin())
+        .args(["@reviewer", "--help"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Usage:\n  ccc [controls...] \"<Prompt>\""));
+    assert!(stdout.contains("--help / -h"));
 }

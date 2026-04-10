@@ -58,10 +58,11 @@ def _apply_real_runner_override(spec: CommandSpec) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
 
-    if not args or args == ["--help"] or args == ["-h"]:
-        if not args:
-            print_usage()
-            return 1
+    if not args:
+        print_usage()
+        return 1
+
+    if any(token in {"--help", "-h"} for token in args):
         print_help()
         return 0
 

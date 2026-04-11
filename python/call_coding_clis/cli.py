@@ -77,6 +77,8 @@ THINKING_ALIASES = {
     "max": 4,
     "xhigh": 4,
 }
+OUTPUT_MODE_CHOICES = ["text", "stream-text", "json", "stream-json", "formatted", "stream-formatted"]
+PROMPT_MODE_CHOICES = ["default", "prepend", "append"]
 
 
 def build_prompt_spec(prompt: str) -> CommandSpec:
@@ -381,15 +383,15 @@ def _parse_add_bool(value: str) -> bool:
 def _ask_existing_alias_action(name: str, current_alias: AliasDef) -> str:
     print(f"Alias @{name} already exists:")
     print(render_alias_block(name, current_alias), end="")
-    while True:
-        answer = input("Modify, replace, or cancel? [modify] ").strip().lower()
-        if answer in {"", "m", "modify"}:
-            return "modify"
-        if answer in {"r", "replace"}:
-            return "replace"
-        if answer in {"c", "cancel"}:
-            return "cancel"
-        print("Please answer modify, replace, or cancel.")
+    return _choose(
+        "Existing alias action",
+        [
+            ("modify", "m", "modify", {"modify"}),
+            ("replace", "r", "replace", {"replace"}),
+            ("cancel", "c", "cancel", {"cancel"}),
+        ],
+        default=1,
+    )
 
 
 def _prompt_alias_fields(alias: AliasDef, keep_current: bool) -> AliasDef:
@@ -409,6 +411,55 @@ def _prompt_alias_fields(alias: AliasDef, keep_current: bool) -> AliasDef:
     for field, label in prompts:
         current = getattr(result, field)
         suffix = f" [{current}]" if current is not None else " [default]"
+        if field == "thinking":
+            choice = _choose_optional_field(
+                label,
+                suffix,
+                [
+                    ("unset", "u", None, {"unset", "default"}),
+                    ("none", "n", 0, {"none"}),
+                    ("low", "l", 1, {"low"}),
+                    ("medium", "m", 2, {"medium", "med", "mid"}),
+                    ("high", "h", 3, {"high"}),
+                    ("xhigh", "x", 4, {"xhigh", "max"}),
+                ],
+            )
+            if choice is not _KEEP_CURRENT:
+                result.thinking = choice
+            continue
+        if field in {"show_thinking", "sanitize_osc"}:
+            choice = _choose_optional_field(
+                label,
+                suffix,
+                [
+                    ("unset", "u", None, {"unset", "default"}),
+                    ("true", "t", True, {"true", "yes", "y", "on"}),
+                    ("false", "f", False, {"false", "no", "n", "off"}),
+                ],
+            )
+            if choice is not _KEEP_CURRENT:
+                setattr(result, field, choice)
+            continue
+        if field == "output_mode":
+            choice = _choose_optional_field(
+                label,
+                suffix,
+                [("unset", "u", None, {"unset", "default"})]
+                + [(mode, _mode_key(mode), mode, {mode}) for mode in OUTPUT_MODE_CHOICES],
+            )
+            if choice is not _KEEP_CURRENT:
+                result.output_mode = choice
+            continue
+        if field == "prompt_mode":
+            choice = _choose_optional_field(
+                label,
+                suffix,
+                [("unset", "u", None, {"unset"})]
+                + [(mode, mode[0], mode, {mode}) for mode in PROMPT_MODE_CHOICES],
+            )
+            if choice is not _KEEP_CURRENT:
+                result.prompt_mode = choice
+            continue
         answer = input(f"{label}{suffix}: ").strip()
         if answer == "":
             continue
@@ -420,8 +471,62 @@ def _prompt_alias_fields(alias: AliasDef, keep_current: bool) -> AliasDef:
 
 
 def _confirm(prompt: str) -> bool:
-    answer = input(f"{prompt} [y/N] ").strip().lower()
-    return answer in {"y", "yes"}
+    return _choose(
+        prompt,
+        [
+            ("yes", "y", True, {"yes"}),
+            ("no", "n", False, {"no"}),
+        ],
+        default=2,
+    )
+
+
+_KEEP_CURRENT = object()
+
+
+def _mode_key(mode: str) -> str:
+    return {
+        "stream-text": "st",
+        "stream-json": "sj",
+        "stream-formatted": "sf",
+    }.get(mode, mode[0])
+
+
+def _choose_optional_field(label: str, suffix: str, choices: list[tuple[str, str, object, set[str]]]) -> object:
+    return _choose(f"{label}{suffix}", choices, default=None, blank_value=_KEEP_CURRENT)
+
+
+def _choice_marker(index: int, key: str, label: str) -> str:
+    if not key:
+        return f"[{index}] {label}"
+    if len(key) == 1 and label.startswith(key):
+        return f"[{index}/{key}]{label[1:]}"
+    return f"[{index}/{key}] {label}"
+
+
+def _choose(
+    prompt: str,
+    choices: list[tuple[str, str, object, set[str]]],
+    *,
+    default: int | None,
+    blank_value: object | None = None,
+) -> object:
+    markers = ", ".join(
+        _choice_marker(index, key, label)
+        for index, (label, key, _, _) in enumerate(choices, 1)
+    )
+    default_suffix = f" [{default}]" if default is not None else ""
+    while True:
+        answer = input(f"{prompt}: {markers}{default_suffix}: ").strip().lower()
+        if answer == "":
+            if default is not None:
+                return choices[default - 1][2]
+            return blank_value
+        for index, (label, key, value, aliases) in enumerate(choices, 1):
+            accepted = {str(index), label, key, *aliases}
+            if answer in accepted:
+                return value
+        print("Please choose one of: " + ", ".join(str(index) for index in range(1, len(choices) + 1)) + ".")
 
 
 def _merge_alias(current: AliasDef, overlay: AliasDef, unset_fields: set[str]) -> AliasDef:

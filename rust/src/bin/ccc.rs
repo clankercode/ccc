@@ -22,6 +22,15 @@ const ADD_OUTPUT_MODES: &[&str] = &[
     "stream-formatted",
 ];
 const ADD_PROMPT_MODES: &[&str] = &["default", "prepend", "append"];
+const KEEP_CURRENT_CHOICE: &str = "__keep_current__";
+const UNSET_CHOICE: &str = "__unset__";
+
+struct WizardChoice<'a> {
+    label: &'a str,
+    key: &'a str,
+    value: &'a str,
+    aliases: &'a [&'a str],
+}
 
 fn alias_has_any_field(alias: &AliasDef) -> bool {
     alias.runner.is_some()
@@ -350,19 +359,102 @@ fn read_prompt(prompt: &str) -> Result<String, String> {
     Ok(answer.trim().to_string())
 }
 
+fn choice_marker(index: usize, choice: &WizardChoice<'_>) -> String {
+    if choice.key.is_empty() {
+        return format!("[{index}] {}", choice.label);
+    }
+    if choice.key.len() == 1 && choice.label.starts_with(choice.key) {
+        return format!("[{index}/{}]{}", choice.key, &choice.label[1..]);
+    }
+    format!("[{index}/{}] {}", choice.key, choice.label)
+}
+
+fn choose(
+    prompt: &str,
+    choices: &[WizardChoice<'_>],
+    default: Option<usize>,
+    blank_value: Option<&str>,
+) -> Result<String, String> {
+    let markers = choices
+        .iter()
+        .enumerate()
+        .map(|(index, choice)| choice_marker(index + 1, choice))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let default_suffix = default
+        .map(|index| format!(" [{index}]"))
+        .unwrap_or_default();
+    loop {
+        let answer =
+            read_prompt(&format!("{prompt}: {markers}{default_suffix}: "))?.to_ascii_lowercase();
+        if answer.is_empty() {
+            if let Some(index) = default {
+                return Ok(choices[index - 1].value.to_string());
+            }
+            return Ok(blank_value.unwrap_or("").to_string());
+        }
+        for (index, choice) in choices.iter().enumerate() {
+            if answer == (index + 1).to_string()
+                || answer == choice.label
+                || answer == choice.key
+                || choice.aliases.iter().any(|alias| answer == *alias)
+            {
+                return Ok(choice.value.to_string());
+            }
+        }
+        let options = (1..=choices.len())
+            .map(|index| index.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        println!("Please choose one of: {options}.");
+    }
+}
+
+fn choose_optional_field(
+    label: &str,
+    suffix: &str,
+    choices: &[WizardChoice<'_>],
+) -> Result<String, String> {
+    choose(
+        &format!("{label}{suffix}"),
+        choices,
+        None,
+        Some(KEEP_CURRENT_CHOICE),
+    )
+}
+
 fn ask_existing_alias_action(name: &str, current_alias: &AliasDef) -> Result<&'static str, String> {
     println!("Alias @{name} already exists:");
     print!("{}", render_alias_block(name, current_alias)?);
-    loop {
-        match read_prompt("Modify, replace, or cancel? [modify] ")?
-            .to_ascii_lowercase()
-            .as_str()
-        {
-            "" | "m" | "modify" => return Ok("modify"),
-            "r" | "replace" => return Ok("replace"),
-            "c" | "cancel" => return Ok("cancel"),
-            _ => println!("Please answer modify, replace, or cancel."),
-        }
+    let action = choose(
+        "Existing alias action",
+        &[
+            WizardChoice {
+                label: "modify",
+                key: "m",
+                value: "modify",
+                aliases: &["modify"],
+            },
+            WizardChoice {
+                label: "replace",
+                key: "r",
+                value: "replace",
+                aliases: &["replace"],
+            },
+            WizardChoice {
+                label: "cancel",
+                key: "c",
+                value: "cancel",
+                aliases: &["cancel"],
+            },
+        ],
+        Some(1),
+        None,
+    )?;
+    match action.as_str() {
+        "modify" => Ok("modify"),
+        "replace" => Ok("replace"),
+        _ => Ok("cancel"),
     }
 }
 
@@ -396,6 +488,194 @@ fn prompt_alias_fields(alias: &AliasDef) -> Result<AliasDef, String> {
             .as_ref()
             .map(|value| format!(" [{value}]"))
             .unwrap_or_else(|| " [default]".to_string());
+        if field == "thinking" {
+            let choice = choose_optional_field(
+                label,
+                &suffix,
+                &[
+                    WizardChoice {
+                        label: "unset",
+                        key: "u",
+                        value: UNSET_CHOICE,
+                        aliases: &["unset", "default"],
+                    },
+                    WizardChoice {
+                        label: "none",
+                        key: "n",
+                        value: "none",
+                        aliases: &["none"],
+                    },
+                    WizardChoice {
+                        label: "low",
+                        key: "l",
+                        value: "low",
+                        aliases: &["low"],
+                    },
+                    WizardChoice {
+                        label: "medium",
+                        key: "m",
+                        value: "medium",
+                        aliases: &["medium", "med", "mid"],
+                    },
+                    WizardChoice {
+                        label: "high",
+                        key: "h",
+                        value: "high",
+                        aliases: &["high"],
+                    },
+                    WizardChoice {
+                        label: "xhigh",
+                        key: "x",
+                        value: "xhigh",
+                        aliases: &["xhigh", "max"],
+                    },
+                ],
+            )?;
+            if choice == KEEP_CURRENT_CHOICE {
+                continue;
+            }
+            if choice == UNSET_CHOICE {
+                unset_alias_field(&mut result, field);
+            } else {
+                set_add_alias_field(&mut result, field, &choice)?;
+            }
+            continue;
+        }
+        if matches!(field, "show_thinking" | "sanitize_osc") {
+            let choice = choose_optional_field(
+                label,
+                &suffix,
+                &[
+                    WizardChoice {
+                        label: "unset",
+                        key: "u",
+                        value: UNSET_CHOICE,
+                        aliases: &["unset", "default"],
+                    },
+                    WizardChoice {
+                        label: "true",
+                        key: "t",
+                        value: "true",
+                        aliases: &["true", "yes", "y", "on"],
+                    },
+                    WizardChoice {
+                        label: "false",
+                        key: "f",
+                        value: "false",
+                        aliases: &["false", "no", "n", "off"],
+                    },
+                ],
+            )?;
+            if choice == KEEP_CURRENT_CHOICE {
+                continue;
+            }
+            if choice == UNSET_CHOICE {
+                unset_alias_field(&mut result, field);
+            } else {
+                set_add_alias_field(&mut result, field, &choice)?;
+            }
+            continue;
+        }
+        if field == "output_mode" {
+            let choice = choose_optional_field(
+                label,
+                &suffix,
+                &[
+                    WizardChoice {
+                        label: "unset",
+                        key: "u",
+                        value: UNSET_CHOICE,
+                        aliases: &["unset", "default"],
+                    },
+                    WizardChoice {
+                        label: "text",
+                        key: "t",
+                        value: "text",
+                        aliases: &["text"],
+                    },
+                    WizardChoice {
+                        label: "stream-text",
+                        key: "st",
+                        value: "stream-text",
+                        aliases: &["stream-text"],
+                    },
+                    WizardChoice {
+                        label: "json",
+                        key: "j",
+                        value: "json",
+                        aliases: &["json"],
+                    },
+                    WizardChoice {
+                        label: "stream-json",
+                        key: "sj",
+                        value: "stream-json",
+                        aliases: &["stream-json"],
+                    },
+                    WizardChoice {
+                        label: "formatted",
+                        key: "f",
+                        value: "formatted",
+                        aliases: &["formatted"],
+                    },
+                    WizardChoice {
+                        label: "stream-formatted",
+                        key: "sf",
+                        value: "stream-formatted",
+                        aliases: &["stream-formatted"],
+                    },
+                ],
+            )?;
+            if choice == KEEP_CURRENT_CHOICE {
+                continue;
+            }
+            if choice == UNSET_CHOICE {
+                unset_alias_field(&mut result, field);
+            } else {
+                set_add_alias_field(&mut result, field, &choice)?;
+            }
+            continue;
+        }
+        if field == "prompt_mode" {
+            let choice = choose_optional_field(
+                label,
+                &suffix,
+                &[
+                    WizardChoice {
+                        label: "unset",
+                        key: "u",
+                        value: UNSET_CHOICE,
+                        aliases: &["unset"],
+                    },
+                    WizardChoice {
+                        label: "default",
+                        key: "d",
+                        value: "default",
+                        aliases: &["default"],
+                    },
+                    WizardChoice {
+                        label: "prepend",
+                        key: "p",
+                        value: "prepend",
+                        aliases: &["prepend"],
+                    },
+                    WizardChoice {
+                        label: "append",
+                        key: "a",
+                        value: "append",
+                        aliases: &["append"],
+                    },
+                ],
+            )?;
+            if choice == KEEP_CURRENT_CHOICE {
+                continue;
+            }
+            if choice == UNSET_CHOICE {
+                unset_alias_field(&mut result, field);
+            } else {
+                set_add_alias_field(&mut result, field, &choice)?;
+            }
+            continue;
+        }
         let answer = read_prompt(&format!("{label}{suffix}: "))?;
         if answer.is_empty() {
             continue;
@@ -410,8 +690,26 @@ fn prompt_alias_fields(alias: &AliasDef) -> Result<AliasDef, String> {
 }
 
 fn confirm(prompt: &str) -> Result<bool, String> {
-    let answer = read_prompt(&format!("{prompt} [y/N] "))?;
-    Ok(matches!(answer.to_ascii_lowercase().as_str(), "y" | "yes"))
+    let answer = choose(
+        prompt,
+        &[
+            WizardChoice {
+                label: "yes",
+                key: "y",
+                value: "yes",
+                aliases: &["yes"],
+            },
+            WizardChoice {
+                label: "no",
+                key: "n",
+                value: "no",
+                aliases: &["no"],
+            },
+        ],
+        Some(2),
+        None,
+    )?;
+    Ok(answer == "yes")
 }
 
 fn filtered_human_stderr(stderr: &str, runner_name: &str) -> String {

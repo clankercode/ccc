@@ -431,11 +431,57 @@ class RunnerTests(unittest.TestCase):
                 "CCC_CONFIG": str(tmp_path / "missing.toml"),
             }
             with mock.patch.dict(os.environ, env, clear=False):
-                with mock.patch("sys.stdin", io.StringIO("cancel\n")):
-                    rc = cli.main(["add", "mm27"])
+                with mock.patch("sys.stdin", io.StringIO("3\n")):
+                    with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                        rc = cli.main(["add", "mm27"])
 
             self.assertEqual(rc, 0)
             self.assertEqual(config_path.read_text(encoding="utf-8"), original)
+            self.assertIn("[1/m]odify", stdout.getvalue())
+            self.assertIn("[3/c]ancel", stdout.getvalue())
+
+    def test_add_alias_existing_replace_accepts_numbered_choices(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            config_path = tmp_path / "xdg" / "ccc" / "config.toml"
+            config_path.parent.mkdir(parents=True)
+            config_path.write_text('[aliases.mm27]\nprompt = "old"\n', encoding="utf-8")
+            env = {
+                "HOME": str(tmp_path / "home"),
+                "XDG_CONFIG_HOME": str(tmp_path / "xdg"),
+                "CCC_CONFIG": str(tmp_path / "missing.toml"),
+            }
+            answers = "\n".join(
+                [
+                    "2",  # replace
+                    "oc",  # runner
+                    "",  # provider
+                    "",  # model
+                    "3",  # thinking: low
+                    "3",  # show_thinking: false
+                    "1",  # sanitize_osc: default
+                    "2",  # output_mode: text
+                    "",  # agent
+                    "Fix the failing tests",  # prompt
+                    "2",  # prompt_mode: default
+                    "1",  # confirm yes
+                ]
+            )
+            with mock.patch.dict(os.environ, env, clear=False):
+                with mock.patch("sys.stdin", io.StringIO(answers + "\n")):
+                    rc = cli.main(["add", "mm27"])
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(
+                config_path.read_text(encoding="utf-8"),
+                '[aliases.mm27]\n'
+                'runner = "oc"\n'
+                "thinking = 1\n"
+                "show_thinking = false\n"
+                'output_mode = "text"\n'
+                'prompt = "Fix the failing tests"\n'
+                'prompt_mode = "default"\n',
+            )
 
     def test_ccc_help_mentions_show_thinking(self) -> None:
         from call_coding_clis.help import HELP_TEXT

@@ -172,12 +172,7 @@ fn test_add_alias_cancel_existing_leaves_file_unchanged() {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    child
-        .stdin
-        .as_mut()
-        .unwrap()
-        .write_all(b"cancel\n")
-        .unwrap();
+    child.stdin.as_mut().unwrap().write_all(b"3\n").unwrap();
     let output = child.wait_with_output().unwrap();
 
     assert!(
@@ -186,5 +181,56 @@ fn test_add_alias_cancel_existing_leaves_file_unchanged() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(fs::read_to_string(&config_path).unwrap(), original);
-    assert!(String::from_utf8_lossy(&output.stdout).contains("Cancelled"));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("[1/m]odify"));
+    assert!(stdout.contains("[3/c]ancel"));
+    assert!(stdout.contains("Cancelled"));
+}
+
+#[test]
+fn test_add_alias_existing_replace_accepts_numbered_choices() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-add-alias-replace-{unique}"));
+    let home_root = base_dir.join("home");
+    let xdg_root = base_dir.join("xdg");
+    let config_path = xdg_root.join("ccc/config.toml");
+    fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+    fs::write(&config_path, "[aliases.mm27]\nprompt = \"old\"\n").unwrap();
+
+    let mut child = Command::new(ccc_bin())
+        .args(["add", "mm27"])
+        .env("HOME", &home_root)
+        .env("XDG_CONFIG_HOME", &xdg_root)
+        .env("CCC_CONFIG", base_dir.join("missing.toml"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(b"2\noc\n\n\n3\n3\n1\n2\n\nFix the failing tests\n2\n1\n")
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read_to_string(&config_path).unwrap(),
+        "[aliases.mm27]\n\
+runner = \"oc\"\n\
+thinking = 1\n\
+show_thinking = false\n\
+output_mode = \"text\"\n\
+prompt = \"Fix the failing tests\"\n\
+prompt_mode = \"default\"\n"
+    );
 }

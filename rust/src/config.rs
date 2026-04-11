@@ -29,6 +29,7 @@ const EXAMPLE_CONFIG: &str = concat!(
     "# output_mode = \"formatted\"\n",
     "# agent = \"reviewer\"\n",
     "# prompt = \"Review the current changes\"\n",
+    "# prompt_mode = \"default\"\n",
 );
 
 pub fn render_example_config() -> String {
@@ -185,6 +186,9 @@ fn merge_alias(target: &mut crate::parser::AliasDef, overlay: &crate::parser::Al
     if overlay.prompt.is_some() {
         target.prompt = overlay.prompt.clone();
     }
+    if overlay.prompt_mode.is_some() {
+        target.prompt_mode = overlay.prompt_mode.clone();
+    }
 }
 
 fn parse_toml_config(content: &str, config: &mut CccConfig) {
@@ -274,6 +278,7 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                 ("alias", "model") => current_alias.model = Some(value.to_string()),
                 ("alias", "agent") => current_alias.agent = Some(value.to_string()),
                 ("alias", "prompt") => current_alias.prompt = Some(value.to_string()),
+                ("alias", "prompt_mode") => current_alias.prompt_mode = Some(value.to_string()),
                 _ => {}
             }
         }

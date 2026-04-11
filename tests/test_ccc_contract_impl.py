@@ -32,6 +32,7 @@ HELP_PRINT_CONFIG_SNIPPET = "--print-config"
 HELP_CONFIG_COMMAND_SNIPPET = "ccc config"
 HELP_MIXED_HELP_SNIPPET = "--help / -h"
 HELP_PRESET_PROMPT_LINE = "Presets can also define a default prompt"
+HELP_PROMPT_MODE_LINE = "prompt_mode lets alias prompts prepend or append text"
 HELP_EXHAUSTIVE_EXAMPLE_1 = (
     'ccc cc +2 :anthropic:claude-sonnet-4-20250514 @reviewer "Add tests"'
 )
@@ -56,6 +57,7 @@ EXAMPLE_CONFIG_EXPECTED = (
     ROOT / "tests" / "fixtures" / "config-example.toml"
 ).read_text(encoding="utf-8")
 PROJECT_LOCAL_CONFIG_IMPLEMENTATIONS = {"Python", "Rust"}
+PROMPT_MODE_IMPLEMENTATIONS = {"Python", "Rust"}
 
 
 class SingleImplCccContractTests(unittest.TestCase):
@@ -216,6 +218,31 @@ class SingleImplCccContractTests(unittest.TestCase):
                         result = lang.invoke_with_args(["@commit"], prompt, env)
                     assertion(result)
 
+    def _run_with_prompt_mode_assertion(
+        self, mode: str, prompt: str | None, assertion
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+            self._write_prompt_mode_config(tmp_path, mode)
+
+            for lang in self.selected_languages:
+                if lang.name not in PROMPT_MODE_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, config=f"prompt_mode:{mode}"):
+                    env = self._make_env(opencode_path, lang)
+                    env["HOME"] = str(tmp_path)
+                    env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+                    env["CCC_CONFIG"] = str(tmp_path / "legacy-config")
+                    if prompt is None:
+                        result = lang.invoke_extra(["@add-task"], env)
+                    else:
+                        result = lang.invoke_with_args(["@add-task"], prompt, env)
+                    assertion(result)
+
     def _write_project_local_config(self, tmp_path: Path) -> Path:
         workspace_root = tmp_path / "workspace"
         repo_root = workspace_root / "repo"
@@ -313,6 +340,34 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def test_whitespace_prompt_falls_back_to_preset_prompt(self) -> None:
         self._run_with_prompt_preset_assertion("   ", self.assert_uses_preset_prompt)
+
+    def test_prompt_mode_prepend_composes_alias_prompt(self) -> None:
+        self._run_with_prompt_mode_assertion(
+            "prepend",
+            "a new feature",
+            self.assert_uses_prepend_prompt_mode,
+        )
+
+    def test_prompt_mode_append_composes_alias_prompt(self) -> None:
+        self._run_with_prompt_mode_assertion(
+            "append",
+            "a new feature",
+            self.assert_uses_append_prompt_mode,
+        )
+
+    def test_prompt_mode_allows_explicit_empty_prompt(self) -> None:
+        self._run_with_prompt_mode_assertion(
+            "prepend",
+            "",
+            self.assert_uses_prompt_mode_with_explicit_empty_prompt,
+        )
+
+    def test_prompt_mode_requires_explicit_prompt_argument(self) -> None:
+        self._run_with_prompt_mode_assertion(
+            "prepend",
+            None,
+            self.assert_rejects_missing_prompt_mode_argument,
+        )
 
     def test_help_surface_mentions_standard_name_slot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1157,6 +1212,29 @@ class SingleImplCccContractTests(unittest.TestCase):
         self.assertEqual(result.stdout, PRESET_PROMPT_EXPECTED)
         self.assertEqual(result.stderr, "")
 
+    def assert_uses_prepend_prompt_mode(self, result) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "opencode run Add this task:\na new feature\n")
+        self.assertEqual(result.stderr, "")
+
+    def assert_uses_append_prompt_mode(self, result) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "opencode run a new feature\nAdd this task:\n")
+        self.assertEqual(result.stderr, "")
+
+    def assert_uses_prompt_mode_with_explicit_empty_prompt(self, result) -> None:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "opencode run Add this task:\n")
+        self.assertEqual(result.stderr, "")
+
+    def assert_rejects_missing_prompt_mode_argument(self, result) -> None:
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn(
+            "prompt_mode prepend requires an explicit prompt argument",
+            result.stderr,
+        )
+
     def assert_help_mentions_standard_name_slot(
         self, result, expected_usage_line
     ) -> None:
@@ -1203,6 +1281,7 @@ class SingleImplCccContractTests(unittest.TestCase):
     def assert_help_mentions_preset_prompt(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(HELP_PRESET_PROMPT_LINE, result.stdout)
+        self.assertIn(HELP_PROMPT_MODE_LINE, result.stdout)
 
     def assert_print_config_output(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1341,6 +1420,20 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def _write_prompt_preset_config(self, tmp_path: Path) -> None:
         toml_config_text = '[aliases.commit]\nprompt = "Commit all changes"\n'
+        home_config_dir = tmp_path / ".config" / "ccc"
+        xdg_config_dir = tmp_path / "xdg" / "ccc"
+        home_config_dir.mkdir(parents=True)
+        xdg_config_dir.mkdir(parents=True)
+        (home_config_dir / "config.toml").write_text(toml_config_text)
+        (xdg_config_dir / "config.toml").write_text(toml_config_text)
+        (tmp_path / "legacy-config").write_text("")
+
+    def _write_prompt_mode_config(self, tmp_path: Path, mode: str) -> None:
+        toml_config_text = (
+            '[aliases.add-task]\n'
+            'prompt = "Add this task:"\n'
+            f'prompt_mode = "{mode}"\n'
+        )
         home_config_dir = tmp_path / ".config" / "ccc"
         xdg_config_dir = tmp_path / "xdg" / "ccc"
         home_config_dir.mkdir(parents=True)

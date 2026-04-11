@@ -5,6 +5,7 @@ fn test_parse_prompt_only() {
     let args: Vec<String> = vec!["hello world".into()];
     let parsed = parse_args(&args);
     assert_eq!(parsed.prompt, "hello world");
+    assert!(parsed.prompt_supplied);
     assert!(parsed.runner.is_none());
     assert!(parsed.thinking.is_none());
     assert!(parsed.show_thinking.is_none());
@@ -21,6 +22,7 @@ fn test_parse_print_config_flag() {
     let parsed = parse_args(&args);
     assert!(parsed.print_config);
     assert!(parsed.prompt.is_empty());
+    assert!(!parsed.prompt_supplied);
 }
 
 #[test]
@@ -280,6 +282,23 @@ fn test_parse_double_dash_treats_print_config_as_prompt_text() {
     let parsed = parse_args(&args);
     assert!(!parsed.print_config);
     assert_eq!(parsed.prompt, "--print-config");
+    assert!(parsed.prompt_supplied);
+}
+
+#[test]
+fn test_parse_empty_string_prompt_counts_as_supplied() {
+    let args: Vec<String> = vec!["".into()];
+    let parsed = parse_args(&args);
+    assert!(parsed.prompt.is_empty());
+    assert!(parsed.prompt_supplied);
+}
+
+#[test]
+fn test_parse_whitespace_prompt_counts_as_supplied() {
+    let args: Vec<String> = vec!["   ".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.prompt, "   ");
+    assert!(parsed.prompt_supplied);
 }
 
 #[test]
@@ -849,6 +868,191 @@ fn test_resolve_explicit_prompt_overrides_alias_prompt() {
         ]
     );
     assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_alias_prompt_mode_prepend_uses_newline_separator() {
+    let config = CccConfig {
+        aliases: {
+            let mut m = std::collections::BTreeMap::new();
+            m.insert(
+                "commit".into(),
+                AliasDef {
+                    prompt: Some("Commit all changes".into()),
+                    prompt_mode: Some("prepend".into()),
+                    ..Default::default()
+                },
+            );
+            m
+        },
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        alias: Some("commit".into()),
+        prompt: "Include the failing tests".into(),
+        prompt_supplied: true,
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(
+        argv,
+        vec![
+            "opencode".to_string(),
+            "run".to_string(),
+            "Commit all changes\nInclude the failing tests".to_string()
+        ]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_alias_prompt_mode_append_uses_newline_separator() {
+    let config = CccConfig {
+        aliases: {
+            let mut m = std::collections::BTreeMap::new();
+            m.insert(
+                "commit".into(),
+                AliasDef {
+                    prompt: Some("Commit all changes".into()),
+                    prompt_mode: Some("append".into()),
+                    ..Default::default()
+                },
+            );
+            m
+        },
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        alias: Some("commit".into()),
+        prompt: "Include the failing tests".into(),
+        prompt_supplied: true,
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(
+        argv,
+        vec![
+            "opencode".to_string(),
+            "run".to_string(),
+            "Include the failing tests\nCommit all changes".to_string()
+        ]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_alias_prompt_mode_requires_supplied_prompt() {
+    let config = CccConfig {
+        aliases: {
+            let mut m = std::collections::BTreeMap::new();
+            m.insert(
+                "commit".into(),
+                AliasDef {
+                    prompt: Some("Commit all changes".into()),
+                    prompt_mode: Some("append".into()),
+                    ..Default::default()
+                },
+            );
+            m
+        },
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        alias: Some("commit".into()),
+        prompt: String::new(),
+        ..Default::default()
+    };
+    let err = resolve_command(&parsed, Some(&config)).unwrap_err();
+    assert_eq!(err, "prompt_mode append requires an explicit prompt argument");
+}
+
+#[test]
+fn test_resolve_alias_prompt_mode_allows_explicit_empty_prompt() {
+    let config = CccConfig {
+        aliases: {
+            let mut m = std::collections::BTreeMap::new();
+            m.insert(
+                "commit".into(),
+                AliasDef {
+                    prompt: Some("Commit all changes".into()),
+                    prompt_mode: Some("prepend".into()),
+                    ..Default::default()
+                },
+            );
+            m
+        },
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        alias: Some("commit".into()),
+        prompt: String::new(),
+        prompt_supplied: true,
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(
+        argv,
+        vec![
+            "opencode".to_string(),
+            "run".to_string(),
+            "Commit all changes".to_string()
+        ]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_alias_prompt_mode_requires_non_empty_alias_prompt() {
+    let config = CccConfig {
+        aliases: {
+            let mut m = std::collections::BTreeMap::new();
+            m.insert(
+                "commit".into(),
+                AliasDef {
+                    prompt: Some("   ".into()),
+                    prompt_mode: Some("append".into()),
+                    ..Default::default()
+                },
+            );
+            m
+        },
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        alias: Some("commit".into()),
+        prompt: "Add tests".into(),
+        prompt_supplied: true,
+        ..Default::default()
+    };
+    let err = resolve_command(&parsed, Some(&config)).unwrap_err();
+    assert_eq!(err, "prompt_mode append requires aliases.commit.prompt");
+}
+
+#[test]
+fn test_resolve_alias_prompt_mode_rejects_invalid_value() {
+    let config = CccConfig {
+        aliases: {
+            let mut m = std::collections::BTreeMap::new();
+            m.insert(
+                "commit".into(),
+                AliasDef {
+                    prompt: Some("Commit all changes".into()),
+                    prompt_mode: Some("replace".into()),
+                    ..Default::default()
+                },
+            );
+            m
+        },
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        alias: Some("commit".into()),
+        prompt: "Add tests".into(),
+        prompt_supplied: true,
+        ..Default::default()
+    };
+    let err = resolve_command(&parsed, Some(&config)).unwrap_err();
+    assert_eq!(err, "prompt_mode must be one of: default, prepend, append");
 }
 
 #[test]

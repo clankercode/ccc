@@ -44,6 +44,7 @@ Controls (free order before the prompt):
   :provider:model  Override provider and model
   @name         Use a named preset from config; if no preset exists, treat it as an agent
                 Presets can also define a default prompt when the user leaves prompt text blank
+                prompt_mode lets alias prompts prepend or append text; prepend/append require an explicit prompt argument
   .mode / ..mode
                 Output-mode sugar with a shared dot identity:
                   .text / ..text, .json / ..json, .fmt / ..fmt

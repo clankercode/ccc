@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 use std::sync::RwLock;
 
 const PERMISSION_MODES: &[&str] = &["safe", "auto", "yolo", "plan"];
+const PROMPT_MODES: &[&str] = &["default", "prepend", "append"];
 const OUTPUT_MODES: &[&str] = &[
     "text",
     "stream-text",
@@ -40,6 +41,7 @@ pub struct ParsedArgs {
     pub model: Option<String>,
     pub alias: Option<String>,
     pub prompt: String,
+    pub prompt_supplied: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -53,6 +55,7 @@ pub struct AliasDef {
     pub model: Option<String>,
     pub agent: Option<String>,
     pub prompt: Option<String>,
+    pub prompt_mode: Option<String>,
 }
 
 impl Default for AliasDef {
@@ -67,6 +70,7 @@ impl Default for AliasDef {
             model: None,
             agent: None,
             prompt: None,
+            prompt_mode: None,
         }
     }
 }
@@ -409,23 +413,25 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
     }
 
     parsed.prompt = positional.join(" ");
+    parsed.prompt_supplied = !positional.is_empty();
     parsed
 }
 
 pub fn resolve_command(
     parsed: &ParsedArgs,
     config: Option<&CccConfig>,
-) -> Result<(Vec<String>, BTreeMap<String, String>, Vec<String>), &'static str> {
+) -> Result<(Vec<String>, BTreeMap<String, String>, Vec<String>), String> {
     let config = config.cloned().unwrap_or_default();
     let registry = RUNNER_REGISTRY.read().unwrap();
     let mut warnings = Vec::new();
 
     let (effective_runner_name, effective_runner, alias_def) =
-        resolve_effective_runner(parsed, &config, &registry).ok_or("no runner found")?;
+        resolve_effective_runner(parsed, &config, &registry)
+            .ok_or_else(|| "no runner found".to_string())?;
 
     let mut argv: Vec<String> = vec![effective_runner.binary.clone()];
     argv.extend(effective_runner.extra_args.iter().cloned());
-    let output_plan = resolve_output_plan(parsed, Some(&config))?;
+    let output_plan = resolve_output_plan(parsed, Some(&config)).map_err(str::to_string)?;
     argv.extend(output_plan.argv_flags.iter().cloned());
 
     let effective_thinking = parsed
@@ -516,10 +522,10 @@ pub fn resolve_command(
     });
     if let Some(ref mode) = effective_permission_mode {
         if mode.is_empty() {
-            return Err("permission mode requires one of: safe, auto, yolo, plan");
+            return Err("permission mode requires one of: safe, auto, yolo, plan".to_string());
         }
         if !PERMISSION_MODES.iter().any(|known| known == mode) {
-            return Err("permission mode must be one of: safe, auto, yolo, plan");
+            return Err("permission mode must be one of: safe, auto, yolo, plan".to_string());
         }
     }
 
@@ -579,15 +585,7 @@ pub fn resolve_command(
         }
     }
 
-    let mut prompt = parsed.prompt.trim().to_string();
-    if prompt.is_empty() {
-        if let Some(alias_prompt) = alias_def.and_then(|a| a.prompt.as_deref()) {
-            prompt = alias_prompt.trim().to_string();
-        }
-    }
-    if prompt.is_empty() {
-        return Err("prompt must not be empty");
-    }
+    let prompt = resolve_prompt(parsed, alias_def)?;
     if effective_runner.prompt_flag.is_empty() {
         argv.push(prompt);
     } else {
@@ -596,6 +594,57 @@ pub fn resolve_command(
     }
 
     Ok((argv, env_overrides, warnings))
+}
+
+fn resolve_prompt(parsed: &ParsedArgs, alias_def: Option<&AliasDef>) -> Result<String, String> {
+    let user_prompt = parsed.prompt.trim();
+    let alias_prompt = alias_def
+        .and_then(|alias| alias.prompt.as_deref())
+        .map(str::trim)
+        .unwrap_or("");
+    let prompt_mode = alias_def
+        .and_then(|alias| alias.prompt_mode.as_deref())
+        .map(str::trim)
+        .filter(|mode| !mode.is_empty())
+        .unwrap_or("default");
+
+    if !PROMPT_MODES.iter().any(|known| *known == prompt_mode) {
+        return Err("prompt_mode must be one of: default, prepend, append".to_string());
+    }
+
+    if prompt_mode == "default" {
+        let prompt = if user_prompt.is_empty() {
+            alias_prompt
+        } else {
+            user_prompt
+        };
+        if prompt.is_empty() {
+            return Err("prompt must not be empty".to_string());
+        }
+        return Ok(prompt.to_string());
+    }
+
+    if !parsed.prompt_supplied {
+        return Err(format!(
+            "prompt_mode {prompt_mode} requires an explicit prompt argument"
+        ));
+    }
+    if alias_prompt.is_empty() {
+        let alias_name = parsed.alias.as_deref().unwrap_or("<alias>");
+        return Err(format!(
+            "prompt_mode {prompt_mode} requires aliases.{alias_name}.prompt"
+        ));
+    }
+
+    let mut parts = vec![alias_prompt, user_prompt];
+    if prompt_mode == "append" {
+        parts.reverse();
+    }
+    Ok(parts
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n"))
 }
 
 fn resolve_alias_def<'a>(parsed: &'a ParsedArgs, config: &'a CccConfig) -> Option<&'a AliasDef> {

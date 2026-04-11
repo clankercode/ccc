@@ -6,6 +6,7 @@ import re
 
 RUNNER_REGISTRY: dict[str, RunnerInfo] = {}
 PERMISSION_MODES = {"safe", "auto", "yolo", "plan"}
+PROMPT_MODES = {"default", "prepend", "append"}
 
 
 @dataclass(slots=True)
@@ -36,6 +37,7 @@ class ParsedArgs:
     model: str | None = None
     alias: str | None = None
     prompt: str = ""
+    prompt_supplied: bool = False
 
 
 @dataclass(slots=True)
@@ -49,6 +51,7 @@ class AliasDef:
     model: str | None = None
     agent: str | None = None
     prompt: str | None = None
+    prompt_mode: str | None = None
 
 
 @dataclass(slots=True)
@@ -256,6 +259,7 @@ def parse_args(argv: list[str]) -> ParsedArgs:
         index += 1
 
     parsed.prompt = " ".join(positional)
+    parsed.prompt_supplied = bool(positional)
     return parsed
 
 
@@ -553,9 +557,7 @@ def resolve_command(
                 f'warning: runner "{effective_runner_name}" does not support permission mode "plan"; ignoring it'
             )
 
-    prompt = parsed.prompt.strip()
-    if not prompt and alias_def and alias_def.prompt is not None:
-        prompt = str(alias_def.prompt).strip()
+    prompt = _resolve_prompt(parsed, alias_def)
     if not prompt:
         raise ValueError("prompt must not be empty")
 
@@ -564,3 +566,33 @@ def resolve_command(
     else:
         argv.append(prompt)
     return argv, env_overrides, warnings
+
+
+def _resolve_prompt(parsed: ParsedArgs, alias_def: AliasDef | None) -> str:
+    user_prompt = parsed.prompt.strip()
+    alias_prompt = ""
+    if alias_def and alias_def.prompt is not None:
+        alias_prompt = str(alias_def.prompt).strip()
+
+    prompt_mode = "default"
+    if alias_def and alias_def.prompt_mode is not None:
+        prompt_mode = str(alias_def.prompt_mode).strip().lower()
+    if prompt_mode not in PROMPT_MODES:
+        raise ValueError("prompt_mode must be one of: default, prepend, append")
+
+    if prompt_mode == "default":
+        if user_prompt:
+            return user_prompt
+        return alias_prompt
+
+    if not parsed.prompt_supplied:
+        raise ValueError(f"prompt_mode {prompt_mode} requires an explicit prompt argument")
+
+    if not alias_prompt:
+        alias_name = parsed.alias or "<alias>"
+        raise ValueError(f"prompt_mode {prompt_mode} requires aliases.{alias_name}.prompt")
+
+    parts = [alias_prompt, user_prompt]
+    if prompt_mode == "append":
+        parts.reverse()
+    return "\n".join(part for part in parts if part)

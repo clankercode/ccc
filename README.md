@@ -113,7 +113,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - runner selectors such as `c`, `cx`, `cc`, `oc`, `k`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `roocode`, `crush`, and `pi`
   - `+0..+4` thinking levels
   - `:provider:model` and `:model`
-  - `@name` for preset lookup with agent fallback; presets can also define a default prompt
+  - `@name` for preset lookup with agent fallback; presets can also define a default prompt, and alias `prompt_mode = "prepend"|"append"` can compose alias prompt text around an explicitly supplied prompt
   - `-h` / `--help` wins anywhere in argv and prints help immediately
   - Python and Rust search project-local `.ccc.toml` files upward from the current directory and override the global config chain
   - `ccc config` prints the resolved config file path and raw contents, preferring `CCC_CONFIG`, then project-local `.ccc.toml`, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`

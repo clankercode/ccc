@@ -47,6 +47,7 @@ runner = "oc"
 
 [aliases.commit]
 prompt = "Commit all changes"
+prompt_mode = "append"
 "#,
     )
     .unwrap();
@@ -76,6 +77,7 @@ prompt = "Commit all changes"
     assert_eq!(quick.runner.as_deref(), Some("oc"));
     let commit = config.aliases.get("commit").unwrap();
     assert_eq!(commit.prompt.as_deref(), Some("Commit all changes"));
+    assert_eq!(commit.prompt_mode.as_deref(), Some("append"));
 }
 
 #[test]

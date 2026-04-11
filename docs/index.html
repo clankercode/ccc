@@ -176,7 +176,7 @@ ccc @reviewer --help</code></pre>
       <tr><td>+thinking</td><td>Set thinking level: <code>+0</code> (off) through <code>+4</code> (max)</td></tr>
       <tr><td>--show-thinking</td><td>Request visible thinking output when supported; default off</td></tr>
       <tr><td>:provider:model</td><td>Override provider and model</td></tr>
-      <tr><td>@alias</td><td>Use a named preset from config</td></tr>
+      <tr><td>@alias</td><td>Use a named preset from config; aliases can provide a fallback prompt or prepend/append prompt text via <code>prompt_mode</code></td></tr>
     </tbody>
   </table>
 </section>
@@ -213,13 +213,13 @@ ccc codex "Write a unit test"</code></pre>
 
 <section id="config">
   <h2>Config</h2>
-  <p>Python and Rust load configuration from a project-local <code>.ccc.toml</code> searched upward from the current directory, then <code>XDG_CONFIG_HOME/ccc/config.toml</code>, then <code>~/.config/ccc/config.toml</code>. Run <code>ccc --print-config</code> to print the canonical example config with the current supported keys, or <code>ccc config</code> to print the resolved config file path and raw contents. When <code>CCC_CONFIG</code> points at an existing file, that path wins for <code>ccc config</code>.</p>
+  <p>Python and Rust load configuration from a project-local <code>.ccc.toml</code> searched upward from the current directory, then <code>XDG_CONFIG_HOME/ccc/config.toml</code>, then <code>~/.config/ccc/config.toml</code>. Run <code>ccc --print-config</code> to print the canonical example config with the current supported keys, or <code>ccc config</code> to print the resolved config file path and raw contents. When <code>CCC_CONFIG</code> points at an existing file, that path wins for <code>ccc config</code>. Aliases can set <code>prompt_mode = "default"|"prepend"|"append"</code>; <code>prepend</code> and <code>append</code> require an explicit prompt argument and join with a single newline.</p>
   <p>Human-formatted output honors <code>FORCE_COLOR</code> and <code>NO_COLOR</code> before falling back to TTY detection; raw output modes are unchanged.</p>
   <table>
     <thead><tr><th>Setting</th><th>Description</th></tr></thead>
     <tbody>
       <tr><td>Default runner</td><td>Which CLI to use when no runner is specified</td></tr>
-      <tr><td>Aliases</td><td>Named presets referenced with <code>@alias</code></td></tr>
+      <tr><td>Aliases</td><td>Named presets referenced with <code>@alias</code>, including optional alias prompt fallback/composition via <code>prompt</code> and <code>prompt_mode</code></td></tr>
       <tr><td>Custom abbreviations</td><td>User-defined runner shorthand names</td></tr>
       <tr><td>Default provider/model</td><td>Fallback provider and model selection</td></tr>
       <tr><td>Visible thinking</td><td><code>show_thinking</code> defaults to off and enables runner-specific visible-thinking flags when supported</td></tr>

@@ -34,6 +34,7 @@ class ParseArgsTests(unittest.TestCase):
     def test_prompt_only(self):
         parsed = parse_args(["hello world"])
         self.assertEqual(parsed.prompt, "hello world")
+        self.assertTrue(parsed.prompt_supplied)
         self.assertIsNone(parsed.runner)
         self.assertIsNone(parsed.thinking)
         self.assertIsNone(parsed.show_thinking)
@@ -49,6 +50,7 @@ class ParseArgsTests(unittest.TestCase):
         parsed = parse_args(["--print-config"])
         self.assertTrue(parsed.print_config)
         self.assertEqual(parsed.prompt, "")
+        self.assertFalse(parsed.prompt_supplied)
 
     def test_runner_selector_cc(self):
         parsed = parse_args(["cc", "fix bug"])
@@ -232,6 +234,17 @@ class ParseArgsTests(unittest.TestCase):
         parsed = parse_args(["--", "--print-config"])
         self.assertFalse(parsed.print_config)
         self.assertEqual(parsed.prompt, "--print-config")
+        self.assertTrue(parsed.prompt_supplied)
+
+    def test_empty_string_prompt_counts_as_supplied(self):
+        parsed = parse_args([""])
+        self.assertEqual(parsed.prompt, "")
+        self.assertTrue(parsed.prompt_supplied)
+
+    def test_whitespace_prompt_counts_as_supplied(self):
+        parsed = parse_args(["   "])
+        self.assertEqual(parsed.prompt, "   ")
+        self.assertTrue(parsed.prompt_supplied)
 
     def test_permission_mode_missing_value_errors_in_resolve(self):
         parsed = parse_args(["--permission-mode"])
@@ -451,6 +464,100 @@ class ResolveCommandTests(unittest.TestCase):
         argv, env, warnings = resolve_command(parsed, config)
         self.assertEqual(argv, ["opencode", "run", "Write the commit summary"])
         self.assertEqual(warnings, [])
+
+    def test_alias_prompt_mode_prepend_uses_newline_separator(self):
+        config = CccConfig(
+            aliases={
+                "commit": AliasDef(
+                    prompt="Commit all changes",
+                    prompt_mode="prepend",
+                )
+            }
+        )
+        parsed = ParsedArgs(
+            alias="commit",
+            prompt="Include the failing tests",
+            prompt_supplied=True,
+        )
+        argv, env, warnings = resolve_command(parsed, config)
+        self.assertEqual(
+            argv,
+            ["opencode", "run", "Commit all changes\nInclude the failing tests"],
+        )
+        self.assertEqual(warnings, [])
+
+    def test_alias_prompt_mode_append_uses_newline_separator(self):
+        config = CccConfig(
+            aliases={
+                "commit": AliasDef(
+                    prompt="Commit all changes",
+                    prompt_mode="append",
+                )
+            }
+        )
+        parsed = ParsedArgs(
+            alias="commit",
+            prompt="Include the failing tests",
+            prompt_supplied=True,
+        )
+        argv, env, warnings = resolve_command(parsed, config)
+        self.assertEqual(
+            argv,
+            ["opencode", "run", "Include the failing tests\nCommit all changes"],
+        )
+        self.assertEqual(warnings, [])
+
+    def test_alias_prompt_mode_requires_supplied_prompt(self):
+        config = CccConfig(
+            aliases={
+                "commit": AliasDef(
+                    prompt="Commit all changes",
+                    prompt_mode="append",
+                )
+            }
+        )
+        parsed = ParsedArgs(alias="commit", prompt="")
+        with self.assertRaisesRegex(
+            ValueError,
+            "prompt_mode append requires an explicit prompt argument",
+        ):
+            resolve_command(parsed, config)
+
+    def test_alias_prompt_mode_allows_explicit_empty_prompt(self):
+        config = CccConfig(
+            aliases={
+                "commit": AliasDef(
+                    prompt="Commit all changes",
+                    prompt_mode="prepend",
+                )
+            }
+        )
+        parsed = ParsedArgs(alias="commit", prompt="", prompt_supplied=True)
+        argv, env, warnings = resolve_command(parsed, config)
+        self.assertEqual(argv, ["opencode", "run", "Commit all changes"])
+        self.assertEqual(warnings, [])
+
+    def test_alias_prompt_mode_requires_non_empty_alias_prompt(self):
+        config = CccConfig(
+            aliases={"commit": AliasDef(prompt="   ", prompt_mode="append")}
+        )
+        parsed = ParsedArgs(alias="commit", prompt="Add tests", prompt_supplied=True)
+        with self.assertRaisesRegex(
+            ValueError,
+            "prompt_mode append requires aliases.commit.prompt",
+        ):
+            resolve_command(parsed, config)
+
+    def test_alias_prompt_mode_rejects_invalid_value(self):
+        config = CccConfig(
+            aliases={"commit": AliasDef(prompt="Commit all changes", prompt_mode="replace")}
+        )
+        parsed = ParsedArgs(alias="commit", prompt="Add tests", prompt_supplied=True)
+        with self.assertRaisesRegex(
+            ValueError,
+            "prompt_mode must be one of: default, prepend, append",
+        ):
+            resolve_command(parsed, config)
 
     def test_explicit_overrides_alias(self):
         config = CccConfig(
@@ -741,6 +848,7 @@ runner = "oc"
 
 [aliases.commit]
 prompt = "Commit all changes"
+prompt_mode = "append"
 """)
             f.flush()
             config = load_config(f.name)
@@ -764,6 +872,7 @@ prompt = "Commit all changes"
         self.assertIn("quick", config.aliases)
         self.assertEqual(config.aliases["quick"].runner, "oc")
         self.assertEqual(config.aliases["commit"].prompt, "Commit all changes")
+        self.assertEqual(config.aliases["commit"].prompt_mode, "append")
 
     def test_render_example_config_matches_fixture(self):
         self.assertEqual(render_example_config(), read_example_config_fixture())

@@ -46,6 +46,7 @@ EXAMPLE_CONFIG = """\
 # output_mode = "formatted"
 # agent = "reviewer"
 # prompt = "Review the current changes"
+# prompt_mode = "default"
 """
 
 
@@ -176,6 +177,7 @@ def _load_from_file_into(path: Path, config: CccConfig) -> None:
                 alias.model = defn.get("model", alias.model)
                 alias.agent = defn.get("agent", alias.agent)
                 alias.prompt = defn.get("prompt", alias.prompt)
+                alias.prompt_mode = defn.get("prompt_mode", alias.prompt_mode)
                 if alias.thinking is not None:
                     alias.thinking = int(alias.thinking)
                 if alias.show_thinking is not None:

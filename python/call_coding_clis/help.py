@@ -30,6 +30,7 @@ Usage:
   ccc [controls...] "<Prompt>"
   ccc [controls...] -- "<Prompt starting with control-like tokens>"
   ccc config
+  ccc add [-g] <alias>
   ccc --print-config
   ccc --help
   ccc -h
@@ -91,6 +92,9 @@ Examples:
 
 Config:
   ccc config                            — print the resolved config file path and contents
+  ccc add [-g] <alias>                  — prompt for alias settings and write them to config
+  ccc add <alias> --runner cc --prompt "Review" --yes
+                                        — write an alias non-interactively
   ccc --print-config                    — print the canonical example config.toml
   .ccc.toml (searched upward from CWD)  — project-local presets and defaults
   XDG_CONFIG_HOME/ccc/config.toml       — global defaults when XDG is set

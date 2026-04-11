@@ -18,8 +18,17 @@ try:
         resolve_output_plan,
         resolve_sanitize_osc,
         resolve_show_thinking,
+        AliasDef,
     )
-    from .config import find_config_command_path, load_config, render_example_config
+    from .config import (
+        find_alias_write_path,
+        find_config_command_path,
+        load_config,
+        normalize_alias_name,
+        render_alias_block,
+        render_example_config,
+        write_alias_block,
+    )
     from .help import print_help, print_usage
 except ImportError:
     from json_output import FormattedRenderer, StructuredStreamProcessor, parse_json_output, render_parsed
@@ -31,9 +40,43 @@ except ImportError:
         resolve_output_plan,
         resolve_sanitize_osc,
         resolve_show_thinking,
+        AliasDef,
     )
-    from config import find_config_command_path, load_config, render_example_config
+    from config import (
+        find_alias_write_path,
+        find_config_command_path,
+        load_config,
+        normalize_alias_name,
+        render_alias_block,
+        render_example_config,
+        write_alias_block,
+    )
     from help import print_help, print_usage
+
+
+ALIAS_FIELDS = {
+    "runner",
+    "provider",
+    "model",
+    "thinking",
+    "show_thinking",
+    "sanitize_osc",
+    "output_mode",
+    "agent",
+    "prompt",
+    "prompt_mode",
+}
+
+THINKING_ALIASES = {
+    "none": 0,
+    "low": 1,
+    "medium": 2,
+    "med": 2,
+    "mid": 2,
+    "high": 3,
+    "max": 4,
+    "xhigh": 4,
+}
 
 
 def build_prompt_spec(prompt: str) -> CommandSpec:
@@ -69,6 +112,9 @@ def main(argv: list[str] | None = None) -> int:
     if any(token in {"--help", "-h"} for token in args):
         print_help()
         return 0
+
+    if args and args[0] == "add":
+        return _add_alias_command(args[1:])
 
     if args == ["config"]:
         config_path = find_config_command_path()
@@ -202,6 +248,195 @@ def main(argv: list[str] | None = None) -> int:
             print(raw_line, file=sys.stderr)
     _print_cleanup_warnings(parsed.cleanup_session, output_plan.runner_name, spec, result)
     return result.exit_code
+
+
+def _add_alias_command(args: list[str]) -> int:
+    try:
+        global_only, name, alias, unset_fields, yes, replace = _parse_add_alias_args(args)
+        config_path = find_alias_write_path(global_only=global_only)
+        current_config = load_config(config_path) if config_path.exists() else None
+        current_alias = current_config.aliases.get(name) if current_config else None
+        print(f"Config path: {config_path}")
+
+        mode = "replace" if replace else "modify"
+        if current_alias and not yes:
+            mode = _ask_existing_alias_action(name, current_alias)
+            if mode == "cancel":
+                print(f"Cancelled; alias @{name} unchanged")
+                return 0
+
+        if current_alias and mode == "modify":
+            final_alias = _merge_alias(current_alias, alias, unset_fields)
+        else:
+            final_alias = alias
+
+        if not yes:
+            final_alias = _prompt_alias_fields(final_alias, keep_current=current_alias is not None and mode == "modify")
+            print(render_alias_block(name, final_alias), end="")
+            if not _confirm("Write this alias?"):
+                print(f"Cancelled; alias @{name} unchanged")
+                return 0
+        elif current_alias is None and not _alias_has_any_field(final_alias):
+            print("ccc add --yes requires at least one alias field", file=sys.stderr)
+            return 1
+
+        write_alias_block(config_path, name, final_alias)
+        print(f"Alias @{name} written")
+        print(render_alias_block(name, final_alias), end="")
+        return 0
+    except (EOFError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+
+def _parse_add_alias_args(args: list[str]) -> tuple[bool, str, AliasDef, set[str], bool, bool]:
+    global_only = False
+    yes = False
+    replace = False
+    name: str | None = None
+    alias = AliasDef()
+    unset_fields: set[str] = set()
+    index = 0
+    while index < len(args):
+        token = args[index]
+        if token == "-g":
+            global_only = True
+        elif token == "--yes":
+            yes = True
+        elif token == "--replace":
+            replace = True
+        elif token == "--unset":
+            value, index = _read_option_value(args, index, token)
+            if value not in ALIAS_FIELDS:
+                raise ValueError(f"unknown alias field for --unset: {value}")
+            unset_fields.add(value)
+        elif token in {"--show-thinking", "--no-show-thinking"}:
+            alias.show_thinking = token == "--show-thinking"
+        elif token in {"--sanitize-osc", "--no-sanitize-osc"}:
+            alias.sanitize_osc = token == "--sanitize-osc"
+        elif token.startswith("--"):
+            field = token[2:].replace("-", "_")
+            value, index = _read_option_value(args, index, token)
+            _set_alias_field(alias, field, value)
+        elif name is None:
+            name = normalize_alias_name(token)
+        else:
+            raise ValueError(f"unexpected argument: {token}")
+        index += 1
+    if name is None:
+        raise ValueError("usage: ccc add [-g] <alias> [alias options]")
+    for field in unset_fields:
+        if getattr(alias, field) is not None:
+            raise ValueError(f"--unset {field} conflicts with --{field.replace('_', '-')}")
+    return global_only, name, alias, unset_fields, yes, replace
+
+
+def _read_option_value(args: list[str], index: int, token: str) -> tuple[str, int]:
+    if index + 1 >= len(args):
+        raise ValueError(f"{token} requires a value")
+    return args[index + 1], index + 1
+
+
+def _set_alias_field(alias: AliasDef, field: str, value: str) -> None:
+    if field not in ALIAS_FIELDS:
+        raise ValueError(f"unknown ccc add option: --{field.replace('_', '-')}")
+    if field == "thinking":
+        alias.thinking = _parse_add_thinking(value)
+    elif field == "output_mode":
+        if value not in {"text", "stream-text", "json", "stream-json", "formatted", "stream-formatted"}:
+            raise ValueError("output_mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted")
+        alias.output_mode = value
+    elif field == "prompt_mode":
+        if value not in {"default", "prepend", "append"}:
+            raise ValueError("prompt_mode must be one of: default, prepend, append")
+        alias.prompt_mode = value
+    elif field in {"show_thinking", "sanitize_osc"}:
+        setattr(alias, field, _parse_add_bool(value))
+    else:
+        setattr(alias, field, value)
+
+
+def _parse_add_thinking(value: str) -> int:
+    lowered = value.lower()
+    if lowered in THINKING_ALIASES:
+        return THINKING_ALIASES[lowered]
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError("thinking must be 0, 1, 2, 3, 4, none, low, medium, high, max, or xhigh") from exc
+    if parsed not in {0, 1, 2, 3, 4}:
+        raise ValueError("thinking must be 0, 1, 2, 3, or 4")
+    return parsed
+
+
+def _parse_add_bool(value: str) -> bool:
+    lowered = value.strip().lower()
+    if lowered in {"1", "true", "yes", "y", "on"}:
+        return True
+    if lowered in {"0", "false", "no", "n", "off"}:
+        return False
+    raise ValueError("boolean values must be true or false")
+
+
+def _ask_existing_alias_action(name: str, current_alias: AliasDef) -> str:
+    print(f"Alias @{name} already exists:")
+    print(render_alias_block(name, current_alias), end="")
+    while True:
+        answer = input("Modify, replace, or cancel? [modify] ").strip().lower()
+        if answer in {"", "m", "modify"}:
+            return "modify"
+        if answer in {"r", "replace"}:
+            return "replace"
+        if answer in {"c", "cancel"}:
+            return "cancel"
+        print("Please answer modify, replace, or cancel.")
+
+
+def _prompt_alias_fields(alias: AliasDef, keep_current: bool) -> AliasDef:
+    result = AliasDef(**{field: getattr(alias, field) for field in ALIAS_FIELDS})
+    prompts = [
+        ("runner", "Runner"),
+        ("provider", "Provider"),
+        ("model", "Model"),
+        ("thinking", "Thinking 0-4"),
+        ("show_thinking", "Show thinking true/false"),
+        ("sanitize_osc", "Sanitize OSC true/false"),
+        ("output_mode", "Output mode"),
+        ("agent", "Agent"),
+        ("prompt", "Prompt"),
+        ("prompt_mode", "Prompt mode"),
+    ]
+    for field, label in prompts:
+        current = getattr(result, field)
+        suffix = f" [{current}]" if current is not None else " [default]"
+        answer = input(f"{label}{suffix}: ").strip()
+        if answer == "":
+            continue
+        if answer.lower() in {"default", "unset"}:
+            setattr(result, field, None)
+        else:
+            _set_alias_field(result, field, answer)
+    return result
+
+
+def _confirm(prompt: str) -> bool:
+    answer = input(f"{prompt} [y/N] ").strip().lower()
+    return answer in {"y", "yes"}
+
+
+def _merge_alias(current: AliasDef, overlay: AliasDef, unset_fields: set[str]) -> AliasDef:
+    result = AliasDef(**{field: getattr(current, field) for field in ALIAS_FIELDS})
+    for field in ALIAS_FIELDS:
+        value = getattr(overlay, field)
+        if value is not None:
+            setattr(result, field, value)
+    for field in unset_fields:
+        setattr(result, field, None)
+    return result
+
+
+def _alias_has_any_field(alias: AliasDef) -> bool:
+    return any(getattr(alias, field) is not None for field in ALIAS_FIELDS)
 
 
 def _handle_structured_chunk(

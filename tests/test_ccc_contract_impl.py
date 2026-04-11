@@ -69,6 +69,7 @@ YOLO_IMPLEMENTATIONS = {"Python", "Rust"}
 PROMPT_PRESET_IMPLEMENTATIONS = {"Python", "Rust"}
 PRINT_CONFIG_IMPLEMENTATIONS = {"Python", "Rust"}
 CONFIG_COMMAND_IMPLEMENTATIONS = {"Python", "Rust"}
+ADD_ALIAS_IMPLEMENTATIONS = {"Python", "Rust"}
 EXAMPLE_CONFIG_EXPECTED = (
     ROOT / "tests" / "fixtures" / "config-example.toml"
 ).read_text(encoding="utf-8")
@@ -703,6 +704,51 @@ class SingleImplCccContractTests(unittest.TestCase):
                             existing.unlink()
                     result = lang.invoke_extra(["config"], env)
                     self.assert_missing_config_command(result, env["CCC_CONFIG"])
+
+    def test_add_alias_yes_writes_config_and_alias_is_usable(self) -> None:
+        alias_block = (
+            '[aliases.mm27]\n'
+            'runner = "oc"\n'
+            'prompt = "Fix the failing tests"\n'
+            'prompt_mode = "default"\n'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in ADD_ALIAS_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, command="add-alias"):
+                    env = self._make_env(opencode_path, lang)
+                    add_result = lang.invoke_extra(
+                        [
+                            "add",
+                            "mm27",
+                            "--runner",
+                            "oc",
+                            "--prompt",
+                            "Fix the failing tests",
+                            "--prompt-mode",
+                            "default",
+                            "--yes",
+                        ],
+                        env,
+                    )
+                    config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                    self.assertEqual(add_result.returncode, 0, add_result.stderr)
+                    self.assertIn(f"Config path: {config_path}", add_result.stdout)
+                    self.assertIn("Alias @mm27 written", add_result.stdout)
+                    self.assertEqual(config_path.read_text(encoding="utf-8"), alias_block)
+
+                    config_result = lang.invoke_extra(["config"], env)
+                    self.assert_config_command_output(config_result, config_path, alias_block)
+
+                    alias_result = lang.invoke_extra(["@mm27"], env)
+                    self.assert_equal_output(alias_result)
 
     def test_help_surface_mentions_project_local_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

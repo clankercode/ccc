@@ -1,16 +1,418 @@
 use call_coding_clis::{
-    find_config_command_path, load_config, parse_args, parse_json_output, print_help, print_usage,
-    render_example_config, render_parsed, resolve_command, resolve_human_tty, resolve_output_plan,
-    resolve_sanitize_osc, resolve_show_thinking, FormattedRenderer, Runner,
+    find_alias_write_path, find_config_command_path, load_config, normalize_alias_name, parse_args,
+    parse_json_output, print_help, print_usage, render_alias_block, render_example_config,
+    render_parsed, resolve_command, resolve_human_tty, resolve_output_plan, resolve_sanitize_osc,
+    resolve_show_thinking, write_alias_block, AliasDef, FormattedRenderer, Runner,
     StructuredStreamProcessor,
 };
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
-use std::io::IsTerminal;
+use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::sync::{Arc, Mutex};
+
+const ADD_OUTPUT_MODES: &[&str] = &[
+    "text",
+    "stream-text",
+    "json",
+    "stream-json",
+    "formatted",
+    "stream-formatted",
+];
+const ADD_PROMPT_MODES: &[&str] = &["default", "prepend", "append"];
+
+fn alias_has_any_field(alias: &AliasDef) -> bool {
+    alias.runner.is_some()
+        || alias.thinking.is_some()
+        || alias.show_thinking.is_some()
+        || alias.sanitize_osc.is_some()
+        || alias.output_mode.is_some()
+        || alias.provider.is_some()
+        || alias.model.is_some()
+        || alias.agent.is_some()
+        || alias.prompt.is_some()
+        || alias.prompt_mode.is_some()
+}
+
+fn parse_add_bool(value: &str) -> Result<bool, String> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "y" | "on" => Ok(true),
+        "0" | "false" | "no" | "n" | "off" => Ok(false),
+        _ => Err("boolean values must be true or false".to_string()),
+    }
+}
+
+fn parse_add_thinking(value: &str) -> Result<i32, String> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "none" => Ok(0),
+        "low" => Ok(1),
+        "med" | "mid" | "medium" => Ok(2),
+        "high" => Ok(3),
+        "max" | "xhigh" => Ok(4),
+        _ => match value.parse::<i32>() {
+            Ok(parsed @ 0..=4) => Ok(parsed),
+            Ok(_) => Err("thinking must be 0, 1, 2, 3, or 4".to_string()),
+            Err(_) => Err(
+                "thinking must be 0, 1, 2, 3, 4, none, low, medium, high, max, or xhigh"
+                    .to_string(),
+            ),
+        },
+    }
+}
+
+fn set_add_alias_field(alias: &mut AliasDef, field: &str, value: &str) -> Result<(), String> {
+    match field {
+        "runner" => alias.runner = Some(value.to_string()),
+        "provider" => alias.provider = Some(value.to_string()),
+        "model" => alias.model = Some(value.to_string()),
+        "thinking" => alias.thinking = Some(parse_add_thinking(value)?),
+        "show_thinking" => alias.show_thinking = Some(parse_add_bool(value)?),
+        "sanitize_osc" => alias.sanitize_osc = Some(parse_add_bool(value)?),
+        "output_mode" => {
+            if !ADD_OUTPUT_MODES.contains(&value) {
+                return Err(
+                    "output_mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted"
+                        .to_string(),
+                );
+            }
+            alias.output_mode = Some(value.to_string());
+        }
+        "agent" => alias.agent = Some(value.to_string()),
+        "prompt" => alias.prompt = Some(value.to_string()),
+        "prompt_mode" => {
+            if !ADD_PROMPT_MODES.contains(&value) {
+                return Err("prompt_mode must be one of: default, prepend, append".to_string());
+            }
+            alias.prompt_mode = Some(value.to_string());
+        }
+        _ => {
+            return Err(format!(
+                "unknown ccc add option: --{}",
+                field.replace('_', "-")
+            ))
+        }
+    }
+    Ok(())
+}
+
+fn parse_add_alias_args(
+    args: &[String],
+) -> Result<(bool, String, AliasDef, Vec<String>, bool, bool), String> {
+    let mut global_only = false;
+    let mut yes = false;
+    let mut replace = false;
+    let mut name: Option<String> = None;
+    let mut alias = AliasDef::default();
+    let mut unset_fields = Vec::new();
+    let mut index = 0;
+    while index < args.len() {
+        let token = &args[index];
+        if token == "-g" {
+            global_only = true;
+        } else if token == "--yes" {
+            yes = true;
+        } else if token == "--replace" {
+            replace = true;
+        } else if token == "--unset" {
+            let value = args
+                .get(index + 1)
+                .ok_or_else(|| "--unset requires a value".to_string())?;
+            if !is_add_alias_field(value) {
+                return Err(format!("unknown alias field for --unset: {value}"));
+            }
+            unset_fields.push(value.to_string());
+            index += 1;
+        } else if token == "--show-thinking" {
+            alias.show_thinking = Some(true);
+        } else if token == "--no-show-thinking" {
+            alias.show_thinking = Some(false);
+        } else if token == "--sanitize-osc" {
+            alias.sanitize_osc = Some(true);
+        } else if token == "--no-sanitize-osc" {
+            alias.sanitize_osc = Some(false);
+        } else if let Some(field) = token.strip_prefix("--") {
+            let value = args
+                .get(index + 1)
+                .ok_or_else(|| format!("{token} requires a value"))?;
+            set_add_alias_field(&mut alias, &field.replace('-', "_"), value)?;
+            index += 1;
+        } else if name.is_none() {
+            name = Some(normalize_alias_name(token)?);
+        } else {
+            return Err(format!("unexpected argument: {token}"));
+        }
+        index += 1;
+    }
+    let name = name.ok_or_else(|| "usage: ccc add [-g] <alias> [alias options]".to_string())?;
+    for field in &unset_fields {
+        if alias_field_is_set(&alias, field) {
+            return Err(format!(
+                "--unset {field} conflicts with --{}",
+                field.replace('_', "-")
+            ));
+        }
+    }
+    Ok((global_only, name, alias, unset_fields, yes, replace))
+}
+
+fn run_add_alias_command(args: &[String]) -> ExitCode {
+    let (global_only, name, alias, unset_fields, yes, replace) = match parse_add_alias_args(args) {
+        Ok(value) => value,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return ExitCode::from(1);
+        }
+    };
+
+    let config_path = find_alias_write_path(global_only);
+    println!("Config path: {}", config_path.display());
+
+    let current_config = if config_path.exists() {
+        Some(load_config(Some(&config_path)))
+    } else {
+        None
+    };
+    let current_alias = current_config
+        .as_ref()
+        .and_then(|config| config.aliases.get(&name))
+        .cloned();
+    let mut mode = if replace { "replace" } else { "modify" };
+    if current_alias.is_some() && !yes {
+        match ask_existing_alias_action(&name, current_alias.as_ref().unwrap()) {
+            Ok(action) if action == "cancel" => {
+                println!("Cancelled; alias @{name} unchanged");
+                return ExitCode::from(0);
+            }
+            Ok(action) => mode = action,
+            Err(error) => {
+                eprintln!("{error}");
+                return ExitCode::from(1);
+            }
+        }
+    }
+
+    let mut final_alias = if mode == "modify" {
+        if let Some(current) = current_alias.clone() {
+            merge_alias(&current, &alias, &unset_fields)
+        } else {
+            alias
+        }
+    } else {
+        alias
+    };
+
+    if !yes {
+        match prompt_alias_fields(&final_alias) {
+            Ok(prompted) => final_alias = prompted,
+            Err(error) => {
+                eprintln!("{error}");
+                return ExitCode::from(1);
+            }
+        }
+        match render_alias_block(&name, &final_alias) {
+            Ok(block) => print!("{block}"),
+            Err(error) => {
+                eprintln!("{error}");
+                return ExitCode::from(1);
+            }
+        }
+        match confirm("Write this alias?") {
+            Ok(true) => {}
+            Ok(false) => {
+                println!("Cancelled; alias @{name} unchanged");
+                return ExitCode::from(0);
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                return ExitCode::from(1);
+            }
+        }
+    } else if current_alias.is_none() && !alias_has_any_field(&final_alias) {
+        eprintln!("ccc add --yes requires at least one alias field");
+        return ExitCode::from(1);
+    }
+
+    if let Err(error) = write_alias_block(&config_path, &name, &final_alias) {
+        eprintln!("{error}");
+        return ExitCode::from(1);
+    }
+    println!("Alias @{name} written");
+    match render_alias_block(&name, &final_alias) {
+        Ok(block) => print!("{block}"),
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::from(1);
+        }
+    }
+    ExitCode::from(0)
+}
+
+fn is_add_alias_field(field: &str) -> bool {
+    matches!(
+        field,
+        "runner"
+            | "provider"
+            | "model"
+            | "thinking"
+            | "show_thinking"
+            | "sanitize_osc"
+            | "output_mode"
+            | "agent"
+            | "prompt"
+            | "prompt_mode"
+    )
+}
+
+fn alias_field_is_set(alias: &AliasDef, field: &str) -> bool {
+    match field {
+        "runner" => alias.runner.is_some(),
+        "provider" => alias.provider.is_some(),
+        "model" => alias.model.is_some(),
+        "thinking" => alias.thinking.is_some(),
+        "show_thinking" => alias.show_thinking.is_some(),
+        "sanitize_osc" => alias.sanitize_osc.is_some(),
+        "output_mode" => alias.output_mode.is_some(),
+        "agent" => alias.agent.is_some(),
+        "prompt" => alias.prompt.is_some(),
+        "prompt_mode" => alias.prompt_mode.is_some(),
+        _ => false,
+    }
+}
+
+fn unset_alias_field(alias: &mut AliasDef, field: &str) {
+    match field {
+        "runner" => alias.runner = None,
+        "provider" => alias.provider = None,
+        "model" => alias.model = None,
+        "thinking" => alias.thinking = None,
+        "show_thinking" => alias.show_thinking = None,
+        "sanitize_osc" => alias.sanitize_osc = None,
+        "output_mode" => alias.output_mode = None,
+        "agent" => alias.agent = None,
+        "prompt" => alias.prompt = None,
+        "prompt_mode" => alias.prompt_mode = None,
+        _ => {}
+    }
+}
+
+fn merge_alias(current: &AliasDef, overlay: &AliasDef, unset_fields: &[String]) -> AliasDef {
+    let mut result = current.clone();
+    if overlay.runner.is_some() {
+        result.runner = overlay.runner.clone();
+    }
+    if overlay.provider.is_some() {
+        result.provider = overlay.provider.clone();
+    }
+    if overlay.model.is_some() {
+        result.model = overlay.model.clone();
+    }
+    if overlay.thinking.is_some() {
+        result.thinking = overlay.thinking;
+    }
+    if overlay.show_thinking.is_some() {
+        result.show_thinking = overlay.show_thinking;
+    }
+    if overlay.sanitize_osc.is_some() {
+        result.sanitize_osc = overlay.sanitize_osc;
+    }
+    if overlay.output_mode.is_some() {
+        result.output_mode = overlay.output_mode.clone();
+    }
+    if overlay.agent.is_some() {
+        result.agent = overlay.agent.clone();
+    }
+    if overlay.prompt.is_some() {
+        result.prompt = overlay.prompt.clone();
+    }
+    if overlay.prompt_mode.is_some() {
+        result.prompt_mode = overlay.prompt_mode.clone();
+    }
+    for field in unset_fields {
+        unset_alias_field(&mut result, field);
+    }
+    result
+}
+
+fn read_prompt(prompt: &str) -> Result<String, String> {
+    print!("{prompt}");
+    io::stdout()
+        .flush()
+        .map_err(|error| format!("failed to write prompt: {error}"))?;
+    let mut answer = String::new();
+    let bytes = io::stdin()
+        .read_line(&mut answer)
+        .map_err(|error| format!("failed to read answer: {error}"))?;
+    if bytes == 0 {
+        return Err("input ended before the wizard completed".to_string());
+    }
+    Ok(answer.trim().to_string())
+}
+
+fn ask_existing_alias_action(name: &str, current_alias: &AliasDef) -> Result<&'static str, String> {
+    println!("Alias @{name} already exists:");
+    print!("{}", render_alias_block(name, current_alias)?);
+    loop {
+        match read_prompt("Modify, replace, or cancel? [modify] ")?
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "" | "m" | "modify" => return Ok("modify"),
+            "r" | "replace" => return Ok("replace"),
+            "c" | "cancel" => return Ok("cancel"),
+            _ => println!("Please answer modify, replace, or cancel."),
+        }
+    }
+}
+
+fn prompt_alias_fields(alias: &AliasDef) -> Result<AliasDef, String> {
+    let mut result = alias.clone();
+    for (field, label, current) in [
+        ("runner", "Runner", alias.runner.clone()),
+        ("provider", "Provider", alias.provider.clone()),
+        ("model", "Model", alias.model.clone()),
+        (
+            "thinking",
+            "Thinking 0-4",
+            alias.thinking.map(|value| value.to_string()),
+        ),
+        (
+            "show_thinking",
+            "Show thinking true/false",
+            alias.show_thinking.map(|value| value.to_string()),
+        ),
+        (
+            "sanitize_osc",
+            "Sanitize OSC true/false",
+            alias.sanitize_osc.map(|value| value.to_string()),
+        ),
+        ("output_mode", "Output mode", alias.output_mode.clone()),
+        ("agent", "Agent", alias.agent.clone()),
+        ("prompt", "Prompt", alias.prompt.clone()),
+        ("prompt_mode", "Prompt mode", alias.prompt_mode.clone()),
+    ] {
+        let suffix = current
+            .as_ref()
+            .map(|value| format!(" [{value}]"))
+            .unwrap_or_else(|| " [default]".to_string());
+        let answer = read_prompt(&format!("{label}{suffix}: "))?;
+        if answer.is_empty() {
+            continue;
+        }
+        if matches!(answer.as_str(), "default" | "unset") {
+            unset_alias_field(&mut result, field);
+        } else {
+            set_add_alias_field(&mut result, field, &answer)?;
+        }
+    }
+    Ok(result)
+}
+
+fn confirm(prompt: &str) -> Result<bool, String> {
+    let answer = read_prompt(&format!("{prompt} [y/N] "))?;
+    Ok(matches!(answer.to_ascii_lowercase().as_str(), "y" | "yes"))
+}
 
 fn filtered_human_stderr(stderr: &str, runner_name: &str) -> String {
     if !matches!(runner_name, "k" | "kimi") || stderr.is_empty() {
@@ -540,6 +942,10 @@ fn main() -> ExitCode {
         println!("Config path: {}", config_path.display());
         print!("{content}");
         return ExitCode::from(0);
+    }
+
+    if args.first().map(String::as_str) == Some("add") {
+        return run_add_alias_command(&args[1..]);
     }
 
     let parsed = parse_args(&args);

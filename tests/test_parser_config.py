@@ -17,9 +17,12 @@ from call_coding_clis.parser import (
     RUNNER_REGISTRY,
 )
 from call_coding_clis.config import (
+    find_alias_write_path,
     find_config_command_path,
     load_config,
     render_example_config,
+    render_alias_block,
+    upsert_alias_block,
 )
 
 
@@ -1148,6 +1151,106 @@ prompt_mode = "append"
             f.flush()
             config = load_config(f.name)
         self.assertEqual(config.default_runner, "oc")
+
+    def test_render_alias_block_omits_unset_keys_and_escapes_strings(self):
+        alias = AliasDef(
+            runner="cc",
+            model='claude "quoted"',
+            thinking=3,
+            show_thinking=True,
+            prompt="Review\nchanges",
+            prompt_mode="append",
+        )
+
+        self.assertEqual(
+            render_alias_block("mm27", alias),
+            '[aliases.mm27]\n'
+            'runner = "cc"\n'
+            'model = "claude \\"quoted\\""\n'
+            'thinking = 3\n'
+            'show_thinking = true\n'
+            'prompt = "Review\\nchanges"\n'
+            'prompt_mode = "append"\n',
+        )
+
+    def test_upsert_alias_block_replaces_only_target_alias(self):
+        content = (
+            "# keep me\n"
+            "[defaults]\n"
+            'runner = "oc"\n'
+            "\n"
+            "[aliases.mm27]\n"
+            'runner = "cc"\n'
+            'prompt = "old"\n'
+            "\n"
+            "[aliases.other]\n"
+            'prompt = "keep"\n'
+        )
+        alias = AliasDef(runner="k", prompt="new")
+
+        updated = upsert_alias_block(content, "mm27", alias)
+
+        self.assertEqual(
+            updated,
+            "# keep me\n"
+            "[defaults]\n"
+            'runner = "oc"\n'
+            "\n"
+            "[aliases.mm27]\n"
+            'runner = "k"\n'
+            'prompt = "new"\n'
+            "\n"
+            "[aliases.other]\n"
+            'prompt = "keep"\n',
+        )
+
+    def test_find_alias_write_path_defaults_to_new_xdg_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "HOME": str(tmp_path / "home"),
+                    "XDG_CONFIG_HOME": str(tmp_path / "xdg"),
+                    "CCC_CONFIG": str(tmp_path / "missing.toml"),
+                },
+                clear=False,
+            ):
+                self.assertEqual(
+                    find_alias_write_path(global_only=False),
+                    tmp_path / "xdg" / "ccc" / "config.toml",
+                )
+
+    def test_find_alias_write_path_global_ignores_project_and_prefers_xdg(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            repo_root = tmp_path / "repo"
+            nested = repo_root / "nested"
+            nested.mkdir(parents=True)
+            project_config = repo_root / ".ccc.toml"
+            project_config.write_text("[aliases.local]\n", encoding="utf-8")
+            home_config = tmp_path / "home" / ".config" / "ccc" / "config.toml"
+            xdg_config = tmp_path / "xdg" / "ccc" / "config.toml"
+            home_config.parent.mkdir(parents=True)
+            xdg_config.parent.mkdir(parents=True)
+            home_config.write_text("[aliases.home]\n", encoding="utf-8")
+            xdg_config.write_text("[aliases.xdg]\n", encoding="utf-8")
+
+            old_cwd = Path.cwd()
+            try:
+                os.chdir(nested)
+                with mock.patch.dict(
+                    os.environ,
+                    {
+                        "HOME": str(tmp_path / "home"),
+                        "XDG_CONFIG_HOME": str(tmp_path / "xdg"),
+                        "CCC_CONFIG": str(tmp_path / "custom.toml"),
+                    },
+                    clear=False,
+                ):
+                    self.assertEqual(find_alias_write_path(global_only=True), xdg_config)
+            finally:
+                os.chdir(old_cwd)
 
 
 class RegistryTests(unittest.TestCase):

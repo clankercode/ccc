@@ -201,6 +201,15 @@ Generate an example config:
 ccc --print-config
 ```
 
+Add or edit an alias with the line-prompt wizard:
+
+```bash
+ccc add mm27
+ccc add mm27 --runner cc --model claude-4 --prompt "Review changes" --prompt-mode default --yes
+```
+
+Without `-g`, `ccc add` writes the same config path shown by `ccc config`, creating a new global config when none exists. With `-g`, it ignores project-local config and writes the effective global config.
+
 Example `.ccc.toml`:
 
 ```toml

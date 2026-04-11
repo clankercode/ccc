@@ -1,4 +1,8 @@
+use std::fs;
+use std::io::Write;
 use std::process::Command;
+use std::process::Stdio;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn ccc_bin() -> &'static str {
     env!("CARGO_BIN_EXE_ccc")
@@ -92,4 +96,95 @@ fn test_help_wins_when_mixed_with_other_args() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Usage:\n  ccc [controls...] \"<Prompt>\""));
     assert!(stdout.contains("--help / -h"));
+}
+
+#[test]
+fn test_add_alias_yes_writes_config() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-add-alias-{unique}"));
+    let home_root = base_dir.join("home");
+    let xdg_root = base_dir.join("xdg");
+    let config_path = xdg_root.join("ccc/config.toml");
+
+    let output = Command::new(ccc_bin())
+        .args([
+            "add",
+            "mm27",
+            "--runner",
+            "cc",
+            "--model",
+            "claude-4",
+            "--prompt",
+            "Review changes",
+            "--prompt-mode",
+            "default",
+            "--yes",
+        ])
+        .env("HOME", &home_root)
+        .env("XDG_CONFIG_HOME", &xdg_root)
+        .env("CCC_CONFIG", base_dir.join("missing.toml"))
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read_to_string(&config_path).unwrap(),
+        "[aliases.mm27]\n\
+runner = \"cc\"\n\
+model = \"claude-4\"\n\
+prompt = \"Review changes\"\n\
+prompt_mode = \"default\"\n"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains(&format!("Config path: {}", config_path.display())));
+    assert!(stdout.contains("Alias @mm27 written"));
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn test_add_alias_cancel_existing_leaves_file_unchanged() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-add-alias-cancel-{unique}"));
+    let home_root = base_dir.join("home");
+    let xdg_root = base_dir.join("xdg");
+    let config_path = xdg_root.join("ccc/config.toml");
+    fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+    let original = "[aliases.mm27]\nprompt = \"old\"\n";
+    fs::write(&config_path, original).unwrap();
+
+    let mut child = Command::new(ccc_bin())
+        .args(["add", "mm27"])
+        .env("HOME", &home_root)
+        .env("XDG_CONFIG_HOME", &xdg_root)
+        .env("CCC_CONFIG", base_dir.join("missing.toml"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(b"cancel\n")
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read_to_string(&config_path).unwrap(), original);
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Cancelled"));
 }

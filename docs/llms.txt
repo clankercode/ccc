@@ -4,6 +4,7 @@
 
 ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Claude Code, Codex, Kimi, Crush) behind a single consistent interface. Each of the 20 language implementations bundles an identical `ccc` CLI binary and a reusable library with `CommandSpec`, `CompletedRun`, and `Runner` types.
 Python and Rust also expose `ccc --print-config`, which prints the canonical example config with the current supported keys, and `ccc config`, which prints the resolved config file path and contents.
+Python and Rust also expose `ccc add [-g] <alias>`, a line-prompt alias wizard that writes `[aliases.<name>]` entries to config; scriptable flags plus `--yes` can write aliases non-interactively.
 
 ## Usage
 
@@ -25,6 +26,7 @@ Slots are parsed in free order before the prompt, except that `-h` / `--help` wi
 - Config: in Python and Rust, project-local `.ccc.toml` files are searched upward from the current directory, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`
 - Generated config: `ccc --print-config` prints the canonical schema using `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 - Resolved config: `ccc config` prints the active config file path and its raw contents; `CCC_CONFIG` wins when it points at an existing file
+- Alias wizard: `ccc add <alias>` writes the resolved config path; `-g` forces the effective global config instead of project-local config; blank/default answers omit alias keys
 
 Session persistence:
 - Python and Rust add Claude `--no-session-persistence` and Codex `--ephemeral` by default.
@@ -41,6 +43,7 @@ Examples:
 - ccc k +4 "Debug the parser"
 - ccc --print-config
 - ccc config
+- ccc add mm27 --runner cc --prompt "Review changes" --prompt-mode default --yes
 
 ## Languages
 

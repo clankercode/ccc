@@ -1,11 +1,14 @@
-use call_coding_clis::{find_config_command_path, load_config, render_example_config};
+use call_coding_clis::{
+    find_alias_write_path, find_config_command_path, load_config, render_alias_block,
+    render_example_config, upsert_alias_block, AliasDef,
+};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn example_config_fixture() -> String {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../tests/fixtures/config-example.toml");
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/config-example.toml");
     fs::read_to_string(path).unwrap()
 }
 
@@ -225,8 +228,7 @@ fn test_find_config_command_path_falls_back_when_ccc_config_is_missing() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let base_dir =
-        std::env::temp_dir().join(format!("ccc-rust-config-command-fallback-{unique}"));
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-config-command-fallback-{unique}"));
     let home_root = base_dir.join("home");
     let xdg_root = base_dir.join("xdg");
     let xdg_path = xdg_root.join("ccc/config.toml");
@@ -262,4 +264,113 @@ fn test_find_config_command_path_falls_back_when_ccc_config_is_missing() {
     }
 
     assert_eq!(resolved, Some(xdg_path));
+}
+
+#[test]
+fn test_render_alias_block_omits_unset_keys_and_escapes_strings() {
+    let alias = AliasDef {
+        runner: Some("cc".to_string()),
+        model: Some("claude \"quoted\"".to_string()),
+        thinking: Some(3),
+        show_thinking: Some(true),
+        prompt: Some("Review\nchanges".to_string()),
+        prompt_mode: Some("append".to_string()),
+        ..AliasDef::default()
+    };
+
+    assert_eq!(
+        render_alias_block("mm27", &alias).unwrap(),
+        "[aliases.mm27]\n\
+runner = \"cc\"\n\
+model = \"claude \\\"quoted\\\"\"\n\
+thinking = 3\n\
+show_thinking = true\n\
+prompt = \"Review\\nchanges\"\n\
+prompt_mode = \"append\"\n"
+    );
+}
+
+#[test]
+fn test_upsert_alias_block_replaces_only_target_alias() {
+    let content = "# keep me\n\
+[defaults]\n\
+runner = \"oc\"\n\
+\n\
+[aliases.mm27]\n\
+runner = \"cc\"\n\
+prompt = \"old\"\n\
+\n\
+[aliases.other]\n\
+prompt = \"keep\"\n";
+    let alias = AliasDef {
+        runner: Some("k".to_string()),
+        prompt: Some("new".to_string()),
+        ..AliasDef::default()
+    };
+
+    assert_eq!(
+        upsert_alias_block(content, "mm27", &alias).unwrap(),
+        "# keep me\n\
+[defaults]\n\
+runner = \"oc\"\n\
+\n\
+[aliases.mm27]\n\
+runner = \"k\"\n\
+prompt = \"new\"\n\
+\n\
+[aliases.other]\n\
+prompt = \"keep\"\n"
+    );
+}
+
+#[test]
+fn test_find_alias_write_path_global_ignores_project_and_prefers_xdg() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-alias-write-{unique}"));
+    let repo_root = base_dir.join("repo");
+    let nested_cwd = repo_root.join("nested");
+    fs::create_dir_all(&nested_cwd).unwrap();
+    fs::write(repo_root.join(".ccc.toml"), "[aliases.local]\n").unwrap();
+    let home_root = base_dir.join("home");
+    let xdg_root = base_dir.join("xdg");
+    let home_path = home_root.join(".config/ccc/config.toml");
+    let xdg_path = xdg_root.join("ccc/config.toml");
+    fs::create_dir_all(home_path.parent().unwrap()).unwrap();
+    fs::create_dir_all(xdg_path.parent().unwrap()).unwrap();
+    fs::write(&home_path, "[aliases.home]\n").unwrap();
+    fs::write(&xdg_path, "[aliases.xdg]\n").unwrap();
+
+    let old_cwd = std::env::current_dir().unwrap();
+    let old_home = std::env::var("HOME").ok();
+    let old_xdg = std::env::var("XDG_CONFIG_HOME").ok();
+    let old_explicit = std::env::var("CCC_CONFIG").ok();
+
+    std::env::set_current_dir(&nested_cwd).unwrap();
+    unsafe { std::env::set_var("HOME", &home_root) };
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &xdg_root) };
+    unsafe { std::env::set_var("CCC_CONFIG", base_dir.join("custom.toml")) };
+
+    let resolved = find_alias_write_path(true);
+
+    std::env::set_current_dir(old_cwd).unwrap();
+    if let Some(value) = old_home {
+        unsafe { std::env::set_var("HOME", value) };
+    } else {
+        unsafe { std::env::remove_var("HOME") };
+    }
+    if let Some(value) = old_xdg {
+        unsafe { std::env::set_var("XDG_CONFIG_HOME", value) };
+    } else {
+        unsafe { std::env::remove_var("XDG_CONFIG_HOME") };
+    }
+    if let Some(value) = old_explicit {
+        unsafe { std::env::set_var("CCC_CONFIG", value) };
+    } else {
+        unsafe { std::env::remove_var("CCC_CONFIG") };
+    }
+
+    assert_eq!(resolved, xdg_path);
 }

@@ -4,6 +4,8 @@ import subprocess
 import tempfile
 import unittest
 from unittest import mock
+import io
+from call_coding_clis import cli
 from call_coding_clis.cli import (
     _apply_real_runner_override,
     _cleanup_runner_session,
@@ -376,6 +378,64 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stdout, "")
         self.assertIn("--print-config", result.stderr)
+
+    def test_add_alias_yes_writes_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            config_path = tmp_path / "xdg" / "ccc" / "config.toml"
+            env = {
+                "HOME": str(tmp_path / "home"),
+                "XDG_CONFIG_HOME": str(tmp_path / "xdg"),
+                "CCC_CONFIG": str(tmp_path / "missing.toml"),
+            }
+            with mock.patch.dict(os.environ, env, clear=False):
+                with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                    rc = cli.main(
+                        [
+                            "add",
+                            "mm27",
+                            "--runner",
+                            "cc",
+                            "--model",
+                            "claude-4",
+                            "--prompt",
+                            "Review changes",
+                            "--prompt-mode",
+                            "default",
+                            "--yes",
+                        ]
+                    )
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(
+                config_path.read_text(encoding="utf-8"),
+                '[aliases.mm27]\n'
+                'runner = "cc"\n'
+                'model = "claude-4"\n'
+                'prompt = "Review changes"\n'
+                'prompt_mode = "default"\n',
+            )
+            self.assertIn(f"Config path: {config_path}", stdout.getvalue())
+            self.assertIn("Alias @mm27 written", stdout.getvalue())
+
+    def test_add_alias_cancel_existing_leaves_file_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            config_path = tmp_path / "xdg" / "ccc" / "config.toml"
+            config_path.parent.mkdir(parents=True)
+            original = '[aliases.mm27]\nprompt = "old"\n'
+            config_path.write_text(original, encoding="utf-8")
+            env = {
+                "HOME": str(tmp_path / "home"),
+                "XDG_CONFIG_HOME": str(tmp_path / "xdg"),
+                "CCC_CONFIG": str(tmp_path / "missing.toml"),
+            }
+            with mock.patch.dict(os.environ, env, clear=False):
+                with mock.patch("sys.stdin", io.StringIO("cancel\n")):
+                    rc = cli.main(["add", "mm27"])
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(config_path.read_text(encoding="utf-8"), original)
 
     def test_ccc_help_mentions_show_thinking(self) -> None:
         from call_coding_clis.help import HELP_TEXT

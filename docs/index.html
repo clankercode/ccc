@@ -215,7 +215,7 @@ ccc codex "Write a unit test"</code></pre>
 
 <section id="config">
   <h2>Config</h2>
-  <p>Python and Rust load configuration from a project-local <code>.ccc.toml</code> searched upward from the current directory, then <code>XDG_CONFIG_HOME/ccc/config.toml</code>, then <code>~/.config/ccc/config.toml</code>. Run <code>ccc --print-config</code> to print the canonical example config with the current supported keys, or <code>ccc config</code> to print the resolved config file path and raw contents. When <code>CCC_CONFIG</code> points at an existing file, that path wins for <code>ccc config</code>. Aliases can set <code>prompt_mode = "default"|"prepend"|"append"</code>; <code>prepend</code> and <code>append</code> require an explicit prompt argument and join with a single newline.</p>
+  <p>Python and Rust load configuration from a project-local <code>.ccc.toml</code> searched upward from the current directory, then <code>XDG_CONFIG_HOME/ccc/config.toml</code>, then <code>~/.config/ccc/config.toml</code>. Run <code>ccc --print-config</code> to print the canonical example config with the current supported keys, or <code>ccc config</code> to print the resolved config file path and raw contents. When <code>CCC_CONFIG</code> points at an existing file, that path wins for <code>ccc config</code>. Use <code>ccc add [-g] &lt;alias&gt;</code> to write alias entries through line prompts, or add flags such as <code>--runner</code>, <code>--model</code>, <code>--prompt</code>, and <code>--yes</code> for non-interactive writes. Aliases can set <code>prompt_mode = "default"|"prepend"|"append"</code>; <code>prepend</code> and <code>append</code> require an explicit prompt argument and join with a single newline.</p>
   <p>Human-formatted output honors <code>FORCE_COLOR</code> and <code>NO_COLOR</code> before falling back to TTY detection; raw output modes are unchanged.</p>
   <p>Python and Rust avoid saved sessions where upstream CLIs support it: Claude receives <code>--no-session-persistence</code> and Codex receives <code>--ephemeral</code> by default. OpenCode, Kimi, Crush, and RooCode may still save sessions, so <code>ccc</code> warns unless <code>--save-session</code> or <code>--cleanup-session</code> is used. Cleanup is currently safe for OpenCode and Kimi only.</p>
   <table>
@@ -223,6 +223,7 @@ ccc codex "Write a unit test"</code></pre>
     <tbody>
       <tr><td>Default runner</td><td>Which CLI to use when no runner is specified</td></tr>
       <tr><td>Aliases</td><td>Named presets referenced with <code>@alias</code>, including optional alias prompt fallback/composition via <code>prompt</code> and <code>prompt_mode</code></td></tr>
+      <tr><td>Alias wizard</td><td><code>ccc add &lt;alias&gt;</code> writes the resolved config path; <code>-g</code> forces the effective global config</td></tr>
       <tr><td>Custom abbreviations</td><td>User-defined runner shorthand names</td></tr>
       <tr><td>Default provider/model</td><td>Fallback provider and model selection</td></tr>
       <tr><td>Visible thinking</td><td><code>show_thinking</code> defaults to off and enables runner-specific visible-thinking flags when supported</td></tr>

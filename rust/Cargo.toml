@@ -5,7 +5,7 @@ edition = "2021"
 description = "Call coding CLIs (opencode, claude, codex, kimi, etc.) from Rust programs"
 license = "Unlicense"
 repository = "https://github.com/xertrov/call-coding-clis"
-keywords = ["cli", "opencode", "claude", "codex", "kimi", "coding-agent"]
+keywords = ["cli", "opencode", "claude", "codex", "coding-agent"]
 categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]

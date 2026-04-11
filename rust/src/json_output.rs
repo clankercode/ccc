@@ -618,16 +618,27 @@ pub fn parse_json_output(raw: &str, schema: &str) -> ParsedJsonOutput {
     }
 }
 
+fn truncate_to_char_limit(text: &str, max_chars: usize) -> Option<String> {
+    text.char_indices()
+        .nth(max_chars)
+        .map(|(index, _)| text[..index].to_string())
+}
+
 fn summarize_text(text: &str, max_lines: usize, max_chars: usize) -> String {
     let lines: Vec<&str> = text.trim().lines().collect();
     if lines.is_empty() {
         return String::new();
     }
-    let mut clipped = lines.into_iter().take(max_lines).collect::<Vec<_>>().join("\n");
-    let truncated = clipped.len() > max_chars || text.trim().lines().count() > max_lines;
-    if clipped.len() > max_chars {
-        clipped.truncate(max_chars);
+    let mut clipped = lines
+        .into_iter()
+        .take(max_lines)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut truncated = text.trim().lines().count() > max_lines;
+    if let Some(safe_clipped) = truncate_to_char_limit(&clipped, max_chars) {
+        clipped = safe_clipped;
         clipped = clipped.trim_end().to_string();
+        truncated = true;
     }
     if truncated {
         clipped.push_str(" …");
@@ -648,10 +659,8 @@ fn bash_command_preview(tool_call: &ToolCall) -> Option<String> {
             if preview.is_empty() {
                 continue;
             }
-            if preview.len() > 400 {
-                preview.truncate(400);
-                preview = preview.trim_end().to_string();
-                preview.push_str(" …");
+            if let Some(safe_preview) = truncate_to_char_limit(&preview, 400) {
+                preview = safe_preview.trim_end().to_string() + " …";
             }
             return Some(preview);
         }

@@ -186,6 +186,41 @@ fn test_render_claude_code_tool_use() {
 }
 
 #[test]
+fn test_render_claude_code_tool_use_truncates_unicode_safely() {
+    let command = format!("{}🛠️tail", "a".repeat(399));
+    let raw = serde_json::json!({
+        "type": "tool_use",
+        "tool_name": "Bash",
+        "tool_input": {"cmd": command}
+    })
+    .to_string()
+        + "\n";
+    let parsed = parse_claude_code_json(&raw);
+    let rendered = render_parsed(&parsed, true, false);
+
+    assert!(rendered.starts_with("[tool:start] Bash: "));
+    assert!(rendered.ends_with(" …"));
+}
+
+#[test]
+fn test_render_claude_code_tool_result_truncates_unicode_safely() {
+    let content = format!("{}🛠️tail", "a".repeat(399));
+    let raw = serde_json::json!({
+        "type": "tool_result",
+        "tool_use_id": "toolu_1",
+        "content": content,
+        "is_error": false
+    })
+    .to_string()
+        + "\n";
+    let parsed = parse_claude_code_json(&raw);
+    let rendered = render_parsed(&parsed, true, false);
+
+    assert!(rendered.starts_with("[tool:result] tool (ok)\n"));
+    assert!(rendered.ends_with(" …"));
+}
+
+#[test]
 fn test_render_kimi_thinking() {
     let raw = "{\"role\":\"assistant\",\"content\":[{\"type\":\"think\",\"think\":\"hmm\"},{\"type\":\"text\",\"text\":\"ok\"}]}\n";
     let parsed = parse_kimi_json(raw);

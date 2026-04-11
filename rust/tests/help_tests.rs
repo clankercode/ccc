@@ -182,8 +182,9 @@ fn test_add_alias_cancel_existing_leaves_file_unchanged() {
     );
     assert_eq!(fs::read_to_string(&config_path).unwrap(), original);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("[1/m]odify"));
-    assert!(stdout.contains("[3/c]ancel"));
+    assert!(stdout.contains("Existing alias action (1-3):"));
+    assert!(stdout.contains("  [m]odify, [r]eplace, [c]ancel"));
+    assert!(stdout.contains("  default m | choice > "));
     assert!(stdout.contains("Cancelled"));
 }
 

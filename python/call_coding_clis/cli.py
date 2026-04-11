@@ -496,12 +496,12 @@ def _choose_optional_field(label: str, suffix: str, choices: list[tuple[str, str
     return _choose(f"{label}{suffix}", choices, default=None, blank_value=_KEEP_CURRENT)
 
 
-def _choice_marker(index: int, key: str, label: str) -> str:
+def _choice_marker(key: str, label: str) -> str:
     if not key:
-        return f"[{index}] {label}"
+        return label
     if len(key) == 1 and label.startswith(key):
-        return f"[{index}/{key}]{label[1:]}"
-    return f"[{index}/{key}] {label}"
+        return f"[{key}]{label[1:]}"
+    return f"[{key}] {label}"
 
 
 def _choose(
@@ -512,12 +512,21 @@ def _choose(
     blank_value: object | None = None,
 ) -> object:
     markers = ", ".join(
-        _choice_marker(index, key, label)
-        for index, (label, key, _, _) in enumerate(choices, 1)
+        _choice_marker(key, label)
+        for label, key, _, _ in choices
     )
-    default_suffix = f" [{default}]" if default is not None else ""
     while True:
-        answer = input(f"{prompt}: {markers}{default_suffix}: ").strip().lower()
+        if default is not None:
+            default_label = choices[default - 1][1] or choices[default - 1][0]
+        elif blank_value is not None:
+            default_label = "keep"
+        else:
+            default_label = "none"
+        answer = input(
+            f"{prompt} (1-{len(choices)}): \n"
+            f"  {markers}\n"
+            f"  default {default_label} | choice > "
+        ).strip().lower()
         if answer == "":
             if default is not None:
                 return choices[default - 1][2]

@@ -359,14 +359,14 @@ fn read_prompt(prompt: &str) -> Result<String, String> {
     Ok(answer.trim().to_string())
 }
 
-fn choice_marker(index: usize, choice: &WizardChoice<'_>) -> String {
+fn choice_marker(choice: &WizardChoice<'_>) -> String {
     if choice.key.is_empty() {
-        return format!("[{index}] {}", choice.label);
+        return choice.label.to_string();
     }
     if choice.key.len() == 1 && choice.label.starts_with(choice.key) {
-        return format!("[{index}/{}]{}", choice.key, &choice.label[1..]);
+        return format!("[{}]{}", choice.key, &choice.label[1..]);
     }
-    format!("[{index}/{}] {}", choice.key, choice.label)
+    format!("[{}] {}", choice.key, choice.label)
 }
 
 fn choose(
@@ -377,16 +377,27 @@ fn choose(
 ) -> Result<String, String> {
     let markers = choices
         .iter()
-        .enumerate()
-        .map(|(index, choice)| choice_marker(index + 1, choice))
+        .map(choice_marker)
         .collect::<Vec<_>>()
         .join(", ");
-    let default_suffix = default
-        .map(|index| format!(" [{index}]"))
-        .unwrap_or_default();
     loop {
-        let answer =
-            read_prompt(&format!("{prompt}: {markers}{default_suffix}: "))?.to_ascii_lowercase();
+        let default_label = if let Some(index) = default {
+            let choice = &choices[index - 1];
+            if choice.key.is_empty() {
+                choice.label
+            } else {
+                choice.key
+            }
+        } else if blank_value.is_some() {
+            "keep"
+        } else {
+            "none"
+        };
+        let answer = read_prompt(&format!(
+            "{prompt} (1-{}): \n  {markers}\n  default {default_label} | choice > ",
+            choices.len()
+        ))?
+        .to_ascii_lowercase();
         if answer.is_empty() {
             if let Some(index) = default {
                 return Ok(choices[index - 1].value.to_string());

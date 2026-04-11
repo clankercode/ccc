@@ -51,6 +51,10 @@ Controls (free order before the prompt):
   --permission-mode <safe|auto|yolo|plan>
                 Request a higher-level permission profile when the selected runner supports it
   --yolo / -y   Request the runner's lowest-friction auto-approval mode when supported
+  --save-session
+                Allow the selected runner to save this run in its normal session history
+  --cleanup-session
+                Try to clean up the created session after the run when no no-persist flag exists
 
 Flags:
   --print-config                         Print the canonical example config.toml and exit

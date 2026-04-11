@@ -6,9 +6,13 @@ import unittest
 from unittest import mock
 from call_coding_clis.cli import (
     _apply_real_runner_override,
+    _cleanup_runner_session,
+    _extract_kimi_resume_session_id,
+    _extract_opencode_session_id,
     _filtered_human_stderr,
     _sanitize_human_output,
     _sanitize_raw_output,
+    _session_persistence_pre_run_warnings,
 )
 from call_coding_clis.help import _get_runner_version
 
@@ -98,6 +102,97 @@ class RunnerTests(unittest.TestCase):
     def test_filtered_human_stderr_keeps_other_runners(self) -> None:
         stderr = "warning: something else\n"
         self.assertEqual(_filtered_human_stderr(stderr, "cc"), stderr)
+
+    def test_extract_opencode_session_id_from_step_start(self) -> None:
+        stdout = '{"type":"step_start","sessionID":"ses_123"}\n{"type":"text","part":{"text":"ok"}}\n'
+        self.assertEqual(_extract_opencode_session_id(stdout), "ses_123")
+
+    def test_extract_kimi_resume_session_id_from_stderr(self) -> None:
+        stderr = "To resume this session: kimi -r 123e4567-e89b-12d3-a456-426614174000\n"
+        self.assertEqual(
+            _extract_kimi_resume_session_id(stderr),
+            "123e4567-e89b-12d3-a456-426614174000",
+        )
+
+    def test_cleanup_runner_session_deletes_opencode_session(self) -> None:
+        stdout = '{"type":"step_start","sessionID":"ses_123"}\n'
+        with mock.patch("subprocess.run") as run:
+            run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+            warnings = _cleanup_runner_session(
+                runner_name="oc",
+                runner_binary="/tmp/mock-opencode",
+                stdout=stdout,
+                stderr="",
+                env={},
+            )
+
+        run.assert_called_once()
+        args, kwargs = run.call_args
+        self.assertEqual(args[0], ["/tmp/mock-opencode", "session", "delete", "ses_123"])
+        self.assertTrue(kwargs["capture_output"])
+        self.assertEqual(warnings, [])
+
+    def test_cleanup_runner_session_deletes_kimi_session_file_from_share_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            session_id = "123e4567-e89b-12d3-a456-426614174000"
+            session_file = Path(tmp) / "sessions" / "2026" / f"{session_id}.json"
+            session_file.parent.mkdir(parents=True)
+            session_file.write_text("{}", encoding="utf-8")
+
+            warnings = _cleanup_runner_session(
+                runner_name="k",
+                runner_binary="kimi",
+                stdout="",
+                stderr=f"To resume this session: kimi -r {session_id}\n",
+                env={"KIMI_SHARE_DIR": tmp},
+            )
+
+            self.assertFalse(session_file.exists())
+            self.assertEqual(warnings, [])
+
+    def test_cleanup_runner_session_deletes_kimi_session_directory_from_share_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            session_id = "123e4567-e89b-12d3-a456-426614174000"
+            session_dir = Path(tmp) / "sessions" / "workdir-hash" / session_id
+            session_dir.mkdir(parents=True)
+            (session_dir / "session.json").write_text("{}", encoding="utf-8")
+
+            warnings = _cleanup_runner_session(
+                runner_name="k",
+                runner_binary="kimi",
+                stdout="",
+                stderr=f"To resume this session: kimi -r {session_id}\n",
+                env={"KIMI_SHARE_DIR": tmp},
+            )
+
+            self.assertFalse(session_dir.exists())
+            self.assertEqual(warnings, [])
+
+    def test_cleanup_runner_session_warns_when_session_id_is_missing(self) -> None:
+        warnings = _cleanup_runner_session(
+            runner_name="oc",
+            runner_binary="opencode",
+            stdout='{"type":"text","part":{"text":"ok"}}\n',
+            stderr="",
+            env={},
+        )
+
+        self.assertEqual(
+            warnings,
+            ["warning: could not find OpenCode session ID for cleanup"],
+        )
+
+    def test_session_persistence_pre_run_warning_policy(self) -> None:
+        warnings = _session_persistence_pre_run_warnings(False, False, "oc")
+        self.assertEqual(
+            warnings,
+            [
+                'warning: runner "opencode" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup'
+            ],
+        )
+        self.assertEqual(_session_persistence_pre_run_warnings(True, False, "oc"), [])
+        self.assertEqual(_session_persistence_pre_run_warnings(False, True, "oc"), [])
+        self.assertEqual(_session_persistence_pre_run_warnings(False, False, "cc"), [])
 
     def test_sanitize_raw_output_strips_opencode_osc_title(self) -> None:
         stdout = (

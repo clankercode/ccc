@@ -324,7 +324,7 @@ fi
 prompt=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        -p|--print|--verbose|--include-partial-messages|--no-thinking|--yolo|--plan|--full-auto|--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox)
+        -p|--print|--verbose|--include-partial-messages|--no-thinking|--yolo|--plan|--full-auto|--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox|--no-session-persistence|--ephemeral|--save-session|--cleanup-session)
             shift
             ;;
         --thinking)

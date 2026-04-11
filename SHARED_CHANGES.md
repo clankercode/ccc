@@ -20,6 +20,15 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-04-11
+
+### Session persistence controls added in Python and Rust
+- Change: Python and Rust now default to non-persistent runner modes where upstream CLIs support them, adding Claude `--no-session-persistence` and Codex `--ephemeral`; runners without verified no-persist flags warn by default, `--save-session` explicitly allows saved sessions, and `--cleanup-session` tries safe post-run cleanup for OpenCode and Kimi
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `tests/test_runner.py`, `tests/test_ccc_contract_impl.py`, `tests/test_harness.py`, `tests/mock-coding-cli/mock_coding_cli.sh`, `rust/tests/parser_tests.rs`, `rust/tests/help_tests.rs`
+- Notes: updated `README.md`, `docs/llms.txt`, `docs/index.html`, `docs/clis/README.md`, and runner docs under `docs/clis/`; Crush and RooCode cleanup intentionally warn instead of deleting guessed sessions
+
 ## 2026-04-10
 
 ### Alias `prompt_mode` added in Python and Rust

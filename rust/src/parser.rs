@@ -17,6 +17,7 @@ const OUTPUT_MODES: &[&str] = &[
 pub struct RunnerInfo {
     pub binary: String,
     pub extra_args: Vec<String>,
+    pub no_persist_flags: Vec<String>,
     pub thinking_flags: BTreeMap<i32, Vec<String>>,
     pub show_thinking_flags: BTreeMap<bool, Vec<String>>,
     pub yolo_flags: Vec<String>,
@@ -35,6 +36,8 @@ pub struct ParsedArgs {
     pub sanitize_osc: Option<bool>,
     pub output_mode: Option<String>,
     pub forward_unknown_json: bool,
+    pub save_session: bool,
+    pub cleanup_session: bool,
     pub yolo: bool,
     pub permission_mode: Option<String>,
     pub provider: Option<String>,
@@ -119,6 +122,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let opencode = RunnerInfo {
         binary: "opencode".into(),
         extra_args: vec!["run".into()],
+        no_persist_flags: vec![],
         thinking_flags: BTreeMap::new(),
         show_thinking_flags: {
             let mut tf = BTreeMap::new();
@@ -134,6 +138,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let claude = RunnerInfo {
         binary: "claude".into(),
         extra_args: vec!["-p".into()],
+        no_persist_flags: vec!["--no-session-persistence".into()],
         thinking_flags: {
             let mut tf = BTreeMap::new();
             tf.insert(0, vec!["--thinking".into(), "disabled".into()]);
@@ -197,6 +202,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let kimi = RunnerInfo {
         binary: "kimi".into(),
         extra_args: vec![],
+        no_persist_flags: vec![],
         thinking_flags: {
             let mut tf = BTreeMap::new();
             tf.insert(0, vec!["--no-thinking".into()]);
@@ -220,6 +226,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let codex = RunnerInfo {
         binary: "codex".into(),
         extra_args: vec!["exec".into()],
+        no_persist_flags: vec!["--ephemeral".into()],
         thinking_flags: BTreeMap::new(),
         show_thinking_flags: BTreeMap::new(),
         yolo_flags: vec!["--dangerously-bypass-approvals-and-sandbox".into()],
@@ -231,6 +238,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let roocode = RunnerInfo {
         binary: "roocode".into(),
         extra_args: vec![],
+        no_persist_flags: vec![],
         thinking_flags: BTreeMap::new(),
         show_thinking_flags: BTreeMap::new(),
         yolo_flags: vec![],
@@ -242,6 +250,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let crush = RunnerInfo {
         binary: "crush".into(),
         extra_args: vec!["run".into()],
+        no_persist_flags: vec![],
         thinking_flags: BTreeMap::new(),
         show_thinking_flags: BTreeMap::new(),
         yolo_flags: vec![],
@@ -385,6 +394,10 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
             }
         } else if token == "--forward-unknown-json" {
             parsed.forward_unknown_json = true;
+        } else if token == "--save-session" {
+            parsed.save_session = true;
+        } else if token == "--cleanup-session" {
+            parsed.cleanup_session = true;
         } else if let Some(mode) = parse_output_mode_sugar(token) {
             parsed.output_mode = Some(mode);
         } else if token == "--yolo" || token == "-y" {
@@ -428,9 +441,17 @@ pub fn resolve_command(
     let (effective_runner_name, effective_runner, alias_def) =
         resolve_effective_runner(parsed, &config, &registry)
             .ok_or_else(|| "no runner found".to_string())?;
+    if parsed.save_session && parsed.cleanup_session {
+        return Err("--save-session and --cleanup-session are mutually exclusive".to_string());
+    }
 
     let mut argv: Vec<String> = vec![effective_runner.binary.clone()];
     argv.extend(effective_runner.extra_args.iter().cloned());
+    warnings.extend(session_persistence_warnings(
+        parsed,
+        &effective_runner_name,
+        effective_runner,
+    ));
     let output_plan = resolve_output_plan(parsed, Some(&config)).map_err(str::to_string)?;
     argv.extend(output_plan.argv_flags.iter().cloned());
 
@@ -569,7 +590,9 @@ pub fn resolve_command(
                 "warning: runner \"crush\" does not support yolo mode in non-interactive run mode; ignoring --yolo".to_string(),
             );
         } else if matches!(effective_runner_name.as_str(), "rc" | "roocode") {
-            warnings.push("warning: runner \"roocode\" yolo mode is unverified; ignoring --yolo".to_string());
+            warnings.push(
+                "warning: runner \"roocode\" yolo mode is unverified; ignoring --yolo".to_string(),
+            );
         }
     } else if matches!(effective_permission_mode.as_deref(), Some("plan")) {
         if matches!(effective_runner_name.as_str(), "cc" | "claude") {
@@ -585,6 +608,10 @@ pub fn resolve_command(
         }
     }
 
+    if !parsed.save_session {
+        argv.extend(effective_runner.no_persist_flags.iter().cloned());
+    }
+
     let prompt = resolve_prompt(parsed, alias_def)?;
     if effective_runner.prompt_flag.is_empty() {
         argv.push(prompt);
@@ -594,6 +621,38 @@ pub fn resolve_command(
     }
 
     Ok((argv, env_overrides, warnings))
+}
+
+fn canonical_runner_name(effective_runner_name: &str, info: &RunnerInfo) -> String {
+    match effective_runner_name {
+        "oc" | "opencode" => "opencode".to_string(),
+        "cc" | "claude" => "claude".to_string(),
+        "c" | "cx" | "codex" => "codex".to_string(),
+        "k" | "kimi" => "kimi".to_string(),
+        "cr" | "crush" => "crush".to_string(),
+        "rc" | "roocode" => "roocode".to_string(),
+        _ => info.binary.clone(),
+    }
+}
+
+fn session_persistence_warnings(
+    parsed: &ParsedArgs,
+    effective_runner_name: &str,
+    info: &RunnerInfo,
+) -> Vec<String> {
+    if parsed.save_session || !info.no_persist_flags.is_empty() {
+        return Vec::new();
+    }
+    let display = canonical_runner_name(effective_runner_name, info);
+    if parsed.cleanup_session {
+        if display == "opencode" || display == "kimi" {
+            return Vec::new();
+        }
+        return vec![format!(
+            "warning: runner \"{display}\" does not support automatic session cleanup; pass --save-session to allow saved sessions explicitly"
+        )];
+    }
+    Vec::new()
 }
 
 fn resolve_prompt(parsed: &ParsedArgs, alias_def: Option<&AliasDef>) -> Result<String, String> {
@@ -648,7 +707,10 @@ fn resolve_prompt(parsed: &ParsedArgs, alias_def: Option<&AliasDef>) -> Result<S
 }
 
 fn resolve_alias_def<'a>(parsed: &'a ParsedArgs, config: &'a CccConfig) -> Option<&'a AliasDef> {
-    parsed.alias.as_ref().and_then(|alias| config.aliases.get(alias))
+    parsed
+        .alias
+        .as_ref()
+        .and_then(|alias| config.aliases.get(alias))
 }
 
 fn resolve_runner_name(parsed_runner: Option<&str>, config: &CccConfig) -> String {
@@ -784,7 +846,11 @@ pub fn resolve_output_plan(
         let mut argv_flags = if mode == "json" {
             vec!["--output-format".into(), "json".into()]
         } else {
-            vec!["--verbose".into(), "--output-format".into(), "stream-json".into()]
+            vec![
+                "--verbose".into(),
+                "--output-format".into(),
+                "stream-json".into(),
+            ]
         };
         if mode == "stream-formatted" {
             argv_flags.push("--include-partial-messages".into());
@@ -806,7 +872,11 @@ pub fn resolve_output_plan(
             stream: mode.starts_with("stream-"),
             formatted: mode.contains("formatted"),
             schema: Some("kimi".into()),
-            argv_flags: vec!["--print".into(), "--output-format".into(), "stream-json".into()],
+            argv_flags: vec![
+                "--print".into(),
+                "--output-format".into(),
+                "stream-json".into(),
+            ],
         });
     }
 

@@ -186,6 +186,18 @@ class ParseArgsTests(unittest.TestCase):
                 self.assertEqual(parsed.permission_mode, "yolo")
                 self.assertEqual(parsed.prompt, "hello")
 
+    def test_save_session_flag(self):
+        parsed = parse_args(["--save-session", "hello"])
+        self.assertTrue(parsed.save_session)
+        self.assertFalse(parsed.cleanup_session)
+        self.assertEqual(parsed.prompt, "hello")
+
+    def test_cleanup_session_flag(self):
+        parsed = parse_args(["--cleanup-session", "hello"])
+        self.assertTrue(parsed.cleanup_session)
+        self.assertFalse(parsed.save_session)
+        self.assertEqual(parsed.prompt, "hello")
+
     def test_permission_mode_flag(self):
         parsed = parse_args(["--permission-mode", "auto", "hello"])
         self.assertEqual(parsed.permission_mode, "auto")
@@ -252,6 +264,11 @@ class ParseArgsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             resolve_command(parsed)
 
+    def test_save_session_and_cleanup_session_conflict(self):
+        parsed = parse_args(["--save-session", "--cleanup-session", "hello"])
+        with self.assertRaisesRegex(ValueError, "mutually exclusive"):
+            resolve_command(parsed)
+
     def test_thinking_out_of_range_not_matched(self):
         parsed = parse_args(["+5", "hello"])
         self.assertIsNone(parsed.thinking)
@@ -280,6 +297,7 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(runner="cc", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
         self.assertEqual(argv[:2], ["claude", "-p"])
+        self.assertIn("--no-session-persistence", argv)
         self.assertNotIn("run", argv)
         self.assertIn("hello", argv)
         self.assertEqual(warnings, [])
@@ -288,12 +306,14 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(runner="c", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
         self.assertEqual(argv[:2], ["codex", "exec"])
+        self.assertIn("--ephemeral", argv)
         self.assertEqual(warnings, [])
 
     def test_codex_runner_via_cx(self):
         parsed = ParsedArgs(runner="cx", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
         self.assertEqual(argv[:2], ["codex", "exec"])
+        self.assertIn("--ephemeral", argv)
         self.assertEqual(warnings, [])
 
     def test_codex_runner_with_model_uses_exec(self):
@@ -301,9 +321,51 @@ class ResolveCommandTests(unittest.TestCase):
         argv, env, warnings = resolve_command(parsed)
         self.assertEqual(
             argv,
-            ["codex", "exec", "--model", "gpt-5.4-mini", "hello"],
+            ["codex", "exec", "--model", "gpt-5.4-mini", "--ephemeral", "hello"],
         )
         self.assertEqual(warnings, [])
+
+    def test_save_session_preserves_old_claude_and_codex_argv(self):
+        cases = [
+            (ParsedArgs(runner="cc", save_session=True, prompt="hello"), ["claude", "-p", "hello"]),
+            (ParsedArgs(runner="c", save_session=True, prompt="hello"), ["codex", "exec", "hello"]),
+        ]
+        for parsed, expected in cases:
+            with self.subTest(runner=parsed.runner):
+                argv, _env, warnings = resolve_command(parsed)
+                self.assertEqual(argv, expected)
+                self.assertEqual(warnings, [])
+
+    def test_resolve_command_does_not_emit_default_persistence_warnings(self):
+        cases = [
+            "oc",
+            "k",
+            "cr",
+            "rc",
+        ]
+        for runner in cases:
+            with self.subTest(runner=runner):
+                _argv, _env, warnings = resolve_command(ParsedArgs(runner=runner, prompt="hello"))
+                self.assertNotIn("may save this session", "\n".join(warnings))
+
+    def test_cleanup_session_suppresses_persistence_warning_for_supported_cleanup_runners(self):
+        for runner in ("oc", "k"):
+            with self.subTest(runner=runner):
+                _argv, _env, warnings = resolve_command(
+                    ParsedArgs(runner=runner, cleanup_session=True, prompt="hello")
+                )
+                self.assertNotIn("may save this session", "\n".join(warnings))
+
+    def test_cleanup_session_warns_for_unsupported_cleanup_runners(self):
+        for runner, display in (("cr", "crush"), ("rc", "roocode")):
+            with self.subTest(runner=runner):
+                _argv, _env, warnings = resolve_command(
+                    ParsedArgs(runner=runner, cleanup_session=True, prompt="hello")
+                )
+                self.assertIn(
+                    f'warning: runner "{display}" does not support automatic session cleanup; pass --save-session to allow saved sessions explicitly',
+                    warnings,
+                )
 
     def test_thinking_flags_for_claude(self):
         parsed = ParsedArgs(runner="cc", thinking=2, prompt="hello")

@@ -10,7 +10,7 @@
 ## Non-interactive shape
 
 ```sh
-codex exec "your prompt"
+codex exec --ephemeral "your prompt"
 ```
 
 Useful flags from local help:
@@ -22,6 +22,7 @@ Useful flags from local help:
 - `--cd`
 - `--add-dir`
 - `--json`
+- `--ephemeral`
 - `-c key=value` config overrides
 
 ## Permission controls
@@ -56,5 +57,7 @@ codex exec --help | rg "sandbox|full-auto|dangerously"
 ## Notes for `ccc`
 
 - `ccc` uses `codex exec`
+- Python and Rust add `--ephemeral` by default so `ccc` runs do not persist Codex session files
+- `ccc --save-session c ...` omits `--ephemeral` and restores normal Codex session saving
 - do not depend on undocumented aliases that may happen to work locally
 - if we add finer controls, Codex is a good fit for `--sandbox` style options

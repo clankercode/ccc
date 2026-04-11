@@ -97,6 +97,21 @@ Python and Rust now implement `--permission-mode <safe|auto|yolo|plan>` with par
 | `yolo` | `OPENCODE_CONFIG_CONTENT='{"permission":"allow"}'` | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--yolo` | unsupported in `run`; warn | unverified; warn |
 | `plan` | no verified equivalent yet | `--permission-mode plan` | no verified equivalent yet | `--plan` | no verified equivalent yet | unverified |
 
+## Session Persistence
+
+Python and Rust now default to avoiding user-visible saved sessions where the upstream CLI exposes a verified non-persistence control:
+
+| CLI | Default `ccc` behavior | `--save-session` | `--cleanup-session` |
+|---|---|---|---|
+| Claude | adds `--no-session-persistence` | omits that flag | not needed |
+| Codex | adds `--ephemeral` | omits that flag | not needed |
+| OpenCode | warns that the run may save a session | suppresses the warning | deletes the emitted `sessionID` with `opencode session delete <id>` when available |
+| Kimi | warns that the run may save a session | suppresses the warning | removes the matching session file under `KIMI_SHARE_DIR` or `~/.kimi` when the resume hint exposes an ID |
+| Crush | warns that the run may save a session | suppresses the warning | warns that automatic cleanup is unsupported |
+| RooCode | warns that the run may save a session | suppresses the warning | warns that automatic cleanup is unsupported |
+
+Cleanup is best-effort and only uses session IDs produced by the run itself. It does not delete by "latest session" heuristics.
+
 ## Tool Control Outlook
 
 - OpenCode and Claude are the real candidates for `--allow-tool` / `--deny-tool`.

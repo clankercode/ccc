@@ -157,6 +157,24 @@ fn test_parse_forward_unknown_json_flag() {
 }
 
 #[test]
+fn test_parse_save_session_flag() {
+    let args: Vec<String> = vec!["--save-session".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert!(parsed.save_session);
+    assert!(!parsed.cleanup_session);
+    assert_eq!(parsed.prompt, "hello");
+}
+
+#[test]
+fn test_parse_cleanup_session_flag() {
+    let args: Vec<String> = vec!["--cleanup-session".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    assert!(parsed.cleanup_session);
+    assert!(!parsed.save_session);
+    assert_eq!(parsed.prompt, "hello");
+}
+
+#[test]
 fn test_parse_provider_model() {
     let args: Vec<String> = vec![":anthropic:claude-4".into(), "hello".into()];
     let parsed = parse_args(&args);
@@ -222,7 +240,12 @@ fn test_parse_permission_mode_yolo_sets_yolo() {
 
 #[test]
 fn test_parse_permission_mode_last_wins_over_yolo_sugar() {
-    let args: Vec<String> = vec!["--yolo".into(), "--permission-mode".into(), "safe".into(), "hello".into()];
+    let args: Vec<String> = vec![
+        "--yolo".into(),
+        "--permission-mode".into(),
+        "safe".into(),
+        "hello".into(),
+    ];
     let parsed = parse_args(&args);
     assert_eq!(parsed.permission_mode.as_deref(), Some("safe"));
     assert!(!parsed.yolo);
@@ -270,7 +293,13 @@ fn test_parse_duplicate_pre_prompt_controls_use_last_value() {
 
 #[test]
 fn test_parse_double_dash_forces_literal_prompt() {
-    let args: Vec<String> = vec!["-y".into(), "--".into(), "+1".into(), "@agent".into(), ":model".into()];
+    let args: Vec<String> = vec![
+        "-y".into(),
+        "--".into(),
+        "+1".into(),
+        "@agent".into(),
+        ":model".into(),
+    ];
     let parsed = parse_args(&args);
     assert!(parsed.yolo);
     assert_eq!(parsed.prompt, "+1 @agent :model");
@@ -310,6 +339,20 @@ fn test_parse_permission_mode_missing_value_errors_in_resolve() {
 }
 
 #[test]
+fn test_parse_save_session_and_cleanup_session_conflict() {
+    let args: Vec<String> = vec![
+        "--save-session".into(),
+        "--cleanup-session".into(),
+        "hello".into(),
+    ];
+    let parsed = parse_args(&args);
+    assert_eq!(
+        resolve_command(&parsed, None).unwrap_err(),
+        "--save-session and --cleanup-session are mutually exclusive"
+    );
+}
+
+#[test]
 fn test_resolve_default_runner_is_opencode() {
     let parsed = ParsedArgs {
         prompt: "hello".into(),
@@ -331,6 +374,7 @@ fn test_resolve_claude_runner() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(argv[..2], ["claude", "-p"]);
+    assert!(argv.contains(&"--no-session-persistence".to_string()));
     assert!(warnings.is_empty());
 }
 
@@ -343,7 +387,81 @@ fn test_resolve_codex_runner_via_c() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(argv[..2], ["codex", "exec"]);
+    assert!(argv.contains(&"--ephemeral".to_string()));
     assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_save_session_preserves_old_claude_and_codex_argv() {
+    let cases = [
+        (
+            ParsedArgs {
+                runner: Some("cc".into()),
+                save_session: true,
+                prompt: "hello".into(),
+                ..Default::default()
+            },
+            vec!["claude", "-p", "hello"],
+        ),
+        (
+            ParsedArgs {
+                runner: Some("c".into()),
+                save_session: true,
+                prompt: "hello".into(),
+                ..Default::default()
+            },
+            vec!["codex", "exec", "hello"],
+        ),
+    ];
+    for (parsed, expected) in cases {
+        let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+        assert_eq!(argv, expected);
+        assert!(warnings.is_empty());
+    }
+}
+
+#[test]
+fn test_resolve_command_does_not_emit_default_persistence_warnings() {
+    for runner in ["oc", "k", "cr", "rc"] {
+        let parsed = ParsedArgs {
+            runner: Some(runner.into()),
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let (_, _, warnings) = resolve_command(&parsed, None).unwrap();
+        assert!(!warnings
+            .iter()
+            .any(|warning| warning.contains("may save this session")));
+    }
+}
+
+#[test]
+fn test_resolve_cleanup_session_warning_policy() {
+    for runner in ["oc", "k"] {
+        let parsed = ParsedArgs {
+            runner: Some(runner.into()),
+            cleanup_session: true,
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let (_, _, warnings) = resolve_command(&parsed, None).unwrap();
+        assert!(!warnings
+            .iter()
+            .any(|warning| warning.contains("may save this session")));
+    }
+
+    for (runner, display) in [("cr", "crush"), ("rc", "roocode")] {
+        let parsed = ParsedArgs {
+            runner: Some(runner.into()),
+            cleanup_session: true,
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let (_, _, warnings) = resolve_command(&parsed, None).unwrap();
+        assert!(warnings.contains(&format!(
+            "warning: runner \"{display}\" does not support automatic session cleanup; pass --save-session to allow saved sessions explicitly"
+        )));
+    }
 }
 
 #[test]
@@ -369,7 +487,14 @@ fn test_resolve_codex_runner_with_model_uses_exec() {
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
         argv,
-        vec!["codex", "exec", "--model", "gpt-5.4-mini", "hello"]
+        vec![
+            "codex",
+            "exec",
+            "--model",
+            "gpt-5.4-mini",
+            "--ephemeral",
+            "hello"
+        ]
     );
     assert!(warnings.is_empty());
 }
@@ -963,7 +1088,10 @@ fn test_resolve_alias_prompt_mode_requires_supplied_prompt() {
         ..Default::default()
     };
     let err = resolve_command(&parsed, Some(&config)).unwrap_err();
-    assert_eq!(err, "prompt_mode append requires an explicit prompt argument");
+    assert_eq!(
+        err,
+        "prompt_mode append requires an explicit prompt argument"
+    );
 }
 
 #[test]
@@ -1169,7 +1297,11 @@ fn test_resolve_yolo_for_opencode_uses_env_override() {
     let (argv, env, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
         argv,
-        vec!["opencode".to_string(), "run".to_string(), "hello".to_string()]
+        vec![
+            "opencode".to_string(),
+            "run".to_string(),
+            "hello".to_string()
+        ]
     );
     assert_eq!(
         env.get("OPENCODE_CONFIG_CONTENT").map(|s| s.as_str()),
@@ -1290,7 +1422,11 @@ fn test_resolve_permission_mode_auto_for_codex() {
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
         argv[..3],
-        ["codex".to_string(), "exec".to_string(), "--full-auto".to_string()]
+        [
+            "codex".to_string(),
+            "exec".to_string(),
+            "--full-auto".to_string()
+        ]
     );
     assert!(warnings.is_empty());
 }
@@ -1352,7 +1488,10 @@ fn test_resolve_permission_mode_auto_warns_for_kimi() {
     );
     assert_eq!(
         warnings,
-        vec!["warning: runner \"k\" does not support permission mode \"auto\"; ignoring it".to_string()]
+        vec![
+            "warning: runner \"k\" does not support permission mode \"auto\"; ignoring it"
+                .to_string()
+        ]
     );
 }
 
@@ -1380,7 +1519,10 @@ fn test_resolve_output_mode_uses_alias_default() {
         prompt: "hello".into(),
         ..Default::default()
     };
-    assert_eq!(resolve_output_mode(&parsed, Some(&config)).unwrap(), "formatted");
+    assert_eq!(
+        resolve_output_mode(&parsed, Some(&config)).unwrap(),
+        "formatted"
+    );
 }
 
 #[test]

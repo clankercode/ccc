@@ -51,6 +51,10 @@ Controls (free order before the prompt):
   --permission-mode <safe|auto|yolo|plan>
                 Request a higher-level permission profile when the selected runner supports it
   --yolo / -y   Request the runner's lowest-friction auto-approval mode when supported
+  --save-session
+                Allow the selected runner to save this run in its normal session history
+  --cleanup-session
+                Try to clean up the created session after the run when no no-persist flag exists
 
 Flags:
   --print-config                         Print the canonical example config.toml and exit
@@ -129,12 +133,25 @@ fn read_json_version(package_json_path: &Path, expected_name: &str) -> String {
 }
 
 fn discover_opencode_version(binary_path: &Path) -> String {
-    read_json_version(&binary_path.parent().unwrap_or(binary_path).parent().unwrap_or(binary_path).join("package.json"), "opencode-ai")
+    read_json_version(
+        &binary_path
+            .parent()
+            .unwrap_or(binary_path)
+            .parent()
+            .unwrap_or(binary_path)
+            .join("package.json"),
+        "opencode-ai",
+    )
 }
 
 fn discover_codex_version(binary_path: &Path) -> String {
     let version = read_json_version(
-        &binary_path.parent().unwrap_or(binary_path).parent().unwrap_or(binary_path).join("package.json"),
+        &binary_path
+            .parent()
+            .unwrap_or(binary_path)
+            .parent()
+            .unwrap_or(binary_path)
+            .join("package.json"),
         "@openai/codex",
     );
     if version.is_empty() {
@@ -149,7 +166,8 @@ fn discover_claude_version(binary_path: &Path) -> String {
         .components()
         .map(|component| component.as_os_str().to_string_lossy().into_owned())
         .collect();
-    if parts.len() < 3 || parts[parts.len() - 3] != "claude" || parts[parts.len() - 2] != "versions" {
+    if parts.len() < 3 || parts[parts.len() - 3] != "claude" || parts[parts.len() - 2] != "versions"
+    {
         return String::new();
     }
     let version = &parts[parts.len() - 1];
@@ -161,7 +179,12 @@ fn discover_claude_version(binary_path: &Path) -> String {
 }
 
 fn discover_kimi_version(binary_path: &Path) -> String {
-    if binary_path.parent().and_then(Path::file_name).and_then(|value| value.to_str()) != Some("bin") {
+    if binary_path
+        .parent()
+        .and_then(Path::file_name)
+        .and_then(|value| value.to_str())
+        != Some("bin")
+    {
         return String::new();
     }
     let lib_dir = match binary_path.parent().and_then(Path::parent) {
@@ -299,9 +322,7 @@ pub fn print_help() {
 }
 
 pub fn print_usage() {
-    eprintln!(
-        "usage: ccc [controls...] \"<Prompt>\""
-    );
+    eprintln!("usage: ccc [controls...] \"<Prompt>\"");
     eprint!("{}", format_runner_checklist());
 }
 
@@ -399,7 +420,11 @@ mod tests {
     #[test]
     fn test_get_runner_version_falls_back_when_metadata_is_missing() {
         assert_eq!(
-            get_runner_version("opencode", "definitely-missing-binary", Path::new("/tmp/missing/opencode")),
+            get_runner_version(
+                "opencode",
+                "definitely-missing-binary",
+                Path::new("/tmp/missing/opencode")
+            ),
             ""
         );
     }

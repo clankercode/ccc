@@ -34,12 +34,25 @@ What this means for `ccc`:
 - for now, the correct behavior is to warn and ignore `--yolo`
 - this is not a good candidate for fine-grained permission controls until the upstream CLI surface is clearer
 
+## Session persistence
+
+Crush exposes session commands, but local help does not show a no-persist flag for `crush run`. It also does not provide a reliable run-output session ID surface that `ccc` can safely delete without guessing.
+
+What this means for `ccc`:
+
+- Python and Rust warn by default that Crush may save a session
+- `--save-session` keeps the current Crush behavior and suppresses that warning
+- `--cleanup-session` warns that automatic cleanup is unsupported for Crush
+- `ccc` does not delete Crush's "last" session, because that could remove a session unrelated to the current run
+
 ## Quick checks
 
 ```sh
 crush --version
 crush --help
 crush run --help
+crush session last --help
+crush session delete --help
 ```
 
 To re-check the yolo mismatch quickly:
@@ -53,3 +66,4 @@ crush run --help | rg yolo
 
 - `ccc` uses `crush run`
 - `ccc --yolo cr ...` currently warns and falls back to plain `crush run`
+- current session cleanup is intentionally unsupported until Crush exposes a safe current-run session ID or no-persist mode

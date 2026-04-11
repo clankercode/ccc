@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
+import shutil
+import subprocess
 import sys
 import re
 
@@ -111,6 +115,12 @@ def main(argv: list[str] | None = None) -> int:
 
     for warning in warnings:
         print(warning, file=sys.stderr)
+    for warning in _session_persistence_pre_run_warnings(
+        parsed.save_session,
+        parsed.cleanup_session,
+        output_plan.runner_name,
+    ):
+        print(warning, file=sys.stderr)
 
     runner = Runner()
     show_thinking = resolve_show_thinking(parsed, config)
@@ -130,6 +140,7 @@ def main(argv: list[str] | None = None) -> int:
             print(stdout, end="")
         if stderr:
             print(stderr, end="", file=sys.stderr)
+        _print_cleanup_warnings(parsed.cleanup_session, output_plan.runner_name, spec, result)
         return result.exit_code
 
     if output_plan.mode in {"stream-text", "stream-json"}:
@@ -141,6 +152,7 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stdout if channel == "stdout" else sys.stderr,
             ),
         )
+        _print_cleanup_warnings(parsed.cleanup_session, output_plan.runner_name, spec, result)
         return result.exit_code
 
     if output_plan.mode == "formatted":
@@ -159,6 +171,7 @@ def main(argv: list[str] | None = None) -> int:
         if forward_unknown_json:
             for raw_line in parsed_output.unknown_json_lines:
                 print(raw_line, file=sys.stderr)
+        _print_cleanup_warnings(parsed.cleanup_session, output_plan.runner_name, spec, result)
         return result.exit_code
 
     renderer = FormattedRenderer(
@@ -187,6 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     if forward_unknown_json:
         for raw_line in processor.take_unknown_json_lines():
             print(raw_line, file=sys.stderr)
+    _print_cleanup_warnings(parsed.cleanup_session, output_plan.runner_name, spec, result)
     return result.exit_code
 
 
@@ -248,6 +262,131 @@ def _sanitize_human_output(text: str, sanitize_osc: bool) -> str:
     for index, value in enumerate(preserved):
         sanitized = sanitized.replace(f"\0OSC8{index}\0", value)
     return sanitized
+
+
+def _print_cleanup_warnings(
+    cleanup_session: bool,
+    runner_name: str,
+    spec: CommandSpec,
+    result,
+) -> None:
+    if not cleanup_session:
+        return
+    runner_binary = spec.argv[0] if spec.argv else runner_name
+    for warning in _cleanup_runner_session(
+        runner_name=runner_name,
+        runner_binary=runner_binary,
+        stdout=result.stdout,
+        stderr=result.stderr,
+        env=spec.env,
+    ):
+        print(warning, file=sys.stderr)
+
+
+def _session_persistence_pre_run_warnings(
+    save_session: bool, cleanup_session: bool, runner_name: str
+) -> list[str]:
+    if save_session or cleanup_session:
+        return []
+    display = _canonical_session_runner_name(runner_name)
+    if display not in {"opencode", "kimi", "crush", "roocode"}:
+        return []
+    return [
+        f'warning: runner "{display}" may save this session; '
+        "pass --save-session to allow this explicitly or --cleanup-session to try cleanup"
+    ]
+
+
+def _canonical_session_runner_name(runner_name: str) -> str:
+    key = runner_name.lower()
+    if key in {"oc", "opencode"}:
+        return "opencode"
+    if key in {"k", "kimi"}:
+        return "kimi"
+    if key in {"cr", "crush"}:
+        return "crush"
+    if key in {"rc", "roocode"}:
+        return "roocode"
+    return key
+
+
+def _extract_opencode_session_id(stdout: str) -> str:
+    for raw_line in stdout.splitlines():
+        try:
+            obj = json.loads(raw_line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        session_id = obj.get("sessionID")
+        if isinstance(session_id, str) and session_id:
+            return session_id
+    return ""
+
+
+_KIMI_RESUME_ID_RE = re.compile(r"To resume this session: kimi -r ([0-9a-f-]+)")
+
+
+def _extract_kimi_resume_session_id(stderr: str) -> str:
+    match = _KIMI_RESUME_ID_RE.search(stderr)
+    return match.group(1) if match else ""
+
+
+def _cleanup_runner_session(
+    *,
+    runner_name: str,
+    runner_binary: str,
+    stdout: str,
+    stderr: str,
+    env: dict[str, str],
+) -> list[str]:
+    key = runner_name.lower()
+    if key in {"oc", "opencode"}:
+        return _cleanup_opencode_session(runner_binary, stdout)
+    if key in {"k", "kimi"}:
+        return _cleanup_kimi_session(stderr, env)
+    return []
+
+
+def _cleanup_opencode_session(runner_binary: str, stdout: str) -> list[str]:
+    session_id = _extract_opencode_session_id(stdout)
+    if not session_id:
+        return ["warning: could not find OpenCode session ID for cleanup"]
+    try:
+        result = subprocess.run(
+            [runner_binary, "session", "delete", session_id],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        return [f"warning: failed to cleanup OpenCode session {session_id}: {exc}"]
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        suffix = f": {detail}" if detail else ""
+        return [f"warning: failed to cleanup OpenCode session {session_id}{suffix}"]
+    return []
+
+
+def _cleanup_kimi_session(stderr: str, env: dict[str, str]) -> list[str]:
+    session_id = _extract_kimi_resume_session_id(stderr)
+    if not session_id:
+        return ["warning: could not find Kimi session ID for cleanup"]
+    root = Path(env.get("KIMI_SHARE_DIR") or os.environ.get("KIMI_SHARE_DIR") or Path.home() / ".kimi")
+    sessions_dir = root / "sessions"
+    matches = list(sessions_dir.glob(f"**/{session_id}*"))
+    if not matches:
+        return [f"warning: could not find Kimi session file for cleanup: {session_id}"]
+    warnings: list[str] = []
+    for path in matches:
+        try:
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+        except OSError as exc:
+            warnings.append(f"warning: failed to cleanup Kimi session {session_id}: {exc}")
+    return warnings
 
 
 class _HumanStderrFilter:

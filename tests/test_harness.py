@@ -513,6 +513,13 @@ TEST_CASES = [
     ),
 ]
 
+OPENCODE_PERSISTENCE_WARNING = (
+    'warning: runner "opencode" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
+)
+KIMI_PERSISTENCE_WARNING = (
+    'warning: runner "kimi" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
+)
+
 
 class CrossLanguageHarness(unittest.TestCase):
     selected_languages = LANGUAGES
@@ -578,9 +585,13 @@ class CrossLanguageHarness(unittest.TestCase):
                             f"  stdout: got {result.stdout!r}, expected {tc.expected_stdout!r}"
                         )
 
-                    if result.stderr != tc.expected_stderr:
+                    expected_stderr = tc.expected_stderr
+                    if lang.name in {"Python", "Rust"}:
+                        expected_stderr = OPENCODE_PERSISTENCE_WARNING + expected_stderr
+
+                    if result.stderr != expected_stderr:
                         details.append(
-                            f"  stderr: got {result.stderr!r}, expected {tc.expected_stderr!r}"
+                            f"  stderr: got {result.stderr!r}, expected {expected_stderr!r}"
                         )
 
                     if details:
@@ -653,7 +664,15 @@ class CrossLanguageHarness(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     for fragment in expected_fragments:
                         self.assertIn(fragment, result.stdout)
-                    self.assertEqual(result.stderr, "")
+                    if lang.name in {"Python", "Rust"} and extra_args[0] in {"k", "oc"}:
+                        expected_stderr = (
+                            KIMI_PERSISTENCE_WARNING
+                            if extra_args[0] == "k"
+                            else OPENCODE_PERSISTENCE_WARNING
+                        )
+                    else:
+                        expected_stderr = ""
+                    self.assertEqual(result.stderr, expected_stderr)
 
     def test_formatted_output_sanitizes_disruptive_osc_but_preserves_hyperlinks(self):
         for lang in self.selected_languages:

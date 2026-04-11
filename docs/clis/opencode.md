@@ -53,11 +53,23 @@ What this means for `ccc`:
 - finer-grained profiles are realistic here
 - per-tool allow/ask/deny could be exposed later, but only as an OpenCode-specific feature unless other runners catch up
 
+## Session persistence
+
+OpenCode exposes session management commands, but local help does not show a no-persist flag for `opencode run`.
+
+What this means for `ccc`:
+
+- Python and Rust warn by default that OpenCode may save a session
+- `--save-session` keeps the current OpenCode behavior and suppresses that warning
+- `--cleanup-session` tries to extract the structured `sessionID` emitted by OpenCode JSON events and then runs `opencode session delete <sessionID>` after the run
+- cleanup can only work when OpenCode emits a session ID that `ccc` can see
+
 ## Quick checks
 
 ```sh
 opencode --version
 opencode run --help
+opencode session delete --help
 ```
 
 To inspect permission docs quickly:
@@ -71,4 +83,5 @@ xdg-open https://opencode.ai/docs/config/
 
 - current `ccc` mapping uses `opencode run`
 - current yolo support is env-config based, not a CLI flag
+- current session cleanup support is post-run deletion based, not true no-persist mode
 - if we add more permission controls later, OpenCode is the easiest place to start

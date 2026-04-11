@@ -15,6 +15,8 @@ Slots are parsed in free order before the prompt, except that `-h` / `--help` wi
   Claude keeps the same `ccc` scale: `+0` becomes `--thinking disabled`, and `+1..+4` become `--thinking enabled` with matching `--effort`.
   Kimi keeps the same `ccc` scale: `+0` becomes `--no-thinking`, and `+1..+4` become `--thinking`.
 - --show-thinking: Request visible thinking output when supported; default off. Implemented in Python and Rust for now.
+- --save-session: Explicitly allow the selected runner's normal session persistence. Implemented in Python and Rust for now.
+- --cleanup-session: Try post-run cleanup when the selected runner lacks a no-persist flag. Implemented in Python and Rust for now.
 - --output-mode: Choose `text`, `stream-text`, `json`, `stream-json`, `formatted`, or `stream-formatted`
   Dot-sugar aliases are available before the prompt: `.text` / `..text`, `.json` / `..json`, `.fmt` / `..fmt`.
   Human-formatted modes honor `FORCE_COLOR` and `NO_COLOR` before falling back to TTY detection.
@@ -23,6 +25,11 @@ Slots are parsed in free order before the prompt, except that `-h` / `--help` wi
 - Config: in Python and Rust, project-local `.ccc.toml` files are searched upward from the current directory, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`
 - Generated config: `ccc --print-config` prints the canonical schema using `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 - Resolved config: `ccc config` prints the active config file path and its raw contents; `CCC_CONFIG` wins when it points at an existing file
+
+Session persistence:
+- Python and Rust add Claude `--no-session-persistence` and Codex `--ephemeral` by default.
+- OpenCode, Kimi, Crush, and RooCode may still save sessions by default; Python and Rust warn unless `--save-session` or `--cleanup-session` is used.
+- `--cleanup-session` currently tries safe cleanup for OpenCode and Kimi only. Crush and RooCode warn because cleanup would require guessing.
 
 Examples:
 - ccc "Fix the failing tests"

@@ -1,13 +1,15 @@
 use call_coding_clis::{
-    find_config_command_path, load_config, parse_args, parse_json_output, print_help,
-    print_usage, render_parsed, render_example_config, resolve_command, resolve_human_tty,
-    resolve_output_plan,
-    resolve_sanitize_osc, resolve_show_thinking,
-    FormattedRenderer, Runner, StructuredStreamProcessor,
+    find_config_command_path, load_config, parse_args, parse_json_output, print_help, print_usage,
+    render_example_config, render_parsed, resolve_command, resolve_human_tty, resolve_output_plan,
+    resolve_sanitize_osc, resolve_show_thinking, FormattedRenderer, Runner,
+    StructuredStreamProcessor,
 };
+use std::collections::BTreeMap;
 use std::env;
+use std::fs;
 use std::io::IsTerminal;
-use std::process::ExitCode;
+use std::path::{Path, PathBuf};
+use std::process::{Command, ExitCode};
 use std::sync::{Arc, Mutex};
 
 fn filtered_human_stderr(stderr: &str, runner_name: &str) -> String {
@@ -90,6 +92,189 @@ fn sanitize_human_output(text: &str, sanitize_osc: bool) -> String {
     sanitized
 }
 
+fn print_cleanup_warnings(
+    cleanup_session: bool,
+    runner_name: &str,
+    spec: &call_coding_clis::CommandSpec,
+    result: &call_coding_clis::CompletedRun,
+) {
+    if !cleanup_session {
+        return;
+    }
+    let runner_binary = spec.argv.first().map(String::as_str).unwrap_or(runner_name);
+    for warning in cleanup_runner_session(
+        runner_name,
+        runner_binary,
+        &result.stdout,
+        &result.stderr,
+        &spec.env,
+    ) {
+        eprintln!("{warning}");
+    }
+}
+
+fn session_persistence_pre_run_warnings(
+    save_session: bool,
+    cleanup_session: bool,
+    runner_name: &str,
+) -> Vec<String> {
+    if save_session || cleanup_session {
+        return Vec::new();
+    }
+    let display = canonical_session_runner_name(runner_name);
+    if !matches!(display.as_str(), "opencode" | "kimi" | "crush" | "roocode") {
+        return Vec::new();
+    }
+    vec![format!(
+        "warning: runner \"{display}\" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup"
+    )]
+}
+
+fn canonical_session_runner_name(runner_name: &str) -> String {
+    match runner_name {
+        "oc" | "opencode" => "opencode".to_string(),
+        "k" | "kimi" => "kimi".to_string(),
+        "cr" | "crush" => "crush".to_string(),
+        "rc" | "roocode" => "roocode".to_string(),
+        _ => runner_name.to_string(),
+    }
+}
+
+fn extract_opencode_session_id(stdout: &str) -> Option<String> {
+    for line in stdout.lines() {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        let Some(session_id) = value.get("sessionID").and_then(|value| value.as_str()) else {
+            continue;
+        };
+        if !session_id.is_empty() {
+            return Some(session_id.to_string());
+        }
+    }
+    None
+}
+
+fn extract_kimi_resume_session_id(stderr: &str) -> Option<String> {
+    let marker = "To resume this session: kimi -r ";
+    let start = stderr.find(marker)? + marker.len();
+    let id = stderr[start..]
+        .chars()
+        .take_while(|ch| ch.is_ascii_hexdigit() || *ch == '-')
+        .collect::<String>();
+    if id.is_empty() {
+        None
+    } else {
+        Some(id)
+    }
+}
+
+fn cleanup_runner_session(
+    runner_name: &str,
+    runner_binary: &str,
+    stdout: &str,
+    stderr: &str,
+    env_overrides: &BTreeMap<String, String>,
+) -> Vec<String> {
+    match runner_name {
+        "oc" | "opencode" => cleanup_opencode_session(runner_binary, stdout),
+        "k" | "kimi" => cleanup_kimi_session(stderr, env_overrides),
+        _ => Vec::new(),
+    }
+}
+
+fn cleanup_opencode_session(runner_binary: &str, stdout: &str) -> Vec<String> {
+    let Some(session_id) = extract_opencode_session_id(stdout) else {
+        return vec!["warning: could not find OpenCode session ID for cleanup".to_string()];
+    };
+    match Command::new(runner_binary)
+        .args(["session", "delete", &session_id])
+        .output()
+    {
+        Ok(output) if output.status.success() => Vec::new(),
+        Ok(output) => {
+            let detail = String::from_utf8_lossy(if output.stderr.is_empty() {
+                &output.stdout
+            } else {
+                &output.stderr
+            })
+            .trim()
+            .to_string();
+            if detail.is_empty() {
+                vec![format!(
+                    "warning: failed to cleanup OpenCode session {session_id}"
+                )]
+            } else {
+                vec![format!(
+                    "warning: failed to cleanup OpenCode session {session_id}: {detail}"
+                )]
+            }
+        }
+        Err(error) => vec![format!(
+            "warning: failed to cleanup OpenCode session {session_id}: {error}"
+        )],
+    }
+}
+
+fn cleanup_kimi_session(stderr: &str, env_overrides: &BTreeMap<String, String>) -> Vec<String> {
+    let Some(session_id) = extract_kimi_resume_session_id(stderr) else {
+        return vec!["warning: could not find Kimi session ID for cleanup".to_string()];
+    };
+    let root = env_overrides
+        .get("KIMI_SHARE_DIR")
+        .cloned()
+        .or_else(|| env::var("KIMI_SHARE_DIR").ok())
+        .or_else(|| env::var("HOME").ok().map(|home| format!("{home}/.kimi")))
+        .map(PathBuf::from);
+    let Some(root) = root else {
+        return vec![format!(
+            "warning: could not find Kimi session file for cleanup: {session_id}"
+        )];
+    };
+    let mut matches = Vec::new();
+    collect_kimi_session_files(&root.join("sessions"), &session_id, &mut matches);
+    if matches.is_empty() {
+        return vec![format!(
+            "warning: could not find Kimi session file for cleanup: {session_id}"
+        )];
+    }
+    let mut warnings = Vec::new();
+    for path in matches {
+        let result = if path.is_dir() {
+            fs::remove_dir_all(&path)
+        } else {
+            fs::remove_file(&path)
+        };
+        if let Err(error) = result {
+            warnings.push(format!(
+                "warning: failed to cleanup Kimi session {session_id}: {error}"
+            ));
+        }
+    }
+    warnings
+}
+
+fn collect_kimi_session_files(dir: &Path, session_id: &str, matches: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| name.starts_with(session_id))
+            .unwrap_or(false)
+        {
+            matches.push(path);
+            continue;
+        }
+        if path.is_dir() {
+            collect_kimi_session_files(&path, session_id, matches);
+        }
+    }
+}
+
 fn apply_real_runner_override(spec: &mut call_coding_clis::CommandSpec) {
     if spec.argv.is_empty() {
         return;
@@ -112,9 +297,13 @@ fn apply_real_runner_override(spec: &mut call_coding_clis::CommandSpec) {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_real_runner_override, filtered_human_stderr, sanitize_human_output,
-        sanitize_raw_output,
+        apply_real_runner_override, cleanup_runner_session, extract_kimi_resume_session_id,
+        extract_opencode_session_id, filtered_human_stderr, sanitize_human_output,
+        sanitize_raw_output, session_persistence_pre_run_warnings,
     };
+    use std::collections::BTreeMap;
+    use std::fs;
+    use std::path::PathBuf;
 
     #[test]
     fn strips_kimi_resume_hint() {
@@ -126,6 +315,118 @@ mod tests {
     fn keeps_other_stderr() {
         let stderr = "warning: something else\n";
         assert_eq!(filtered_human_stderr(stderr, "cc"), stderr);
+    }
+
+    #[test]
+    fn extracts_opencode_session_id_from_step_start() {
+        let stdout = "{\"type\":\"step_start\",\"sessionID\":\"ses_123\"}\n{\"type\":\"text\"}\n";
+        assert_eq!(
+            extract_opencode_session_id(stdout),
+            Some("ses_123".to_string())
+        );
+    }
+
+    #[test]
+    fn extracts_kimi_resume_session_id_from_stderr() {
+        let stderr = "To resume this session: kimi -r 123e4567-e89b-12d3-a456-426614174000\n";
+        assert_eq!(
+            extract_kimi_resume_session_id(stderr),
+            Some("123e4567-e89b-12d3-a456-426614174000".to_string())
+        );
+    }
+
+    #[test]
+    fn cleanup_runner_session_deletes_kimi_session_file_from_share_dir() {
+        let tmp = unique_tmp_dir("kimi-cleanup");
+        let session_id = "123e4567-e89b-12d3-a456-426614174000";
+        let session_file = tmp
+            .join("sessions")
+            .join("2026")
+            .join(format!("{session_id}.json"));
+        fs::create_dir_all(session_file.parent().unwrap()).unwrap();
+        fs::write(&session_file, "{}").unwrap();
+
+        let mut env = BTreeMap::new();
+        env.insert(
+            "KIMI_SHARE_DIR".to_string(),
+            tmp.to_string_lossy().into_owned(),
+        );
+        let warnings = cleanup_runner_session(
+            "k",
+            "kimi",
+            "",
+            &format!("To resume this session: kimi -r {session_id}\n"),
+            &env,
+        );
+
+        assert!(!session_file.exists());
+        assert!(warnings.is_empty());
+        let _ = fs::remove_dir_all(tmp);
+    }
+
+    #[test]
+    fn cleanup_runner_session_deletes_kimi_session_directory_from_share_dir() {
+        let tmp = unique_tmp_dir("kimi-cleanup-dir");
+        let session_id = "123e4567-e89b-12d3-a456-426614174000";
+        let session_dir = tmp.join("sessions").join("workdir-hash").join(session_id);
+        fs::create_dir_all(&session_dir).unwrap();
+        fs::write(session_dir.join("session.json"), "{}").unwrap();
+
+        let mut env = BTreeMap::new();
+        env.insert(
+            "KIMI_SHARE_DIR".to_string(),
+            tmp.to_string_lossy().into_owned(),
+        );
+        let warnings = cleanup_runner_session(
+            "k",
+            "kimi",
+            "",
+            &format!("To resume this session: kimi -r {session_id}\n"),
+            &env,
+        );
+
+        assert!(!session_dir.exists());
+        assert!(warnings.is_empty());
+        let _ = fs::remove_dir_all(tmp);
+    }
+
+    #[test]
+    fn cleanup_runner_session_warns_when_opencode_session_id_is_missing() {
+        let warnings = cleanup_runner_session(
+            "oc",
+            "opencode",
+            "{\"type\":\"text\"}\n",
+            "",
+            &BTreeMap::new(),
+        );
+        assert_eq!(
+            warnings,
+            vec!["warning: could not find OpenCode session ID for cleanup".to_string()]
+        );
+    }
+
+    #[test]
+    fn session_persistence_pre_run_warning_policy() {
+        assert_eq!(
+            session_persistence_pre_run_warnings(false, false, "oc"),
+            vec!["warning: runner \"opencode\" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup".to_string()]
+        );
+        assert!(session_persistence_pre_run_warnings(true, false, "oc").is_empty());
+        assert!(session_persistence_pre_run_warnings(false, true, "oc").is_empty());
+        assert!(session_persistence_pre_run_warnings(false, false, "cc").is_empty());
+    }
+
+    fn unique_tmp_dir(name: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "ccc-{name}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&path).unwrap();
+        path
     }
 
     #[test]
@@ -229,7 +530,10 @@ fn main() -> ExitCode {
         let content = match std::fs::read_to_string(&config_path) {
             Ok(content) => content,
             Err(error) => {
-                eprintln!("Failed to read config file {}: {error}", config_path.display());
+                eprintln!(
+                    "Failed to read config file {}: {error}",
+                    config_path.display()
+                );
                 return ExitCode::from(1);
             }
         };
@@ -275,6 +579,14 @@ fn main() -> ExitCode {
 
     let mut spec = spec;
     apply_real_runner_override(&mut spec);
+    let cleanup_spec = spec.clone();
+    for warning in session_persistence_pre_run_warnings(
+        parsed.save_session,
+        parsed.cleanup_session,
+        &output_plan.runner_name,
+    ) {
+        eprintln!("{warning}");
+    }
 
     let runner = Runner::new();
     let show_thinking = resolve_show_thinking(&parsed, Some(&config));
@@ -297,6 +609,12 @@ fn main() -> ExitCode {
             if !stderr.is_empty() {
                 eprint!("{}", stderr);
             }
+            print_cleanup_warnings(
+                parsed.cleanup_session,
+                &output_plan.runner_name,
+                &cleanup_spec,
+                &result,
+            );
             std::process::exit(result.exit_code)
         }
         "stream-text" | "stream-json" => {
@@ -307,6 +625,12 @@ fn main() -> ExitCode {
                     eprint!("{}", chunk);
                 }
             });
+            print_cleanup_warnings(
+                parsed.cleanup_session,
+                &output_plan.runner_name,
+                &cleanup_spec,
+                &result,
+            );
             std::process::exit(result.exit_code)
         }
         "formatted" => {
@@ -324,15 +648,19 @@ fn main() -> ExitCode {
                 println!("{}", sanitize_human_output(&rendered, sanitize_osc));
             }
             if forward_unknown_json {
-                for raw_line in parse_json_output(
-                    &result.stdout,
-                    output_plan.schema.as_deref().unwrap_or(""),
-                )
-                .unknown_json_lines
+                for raw_line in
+                    parse_json_output(&result.stdout, output_plan.schema.as_deref().unwrap_or(""))
+                        .unknown_json_lines
                 {
                     eprintln!("{}", raw_line);
                 }
             }
+            print_cleanup_warnings(
+                parsed.cleanup_session,
+                &output_plan.runner_name,
+                &cleanup_spec,
+                &result,
+            );
             std::process::exit(result.exit_code)
         }
         "stream-formatted" => {
@@ -373,6 +701,12 @@ fn main() -> ExitCode {
                     }
                 }
             }
+            print_cleanup_warnings(
+                parsed.cleanup_session,
+                &output_plan.runner_name,
+                &cleanup_spec,
+                &result,
+            );
             std::process::exit(result.exit_code)
         }
         _ => {

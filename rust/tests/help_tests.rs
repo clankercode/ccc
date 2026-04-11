@@ -38,6 +38,8 @@ fn test_help_mentions_name_slot() {
     assert!(stdout.contains(".text / ..text, .json / ..json, .fmt / ..fmt"));
     assert!(stdout.contains("--permission-mode <safe|auto|yolo|plan>"));
     assert!(stdout.contains("--yolo / -y"));
+    assert!(stdout.contains("--save-session"));
+    assert!(stdout.contains("--cleanup-session"));
     assert!(stdout.contains("Treat all remaining args as prompt text"));
     assert!(stdout.contains(".ccc.toml (searched upward from CWD)"));
     assert!(stdout.contains("XDG_CONFIG_HOME/ccc/config.toml"));
@@ -57,9 +59,15 @@ fn test_usage_mentions_name_slot() {
 
 #[test]
 fn test_print_config_outputs_example_config() {
-    let output = Command::new(ccc_bin()).arg("--print-config").output().unwrap();
+    let output = Command::new(ccc_bin())
+        .arg("--print-config")
+        .output()
+        .unwrap();
     assert!(output.status.success());
-    assert_eq!(String::from_utf8_lossy(&output.stdout), example_config_fixture());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        example_config_fixture()
+    );
     assert!(output.stderr.is_empty());
 }
 

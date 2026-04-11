@@ -11,7 +11,7 @@
 ## Non-interactive shape
 
 ```sh
-claude -p "your prompt"
+claude -p --no-session-persistence "your prompt"
 ```
 
 Useful flags from local help:
@@ -25,6 +25,7 @@ Useful flags from local help:
 - `--disallowed-tools`
 - `--add-dir`
 - `--output-format text|json|stream-json`
+- `--no-session-persistence`
 
 ## Permission controls
 
@@ -68,4 +69,6 @@ xdg-open https://docs.anthropic.com/en/docs/claude-code/settings
 ## Notes for `ccc`
 
 - `ccc` now uses `claude -p` for non-interactive mode
+- Python and Rust add `--no-session-persistence` by default so `ccc` runs do not appear in the user's resumable session list
+- `ccc --save-session cc ...` omits the no-persistence flag and restores normal Claude session saving
 - Claude is one of the best candidates for exposing more than a binary yolo switch

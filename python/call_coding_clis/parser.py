@@ -13,6 +13,7 @@ PROMPT_MODES = {"default", "prepend", "append"}
 class RunnerInfo:
     binary: str
     extra_args: list[str] = field(default_factory=list)
+    no_persist_flags: list[str] = field(default_factory=list)
     thinking_flags: dict[int, list[str]] = field(default_factory=dict)
     show_thinking_flags: dict[bool, list[str]] = field(default_factory=dict)
     yolo_flags: list[str] = field(default_factory=list)
@@ -31,6 +32,8 @@ class ParsedArgs:
     sanitize_osc: bool | None = None
     output_mode: str | None = None
     forward_unknown_json: bool = False
+    save_session: bool = False
+    cleanup_session: bool = False
     yolo: bool = False
     permission_mode: str | None = None
     provider: str | None = None
@@ -73,6 +76,7 @@ def _register_defaults() -> None:
     RUNNER_REGISTRY["opencode"] = RunnerInfo(
         binary="opencode",
         extra_args=["run"],
+        no_persist_flags=[],
         thinking_flags={},
         show_thinking_flags={True: ["--thinking"]},
         yolo_flags=[],
@@ -84,6 +88,7 @@ def _register_defaults() -> None:
     RUNNER_REGISTRY["claude"] = RunnerInfo(
         binary="claude",
         extra_args=["-p"],
+        no_persist_flags=["--no-session-persistence"],
         thinking_flags={
             0: ["--thinking", "disabled"],
             1: ["--thinking", "enabled", "--effort", "low"],
@@ -101,6 +106,7 @@ def _register_defaults() -> None:
     RUNNER_REGISTRY["kimi"] = RunnerInfo(
         binary="kimi",
         extra_args=[],
+        no_persist_flags=[],
         thinking_flags={
             0: ["--no-thinking"],
             1: ["--thinking"],
@@ -118,6 +124,7 @@ def _register_defaults() -> None:
     RUNNER_REGISTRY["codex"] = RunnerInfo(
         binary="codex",
         extra_args=["exec"],
+        no_persist_flags=["--ephemeral"],
         thinking_flags={},
         show_thinking_flags={},
         yolo_flags=["--dangerously-bypass-approvals-and-sandbox"],
@@ -128,6 +135,7 @@ def _register_defaults() -> None:
     RUNNER_REGISTRY["roocode"] = RunnerInfo(
         binary="roocode",
         extra_args=[],
+        no_persist_flags=[],
         thinking_flags={},
         show_thinking_flags={},
         provider_flag="",
@@ -137,6 +145,7 @@ def _register_defaults() -> None:
     RUNNER_REGISTRY["crush"] = RunnerInfo(
         binary="crush",
         extra_args=["run"],
+        no_persist_flags=[],
         thinking_flags={},
         show_thinking_flags={},
         yolo_flags=[],
@@ -233,6 +242,10 @@ def parse_args(argv: list[str]) -> ParsedArgs:
                 index += 1
         elif token == "--forward-unknown-json":
             parsed.forward_unknown_json = True
+        elif token == "--save-session":
+            parsed.save_session = True
+        elif token == "--cleanup-session":
+            parsed.cleanup_session = True
         elif token.lower() in OUTPUT_MODE_SUGAR:
             parsed.output_mode = OUTPUT_MODE_SUGAR[token.lower()]
         elif token in {"--yolo", "-y"}:
@@ -453,8 +466,11 @@ def resolve_command(
 
     warnings: list[str] = []
     requested_agent = parsed.alias if parsed.alias and alias_def is None else None
+    if parsed.save_session and parsed.cleanup_session:
+        raise ValueError("--save-session and --cleanup-session are mutually exclusive")
 
     argv = [info.binary] + list(info.extra_args)
+    warnings.extend(_session_persistence_warnings(parsed, effective_runner_name, info))
     output_plan = resolve_output_plan(parsed, config)
     argv.extend(output_plan.argv_flags)
 
@@ -557,6 +573,9 @@ def resolve_command(
                 f'warning: runner "{effective_runner_name}" does not support permission mode "plan"; ignoring it'
             )
 
+    if not parsed.save_session:
+        argv.extend(info.no_persist_flags)
+
     prompt = _resolve_prompt(parsed, alias_def)
     if not prompt:
         raise ValueError("prompt must not be empty")
@@ -566,6 +585,40 @@ def resolve_command(
     else:
         argv.append(prompt)
     return argv, env_overrides, warnings
+
+
+def _canonical_runner_name(effective_runner_name: str, info: RunnerInfo) -> str:
+    name = effective_runner_name.lower()
+    if name in {"oc", "opencode"}:
+        return "opencode"
+    if name in {"cc", "claude"}:
+        return "claude"
+    if name in {"c", "cx", "codex"}:
+        return "codex"
+    if name in {"k", "kimi"}:
+        return "kimi"
+    if name in {"cr", "crush"}:
+        return "crush"
+    if name in {"rc", "roocode"}:
+        return "roocode"
+    return info.binary
+
+
+def _session_persistence_warnings(
+    parsed: ParsedArgs, effective_runner_name: str, info: RunnerInfo
+) -> list[str]:
+    if parsed.save_session or info.no_persist_flags:
+        return []
+
+    display = _canonical_runner_name(effective_runner_name, info)
+    if parsed.cleanup_session:
+        if display in {"opencode", "kimi"}:
+            return []
+        return [
+            f'warning: runner "{display}" does not support automatic session cleanup; '
+            "pass --save-session to allow saved sessions explicitly"
+        ]
+    return []
 
 
 def _resolve_prompt(parsed: ParsedArgs, alias_def: AliasDef | None) -> str:

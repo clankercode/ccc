@@ -61,6 +61,7 @@
 | F32 | Yolo mode | `--yolo` / `-y` selects the runner's lowest-friction auto-approval mode |
 | F33 | Order-independent controls | Pre-prompt control tokens may appear in any order; `--` forces literal prompt text |
 | F34 | Permission mode | `--permission-mode <safe|auto|yolo|plan>` maps to runner-specific permission profiles where supported |
+| F35 | Session persistence controls | `--save-session` explicitly allows saved sessions, while default runner mappings avoid persistence where supported and warn otherwise; `--cleanup-session` tries safe post-run cleanup |
 
 ### v3 JSON Output Features
 
@@ -117,6 +118,7 @@
 | F20 Config loading | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | yes | n/a | yes | yes |
 | F21 Custom abbrevs | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | yes | n/a | yes | yes |
 | F22 Default prov/model | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | yes | n/a | yes | yes |
+| F35 Session persistence controls | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | n/a | - | - |
 
 ### v3 JSON Output Features
 

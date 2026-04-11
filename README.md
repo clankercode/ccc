@@ -120,10 +120,13 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - `formatted` and `stream-formatted` honor `FORCE_COLOR` / `NO_COLOR` before falling back to TTY detection
   - `--print-config` to print the canonical example `config.toml`
   - `--permission-mode safe|auto|yolo|plan`
+  - `--save-session` to explicitly allow normal runner session persistence
+  - `--cleanup-session` to try post-run cleanup when a runner lacks a no-persist flag
   - `--show-thinking` / `--no-show-thinking`
   - `--yolo` / `-y`
 - `--` forces the rest of argv to be treated as prompt text, even if it starts with control-like tokens
-- Python and Rust currently use `claude -p`, `codex exec`, and `crush run` for non-interactive invocation
+- Python and Rust currently use `claude -p --no-session-persistence`, `codex exec --ephemeral`, and `crush run` for non-interactive invocation
+- By default Python and Rust avoid saved sessions where the selected CLI supports it; OpenCode, Kimi, Crush, and RooCode warn that the runner may save a session unless `--save-session` or `--cleanup-session` is used
 - `ccc --print-config` is the source of truth for the current canonical config schema: `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 - `ccc config` is the source of truth for which config file currently resolves in the active shell
 

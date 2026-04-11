@@ -97,8 +97,8 @@ impl Default for CccConfig {
             default_runner: "oc".to_string(),
             default_provider: String::new(),
             default_model: String::new(),
-            default_thinking: None,
-            default_show_thinking: false,
+            default_thinking: Some(1),
+            default_show_thinking: true,
             default_sanitize_osc: None,
             default_output_mode: "text".to_string(),
             aliases: BTreeMap::new(),
@@ -460,15 +460,17 @@ pub fn resolve_command(
         .or_else(|| alias_def.and_then(|a| a.thinking))
         .or(config.default_thinking);
 
+    let mut thinking_flags_applied = false;
     if let Some(level) = effective_thinking {
         if let Some(flags) = effective_runner.thinking_flags.get(&level) {
             argv.extend(flags.iter().cloned());
+            thinking_flags_applied = true;
         }
     }
 
     let effective_show_thinking = resolve_show_thinking(parsed, Some(&config));
 
-    if effective_thinking.is_none() && effective_show_thinking {
+    if !thinking_flags_applied && effective_show_thinking {
         if let Some(flags) = effective_runner.show_thinking_flags.get(&true) {
             argv.extend(flags.iter().cloned());
         }

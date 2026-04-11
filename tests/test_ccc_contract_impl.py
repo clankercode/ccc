@@ -14,18 +14,18 @@ from tests.test_harness import LanguageSpec, _resolve_selected_languages
 
 
 PROMPT = "Fix the failing tests"
-EXPECTED = f"opencode run {PROMPT}\n"
-CONFIG_DEFAULT_RUNNER_EXPECTED = f"claude -p {PROMPT}\n"
-AGENT_FALLBACK_EXPECTED = f"opencode run --agent reviewer {PROMPT}\n"
-PRESET_AGENT_EXPECTED = f"opencode run --agent specialist {PROMPT}\n"
+EXPECTED = f"opencode run --thinking {PROMPT}\n"
+CONFIG_DEFAULT_RUNNER_EXPECTED = f"claude -p --thinking enabled --effort low {PROMPT}\n"
+AGENT_FALLBACK_EXPECTED = f"opencode run --thinking --agent reviewer {PROMPT}\n"
+PRESET_AGENT_EXPECTED = f"opencode run --thinking --agent specialist {PROMPT}\n"
 PRESET_PROMPT = "Commit all changes"
-PRESET_PROMPT_EXPECTED = f"opencode run {PRESET_PROMPT}\n"
+PRESET_PROMPT_EXPECTED = f"opencode run --thinking {PRESET_PROMPT}\n"
 PROJECT_LOCAL_PROMPT_EXPECTED = "kimi --thinking --model xdg-model --prompt Repo prompt\n"
 CODEX_RUNNER_EXPECTED = f"codex exec {PROMPT}\n"
 CODEX_RUNNER_NO_PERSIST_EXPECTED = f"codex exec --ephemeral {PROMPT}\n"
-CLAUDE_RUNNER_EXPECTED = f"claude -p {PROMPT}\n"
-CLAUDE_RUNNER_NO_PERSIST_EXPECTED = f"claude -p --no-session-persistence {PROMPT}\n"
-KIMI_RUNNER_EXPECTED = f"kimi --prompt {PROMPT}\n"
+CLAUDE_RUNNER_EXPECTED = f"claude -p --thinking enabled --effort low {PROMPT}\n"
+CLAUDE_RUNNER_NO_PERSIST_EXPECTED = f"claude -p --thinking enabled --effort low --no-session-persistence {PROMPT}\n"
+KIMI_RUNNER_EXPECTED = f"kimi --thinking --prompt {PROMPT}\n"
 OPENCODE_PERSISTENCE_WARNING = (
     'warning: runner "opencode" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
 )
@@ -811,41 +811,41 @@ class SingleImplCccContractTests(unittest.TestCase):
 
             cases = {
                 "Python": [
-                    (["cc", "--permission-mode", "safe"], "claude -p --permission-mode default --no-session-persistence Fix the failing tests\n", ""),
-                    (["oc", "--permission-mode", "safe"], "opencode run Fix the failing tests\n", f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"ask"}}'),
+                    (["cc", "--permission-mode", "safe"], "claude -p --thinking enabled --effort low --permission-mode default --no-session-persistence Fix the failing tests\n", ""),
+                    (["oc", "--permission-mode", "safe"], "opencode run --thinking Fix the failing tests\n", f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"ask"}}'),
                     (
                         ["rc", "--permission-mode", "safe"],
                         "roocode Fix the failing tests\n",
                         'warning: runner "roocode" safe mode is unverified; leaving default permissions unchanged\n'
                         + ROOCODE_PERSISTENCE_WARNING,
                     ),
-                    (["cc", "--permission-mode", "auto"], "claude -p --permission-mode auto --no-session-persistence Fix the failing tests\n", ""),
+                    (["cc", "--permission-mode", "auto"], "claude -p --thinking enabled --effort low --permission-mode auto --no-session-persistence Fix the failing tests\n", ""),
                     (["c", "--permission-mode", "auto"], "codex exec --full-auto --ephemeral Fix the failing tests\n", ""),
-                    (["cc", "--permission-mode", "plan"], "claude -p --permission-mode plan --no-session-persistence Fix the failing tests\n", ""),
-                    (["k", "--permission-mode", "plan"], "kimi --plan --prompt Fix the failing tests\n", KIMI_PERSISTENCE_WARNING),
+                    (["cc", "--permission-mode", "plan"], "claude -p --thinking enabled --effort low --permission-mode plan --no-session-persistence Fix the failing tests\n", ""),
+                    (["k", "--permission-mode", "plan"], "kimi --thinking --plan --prompt Fix the failing tests\n", KIMI_PERSISTENCE_WARNING),
                     (
                         ["k", "--permission-mode", "auto"],
-                        "kimi --prompt Fix the failing tests\n",
+                        "kimi --thinking --prompt Fix the failing tests\n",
                         'warning: runner "k" does not support permission mode "auto"; ignoring it\n'
                         + KIMI_PERSISTENCE_WARNING,
                     ),
                 ],
                 "Rust": [
-                    (["cc", "--permission-mode", "safe"], "claude -p --permission-mode default --no-session-persistence Fix the failing tests\n", ""),
-                    (["oc", "--permission-mode", "safe"], "opencode run Fix the failing tests\n", f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"ask"}}'),
+                    (["cc", "--permission-mode", "safe"], "claude -p --thinking enabled --effort low --permission-mode default --no-session-persistence Fix the failing tests\n", ""),
+                    (["oc", "--permission-mode", "safe"], "opencode run --thinking Fix the failing tests\n", f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"ask"}}'),
                     (
                         ["rc", "--permission-mode", "safe"],
                         "roocode Fix the failing tests\n",
                         'warning: runner "roocode" safe mode is unverified; leaving default permissions unchanged\n'
                         + ROOCODE_PERSISTENCE_WARNING,
                     ),
-                    (["cc", "--permission-mode", "auto"], "claude -p --permission-mode auto --no-session-persistence Fix the failing tests\n", ""),
+                    (["cc", "--permission-mode", "auto"], "claude -p --thinking enabled --effort low --permission-mode auto --no-session-persistence Fix the failing tests\n", ""),
                     (["c", "--permission-mode", "auto"], "codex exec --full-auto --ephemeral Fix the failing tests\n", ""),
-                    (["cc", "--permission-mode", "plan"], "claude -p --permission-mode plan --no-session-persistence Fix the failing tests\n", ""),
-                    (["k", "--permission-mode", "plan"], "kimi --plan --prompt Fix the failing tests\n", KIMI_PERSISTENCE_WARNING),
+                    (["cc", "--permission-mode", "plan"], "claude -p --thinking enabled --effort low --permission-mode plan --no-session-persistence Fix the failing tests\n", ""),
+                    (["k", "--permission-mode", "plan"], "kimi --thinking --plan --prompt Fix the failing tests\n", KIMI_PERSISTENCE_WARNING),
                     (
                         ["k", "--permission-mode", "auto"],
-                        "kimi --prompt Fix the failing tests\n",
+                        "kimi --thinking --prompt Fix the failing tests\n",
                         'warning: runner "k" does not support permission mode "auto"; ignoring it\n'
                         + KIMI_PERSISTENCE_WARNING,
                     ),
@@ -1002,28 +1002,28 @@ class SingleImplCccContractTests(unittest.TestCase):
 
             cases = {
                 "Python": [
-                    (["cc", ".json"], "claude -p --output-format json --no-session-persistence Fix the failing tests\n"),
+                    (["cc", ".json"], "claude -p --output-format json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n"),
                     (
                         ["cc", "..json"],
-                        "claude -p --verbose --output-format stream-json --no-session-persistence Fix the failing tests\n",
+                        "claude -p --verbose --output-format stream-json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
                     ),
                     (
                         ["k", "..json"],
-                        "kimi --print --output-format stream-json --prompt Fix the failing tests\n",
+                        "kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
                     ),
-                    (["oc", ".json"], "opencode run --format json Fix the failing tests\n"),
+                    (["oc", ".json"], "opencode run --format json --thinking Fix the failing tests\n"),
                 ],
                 "Rust": [
-                    (["cc", ".json"], "claude -p --output-format json --no-session-persistence Fix the failing tests\n"),
+                    (["cc", ".json"], "claude -p --output-format json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n"),
                     (
                         ["cc", "..json"],
-                        "claude -p --verbose --output-format stream-json --no-session-persistence Fix the failing tests\n",
+                        "claude -p --verbose --output-format stream-json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
                     ),
                     (
                         ["k", "..json"],
-                        "kimi --print --output-format stream-json --prompt Fix the failing tests\n",
+                        "kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
                     ),
-                    (["oc", ".json"], "opencode run --format json Fix the failing tests\n"),
+                    (["oc", ".json"], "opencode run --format json --thinking Fix the failing tests\n"),
                 ],
             }
 
@@ -1056,38 +1056,38 @@ class SingleImplCccContractTests(unittest.TestCase):
 
             cases = {
                 "Python": [
-                    (["cc", ".fmt"], "[assistant] claude -p --verbose --output-format stream-json --no-session-persistence Fix the failing tests\n"),
+                    (["cc", ".fmt"], "[assistant] claude -p --verbose --output-format stream-json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n"),
                     (
                         ["cc", "..fmt"],
-                        "[assistant] claude -p --verbose --output-format stream-json --include-partial-messages --no-session-persistence Fix the failing tests\n",
+                        "[assistant] claude -p --verbose --output-format stream-json --include-partial-messages --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
                     ),
                     (
                         ["k", ".fmt"],
-                        "[assistant] kimi --print --output-format stream-json --prompt Fix the failing tests\n",
+                        "[assistant] kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
                     ),
                     (
                         ["k", "..fmt"],
-                        "[assistant] kimi --print --output-format stream-json --prompt Fix the failing tests\n",
+                        "[assistant] kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
                     ),
-                    (["oc", ".fmt"], "[assistant] opencode run --format json Fix the failing tests\n"),
-                    (["oc", "..fmt"], "[assistant] opencode run --format json Fix the failing tests\n"),
+                    (["oc", ".fmt"], "[assistant] opencode run --format json --thinking Fix the failing tests\n"),
+                    (["oc", "..fmt"], "[assistant] opencode run --format json --thinking Fix the failing tests\n"),
                 ],
                 "Rust": [
-                    (["cc", ".fmt"], "[assistant] claude -p --verbose --output-format stream-json --no-session-persistence Fix the failing tests\n"),
+                    (["cc", ".fmt"], "[assistant] claude -p --verbose --output-format stream-json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n"),
                     (
                         ["cc", "..fmt"],
-                        "[assistant] claude -p --verbose --output-format stream-json --include-partial-messages --no-session-persistence Fix the failing tests\n",
+                        "[assistant] claude -p --verbose --output-format stream-json --include-partial-messages --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
                     ),
                     (
                         ["k", ".fmt"],
-                        "[assistant] kimi --print --output-format stream-json --prompt Fix the failing tests\n",
+                        "[assistant] kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
                     ),
                     (
                         ["k", "..fmt"],
-                        "[assistant] kimi --print --output-format stream-json --prompt Fix the failing tests\n",
+                        "[assistant] kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
                     ),
-                    (["oc", ".fmt"], "[assistant] opencode run --format json Fix the failing tests\n"),
-                    (["oc", "..fmt"], "[assistant] opencode run --format json Fix the failing tests\n"),
+                    (["oc", ".fmt"], "[assistant] opencode run --format json --thinking Fix the failing tests\n"),
+                    (["oc", "..fmt"], "[assistant] opencode run --format json --thinking Fix the failing tests\n"),
                 ],
             }
 
@@ -1115,7 +1115,7 @@ class SingleImplCccContractTests(unittest.TestCase):
             self._write_structured_argv_echo_stub(opencode_path, "opencode", "opencode")
 
             expected_stdout = (
-                "\x1b[96m💬\x1b[0m opencode run --format json Fix the failing tests\n"
+                "\x1b[96m💬\x1b[0m opencode run --format json --thinking Fix the failing tests\n"
             )
 
             for lang in self.selected_languages:
@@ -1193,7 +1193,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(
                         result.stdout,
-                        "opencode run +1 @agent :model\n",
+                        "opencode run --thinking +1 @agent :model\n",
                     )
                     self.assertEqual(result.stderr, OPENCODE_PERSISTENCE_WARNING)
 
@@ -1215,28 +1215,28 @@ class SingleImplCccContractTests(unittest.TestCase):
 
             cases = {
                 "Python": [
-                    (["cc", "--yolo"], "claude -p --dangerously-skip-permissions --no-session-persistence Fix the failing tests\n", ""),
+                    (["cc", "--yolo"], "claude -p --thinking enabled --effort low --dangerously-skip-permissions --no-session-persistence Fix the failing tests\n", ""),
                     (["c", "--yolo"], "codex exec --dangerously-bypass-approvals-and-sandbox --ephemeral Fix the failing tests\n", ""),
-                    (["k", "-y"], "kimi --yolo --prompt Fix the failing tests\n", KIMI_PERSISTENCE_WARNING),
+                    (["k", "-y"], "kimi --thinking --yolo --prompt Fix the failing tests\n", KIMI_PERSISTENCE_WARNING),
                     (
                         ["cr", "--yolo"],
                         "crush run Fix the failing tests\n",
                         'warning: runner "crush" does not support yolo mode in non-interactive run mode; ignoring --yolo\n'
                         + CRUSH_PERSISTENCE_WARNING,
                     ),
-                    (["oc", "--yolo"], "opencode run Fix the failing tests\n", f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"allow"}}'),
+                    (["oc", "--yolo"], "opencode run --thinking Fix the failing tests\n", f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"allow"}}'),
                 ],
                 "Rust": [
-                    (["cc", "--yolo"], "claude -p --dangerously-skip-permissions --no-session-persistence Fix the failing tests\n", ""),
+                    (["cc", "--yolo"], "claude -p --thinking enabled --effort low --dangerously-skip-permissions --no-session-persistence Fix the failing tests\n", ""),
                     (["c", "--yolo"], "codex exec --dangerously-bypass-approvals-and-sandbox --ephemeral Fix the failing tests\n", ""),
-                    (["k", "-y"], "kimi --yolo --prompt Fix the failing tests\n", KIMI_PERSISTENCE_WARNING),
+                    (["k", "-y"], "kimi --thinking --yolo --prompt Fix the failing tests\n", KIMI_PERSISTENCE_WARNING),
                     (
                         ["cr", "--yolo"],
                         "crush run Fix the failing tests\n",
                         'warning: runner "crush" does not support yolo mode in non-interactive run mode; ignoring --yolo\n'
                         + CRUSH_PERSISTENCE_WARNING,
                     ),
-                    (["oc", "--yolo"], "opencode run Fix the failing tests\n", f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"allow"}}'),
+                    (["oc", "--yolo"], "opencode run --thinking Fix the failing tests\n", f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"allow"}}'),
                 ],
             }
 
@@ -1297,17 +1297,17 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def assert_uses_prepend_prompt_mode(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "opencode run Add this task:\na new feature\n")
+        self.assertEqual(result.stdout, "opencode run --thinking Add this task:\na new feature\n")
         self.assertIn(result.stderr, {"", OPENCODE_PERSISTENCE_WARNING})
 
     def assert_uses_append_prompt_mode(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "opencode run a new feature\nAdd this task:\n")
+        self.assertEqual(result.stdout, "opencode run --thinking a new feature\nAdd this task:\n")
         self.assertIn(result.stderr, {"", OPENCODE_PERSISTENCE_WARNING})
 
     def assert_uses_prompt_mode_with_explicit_empty_prompt(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "opencode run Add this task:\n")
+        self.assertEqual(result.stdout, "opencode run --thinking Add this task:\n")
         self.assertIn(result.stderr, {"", OPENCODE_PERSISTENCE_WARNING})
 
     def assert_rejects_missing_prompt_mode_argument(self, result) -> None:
@@ -1414,7 +1414,7 @@ class SingleImplCccContractTests(unittest.TestCase):
             "  exit 9\n"
             "fi\n"
             "shift\n"
-            "printf 'opencode run %s\\n' \"$1\"\n"
+            "printf 'opencode run %s\\n' \"$*\"\n"
         )
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
@@ -1483,15 +1483,20 @@ class SingleImplCccContractTests(unittest.TestCase):
             "  exit 9\n"
             "fi\n"
             "shift\n"
+            'thinking=""\n'
+            'if [ "$1" = "--thinking" ]; then\n'
+            '  thinking="--thinking "\n'
+            "  shift\n"
+            "fi\n"
             'agent=""\n'
             'if [ "$1" = "--agent" ]; then\n'
             '  agent="$2"\n'
             "  shift 2\n"
             "fi\n"
             'if [ -n "$agent" ]; then\n'
-            "  printf 'opencode run --agent %s %s\\n' \"$agent\" \"$1\"\n"
+            "  printf 'opencode run %s--agent %s %s\\n' \"$thinking\" \"$agent\" \"$1\"\n"
             "else\n"
-            "  printf 'opencode run %s\\n' \"$1\"\n"
+            "  printf 'opencode run %s%s\\n' \"$thinking\" \"$1\"\n"
             "fi\n"
         )
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)

@@ -174,7 +174,7 @@ ccc @reviewer --help</code></pre>
       <tr><td>runner</td><td>Select which coding CLI to use (default: <code>oc</code>)<br>
         <code>opencode</code> (<code>oc</code>), <code>claude</code> (<code>cc</code>), <code>kimi</code> (<code>k</code>), <code>codex</code> (<code>c/cx</code>), <code>roocode</code> (<code>rc</code>), <code>crush</code> (<code>cr</code>)</td></tr>
       <tr><td>+thinking</td><td>Set thinking level: <code>+0</code> (off) through <code>+4</code> (max)</td></tr>
-      <tr><td>--show-thinking</td><td>Request visible thinking output when supported; default off</td></tr>
+      <tr><td>--show-thinking</td><td>Request visible thinking output when supported; default on</td></tr>
       <tr><td>--save-session</td><td>Explicitly allow the selected runner's normal session persistence</td></tr>
       <tr><td>--cleanup-session</td><td>Try post-run cleanup when the selected runner lacks a no-persist flag</td></tr>
       <tr><td>:provider:model</td><td>Override provider and model</td></tr>
@@ -226,7 +226,7 @@ ccc codex "Write a unit test"</code></pre>
       <tr><td>Alias wizard</td><td><code>ccc add &lt;alias&gt;</code> writes the resolved config path; <code>-g</code> forces the effective global config</td></tr>
       <tr><td>Custom abbreviations</td><td>User-defined runner shorthand names</td></tr>
       <tr><td>Default provider/model</td><td>Fallback provider and model selection</td></tr>
-      <tr><td>Visible thinking</td><td><code>show_thinking</code> defaults to off and enables runner-specific visible-thinking flags when supported</td></tr>
+      <tr><td>Visible thinking</td><td><code>show_thinking</code> defaults to on and enables runner-specific visible-thinking flags when supported</td></tr>
       <tr><td>Canonical sections</td><td><code>[defaults]</code>, <code>[abbreviations]</code>, and <code>[aliases.&lt;name&gt;]</code></td></tr>
     </tbody>
   </table>

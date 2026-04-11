@@ -62,8 +62,8 @@ class CccConfig:
     default_runner: str = "oc"
     default_provider: str = ""
     default_model: str = ""
-    default_thinking: int | None = None
-    default_show_thinking: bool = False
+    default_thinking: int | None = 1
+    default_show_thinking: bool = True
     default_sanitize_osc: bool | None = None
     default_output_mode: str = "text"
     aliases: dict[str, AliasDef] = field(default_factory=dict)
@@ -479,15 +479,17 @@ def resolve_command(
         effective_thinking = alias_def.thinking
     if effective_thinking is None:
         effective_thinking = config.default_thinking
+    thinking_flags_applied = False
     if effective_thinking is not None and effective_thinking in info.thinking_flags:
         argv.extend(info.thinking_flags[effective_thinking])
+        thinking_flags_applied = True
 
     effective_show_thinking = parsed.show_thinking
     if effective_show_thinking is None and alias_def and alias_def.show_thinking is not None:
         effective_show_thinking = alias_def.show_thinking
     if effective_show_thinking is None:
         effective_show_thinking = config.default_show_thinking
-    if effective_thinking is None and effective_show_thinking:
+    if not thinking_flags_applied and effective_show_thinking:
         if True in info.show_thinking_flags:
             argv.extend(info.show_thinking_flags[True])
 

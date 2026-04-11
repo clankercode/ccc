@@ -61,7 +61,7 @@ Flags:
   --print-config                         Print the canonical example config.toml and exit
   --help / -h                           Print help and exit, even when mixed with other args
   --show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it
-                                        (default: off; config key: show_thinking)
+                                        (default: on; config key: show_thinking)
   --sanitize-osc / --no-sanitize-osc    Strip disruptive OSC control output in human-facing modes
                                         while preserving OSC 8 hyperlinks
                                         (config key: defaults.sanitize_osc)

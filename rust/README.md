@@ -217,8 +217,8 @@ Example `.ccc.toml`:
 runner = "oc"
 provider = "anthropic"
 model = "claude-4"
-thinking = 2
-show_thinking = false
+thinking = 1
+show_thinking = true
 sanitize_osc = true
 output_mode = "formatted"
 

@@ -401,7 +401,15 @@ fn test_resolve_save_session_preserves_old_claude_and_codex_argv() {
                 prompt: "hello".into(),
                 ..Default::default()
             },
-            vec!["claude", "-p", "hello"],
+            vec![
+                "claude",
+                "-p",
+                "--thinking",
+                "enabled",
+                "--effort",
+                "low",
+                "hello",
+            ],
         ),
         (
             ParsedArgs {
@@ -679,6 +687,52 @@ fn test_resolve_show_thinking_for_kimi() {
 }
 
 #[test]
+fn test_resolve_default_show_thinking_enables_opencode_thinking() {
+    let parsed = ParsedArgs {
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[..3], ["opencode", "run", "--thinking"]);
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_default_thinking_effort_is_low_for_claude() {
+    let parsed = ParsedArgs {
+        runner: Some("cc".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv[..6],
+        [
+            "claude".to_string(),
+            "-p".to_string(),
+            "--thinking".to_string(),
+            "enabled".to_string(),
+            "--effort".to_string(),
+            "low".to_string()
+        ]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_no_show_thinking_overrides_default_for_opencode() {
+    let parsed = ParsedArgs {
+        show_thinking: Some(false),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv[..2], ["opencode", "run"]);
+    assert!(!argv.contains(&"--thinking".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
 fn test_resolve_show_thinking_does_not_override_explicit_thinking() {
     let parsed = ParsedArgs {
         runner: Some("cc".into()),
@@ -773,6 +827,7 @@ fn test_resolve_kimi_uses_prompt_flag() {
         argv,
         [
             "kimi".to_string(),
+            "--thinking".to_string(),
             "--prompt".to_string(),
             "hello".to_string()
         ]
@@ -958,7 +1013,10 @@ fn test_resolve_alias_prompt_fills_missing_prompt() {
         ..Default::default()
     };
     let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
-    assert_eq!(argv, vec!["opencode", "run", "Commit all changes"]);
+    assert_eq!(
+        argv,
+        vec!["opencode", "run", "--thinking", "Commit all changes"]
+    );
     assert!(warnings.is_empty());
 }
 
@@ -989,6 +1047,7 @@ fn test_resolve_explicit_prompt_overrides_alias_prompt() {
         vec![
             "opencode".to_string(),
             "run".to_string(),
+            "--thinking".to_string(),
             "Write the commit summary".to_string()
         ]
     );
@@ -1024,6 +1083,7 @@ fn test_resolve_alias_prompt_mode_prepend_uses_newline_separator() {
         vec![
             "opencode".to_string(),
             "run".to_string(),
+            "--thinking".to_string(),
             "Commit all changes\nInclude the failing tests".to_string()
         ]
     );
@@ -1059,6 +1119,7 @@ fn test_resolve_alias_prompt_mode_append_uses_newline_separator() {
         vec![
             "opencode".to_string(),
             "run".to_string(),
+            "--thinking".to_string(),
             "Include the failing tests\nCommit all changes".to_string()
         ]
     );
@@ -1123,6 +1184,7 @@ fn test_resolve_alias_prompt_mode_allows_explicit_empty_prompt() {
         vec![
             "opencode".to_string(),
             "run".to_string(),
+            "--thinking".to_string(),
             "Commit all changes".to_string()
         ]
     );
@@ -1223,10 +1285,14 @@ fn test_resolve_yolo_for_claude() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
-        argv[..3],
+        argv[..7],
         [
             "claude".to_string(),
             "-p".to_string(),
+            "--thinking".to_string(),
+            "enabled".to_string(),
+            "--effort".to_string(),
+            "low".to_string(),
             "--dangerously-skip-permissions".to_string()
         ]
     );
@@ -1262,7 +1328,14 @@ fn test_resolve_yolo_for_kimi() {
         ..Default::default()
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
-    assert_eq!(argv[..2], ["kimi".to_string(), "--yolo".to_string()]);
+    assert_eq!(
+        argv[..3],
+        [
+            "kimi".to_string(),
+            "--thinking".to_string(),
+            "--yolo".to_string()
+        ]
+    );
     assert_eq!(
         argv[argv.len() - 2..],
         ["--prompt".to_string(), "hello".to_string()]
@@ -1300,6 +1373,7 @@ fn test_resolve_yolo_for_opencode_uses_env_override() {
         vec![
             "opencode".to_string(),
             "run".to_string(),
+            "--thinking".to_string(),
             "hello".to_string()
         ]
     );
@@ -1336,10 +1410,14 @@ fn test_resolve_permission_mode_safe_for_claude() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
-        argv[..4],
+        argv[..8],
         [
             "claude".to_string(),
             "-p".to_string(),
+            "--thinking".to_string(),
+            "enabled".to_string(),
+            "--effort".to_string(),
+            "low".to_string(),
             "--permission-mode".to_string(),
             "default".to_string()
         ]
@@ -1361,6 +1439,7 @@ fn test_resolve_permission_mode_safe_for_opencode_uses_ask_override() {
         [
             "opencode".to_string(),
             "run".to_string(),
+            "--thinking".to_string(),
             "hello".to_string()
         ]
     );
@@ -1400,10 +1479,14 @@ fn test_resolve_permission_mode_auto_for_claude() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
-        argv[..4],
+        argv[..8],
         [
             "claude".to_string(),
             "-p".to_string(),
+            "--thinking".to_string(),
+            "enabled".to_string(),
+            "--effort".to_string(),
+            "low".to_string(),
             "--permission-mode".to_string(),
             "auto".to_string()
         ]
@@ -1441,10 +1524,14 @@ fn test_resolve_permission_mode_plan_for_claude() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
-        argv[..4],
+        argv[..8],
         [
             "claude".to_string(),
             "-p".to_string(),
+            "--thinking".to_string(),
+            "enabled".to_string(),
+            "--effort".to_string(),
+            "low".to_string(),
             "--permission-mode".to_string(),
             "plan".to_string()
         ]
@@ -1461,7 +1548,14 @@ fn test_resolve_permission_mode_plan_for_kimi() {
         ..Default::default()
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
-    assert_eq!(argv[..2], ["kimi".to_string(), "--plan".to_string()]);
+    assert_eq!(
+        argv[..3],
+        [
+            "kimi".to_string(),
+            "--thinking".to_string(),
+            "--plan".to_string()
+        ]
+    );
     assert_eq!(
         argv[argv.len() - 2..],
         ["--prompt".to_string(), "hello".to_string()]
@@ -1482,6 +1576,7 @@ fn test_resolve_permission_mode_auto_warns_for_kimi() {
         argv,
         [
             "kimi".to_string(),
+            "--thinking".to_string(),
             "--prompt".to_string(),
             "hello".to_string()
         ]

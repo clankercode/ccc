@@ -15,7 +15,7 @@ Slots are parsed in free order before the prompt, except that `-h` / `--help` wi
 - +thinking: Set thinking level from +0 (off) to +4 (max)
   Claude keeps the same `ccc` scale: `+0` becomes `--thinking disabled`, and `+1..+4` become `--thinking enabled` with matching `--effort`.
   Kimi keeps the same `ccc` scale: `+0` becomes `--no-thinking`, and `+1..+4` become `--thinking`.
-- --show-thinking: Request visible thinking output when supported; default off. Implemented in Python and Rust for now.
+- --show-thinking: Request visible thinking output when supported; default on. Implemented in Python and Rust for now.
 - --save-session: Explicitly allow the selected runner's normal session persistence. Implemented in Python and Rust for now.
 - --cleanup-session: Try post-run cleanup when the selected runner lacks a no-persist flag. Implemented in Python and Rust for now.
 - --output-mode: Choose `text`, `stream-text`, `json`, `stream-json`, `formatted`, or `stream-formatted`

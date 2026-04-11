@@ -61,7 +61,7 @@ It was not chosen for v1 because it is more opinionated and more likely to age b
 
 ## Rendering Rules
 
-- Thinking stays hidden unless `--show-thinking` is enabled.
+- Thinking is visible by default; use `--no-show-thinking` to hide supported runner thinking output.
 - Human-formatted output falls back to plain labels unless `FORCE_COLOR` is set or `NO_COLOR` disables colors.
 - Bash tool output shows the executed command digest up to 400 characters.
 - File-edit tools are summarized; full file contents and diffs are intentionally hidden.

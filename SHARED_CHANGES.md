@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-12
 
+### Thinking is visible by default with low effort
+- Change: Python and Rust now default `show_thinking` to on and default `thinking` to level `1`; OpenCode receives `--thinking` by default, Claude receives `--thinking enabled --effort low`, and Kimi receives `--thinking`
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `rust/tests/parser_tests.rs`, `tests/test_ccc_contract_impl.py`
+- Notes: `--no-show-thinking` still disables OpenCode visible-thinking output, while explicit `+0` / `+none` still disables runner thinking where supported
+
 ### `ccc add` success output now uses a checkmarked footer
 - Change: Python and Rust now print successful alias writes as a checkmarked heading followed by an indented alias block, matching the wizard menu layout
 - Required implementations: Python and Rust

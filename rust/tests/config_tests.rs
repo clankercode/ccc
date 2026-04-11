@@ -117,8 +117,8 @@ default_sanitize_osc = false
     assert_eq!(config.default_provider, "");
     assert_eq!(config.default_model, "");
     assert_eq!(config.default_output_mode, "text");
-    assert_eq!(config.default_thinking, None);
-    assert!(!config.default_show_thinking);
+    assert_eq!(config.default_thinking, Some(1));
+    assert!(config.default_show_thinking);
     assert_eq!(config.default_sanitize_osc, None);
 }
 

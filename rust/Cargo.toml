@@ -1,7 +1,12 @@
 [package]
-name = "call-coding-clis"
+name = "ccc"
 version = "0.1.0"
 edition = "2021"
+description = "Call coding CLIs (opencode, claude, codex, kimi, etc.) from Rust programs"
+license = "Unlicense"
+repository = "https://github.com/xertrov/call-coding-clis"
+keywords = ["cli", "opencode", "claude", "codex", "kimi", "coding-agent"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "ccc"

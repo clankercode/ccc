@@ -429,6 +429,7 @@ class RunnerTests(unittest.TestCase):
                 "HOME": str(tmp_path / "home"),
                 "XDG_CONFIG_HOME": str(tmp_path / "xdg"),
                 "CCC_CONFIG": str(tmp_path / "missing.toml"),
+                "FORCE_COLOR": "1",
             }
             with mock.patch.dict(os.environ, env, clear=False):
                 with mock.patch("sys.stdin", io.StringIO("3\n")):
@@ -437,9 +438,12 @@ class RunnerTests(unittest.TestCase):
 
             self.assertEqual(rc, 0)
             self.assertEqual(config_path.read_text(encoding="utf-8"), original)
-            self.assertIn("Existing alias action (1-3):", stdout.getvalue())
+            self.assertIn("Existing alias action", stdout.getvalue())
+            self.assertIn("(1-3)", stdout.getvalue())
             self.assertIn("  [m]odify, [r]eplace, [c]ancel", stdout.getvalue())
-            self.assertIn("  default m | choice > ", stdout.getvalue())
+            self.assertIn("default", stdout.getvalue())
+            self.assertIn("choice >", stdout.getvalue())
+            self.assertIn("\x1b[", stdout.getvalue())
 
     def test_add_alias_existing_replace_accepts_numbered_choices(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

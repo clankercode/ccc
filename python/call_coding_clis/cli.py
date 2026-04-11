@@ -482,6 +482,21 @@ def _confirm(prompt: str) -> bool:
 
 
 _KEEP_CURRENT = object()
+_MENU_RESET = "\x1b[0m"
+
+
+def _menu_color_enabled() -> bool:
+    if os.environ.get("FORCE_COLOR"):
+        return True
+    if os.environ.get("NO_COLOR"):
+        return False
+    return sys.stdout.isatty()
+
+
+def _menu_style(text: str, code: str, enabled: bool) -> str:
+    if not enabled:
+        return text
+    return f"\x1b[{code}m{text}{_MENU_RESET}"
 
 
 def _mode_key(mode: str) -> str:
@@ -516,6 +531,7 @@ def _choose(
         for label, key, _, _ in choices
     )
     while True:
+        color = _menu_color_enabled()
         if default is not None:
             default_label = choices[default - 1][1] or choices[default - 1][0]
         elif blank_value is not None:
@@ -523,9 +539,11 @@ def _choose(
         else:
             default_label = "none"
         answer = input(
-            f"{prompt} (1-{len(choices)}): \n"
-            f"  {markers}\n"
-            f"  default {default_label} | choice > "
+            f"{_menu_style(prompt, '1;36', color)} "
+            f"{_menu_style(f'(1-{len(choices)})', '2', color)}: \n"
+            f"{_menu_style(f'  {markers}', '32', color)}\n"
+            f"  {_menu_style('default', '2', color)} {_menu_style(default_label, '33', color)} | "
+            f"{_menu_style('choice >', '1;36', color)} "
         ).strip().lower()
         if answer == "":
             if default is not None:
@@ -535,7 +553,7 @@ def _choose(
             accepted = {str(index), label, key, *aliases}
             if answer in accepted:
                 return value
-        print("Please choose one of: " + ", ".join(str(index) for index in range(1, len(choices) + 1)) + ".")
+        print(_menu_style("Please choose one of: ", "31", color) + ", ".join(str(index) for index in range(1, len(choices) + 1)) + ".")
 
 
 def _merge_alias(current: AliasDef, overlay: AliasDef, unset_fields: set[str]) -> AliasDef:

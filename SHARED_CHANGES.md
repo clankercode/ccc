@@ -20,6 +20,15 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-04-12
+
+### `ccc add` wizard menus now use color on TTYs
+- Change: Python and Rust now color-code bounded-choice `ccc add` wizard menus while preserving plain output for pipes; `FORCE_COLOR` enables menu color and `NO_COLOR` disables it, matching the existing formatted-output color policy
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_runner.py`, `rust/tests/help_tests.rs`
+- Notes: updated `README.md`, `docs/llms.txt`, and `docs/clis/README.md`
+
 ## 2026-04-11
 
 ### `ccc add` alias wizard added in Python and Rust

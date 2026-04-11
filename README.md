@@ -118,7 +118,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - Python and Rust search project-local `.ccc.toml` files upward from the current directory and override the global config chain
   - `ccc config` prints the resolved config file path and raw contents, preferring `CCC_CONFIG`, then project-local `.ccc.toml`, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`
   - `ccc add [-g] <alias>` starts a line-prompt wizard for writing `[aliases.<name>]` config; flags such as `--runner`, `--model`, `--prompt`, and `--prompt-mode` can prefill values, and `--yes` writes non-interactively
-  - `formatted` and `stream-formatted` honor `FORCE_COLOR` / `NO_COLOR` before falling back to TTY detection
+  - `formatted`, `stream-formatted`, and `ccc add` menu prompts honor `FORCE_COLOR` / `NO_COLOR` before falling back to TTY detection
   - `--print-config` to print the canonical example `config.toml`
   - `--permission-mode safe|auto|yolo|plan`
   - `--save-session` to explicitly allow normal runner session persistence

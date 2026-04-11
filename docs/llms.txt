@@ -26,7 +26,7 @@ Slots are parsed in free order before the prompt, except that `-h` / `--help` wi
 - Config: in Python and Rust, project-local `.ccc.toml` files are searched upward from the current directory, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`
 - Generated config: `ccc --print-config` prints the canonical schema using `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 - Resolved config: `ccc config` prints the active config file path and its raw contents; `CCC_CONFIG` wins when it points at an existing file
-- Alias wizard: `ccc add <alias>` writes the resolved config path; `-g` forces the effective global config instead of project-local config; blank/default answers omit alias keys
+- Alias wizard: `ccc add <alias>` writes the resolved config path; `-g` forces the effective global config instead of project-local config; blank/default answers omit alias keys; menu prompt color follows TTY detection and honors FORCE_COLOR/NO_COLOR
 
 Session persistence:
 - Python and Rust add Claude `--no-session-persistence` and Codex `--ephemeral` by default.

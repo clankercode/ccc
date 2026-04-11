@@ -24,6 +24,7 @@ const ADD_OUTPUT_MODES: &[&str] = &[
 const ADD_PROMPT_MODES: &[&str] = &["default", "prepend", "append"];
 const KEEP_CURRENT_CHOICE: &str = "__keep_current__";
 const UNSET_CHOICE: &str = "__unset__";
+const MENU_RESET: &str = "\x1b[0m";
 
 struct WizardChoice<'a> {
     label: &'a str,
@@ -369,6 +370,24 @@ fn choice_marker(choice: &WizardChoice<'_>) -> String {
     format!("[{}] {}", choice.key, choice.label)
 }
 
+fn menu_color_enabled() -> bool {
+    if env::var("FORCE_COLOR").is_ok_and(|value| !value.is_empty()) {
+        return true;
+    }
+    if env::var("NO_COLOR").is_ok_and(|value| !value.is_empty()) {
+        return false;
+    }
+    io::stdout().is_terminal()
+}
+
+fn menu_style(text: &str, code: &str, enabled: bool) -> String {
+    if enabled {
+        format!("\x1b[{code}m{text}{MENU_RESET}")
+    } else {
+        text.to_string()
+    }
+}
+
 fn choose(
     prompt: &str,
     choices: &[WizardChoice<'_>],
@@ -381,6 +400,7 @@ fn choose(
         .collect::<Vec<_>>()
         .join(", ");
     loop {
+        let color = menu_color_enabled();
         let default_label = if let Some(index) = default {
             let choice = &choices[index - 1];
             if choice.key.is_empty() {
@@ -394,8 +414,13 @@ fn choose(
             "none"
         };
         let answer = read_prompt(&format!(
-            "{prompt} (1-{}): \n  {markers}\n  default {default_label} | choice > ",
-            choices.len()
+            "{} {}: \n{}\n  {} {} | {} ",
+            menu_style(prompt, "1;36", color),
+            menu_style(&format!("(1-{})", choices.len()), "2", color),
+            menu_style(&format!("  {markers}"), "32", color),
+            menu_style("default", "2", color),
+            menu_style(default_label, "33", color),
+            menu_style("choice >", "1;36", color),
         ))?
         .to_ascii_lowercase();
         if answer.is_empty() {
@@ -417,7 +442,10 @@ fn choose(
             .map(|index| index.to_string())
             .collect::<Vec<_>>()
             .join(", ");
-        println!("Please choose one of: {options}.");
+        println!(
+            "{}{options}.",
+            menu_style("Please choose one of: ", "31", color)
+        );
     }
 }
 

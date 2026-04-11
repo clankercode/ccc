@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-12
 
+### OpenCode read/tool work is now visible in text mode when thinking is shown
+- Change: Python and Rust now parse OpenCode `tool_use` events and, when `show_thinking` is enabled in OpenCode `text` mode, internally use the structured event stream so incoming work like read/tool activity is visible instead of collapsing to assistant prose only; raw `json` mode and non-OpenCode text-mode command-shape behavior remain unchanged
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_json_output.py`, `tests/test_runner.py`, `rust/tests/json_output_tests.rs`, `rust/tests/help_tests.rs`
+- Notes: updated this shared log; the motivation was debugging looper/ccc runs where visible thinking came through but OpenCode read/tool work disappeared in default text mode, making it hard to understand what the agent was doing
+
 ### `ccc add` success output now uses a checkmarked footer
 - Change: Python and Rust now print successful alias writes as a checkmarked heading followed by an indented alias block, matching the wizard menu layout
 - Required implementations: Python and Rust

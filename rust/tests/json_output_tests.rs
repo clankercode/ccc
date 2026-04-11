@@ -48,6 +48,38 @@ fn test_opencode_event_stream_response() {
 }
 
 #[test]
+fn test_opencode_tool_use_and_result_response() {
+    let raw = concat!(
+        "{\"type\":\"step_start\",\"timestamp\":1,\"sessionID\":\"ses_2\",\"part\":{\"type\":\"step-start\"}}\n",
+        "{\"type\":\"tool_use\",\"timestamp\":2,\"sessionID\":\"ses_2\",\"part\":{\"type\":\"tool\",\"tool\":\"read\",\"callID\":\"call_1\",\"state\":{\"status\":\"completed\",\"input\":{\"filePath\":\"/tmp/example.txt\",\"offset\":1,\"limit\":1},\"output\":\"<content>1: hello</content>\"}}}\n",
+        "{\"type\":\"text\",\"timestamp\":3,\"sessionID\":\"ses_2\",\"part\":{\"type\":\"text\",\"text\":\"Done reading.\"}}\n"
+    );
+    let parsed = parse_opencode_json(raw);
+    let tool_use_events: Vec<_> = parsed
+        .events
+        .iter()
+        .filter(|event| event.event_type == "tool_use")
+        .collect();
+    let tool_result_events: Vec<_> = parsed
+        .events
+        .iter()
+        .filter(|event| event.event_type == "tool_result")
+        .collect();
+    assert_eq!(tool_use_events.len(), 1);
+    assert_eq!(tool_result_events.len(), 1);
+    assert_eq!(tool_use_events[0].tool_call.as_ref().unwrap().name, "read");
+    assert_eq!(
+        tool_result_events[0]
+            .tool_result
+            .as_ref()
+            .unwrap()
+            .tool_call_id,
+        "call_1"
+    );
+    assert_eq!(parsed.final_text, "Done reading.");
+}
+
+#[test]
 fn test_claude_code_simple_response() {
     let raw = concat!(
         "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"sess-123\"}\n",
@@ -178,6 +210,20 @@ fn test_render_opencode_uses_color_prefixes_on_tty() {
 }
 
 #[test]
+fn test_render_opencode_tool_use() {
+    let raw = concat!(
+        "{\"type\":\"step_start\",\"timestamp\":1,\"sessionID\":\"ses_2\",\"part\":{\"type\":\"step-start\"}}\n",
+        "{\"type\":\"tool_use\",\"timestamp\":2,\"sessionID\":\"ses_2\",\"part\":{\"type\":\"tool\",\"tool\":\"read\",\"callID\":\"call_1\",\"state\":{\"status\":\"completed\",\"input\":{\"filePath\":\"/tmp/example.txt\",\"offset\":1,\"limit\":1},\"output\":\"<content>1: hello</content>\"}}}\n",
+        "{\"type\":\"text\",\"timestamp\":3,\"sessionID\":\"ses_2\",\"part\":{\"type\":\"text\",\"text\":\"Done reading.\"}}\n"
+    );
+    let parsed = parse_opencode_json(raw);
+    let rendered = render_parsed(&parsed, true, false);
+    assert!(rendered.contains("[tool:start] read"));
+    assert!(rendered.contains("[tool:result] read (ok)"));
+    assert!(rendered.contains("[assistant] Done reading."));
+}
+
+#[test]
 fn test_render_claude_code_tool_use() {
     let raw = "{\"type\":\"tool_use\",\"tool_name\":\"Bash\",\"tool_input\":{\"cmd\":\"ls\"}}\n";
     let parsed = parse_claude_code_json(raw);
@@ -288,10 +334,8 @@ fn test_stream_processor_renders_incrementally() {
         "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"checking\"}}}\n",
         "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"done\"}}}\n"
     );
-    let mut processor = StructuredStreamProcessor::new(
-        "claude-code",
-        FormattedRenderer::new(true, false),
-    );
+    let mut processor =
+        StructuredStreamProcessor::new("claude-code", FormattedRenderer::new(true, false));
     let mut chunks = Vec::new();
     for line in raw.lines() {
         let rendered = processor.feed(&(line.to_string() + "\n"));
@@ -299,10 +343,18 @@ fn test_stream_processor_renders_incrementally() {
             chunks.push(rendered);
         }
     }
-    assert!(chunks.iter().any(|chunk| chunk.contains("[tool:start] Bash")));
-    assert!(chunks.iter().any(|chunk| chunk.contains("[tool:result] Bash (ok): printf hi")));
-    assert!(chunks.iter().any(|chunk| chunk.contains("[thinking] checking")));
-    assert!(chunks.iter().any(|chunk| chunk.contains("[assistant] done")));
+    assert!(chunks
+        .iter()
+        .any(|chunk| chunk.contains("[tool:start] Bash")));
+    assert!(chunks
+        .iter()
+        .any(|chunk| chunk.contains("[tool:result] Bash (ok): printf hi")));
+    assert!(chunks
+        .iter()
+        .any(|chunk| chunk.contains("[thinking] checking")));
+    assert!(chunks
+        .iter()
+        .any(|chunk| chunk.contains("[assistant] done")));
 }
 
 #[test]
@@ -312,10 +364,8 @@ fn test_stream_processor_dedupes_final_assistant_and_result_after_text_deltas() 
         "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"DONE\"}]}}\n",
         "{\"type\":\"result\",\"subtype\":\"success\",\"result\":\"DONE\"}\n"
     );
-    let mut processor = StructuredStreamProcessor::new(
-        "claude-code",
-        FormattedRenderer::new(false, false),
-    );
+    let mut processor =
+        StructuredStreamProcessor::new("claude-code", FormattedRenderer::new(false, false));
     let mut chunks = Vec::new();
     for line in raw.lines() {
         let rendered = processor.feed(&(line.to_string() + "\n"));

@@ -1308,14 +1308,33 @@ fn main() -> ExitCode {
     }
 
     let config = load_config(None);
-    let output_plan = match resolve_output_plan(&parsed, Some(&config)) {
+    let requested_output_plan = match resolve_output_plan(&parsed, Some(&config)) {
         Ok(plan) => plan,
         Err(msg) => {
             eprintln!("{msg}");
             return ExitCode::from(1);
         }
     };
-    let spec = match resolve_command(&parsed, Some(&config)) {
+    let show_thinking = resolve_show_thinking(&parsed, Some(&config));
+    let text_mode_with_visible_work = requested_output_plan.mode == "text"
+        && show_thinking
+        && matches!(
+            requested_output_plan.runner_name.as_str(),
+            "oc" | "opencode"
+        );
+    let mut command_parsed = parsed.clone();
+    if text_mode_with_visible_work {
+        command_parsed.output_mode = Some("stream-formatted".to_string());
+    }
+    let command_output_plan = match resolve_output_plan(&command_parsed, Some(&config)) {
+        Ok(plan) => plan,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return ExitCode::from(1);
+        }
+    };
+    let output_plan = requested_output_plan.clone();
+    let spec = match resolve_command(&command_parsed, Some(&config)) {
         Ok((argv, env_overrides, warnings)) => {
             let mut spec = call_coding_clis::CommandSpec::new(argv);
             for (k, v) in env_overrides {
@@ -1344,7 +1363,6 @@ fn main() -> ExitCode {
     }
 
     let runner = Runner::new();
-    let show_thinking = resolve_show_thinking(&parsed, Some(&config));
     let sanitize_osc = resolve_sanitize_osc(&parsed, Some(&config));
     let forward_unknown_json = parsed.forward_unknown_json;
     let human_tty = resolve_human_tty(
@@ -1354,7 +1372,61 @@ fn main() -> ExitCode {
     );
 
     match output_plan.mode.as_str() {
-        "text" | "json" => {
+        "json" => {
+            let result = runner.run(spec);
+            let stdout = sanitize_raw_output(&result.stdout, &output_plan.runner_name);
+            let stderr = sanitize_raw_output(&result.stderr, &output_plan.runner_name);
+            if !stdout.is_empty() {
+                print!("{}", stdout);
+            }
+            if !stderr.is_empty() {
+                eprint!("{}", stderr);
+            }
+            print_cleanup_warnings(
+                parsed.cleanup_session,
+                &output_plan.runner_name,
+                &cleanup_spec,
+                &result,
+            );
+            std::process::exit(result.exit_code)
+        }
+        _ if text_mode_with_visible_work => {
+            let stream_runner_name = command_output_plan.runner_name.clone();
+            let processor = Arc::new(Mutex::new(StructuredStreamProcessor::new(
+                command_output_plan.schema.as_deref().unwrap_or(""),
+                FormattedRenderer::new(show_thinking, human_tty),
+            )));
+            let callback_processor = Arc::clone(&processor);
+            let result = runner.stream(spec, move |channel, chunk| {
+                if channel == "stderr" {
+                    let filtered = filtered_human_stderr(chunk, &stream_runner_name);
+                    if !filtered.is_empty() {
+                        eprint!("{}", sanitize_human_output(&filtered, sanitize_osc));
+                    }
+                    return;
+                }
+                if let Ok(mut processor) = callback_processor.lock() {
+                    let rendered = processor.feed(chunk);
+                    if !rendered.is_empty() {
+                        println!("{}", sanitize_human_output(&rendered, sanitize_osc));
+                    }
+                }
+            });
+            if let Ok(mut processor) = processor.lock() {
+                let trailing = processor.finish();
+                if !trailing.is_empty() {
+                    println!("{}", sanitize_human_output(&trailing, sanitize_osc));
+                }
+            }
+            print_cleanup_warnings(
+                parsed.cleanup_session,
+                &command_output_plan.runner_name,
+                &cleanup_spec,
+                &result,
+            );
+            std::process::exit(result.exit_code)
+        }
+        "text" => {
             let result = runner.run(spec);
             let stdout = sanitize_raw_output(&result.stdout, &output_plan.runner_name);
             let stderr = sanitize_raw_output(&result.stderr, &output_plan.runner_name);

@@ -84,4 +84,5 @@ xdg-open https://opencode.ai/docs/config/
 - current `ccc` mapping uses `opencode run`
 - current yolo support is env-config based, not a CLI flag
 - current session cleanup support is post-run deletion based, not true no-persist mode
+- when `show_thinking` is enabled in `text` mode, Python and Rust intentionally upgrade OpenCode to the structured event stream so visible incoming work like read/tool activity is rendered instead of collapsing to assistant prose only
 - if we add more permission controls later, OpenCode is the easiest place to start

@@ -113,6 +113,60 @@ fn apply_opencode_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                 }
             }
         }
+    } else if obj.get("type").and_then(|value| value.as_str()) == Some("tool_use") {
+        if let Some(part) = obj.get("part").and_then(|value| value.as_object()) {
+            let tool_name = part
+                .get("tool")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .to_string();
+            let call_id = part
+                .get("callID")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .to_string();
+            let state = part
+                .get("state")
+                .and_then(|value| value.as_object())
+                .cloned()
+                .unwrap_or_default();
+            let tool_input = state
+                .get("input")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let tool_output = state
+                .get("output")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .to_string();
+            let is_error = state
+                .get("status")
+                .and_then(|value| value.as_str())
+                .map(|value| value.eq_ignore_ascii_case("error"))
+                .unwrap_or(false);
+            result.events.push(JsonEvent {
+                event_type: "tool_use".into(),
+                text: String::new(),
+                thinking: String::new(),
+                tool_call: Some(ToolCall {
+                    id: call_id.clone(),
+                    name: tool_name,
+                    arguments: serde_json::to_string(&tool_input).unwrap_or_default(),
+                }),
+                tool_result: None,
+            });
+            result.events.push(JsonEvent {
+                event_type: "tool_result".into(),
+                text: String::new(),
+                thinking: String::new(),
+                tool_call: None,
+                tool_result: Some(ToolResult {
+                    tool_call_id: call_id,
+                    content: tool_output,
+                    is_error,
+                }),
+            });
+        }
     } else if obj.get("type").and_then(|value| value.as_str()) == Some("step_finish") {
         if let Some(part) = obj.get("part").and_then(|value| value.as_object()) {
             if let Some(tokens) = part.get("tokens").and_then(|value| value.as_object()) {
@@ -141,10 +195,16 @@ fn apply_opencode_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
 }
 
 fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
-    let msg_type = obj.get("type").and_then(|value| value.as_str()).unwrap_or("");
+    let msg_type = obj
+        .get("type")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
     match msg_type {
         "system" => {
-            let subtype = obj.get("subtype").and_then(|value| value.as_str()).unwrap_or("");
+            let subtype = obj
+                .get("subtype")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
             if subtype == "init" {
                 result.session_id = obj
                     .get("session_id")
@@ -166,7 +226,9 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                 if let Some(content) = message.get("content").and_then(|value| value.as_array()) {
                     let texts: Vec<String> = content
                         .iter()
-                        .filter(|block| block.get("type").and_then(|value| value.as_str()) == Some("text"))
+                        .filter(|block| {
+                            block.get("type").and_then(|value| value.as_str()) == Some("text")
+                        })
                         .filter_map(|block| block.get("text").and_then(|value| value.as_str()))
                         .map(|text| text.to_string())
                         .collect();
@@ -193,7 +255,8 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
             if let Some(message) = obj.get("message").and_then(|value| value.as_object()) {
                 if let Some(content) = message.get("content").and_then(|value| value.as_array()) {
                     for block in content {
-                        if block.get("type").and_then(|value| value.as_str()) == Some("tool_result") {
+                        if block.get("type").and_then(|value| value.as_str()) == Some("tool_result")
+                        {
                             result.events.push(JsonEvent {
                                 event_type: "tool_result".into(),
                                 text: String::new(),
@@ -223,11 +286,16 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
         }
         "stream_event" => {
             if let Some(event) = obj.get("event").and_then(|value| value.as_object()) {
-                let event_type = event.get("type").and_then(|value| value.as_str()).unwrap_or("");
+                let event_type = event
+                    .get("type")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("");
                 if event_type == "content_block_delta" {
                     if let Some(delta) = event.get("delta").and_then(|value| value.as_object()) {
-                        let delta_type =
-                            delta.get("type").and_then(|value| value.as_str()).unwrap_or("");
+                        let delta_type = delta
+                            .get("type")
+                            .and_then(|value| value.as_str())
+                            .unwrap_or("");
                         match delta_type {
                             "text_delta" => result.events.push(JsonEvent {
                                 event_type: "text_delta".into(),
@@ -266,8 +334,9 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                         }
                     }
                 } else if event_type == "content_block_start" {
-                    if let Some(content_block) =
-                        event.get("content_block").and_then(|value| value.as_object())
+                    if let Some(content_block) = event
+                        .get("content_block")
+                        .and_then(|value| value.as_object())
                     {
                         let block_type = content_block
                             .get("type")
@@ -307,7 +376,10 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
             }
         }
         "tool_use" => {
-            let tool_input = obj.get("tool_input").cloned().unwrap_or(serde_json::Value::Null);
+            let tool_input = obj
+                .get("tool_input")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
             result.events.push(JsonEvent {
                 event_type: "tool_use".into(),
                 text: String::new(),
@@ -349,7 +421,10 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
             });
         }
         "result" => {
-            let subtype = obj.get("subtype").and_then(|value| value.as_str()).unwrap_or("");
+            let subtype = obj
+                .get("subtype")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
             if subtype == "success" {
                 result.final_text = obj
                     .get("result")
@@ -409,7 +484,10 @@ fn apply_kimi_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
         "SubagentEvent",
         "ToolCallRequest",
     ];
-    let wire_type = obj.get("type").and_then(|value| value.as_str()).unwrap_or("");
+    let wire_type = obj
+        .get("type")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
     if passthrough_events.contains(&wire_type) {
         result.events.push(JsonEvent {
             event_type: wire_type.to_ascii_lowercase(),
@@ -421,7 +499,10 @@ fn apply_kimi_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
         return;
     }
 
-    let role = obj.get("role").and_then(|value| value.as_str()).unwrap_or("");
+    let role = obj
+        .get("role")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
     if role == "assistant" {
         if let Some(text) = obj.get("content").and_then(|value| value.as_str()) {
             result.final_text = text.to_string();
@@ -435,7 +516,10 @@ fn apply_kimi_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
         } else if let Some(parts) = obj.get("content").and_then(|value| value.as_array()) {
             let mut texts = Vec::new();
             for part in parts {
-                let part_type = part.get("type").and_then(|value| value.as_str()).unwrap_or("");
+                let part_type = part
+                    .get("type")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("");
                 if part_type == "text" {
                     if let Some(text) = part.get("text").and_then(|value| value.as_str()) {
                         texts.push(text.to_string());
@@ -467,7 +551,9 @@ fn apply_kimi_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
         }
         if let Some(tool_calls) = obj.get("tool_calls").and_then(|value| value.as_array()) {
             for tool_call in tool_calls {
-                let function = tool_call.get("function").and_then(|value| value.as_object());
+                let function = tool_call
+                    .get("function")
+                    .and_then(|value| value.as_object());
                 result.events.push(JsonEvent {
                     event_type: "tool_call".into(),
                     text: String::new(),
@@ -702,6 +788,7 @@ pub struct FormattedRenderer {
     tool_calls_by_id: BTreeMap<String, ToolCall>,
     pending_tool_call: Option<ToolCall>,
     streamed_assistant_buffer: String,
+    plain_text_tool_work: bool,
 }
 
 impl FormattedRenderer {
@@ -713,6 +800,7 @@ impl FormattedRenderer {
             tool_calls_by_id: BTreeMap::new(),
             pending_tool_call: None,
             streamed_assistant_buffer: String::new(),
+            plain_text_tool_work: false,
         }
     }
 
@@ -764,9 +852,11 @@ impl FormattedRenderer {
                 if let Some(tool_call) = &event.tool_call {
                     self.streamed_assistant_buffer.clear();
                     if !tool_call.id.is_empty() {
-                        self.tool_calls_by_id.insert(tool_call.id.clone(), tool_call.clone());
+                        self.tool_calls_by_id
+                            .insert(tool_call.id.clone(), tool_call.clone());
                     }
                     self.pending_tool_call = Some(tool_call.clone());
+                    self.plain_text_tool_work = true;
                     Some(self.render_tool_start(tool_call))
                 } else {
                     None
@@ -782,13 +872,10 @@ impl FormattedRenderer {
                 }
                 None
             }
-            "tool_result" => event
-                .tool_result
-                .as_ref()
-                .map(|tool_result| {
-                    self.streamed_assistant_buffer.clear();
-                    self.render_tool_result(tool_result)
-                }),
+            "tool_result" => event.tool_result.as_ref().map(|tool_result| {
+                self.streamed_assistant_buffer.clear();
+                self.render_tool_result(tool_result)
+            }),
             "error" if !event.text.is_empty() => {
                 self.streamed_assistant_buffer.clear();
                 Some(self.render_message("error", &event.text))
@@ -802,10 +889,22 @@ impl FormattedRenderer {
             self.seen_final_texts.insert(text.to_string());
         }
         let prefix = match kind {
-            "assistant" => prefix("💬", "[assistant]", "96", self.tty),
-            "thinking" => prefix("🧠", "[thinking]", "2;35", self.tty),
-            "success" => prefix("✅", "[ok]", "92", self.tty),
-            _ => prefix("❌", "[error]", "91", self.tty),
+            "assistant" => renderer_prefix(
+                "💬",
+                "[assistant]",
+                "96",
+                self.tty,
+                self.plain_text_tool_work,
+            ),
+            "thinking" => renderer_prefix(
+                "🧠",
+                "[thinking]",
+                "2;35",
+                self.tty,
+                self.plain_text_tool_work,
+            ),
+            "success" => renderer_prefix("✅", "[ok]", "92", self.tty, self.plain_text_tool_work),
+            _ => renderer_prefix("❌", "[error]", "91", self.tty, self.plain_text_tool_work),
         };
         with_prefix(&prefix, text)
     }
@@ -855,6 +954,22 @@ fn prefix(emoji: &str, plain: &str, color_code: &str, tty: bool) -> String {
     } else {
         plain.to_string()
     }
+}
+
+fn renderer_prefix(
+    emoji: &str,
+    plain: &str,
+    color_code: &str,
+    tty: bool,
+    plain_text_tool_work: bool,
+) -> String {
+    if tty {
+        return style(emoji, color_code, true);
+    }
+    if plain_text_tool_work && matches!(plain, "[assistant]" | "[thinking]" | "[ok]" | "[error]") {
+        return plain.to_string();
+    }
+    plain.to_string()
 }
 
 fn with_prefix(prefix: &str, text: &str) -> String {

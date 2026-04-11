@@ -233,7 +233,9 @@ emit_usage_error() {
 emit_tool_call() {
     case "$SCHEMA" in
         opencode)
-            printf '{"response":"mock: tool call executed"}\n'
+            printf '{"type":"step_start","timestamp":1,"sessionID":"ses_2","part":{"type":"step-start"}}\n'
+            printf '{"type":"tool_use","timestamp":2,"sessionID":"ses_2","part":{"type":"tool","tool":"read","callID":"call_1","state":{"status":"completed","input":{"filePath":"/tmp/example.txt","offset":1,"limit":1},"output":"<content>1: hello</content>"}}}\n'
+            printf '{"type":"text","timestamp":3,"sessionID":"ses_2","part":{"type":"text","text":"mock: tool call executed"}}\n'
             ;;
         claude-code)
             json_claude_init

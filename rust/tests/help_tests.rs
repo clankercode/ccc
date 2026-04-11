@@ -144,7 +144,8 @@ prompt_mode = \"default\"\n"
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&format!("Config path: {}", config_path.display())));
-    assert!(stdout.contains("Alias @mm27 written"));
+    assert!(stdout.contains("\n✓  Alias @mm27 written\n\n"));
+    assert!(stdout.contains("  [aliases.mm27]\n"));
     assert!(output.stderr.is_empty());
 }
 

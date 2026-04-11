@@ -194,4 +194,4 @@ ccc add mm27 --runner cc --model claude-4 --prompt "Review changes" --prompt-mod
 
 Without `-g`, the command writes the same config file that `ccc config` resolves, creating a new global config under `XDG_CONFIG_HOME/ccc/config.toml` or `~/.config/ccc/config.toml` when no config exists. With `-g`, it ignores project-local config and writes the effective global config, preferring XDG over home when both exist.
 
-Blank/default wizard answers omit alias keys. Existing aliases first ask whether to modify, replace, or cancel; `--yes` modifies existing aliases unless `--replace` is provided. Wizard menu prompts use color on TTYs, can be forced with `FORCE_COLOR=1`, and are disabled with `NO_COLOR=1`.
+Blank/default wizard answers omit alias keys. Existing aliases first ask whether to modify, replace, or cancel; `--yes` modifies existing aliases unless `--replace` is provided. Wizard menu prompts use color on TTYs, can be forced with `FORCE_COLOR=1`, and are disabled with `NO_COLOR=1`. Successful writes print a checkmarked heading followed by the written alias block indented for readability.

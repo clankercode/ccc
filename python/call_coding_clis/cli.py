@@ -9,7 +9,12 @@ import sys
 import re
 
 try:
-    from .json_output import FormattedRenderer, StructuredStreamProcessor, parse_json_output, render_parsed
+    from .json_output import (
+        FormattedRenderer,
+        StructuredStreamProcessor,
+        parse_json_output,
+        render_parsed,
+    )
     from .json_output import resolve_human_tty
     from .runner import CommandSpec, Runner
     from .parser import (
@@ -31,7 +36,12 @@ try:
     )
     from .help import print_help, print_usage
 except ImportError:
-    from json_output import FormattedRenderer, StructuredStreamProcessor, parse_json_output, render_parsed
+    from json_output import (
+        FormattedRenderer,
+        StructuredStreamProcessor,
+        parse_json_output,
+        render_parsed,
+    )
     from json_output import resolve_human_tty
     from runner import CommandSpec, Runner
     from parser import (
@@ -180,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
         os.environ.get("NO_COLOR"),
     )
 
-    if output_plan.mode in {"text", "json"}:
+    if output_plan.mode == "json":
         result = runner.run(spec)
         stdout = _sanitize_raw_output(result.stdout, output_plan.runner_name)
         stderr = _sanitize_raw_output(result.stderr, output_plan.runner_name)
@@ -188,7 +198,22 @@ def main(argv: list[str] | None = None) -> int:
             print(stdout, end="")
         if stderr:
             print(stderr, end="", file=sys.stderr)
-        _print_cleanup_warnings(parsed.cleanup_session, output_plan.runner_name, spec, result)
+        _print_cleanup_warnings(
+            parsed.cleanup_session, output_plan.runner_name, spec, result
+        )
+        return result.exit_code
+
+    if output_plan.mode == "text":
+        result = runner.run(spec)
+        stdout = _sanitize_raw_output(result.stdout, output_plan.runner_name)
+        stderr = _sanitize_raw_output(result.stderr, output_plan.runner_name)
+        if stdout:
+            print(stdout, end="")
+        if stderr:
+            print(stderr, end="", file=sys.stderr)
+        _print_cleanup_warnings(
+            parsed.cleanup_session, output_plan.runner_name, spec, result
+        )
         return result.exit_code
 
     if output_plan.mode in {"stream-text", "stream-json"}:
@@ -200,7 +225,9 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stdout if channel == "stdout" else sys.stderr,
             ),
         )
-        _print_cleanup_warnings(parsed.cleanup_session, output_plan.runner_name, spec, result)
+        _print_cleanup_warnings(
+            parsed.cleanup_session, output_plan.runner_name, spec, result
+        )
         return result.exit_code
 
     if output_plan.mode == "formatted":
@@ -219,7 +246,9 @@ def main(argv: list[str] | None = None) -> int:
         if forward_unknown_json:
             for raw_line in parsed_output.unknown_json_lines:
                 print(raw_line, file=sys.stderr)
-        _print_cleanup_warnings(parsed.cleanup_session, output_plan.runner_name, spec, result)
+        _print_cleanup_warnings(
+            parsed.cleanup_session, output_plan.runner_name, spec, result
+        )
         return result.exit_code
 
     renderer = FormattedRenderer(
@@ -244,11 +273,17 @@ def main(argv: list[str] | None = None) -> int:
         print(_sanitize_human_output(trailing, sanitize_osc))
     trailing_stderr = stderr_filter.finish()
     if trailing_stderr:
-        print(_sanitize_human_output(trailing_stderr, sanitize_osc), end="", file=sys.stderr)
+        print(
+            _sanitize_human_output(trailing_stderr, sanitize_osc),
+            end="",
+            file=sys.stderr,
+        )
     if forward_unknown_json:
         for raw_line in processor.take_unknown_json_lines():
             print(raw_line, file=sys.stderr)
-    _print_cleanup_warnings(parsed.cleanup_session, output_plan.runner_name, spec, result)
+    _print_cleanup_warnings(
+        parsed.cleanup_session, output_plan.runner_name, spec, result
+    )
     return result.exit_code
 
 
@@ -283,8 +318,7 @@ def _add_alias_command(args: list[str]) -> int:
             return 1
 
         write_alias_block(config_path, name, final_alias)
-        print(f"Alias @{name} written")
-        print(render_alias_block(name, final_alias), end="")
+        print(_format_written_alias(name, final_alias), end="")
         return 0
     except (EOFError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
@@ -499,6 +533,13 @@ def _menu_style(text: str, code: str, enabled: bool) -> str:
     return f"\x1b[{code}m{text}{_MENU_RESET}"
 
 
+def _format_written_alias(name: str, alias: AliasDef) -> str:
+    heading = _menu_style(f"✓  Alias @{name} written", "1;32", _menu_color_enabled())
+    block = render_alias_block(name, alias)
+    indented_block = "".join(f"  {line}" for line in block.splitlines(keepends=True))
+    return f"\n{heading}\n\n{indented_block}"
+
+
 def _mode_key(mode: str) -> str:
     return {
         "stream-text": "st",
@@ -582,7 +623,9 @@ def _handle_structured_chunk(
     if channel == "stderr":
         filtered = stderr_filter.feed(chunk)
         if filtered:
-            print(_sanitize_human_output(filtered, sanitize_osc), end="", file=sys.stderr)
+            print(
+                _sanitize_human_output(filtered, sanitize_osc), end="", file=sys.stderr
+            )
         return
     rendered = processor.feed(chunk)
     if rendered:
@@ -592,7 +635,9 @@ def _handle_structured_chunk(
             print(raw_line, file=sys.stderr)
 
 
-_KIMI_RESUME_RE = re.compile(r"^To resume this session: kimi -r [0-9a-f-]+\s*$", re.MULTILINE)
+_KIMI_RESUME_RE = re.compile(
+    r"^To resume this session: kimi -r [0-9a-f-]+\s*$", re.MULTILINE
+)
 _OSC_RE = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
 _OSC_8_PREFIX_RE = re.compile(r"^\x1b]8;")
 
@@ -739,7 +784,11 @@ def _cleanup_kimi_session(stderr: str, env: dict[str, str]) -> list[str]:
     session_id = _extract_kimi_resume_session_id(stderr)
     if not session_id:
         return ["warning: could not find Kimi session ID for cleanup"]
-    root = Path(env.get("KIMI_SHARE_DIR") or os.environ.get("KIMI_SHARE_DIR") or Path.home() / ".kimi")
+    root = Path(
+        env.get("KIMI_SHARE_DIR")
+        or os.environ.get("KIMI_SHARE_DIR")
+        or Path.home() / ".kimi"
+    )
     sessions_dir = root / "sessions"
     matches = list(sessions_dir.glob(f"**/{session_id}*"))
     if not matches:
@@ -752,7 +801,9 @@ def _cleanup_kimi_session(stderr: str, env: dict[str, str]) -> list[str]:
             else:
                 path.unlink()
         except OSError as exc:
-            warnings.append(f"warning: failed to cleanup Kimi session {session_id}: {exc}")
+            warnings.append(
+                f"warning: failed to cleanup Kimi session {session_id}: {exc}"
+            )
     return warnings
 
 

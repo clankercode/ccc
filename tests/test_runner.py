@@ -7,6 +7,7 @@ from unittest import mock
 import io
 from call_coding_clis import cli
 from call_coding_clis.cli import (
+    main,
     _apply_real_runner_override,
     _cleanup_runner_session,
     _extract_kimi_resume_session_id,
@@ -27,6 +28,44 @@ def read_example_config_fixture() -> str:
 
 
 class RunnerTests(unittest.TestCase):
+    def test_formatted_mode_with_show_thinking_surfaces_opencode_tool_work(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            config_path = tmp_path / "ccc-config.toml"
+            config_path.write_text("", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["PYTHONPATH"] = "python"
+            env["MOCK_JSON_SCHEMA"] = "opencode"
+            env["CCC_REAL_OPENCODE"] = str(
+                Path(__file__).resolve().parent
+                / "mock-coding-cli"
+                / "mock_coding_cli.sh"
+            )
+            env["CCC_CONFIG"] = str(config_path)
+            env["HOME"] = str(tmp_path / "home")
+            env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+
+            with mock.patch.dict(os.environ, env, clear=False):
+                with mock.patch("sys.stdout.isatty", return_value=False):
+                    with mock.patch("sys.stderr.isatty", return_value=False):
+                        with mock.patch(
+                            "sys.argv", ["ccc", "oc", "..fmt", "--show-thinking", "tool call"]
+                        ):
+                            with mock.patch("sys.stdout") as stdout:
+                                with mock.patch("sys.stderr") as stderr:
+                                    rc = main(["oc", "..fmt", "--show-thinking", "tool call"])
+
+        self.assertEqual(rc, 0)
+        rendered_stdout = "".join(call.args[0] for call in stdout.write.call_args_list)
+        rendered_stderr = "".join(call.args[0] for call in stderr.write.call_args_list)
+        self.assertIn("[tool:start] read", rendered_stdout)
+        self.assertIn("[tool:result] read (ok)", rendered_stdout)
+        self.assertIn("[assistant] mock: tool call executed", rendered_stdout)
+        self.assertIn(
+            'warning: runner "opencode" may save this session', rendered_stderr
+        )
+
     def test_runner_version_reads_opencode_package_json_before_command(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -64,7 +103,9 @@ class RunnerTests(unittest.TestCase):
             fallback.assert_not_called()
 
     def test_runner_version_reads_claude_version_from_install_path(self) -> None:
-        with mock.patch("os.path.realpath", return_value="/tmp/.local/share/claude/versions/2.1.98"):
+        with mock.patch(
+            "os.path.realpath", return_value="/tmp/.local/share/claude/versions/2.1.98"
+        ):
             with mock.patch("call_coding_clis.help._get_version") as fallback:
                 version = _get_runner_version("claude", "claude", "/tmp/bin/claude")
 
@@ -75,7 +116,13 @@ class RunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             binary_path = root / "bin" / "kimi"
-            metadata_dir = root / "lib" / "python3.13" / "site-packages" / "kimi_cli-1.30.0.dist-info"
+            metadata_dir = (
+                root
+                / "lib"
+                / "python3.13"
+                / "site-packages"
+                / "kimi_cli-1.30.0.dist-info"
+            )
             binary_path.parent.mkdir(parents=True)
             metadata_dir.mkdir(parents=True)
             binary_path.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
@@ -91,14 +138,20 @@ class RunnerTests(unittest.TestCase):
             fallback.assert_not_called()
 
     def test_runner_version_falls_back_when_metadata_is_missing(self) -> None:
-        with mock.patch("call_coding_clis.help._get_version", return_value="fallback 9.9.9") as fallback:
-            version = _get_runner_version("opencode", "opencode", "/tmp/missing/opencode")
+        with mock.patch(
+            "call_coding_clis.help._get_version", return_value="fallback 9.9.9"
+        ) as fallback:
+            version = _get_runner_version(
+                "opencode", "opencode", "/tmp/missing/opencode"
+            )
 
         self.assertEqual(version, "fallback 9.9.9")
         fallback.assert_called_once_with("opencode")
 
     def test_filtered_human_stderr_strips_kimi_resume_hint(self) -> None:
-        stderr = "\nTo resume this session: kimi -r 123e4567-e89b-12d3-a456-426614174000\n"
+        stderr = (
+            "\nTo resume this session: kimi -r 123e4567-e89b-12d3-a456-426614174000\n"
+        )
         self.assertEqual(_filtered_human_stderr(stderr, "k"), "")
 
     def test_filtered_human_stderr_keeps_other_runners(self) -> None:
@@ -110,7 +163,9 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(_extract_opencode_session_id(stdout), "ses_123")
 
     def test_extract_kimi_resume_session_id_from_stderr(self) -> None:
-        stderr = "To resume this session: kimi -r 123e4567-e89b-12d3-a456-426614174000\n"
+        stderr = (
+            "To resume this session: kimi -r 123e4567-e89b-12d3-a456-426614174000\n"
+        )
         self.assertEqual(
             _extract_kimi_resume_session_id(stderr),
             "123e4567-e89b-12d3-a456-426614174000",
@@ -130,11 +185,15 @@ class RunnerTests(unittest.TestCase):
 
         run.assert_called_once()
         args, kwargs = run.call_args
-        self.assertEqual(args[0], ["/tmp/mock-opencode", "session", "delete", "ses_123"])
+        self.assertEqual(
+            args[0], ["/tmp/mock-opencode", "session", "delete", "ses_123"]
+        )
         self.assertTrue(kwargs["capture_output"])
         self.assertEqual(warnings, [])
 
-    def test_cleanup_runner_session_deletes_kimi_session_file_from_share_dir(self) -> None:
+    def test_cleanup_runner_session_deletes_kimi_session_file_from_share_dir(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             session_id = "123e4567-e89b-12d3-a456-426614174000"
             session_file = Path(tmp) / "sessions" / "2026" / f"{session_id}.json"
@@ -152,7 +211,9 @@ class RunnerTests(unittest.TestCase):
             self.assertFalse(session_file.exists())
             self.assertEqual(warnings, [])
 
-    def test_cleanup_runner_session_deletes_kimi_session_directory_from_share_dir(self) -> None:
+    def test_cleanup_runner_session_deletes_kimi_session_directory_from_share_dir(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             session_id = "123e4567-e89b-12d3-a456-426614174000"
             session_dir = Path(tmp) / "sessions" / "workdir-hash" / session_id
@@ -416,7 +477,8 @@ class RunnerTests(unittest.TestCase):
                 'prompt_mode = "default"\n',
             )
             self.assertIn(f"Config path: {config_path}", stdout.getvalue())
-            self.assertIn("Alias @mm27 written", stdout.getvalue())
+            self.assertIn("\n✓  Alias @mm27 written\n\n", stdout.getvalue())
+            self.assertIn("  [aliases.mm27]\n", stdout.getvalue())
 
     def test_add_alias_cancel_existing_leaves_file_unchanged(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

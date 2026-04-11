@@ -248,9 +248,8 @@ fn run_add_alias_command(args: &[String]) -> ExitCode {
         eprintln!("{error}");
         return ExitCode::from(1);
     }
-    println!("Alias @{name} written");
     match render_alias_block(&name, &final_alias) {
-        Ok(block) => print!("{block}"),
+        Ok(block) => print!("{}", format_written_alias(&name, &block)),
         Err(error) => {
             eprintln!("{error}");
             return ExitCode::from(1);
@@ -386,6 +385,19 @@ fn menu_style(text: &str, code: &str, enabled: bool) -> String {
     } else {
         text.to_string()
     }
+}
+
+fn format_written_alias(name: &str, block: &str) -> String {
+    let heading = menu_style(
+        &format!("✓  Alias @{name} written"),
+        "1;32",
+        menu_color_enabled(),
+    );
+    let indented_block = block
+        .lines()
+        .map(|line| format!("  {line}\n"))
+        .collect::<String>();
+    format!("\n{heading}\n\n{indented_block}")
 }
 
 fn choose(

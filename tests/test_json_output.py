@@ -24,6 +24,12 @@ OPENCODE_EVENT_STREAM = (
     '{"type":"step_finish","timestamp":3,"sessionID":"ses_1","part":{"type":"step-finish","tokens":{"total":10,"input":2,"output":3,"reasoning":5,"cache":{"write":0,"read":7}},"cost":0}}\n'
 )
 
+OPENCODE_TOOL_STREAM = (
+    '{"type":"step_start","timestamp":1,"sessionID":"ses_2","part":{"type":"step-start"}}\n'
+    '{"type":"tool_use","timestamp":2,"sessionID":"ses_2","part":{"type":"tool","tool":"read","callID":"call_1","state":{"status":"completed","input":{"filePath":"/tmp/example.txt","offset":1,"limit":1},"output":"<content>1: hello</content>"}}}\n'
+    '{"type":"text","timestamp":3,"sessionID":"ses_2","part":{"type":"text","text":"Done reading."}}\n'
+)
+
 CLAUDE_CODE_STDOUT = (
     '{"type":"system","subtype":"init","session_id":"sess-1","tools":[],"model":"mock","permission_mode":"default"}\n'
     '{"type":"assistant","message":{"id":"msg_1","type":"message","role":"assistant","model":"mock",'
@@ -97,6 +103,16 @@ class ParseOpenCodeJsonTests(unittest.TestCase):
         self.assertEqual(result.events[-1].event_type, "text")
         self.assertEqual(result.usage["total"], 10)
         self.assertEqual(result.usage["cache_read"], 7)
+
+    def test_tool_use_and_result_response(self):
+        result = parse_opencode_json(OPENCODE_TOOL_STREAM)
+        tool_use_events = [e for e in result.events if e.event_type == "tool_use"]
+        tool_result_events = [e for e in result.events if e.event_type == "tool_result"]
+        self.assertEqual(len(tool_use_events), 1)
+        self.assertEqual(len(tool_result_events), 1)
+        self.assertEqual(tool_use_events[0].tool_call.name, "read")
+        self.assertEqual(tool_result_events[0].tool_result.tool_call_id, "call_1")
+        self.assertEqual(result.final_text, "Done reading.")
 
 
 class ParseClaudeCodeJsonTests(unittest.TestCase):
@@ -175,6 +191,13 @@ class RenderParsedTests(unittest.TestCase):
         rendered = render_parsed(result, tty=True)
         self.assertEqual(rendered, "\x1b[96m💬\x1b[0m Hello from OpenCode")
 
+    def test_render_opencode_tool_use(self):
+        result = parse_opencode_json(OPENCODE_TOOL_STREAM)
+        rendered = render_parsed(result, show_thinking=True)
+        self.assertIn("[tool:start] read", rendered)
+        self.assertIn("[tool:result] read (ok)", rendered)
+        self.assertIn("[assistant] Done reading.", rendered)
+
     def test_render_claude(self):
         result = parse_claude_code_json(CLAUDE_CODE_STDOUT)
         rendered = render_parsed(result)
@@ -238,7 +261,9 @@ class RenderParsedTests(unittest.TestCase):
         self.assertTrue(any("[thinking] checking..." in chunk for chunk in chunks))
         self.assertTrue(any("[assistant] hello world" in chunk for chunk in chunks))
 
-    def test_stream_processor_dedupes_final_assistant_and_result_after_text_deltas(self):
+    def test_stream_processor_dedupes_final_assistant_and_result_after_text_deltas(
+        self,
+    ):
         raw = (
             '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"DONE"}}}\n'
             '{"type":"assistant","message":{"content":[{"type":"text","text":"DONE"}]}}\n'
@@ -286,17 +311,24 @@ class RenderParsedTests(unittest.TestCase):
         ).read_text()
         result = parse_claude_code_json(raw)
         rendered = render_parsed(result, show_thinking=True)
-        self.assertIn("[thinking] The user wants a staged tool-using response.", rendered)
+        self.assertIn(
+            "[thinking] The user wants a staged tool-using response.", rendered
+        )
         self.assertIn("[assistant] Computing the first multiplication.", rendered)
         self.assertGreaterEqual(len(result.unknown_json_lines), 6)
         self.assertTrue(
             any('"type":"message_start"' in line for line in result.unknown_json_lines)
         )
         self.assertTrue(
-            any('"type":"signature_delta"' in line for line in result.unknown_json_lines)
+            any(
+                '"type":"signature_delta"' in line for line in result.unknown_json_lines
+            )
         )
         self.assertTrue(
-            any('"type":"content_block_stop"' in line for line in result.unknown_json_lines)
+            any(
+                '"type":"content_block_stop"' in line
+                for line in result.unknown_json_lines
+            )
         )
         self.assertTrue(
             any('"type":"message_delta"' in line for line in result.unknown_json_lines)
@@ -305,7 +337,10 @@ class RenderParsedTests(unittest.TestCase):
             any('"type":"message_stop"' in line for line in result.unknown_json_lines)
         )
         self.assertTrue(
-            any('"type":"rate_limit_event"' in line for line in result.unknown_json_lines)
+            any(
+                '"type":"rate_limit_event"' in line
+                for line in result.unknown_json_lines
+            )
         )
 
     def test_fixture_kimi_tool_bash(self):

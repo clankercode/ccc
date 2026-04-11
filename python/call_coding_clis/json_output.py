@@ -96,6 +96,42 @@ def _apply_opencode_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
                 result.final_text = text
                 result.events.append(JsonEvent(event_type="text", text=text, raw=obj))
         return True
+    if event_type == "tool_use":
+        part = obj.get("part", {})
+        if not isinstance(part, dict):
+            return False
+        tool_name = str(part.get("tool", ""))
+        call_id = str(part.get("callID", ""))
+        state = part.get("state", {})
+        if not isinstance(state, dict):
+            state = {}
+        tool_input = state.get("input", {})
+        tool_output = state.get("output", "")
+        result.events.append(
+            JsonEvent(
+                event_type="tool_use",
+                tool_call=ToolCall(
+                    id=call_id,
+                    name=tool_name,
+                    arguments=json.dumps(tool_input)
+                    if isinstance(tool_input, dict)
+                    else "",
+                ),
+                raw=obj,
+            )
+        )
+        result.events.append(
+            JsonEvent(
+                event_type="tool_result",
+                tool_result=ToolResult(
+                    tool_call_id=call_id,
+                    content=str(tool_output),
+                    is_error=str(state.get("status", "")).lower() == "error",
+                ),
+                raw=obj,
+            )
+        )
+        return True
     if event_type == "step_finish":
         part = obj.get("part", {})
         if isinstance(part, dict):
@@ -145,7 +181,9 @@ def _apply_claude_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
             if texts:
                 text = "\n".join(texts)
                 result.final_text = text
-                result.events.append(JsonEvent(event_type="assistant", text=text, raw=obj))
+                result.events.append(
+                    JsonEvent(event_type="assistant", text=text, raw=obj)
+                )
             usage = message.get("usage", {})
             if isinstance(usage, dict):
                 result.usage = {
@@ -171,10 +209,14 @@ def _apply_claude_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
                                 raw=obj,
                             )
                         )
-        return any(
-            isinstance(block, dict) and block.get("type") == "tool_result"
-            for block in content
-        ) if isinstance(content, list) else False
+        return (
+            any(
+                isinstance(block, dict) and block.get("type") == "tool_result"
+                for block in content
+            )
+            if isinstance(content, list)
+            else False
+        )
 
     if msg_type == "stream_event":
         event = obj.get("event", {})
@@ -282,7 +324,9 @@ def _apply_claude_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
             return True
         elif subtype == "error":
             result.error = str(obj.get("error", ""))
-            result.events.append(JsonEvent(event_type="error", text=result.error, raw=obj))
+            result.events.append(
+                JsonEvent(event_type="error", text=result.error, raw=obj)
+            )
             return True
     return False
 
@@ -314,7 +358,9 @@ def _apply_kimi_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
         tool_calls = obj.get("tool_calls")
         if isinstance(content, str):
             result.final_text = content
-            result.events.append(JsonEvent(event_type="assistant", text=content, raw=obj))
+            result.events.append(
+                JsonEvent(event_type="assistant", text=content, raw=obj)
+            )
         elif isinstance(content, list):
             texts: list[str] = []
             for part in content:
@@ -334,7 +380,9 @@ def _apply_kimi_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
             if texts:
                 text = "\n".join(texts)
                 result.final_text = text
-                result.events.append(JsonEvent(event_type="assistant", text=text, raw=obj))
+                result.events.append(
+                    JsonEvent(event_type="assistant", text=text, raw=obj)
+                )
         if isinstance(tool_calls, list):
             for tool_call_data in tool_calls:
                 if not isinstance(tool_call_data, dict):
@@ -467,7 +515,15 @@ def _bash_command_preview(tool_call: ToolCall) -> str:
 
 def _tool_preview(tool_name: str, text: str) -> str:
     normalized = tool_name.lower()
-    if normalized in {"read", "write", "edit", "multiedit", "read_file", "write_file", "edit_file"}:
+    if normalized in {
+        "read",
+        "write",
+        "edit",
+        "multiedit",
+        "read_file",
+        "write_file",
+        "edit_file",
+    }:
         return ""
     return _summarize_text(text)
 
@@ -492,6 +548,7 @@ class FormattedRenderer:
         self._tool_calls_by_id: dict[str, ToolCall] = {}
         self._pending_tool_call: ToolCall | None = None
         self._streamed_assistant_buffer = ""
+        self._plain_text_tool_work = False
 
     def render_output(self, output: ParsedJsonOutput) -> str:
         parts: list[str] = []
@@ -507,7 +564,10 @@ class FormattedRenderer:
             return self._render_message("assistant", event.text)
 
         if event.event_type in {"assistant", "text"} and event.text:
-            if self._streamed_assistant_buffer and event.text == self._streamed_assistant_buffer:
+            if (
+                self._streamed_assistant_buffer
+                and event.text == self._streamed_assistant_buffer
+            ):
                 self._seen_final_texts.add(event.text)
                 self._streamed_assistant_buffer = ""
                 return ""
@@ -515,7 +575,10 @@ class FormattedRenderer:
             return self._render_message("assistant", event.text)
 
         if event.event_type == "result" and event.text:
-            if self._streamed_assistant_buffer and event.text == self._streamed_assistant_buffer:
+            if (
+                self._streamed_assistant_buffer
+                and event.text == self._streamed_assistant_buffer
+            ):
                 self._seen_final_texts.add(event.text)
                 self._streamed_assistant_buffer = ""
                 return ""
@@ -529,12 +592,16 @@ class FormattedRenderer:
                 return ""
             return self._render_message("thinking", event.thinking)
 
-        if event.event_type in {"tool_use", "tool_use_start", "tool_call"} and event.tool_call:
+        if (
+            event.event_type in {"tool_use", "tool_use_start", "tool_call"}
+            and event.tool_call
+        ):
             tool_call = event.tool_call
             self._streamed_assistant_buffer = ""
             if tool_call.id:
                 self._tool_calls_by_id[tool_call.id] = tool_call
             self._pending_tool_call = tool_call
+            self._plain_text_tool_work = True
             return self._render_tool_start(tool_call)
 
         if event.event_type == "tool_input_delta" and event.text:
@@ -575,7 +642,9 @@ class FormattedRenderer:
 
     def _render_tool_result(self, tool_result: ToolResult) -> str:
         prefix = self._prefix("📎", "[tool:result]", "36")
-        tool_call = self._tool_calls_by_id.get(tool_result.tool_call_id, self._pending_tool_call)
+        tool_call = self._tool_calls_by_id.get(
+            tool_result.tool_call_id, self._pending_tool_call
+        )
         tool_name = tool_call.name if tool_call else "tool"
         status = "error" if tool_result.is_error else "ok"
         summary = f"{tool_name} ({status})"
@@ -591,6 +660,13 @@ class FormattedRenderer:
     def _prefix(self, emoji: str, plain: str, color_code: str) -> str:
         if self.tty:
             return _style(emoji, color_code, True)
+        if self._plain_text_tool_work and plain in {
+            "[assistant]",
+            "[thinking]",
+            "[ok]",
+            "[error]",
+        }:
+            return plain
         return plain
 
     def _with_prefix(self, prefix: str, text: str) -> str:

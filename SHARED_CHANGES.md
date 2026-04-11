@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-12
 
+### `ccc add` success output now uses a checkmarked footer
+- Change: Python and Rust now print successful alias writes as a checkmarked heading followed by an indented alias block, matching the wizard menu layout
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_runner.py`, `rust/tests/help_tests.rs`
+- Notes: updated `docs/clis/README.md`
+
 ### `ccc add` wizard menus now use color on TTYs
 - Change: Python and Rust now color-code bounded-choice `ccc add` wizard menus while preserving plain output for pipes; `FORCE_COLOR` enables menu color and `NO_COLOR` disables it, matching the existing formatted-output color policy
 - Required implementations: Python and Rust

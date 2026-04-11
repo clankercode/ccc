@@ -240,3 +240,43 @@ prompt = \"Fix the failing tests\"\n\
 prompt_mode = \"default\"\n"
     );
 }
+
+#[test]
+fn test_text_mode_with_show_thinking_surfaces_opencode_tool_work() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-text-visible-work-{unique}"));
+    let config_path = base_dir.join("ccc-config.toml");
+    fs::create_dir_all(&base_dir).unwrap();
+    fs::write(&config_path, "").unwrap();
+
+    let output = Command::new(ccc_bin())
+        .args(["oc", "--show-thinking", "tool call"])
+        .env(
+            "CCC_REAL_OPENCODE",
+            format!(
+                "{}/../tests/mock-coding-cli/mock_coding_cli.sh",
+                env!("CARGO_MANIFEST_DIR")
+            ),
+        )
+        .env("MOCK_JSON_SCHEMA", "opencode")
+        .env("CCC_CONFIG", &config_path)
+        .env("HOME", base_dir.join("home"))
+        .env("XDG_CONFIG_HOME", base_dir.join("xdg"))
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stdout.contains("read"));
+    assert!(stdout.contains("read (ok)"));
+    assert!(stdout.contains("mock: tool call executed"));
+    assert!(stderr.contains("warning: runner \"opencode\" may save this session"));
+}

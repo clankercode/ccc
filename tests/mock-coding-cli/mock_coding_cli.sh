@@ -13,6 +13,10 @@ SCHEMA="${MOCK_JSON_SCHEMA:-}"
 
 # --- JSON output helpers ---
 
+json_escape() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
 json_opencode() {
     _response="$1"
     printf '{"response":"%s"}\n' "$_response"
@@ -208,13 +212,19 @@ emit_stdin() {
 emit_unknown() {
     _prompt="$1"
     case "$SCHEMA" in
-        opencode)    printf '{"response":"mock: unknown prompt '"'"'%s'"'"'"}\n' "$_prompt" ;;
+        opencode)
+            _escaped=$(json_escape "mock: unknown prompt '$_prompt'")
+            printf '{"response":"%s"}\n' "$_escaped"
+            ;;
         claude-code)
             json_claude_init
             json_claude_assistant "mock: unknown prompt '$_prompt'"
             json_claude_result "mock: unknown prompt '$_prompt'" 0
             ;;
-        kimi-code)   printf '{"role":"assistant","content":"mock: unknown prompt '"'"'%s'"'"'"}\n' "$_prompt" ;;
+        kimi-code)
+            _escaped=$(json_escape "mock: unknown prompt '$_prompt'")
+            printf '{"role":"assistant","content":"%s"}\n' "$_escaped"
+            ;;
         *)           printf "mock: unknown prompt '%s'\n" "$_prompt" ;;
     esac
     exit 0

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 import os
 from pathlib import Path
@@ -87,7 +88,14 @@ THINKING_ALIASES = {
     "max": 4,
     "xhigh": 4,
 }
-OUTPUT_MODE_CHOICES = ["text", "stream-text", "json", "stream-json", "formatted", "stream-formatted"]
+OUTPUT_MODE_CHOICES = [
+    "text",
+    "stream-text",
+    "json",
+    "stream-json",
+    "formatted",
+    "stream-formatted",
+]
 PROMPT_MODE_CHOICES = ["default", "prepend", "append"]
 
 
@@ -162,8 +170,20 @@ def main(argv: list[str] | None = None) -> int:
 
     config = load_config()
     try:
-        argv_list, env_overrides, warnings = resolve_command(parsed, config)
-        output_plan = resolve_output_plan(parsed, config)
+        requested_output_plan = resolve_output_plan(parsed, config)
+        show_thinking = resolve_show_thinking(parsed, config)
+        text_mode_with_visible_work = (
+            requested_output_plan.mode == "text"
+            and show_thinking
+            and requested_output_plan.runner_name.lower() in {"oc", "opencode"}
+        )
+        command_parsed = (
+            replace(parsed, output_mode="stream-formatted")
+            if text_mode_with_visible_work
+            else parsed
+        )
+        argv_list, env_overrides, warnings = resolve_command(command_parsed, config)
+        output_plan = resolve_output_plan(command_parsed, config)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -181,7 +201,6 @@ def main(argv: list[str] | None = None) -> int:
         print(warning, file=sys.stderr)
 
     runner = Runner()
-    show_thinking = resolve_show_thinking(parsed, config)
     sanitize_osc = resolve_sanitize_osc(parsed, config)
     forward_unknown_json = parsed.forward_unknown_json
     human_tty = resolve_human_tty(
@@ -189,6 +208,36 @@ def main(argv: list[str] | None = None) -> int:
         os.environ.get("FORCE_COLOR"),
         os.environ.get("NO_COLOR"),
     )
+
+    if text_mode_with_visible_work:
+        renderer = FormattedRenderer(show_thinking=show_thinking, tty=human_tty)
+        processor = StructuredStreamProcessor(output_plan.schema or "", renderer)
+        stderr_filter = _HumanStderrFilter(output_plan.runner_name)
+        result = runner.stream(
+            spec,
+            lambda channel, chunk: _handle_structured_chunk(
+                channel,
+                chunk,
+                processor,
+                False,
+                stderr_filter,
+                sanitize_osc,
+            ),
+        )
+        trailing = processor.finish()
+        if trailing:
+            print(_sanitize_human_output(trailing, sanitize_osc))
+        trailing_stderr = stderr_filter.finish()
+        if trailing_stderr:
+            print(
+                _sanitize_human_output(trailing_stderr, sanitize_osc),
+                end="",
+                file=sys.stderr,
+            )
+        _print_cleanup_warnings(
+            parsed.cleanup_session, output_plan.runner_name, spec, result
+        )
+        return result.exit_code
 
     if output_plan.mode == "json":
         result = runner.run(spec)
@@ -289,7 +338,9 @@ def main(argv: list[str] | None = None) -> int:
 
 def _add_alias_command(args: list[str]) -> int:
     try:
-        global_only, name, alias, unset_fields, yes, replace = _parse_add_alias_args(args)
+        global_only, name, alias, unset_fields, yes, replace = _parse_add_alias_args(
+            args
+        )
         config_path = find_alias_write_path(global_only=global_only)
         current_config = load_config(config_path) if config_path.exists() else None
         current_alias = current_config.aliases.get(name) if current_config else None
@@ -308,7 +359,9 @@ def _add_alias_command(args: list[str]) -> int:
             final_alias = alias
 
         if not yes:
-            final_alias = _prompt_alias_fields(final_alias, keep_current=current_alias is not None and mode == "modify")
+            final_alias = _prompt_alias_fields(
+                final_alias, keep_current=current_alias is not None and mode == "modify"
+            )
             print(render_alias_block(name, final_alias), end="")
             if not _confirm("Write this alias?"):
                 print(f"Cancelled; alias @{name} unchanged")
@@ -325,7 +378,9 @@ def _add_alias_command(args: list[str]) -> int:
         return 1
 
 
-def _parse_add_alias_args(args: list[str]) -> tuple[bool, str, AliasDef, set[str], bool, bool]:
+def _parse_add_alias_args(
+    args: list[str],
+) -> tuple[bool, str, AliasDef, set[str], bool, bool]:
     global_only = False
     yes = False
     replace = False
@@ -363,7 +418,9 @@ def _parse_add_alias_args(args: list[str]) -> tuple[bool, str, AliasDef, set[str
         raise ValueError("usage: ccc add [-g] <alias> [alias options]")
     for field in unset_fields:
         if getattr(alias, field) is not None:
-            raise ValueError(f"--unset {field} conflicts with --{field.replace('_', '-')}")
+            raise ValueError(
+                f"--unset {field} conflicts with --{field.replace('_', '-')}"
+            )
     return global_only, name, alias, unset_fields, yes, replace
 
 
@@ -379,8 +436,17 @@ def _set_alias_field(alias: AliasDef, field: str, value: str) -> None:
     if field == "thinking":
         alias.thinking = _parse_add_thinking(value)
     elif field == "output_mode":
-        if value not in {"text", "stream-text", "json", "stream-json", "formatted", "stream-formatted"}:
-            raise ValueError("output_mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted")
+        if value not in {
+            "text",
+            "stream-text",
+            "json",
+            "stream-json",
+            "formatted",
+            "stream-formatted",
+        }:
+            raise ValueError(
+                "output_mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted"
+            )
         alias.output_mode = value
     elif field == "prompt_mode":
         if value not in {"default", "prepend", "append"}:
@@ -399,7 +465,9 @@ def _parse_add_thinking(value: str) -> int:
     try:
         parsed = int(value)
     except ValueError as exc:
-        raise ValueError("thinking must be 0, 1, 2, 3, 4, none, low, medium, high, max, or xhigh") from exc
+        raise ValueError(
+            "thinking must be 0, 1, 2, 3, 4, none, low, medium, high, max, or xhigh"
+        ) from exc
     if parsed not in {0, 1, 2, 3, 4}:
         raise ValueError("thinking must be 0, 1, 2, 3, or 4")
     return parsed
@@ -479,7 +547,10 @@ def _prompt_alias_fields(alias: AliasDef, keep_current: bool) -> AliasDef:
                 label,
                 suffix,
                 [("unset", "u", None, {"unset", "default"})]
-                + [(mode, _mode_key(mode), mode, {mode}) for mode in OUTPUT_MODE_CHOICES],
+                + [
+                    (mode, _mode_key(mode), mode, {mode})
+                    for mode in OUTPUT_MODE_CHOICES
+                ],
             )
             if choice is not _KEEP_CURRENT:
                 result.output_mode = choice
@@ -548,7 +619,9 @@ def _mode_key(mode: str) -> str:
     }.get(mode, mode[0])
 
 
-def _choose_optional_field(label: str, suffix: str, choices: list[tuple[str, str, object, set[str]]]) -> object:
+def _choose_optional_field(
+    label: str, suffix: str, choices: list[tuple[str, str, object, set[str]]]
+) -> object:
     return _choose(f"{label}{suffix}", choices, default=None, blank_value=_KEEP_CURRENT)
 
 
@@ -567,10 +640,7 @@ def _choose(
     default: int | None,
     blank_value: object | None = None,
 ) -> object:
-    markers = ", ".join(
-        _choice_marker(key, label)
-        for label, key, _, _ in choices
-    )
+    markers = ", ".join(_choice_marker(key, label) for label, key, _, _ in choices)
     while True:
         color = _menu_color_enabled()
         if default is not None:
@@ -579,13 +649,17 @@ def _choose(
             default_label = "keep"
         else:
             default_label = "none"
-        answer = input(
-            f"{_menu_style(prompt, '1;36', color)} "
-            f"{_menu_style(f'(1-{len(choices)})', '2', color)}: \n"
-            f"{_menu_style(f'  {markers}', '32', color)}\n"
-            f"  {_menu_style('default', '2', color)} {_menu_style(default_label, '33', color)} | "
-            f"{_menu_style('choice >', '1;36', color)} "
-        ).strip().lower()
+        answer = (
+            input(
+                f"{_menu_style(prompt, '1;36', color)} "
+                f"{_menu_style(f'(1-{len(choices)})', '2', color)}: \n"
+                f"{_menu_style(f'  {markers}', '32', color)}\n"
+                f"  {_menu_style('default', '2', color)} {_menu_style(default_label, '33', color)} | "
+                f"{_menu_style('choice >', '1;36', color)} "
+            )
+            .strip()
+            .lower()
+        )
         if answer == "":
             if default is not None:
                 return choices[default - 1][2]
@@ -594,10 +668,16 @@ def _choose(
             accepted = {str(index), label, key, *aliases}
             if answer in accepted:
                 return value
-        print(_menu_style("Please choose one of: ", "31", color) + ", ".join(str(index) for index in range(1, len(choices) + 1)) + ".")
+        print(
+            _menu_style("Please choose one of: ", "31", color)
+            + ", ".join(str(index) for index in range(1, len(choices) + 1))
+            + "."
+        )
 
 
-def _merge_alias(current: AliasDef, overlay: AliasDef, unset_fields: set[str]) -> AliasDef:
+def _merge_alias(
+    current: AliasDef, overlay: AliasDef, unset_fields: set[str]
+) -> AliasDef:
     result = AliasDef(**{field: getattr(current, field) for field in ALIAS_FIELDS})
     for field in ALIAS_FIELDS:
         value = getattr(overlay, field)

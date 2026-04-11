@@ -103,6 +103,8 @@ static SubprocessResult run_ccc(const fs::path& ccc_bin,
         ::close(stdout_pipe[0]); ::close(stdout_pipe[1]);
         ::close(stderr_pipe[0]); ::close(stderr_pipe[1]);
 
+        // Unset CCC_REAL_OPENCODE by default to prevent interference from previous tests
+        ::unsetenv("CCC_REAL_OPENCODE");
         for (const auto& [k, v] : extra_env) {
             ::setenv(k.c_str(), v.c_str(), 1);
         }

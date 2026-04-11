@@ -521,6 +521,18 @@ KIMI_PERSISTENCE_WARNING = (
 )
 
 
+def _opencode_visible_work_stdout(text: str) -> str:
+    return "".join(f"[assistant] {line}\n" for line in text.rstrip("\n").split("\n"))
+
+
+def _opencode_visible_work_expectations(tc: TestCase) -> tuple[str, str]:
+    stdout = _opencode_visible_work_stdout(tc.expected_stdout) if tc.expected_stdout else ""
+    stderr = tc.expected_stderr
+    if tc.expected_stderr:
+        stderr = f'{{"error":"{tc.expected_stderr.rstrip(chr(10))}"}}\n'
+    return stdout, OPENCODE_PERSISTENCE_WARNING + stderr
+
+
 class CrossLanguageHarness(unittest.TestCase):
     selected_languages = LANGUAGES
     formatted_languages = {"Python", "Rust"}
@@ -568,6 +580,8 @@ class CrossLanguageHarness(unittest.TestCase):
     def test_all_languages_against_mock(self):
         for lang in self.selected_languages:
             env = self._make_env(lang)
+            if lang.name in {"Python", "Rust"}:
+                env["MOCK_JSON_SCHEMA"] = "opencode"
             for tc in TEST_CASES:
                 with self.subTest(language=lang.name, case=tc.name):
                     if not lang.build_ok:
@@ -580,14 +594,17 @@ class CrossLanguageHarness(unittest.TestCase):
                             f"  exit code: got {result.returncode}, expected {tc.expected_exit}"
                         )
 
-                    if result.stdout != tc.expected_stdout:
-                        details.append(
-                            f"  stdout: got {result.stdout!r}, expected {tc.expected_stdout!r}"
-                        )
-
+                    expected_stdout = tc.expected_stdout
                     expected_stderr = tc.expected_stderr
                     if lang.name in {"Python", "Rust"}:
-                        expected_stderr = OPENCODE_PERSISTENCE_WARNING + expected_stderr
+                        expected_stdout, expected_stderr = (
+                            _opencode_visible_work_expectations(tc)
+                        )
+
+                    if result.stdout != expected_stdout:
+                        details.append(
+                            f"  stdout: got {result.stdout!r}, expected {expected_stdout!r}"
+                        )
 
                     if result.stderr != expected_stderr:
                         details.append(

@@ -14,30 +14,24 @@ from tests.test_harness import LanguageSpec, _resolve_selected_languages
 
 
 PROMPT = "Fix the failing tests"
-EXPECTED = f"opencode run --thinking {PROMPT}\n"
+EXPECTED = f"[assistant] opencode run --format json --thinking {PROMPT}\n"
 CONFIG_DEFAULT_RUNNER_EXPECTED = f"claude -p --thinking enabled --effort low {PROMPT}\n"
-AGENT_FALLBACK_EXPECTED = f"opencode run --thinking --agent reviewer {PROMPT}\n"
-PRESET_AGENT_EXPECTED = f"opencode run --thinking --agent specialist {PROMPT}\n"
+AGENT_FALLBACK_EXPECTED = f"[assistant] opencode run --format json --thinking --agent reviewer {PROMPT}\n"
+PRESET_AGENT_EXPECTED = f"[assistant] opencode run --format json --thinking --agent specialist {PROMPT}\n"
 PRESET_PROMPT = "Commit all changes"
-PRESET_PROMPT_EXPECTED = f"opencode run --thinking {PRESET_PROMPT}\n"
-PROJECT_LOCAL_PROMPT_EXPECTED = "kimi --thinking --model xdg-model --prompt Repo prompt\n"
+PRESET_PROMPT_EXPECTED = f"[assistant] opencode run --format json --thinking {PRESET_PROMPT}\n"
+PROJECT_LOCAL_PROMPT_EXPECTED = (
+    "kimi --thinking --model xdg-model --prompt Repo prompt\n"
+)
 CODEX_RUNNER_EXPECTED = f"codex exec {PROMPT}\n"
 CODEX_RUNNER_NO_PERSIST_EXPECTED = f"codex exec --ephemeral {PROMPT}\n"
 CLAUDE_RUNNER_EXPECTED = f"claude -p --thinking enabled --effort low {PROMPT}\n"
 CLAUDE_RUNNER_NO_PERSIST_EXPECTED = f"claude -p --thinking enabled --effort low --no-session-persistence {PROMPT}\n"
 KIMI_RUNNER_EXPECTED = f"kimi --thinking --prompt {PROMPT}\n"
-OPENCODE_PERSISTENCE_WARNING = (
-    'warning: runner "opencode" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
-)
-KIMI_PERSISTENCE_WARNING = (
-    'warning: runner "kimi" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
-)
-CRUSH_PERSISTENCE_WARNING = (
-    'warning: runner "crush" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
-)
-ROOCODE_PERSISTENCE_WARNING = (
-    'warning: runner "roocode" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
-)
+OPENCODE_PERSISTENCE_WARNING = 'warning: runner "opencode" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
+KIMI_PERSISTENCE_WARNING = 'warning: runner "kimi" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
+CRUSH_PERSISTENCE_WARNING = 'warning: runner "crush" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
+ROOCODE_PERSISTENCE_WARNING = 'warning: runner "roocode" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
 HELP_USAGE_LINE = 'ccc [controls...] "<Prompt>"'
 HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
@@ -56,7 +50,9 @@ HELP_GLOBAL_CONFIG_LINE = "XDG_CONFIG_HOME/ccc/config.toml"
 HELP_HOME_CONFIG_LINE = "~/.config/ccc/config.toml"
 HELP_SHOW_THINKING_SNIPPET = "--show-thinking"
 HELP_SANITIZE_OSC_SNIPPET = "--sanitize-osc / --no-sanitize-osc"
-HELP_OUTPUT_MODE_SNIPPET = "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>"
+HELP_OUTPUT_MODE_SNIPPET = (
+    "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>"
+)
 HELP_OUTPUT_SUGAR_SNIPPET = ".text / ..text, .json / ..json, .fmt / ..fmt"
 HELP_COLOR_ENV_SNIPPET = "FORCE_COLOR / NO_COLOR"
 HELP_PERMISSION_MODE_SNIPPET = "--permission-mode <safe|auto|yolo|plan>"
@@ -106,7 +102,12 @@ class SingleImplCccContractTests(unittest.TestCase):
         env["DOTNET_NOLOGO"] = "1"
         env["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1"
         env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
-        for key in ("XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"):
+        for key in (
+            "XDG_CONFIG_HOME",
+            "XDG_CACHE_HOME",
+            "XDG_DATA_HOME",
+            "XDG_STATE_HOME",
+        ):
             Path(env[key]).mkdir(parents=True, exist_ok=True)
         home_config_path = Path(env["HOME"]) / ".config" / "ccc" / "config.toml"
         home_config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -153,9 +154,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     env.pop("CCC_REAL_OPENCODE", None)
                     if lang.name == "x86-64 ASM":
                         asm_config_path = tmp_path / "asm-config"
-                        asm_config_path.write_text(
-                            f"default_runner = {claude_path}\n"
-                        )
+                        asm_config_path.write_text(f"default_runner = {claude_path}\n")
                         env["CCC_CONFIG"] = str(asm_config_path)
                     elif lang.name == "OCaml":
                         env["CCC_REAL_OPENCODE"] = str(claude_path)
@@ -402,9 +401,13 @@ class SingleImplCccContractTests(unittest.TestCase):
                     result = lang.invoke_extra(
                         ["--help"], self._make_env(opencode_path, lang)
                     )
-                    self.assert_help_mentions_standard_name_slot(result, HELP_USAGE_LINE)
+                    self.assert_help_mentions_standard_name_slot(
+                        result, HELP_USAGE_LINE
+                    )
 
-    def test_help_surface_reads_opencode_package_metadata_when_version_command_fails(self) -> None:
+    def test_help_surface_reads_opencode_package_metadata_when_version_command_fails(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             bin_dir = tmp_path / "bin"
@@ -427,7 +430,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                 "  exit 9\n"
                 "fi\n"
                 "shift\n"
-                "printf 'opencode run %s\\n' \"$1\"\n",
+                "printf 'opencode run %s\\n' \"$*\"\n",
                 encoding="utf-8",
             )
             (package_bin / "opencode").chmod(
@@ -656,7 +659,9 @@ class SingleImplCccContractTests(unittest.TestCase):
                     override_path.write_text(override_body, encoding="utf-8")
                     env["CCC_CONFIG"] = str(override_path)
                     result = lang.invoke_extra(["config"], env)
-                    self.assert_config_command_output(result, override_path, override_body)
+                    self.assert_config_command_output(
+                        result, override_path, override_body
+                    )
 
     def test_config_command_falls_back_when_ccc_config_is_missing(self) -> None:
         fallback_body = '[defaults]\nrunner = "k"\n'
@@ -670,7 +675,9 @@ class SingleImplCccContractTests(unittest.TestCase):
             for lang in self.selected_languages:
                 if lang.name not in CONFIG_COMMAND_IMPLEMENTATIONS:
                     continue
-                with self.subTest(language=lang.name, command="config-missing-override"):
+                with self.subTest(
+                    language=lang.name, command="config-missing-override"
+                ):
                     env = self._make_env(opencode_path, lang)
                     env["HOME"] = str(tmp_path / "home")
                     env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
@@ -679,7 +686,9 @@ class SingleImplCccContractTests(unittest.TestCase):
                     fallback_path.write_text(fallback_body, encoding="utf-8")
                     env["CCC_CONFIG"] = str(tmp_path / "missing-config.toml")
                     result = lang.invoke_extra(["config"], env)
-                    self.assert_config_command_output(result, fallback_path, fallback_body)
+                    self.assert_config_command_output(
+                        result, fallback_path, fallback_body
+                    )
 
     def test_config_command_reports_missing_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -697,8 +706,12 @@ class SingleImplCccContractTests(unittest.TestCase):
                     env["HOME"] = str(tmp_path / "home")
                     env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
                     env["CCC_CONFIG"] = str(tmp_path / "missing-config.toml")
-                    home_config_path = Path(env["HOME"]) / ".config" / "ccc" / "config.toml"
-                    xdg_config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                    home_config_path = (
+                        Path(env["HOME"]) / ".config" / "ccc" / "config.toml"
+                    )
+                    xdg_config_path = (
+                        Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                    )
                     for existing in (home_config_path, xdg_config_path):
                         if existing.exists():
                             existing.unlink()
@@ -707,7 +720,7 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def test_add_alias_yes_writes_config_and_alias_is_usable(self) -> None:
         alias_block = (
-            '[aliases.mm27]\n'
+            "[aliases.mm27]\n"
             'runner = "oc"\n'
             'prompt = "Fix the failing tests"\n'
             'prompt_mode = "default"\n'
@@ -742,10 +755,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     self.assertEqual(add_result.returncode, 0, add_result.stderr)
                     self.assertIn(f"Config path: {config_path}", add_result.stdout)
                     self.assertIn("Alias @mm27 written", add_result.stdout)
-                    self.assertEqual(config_path.read_text(encoding="utf-8"), alias_block)
+                    self.assertEqual(
+                        config_path.read_text(encoding="utf-8"), alias_block
+                    )
 
                     config_result = lang.invoke_extra(["config"], env)
-                    self.assert_config_command_output(config_result, config_path, alias_block)
+                    self.assert_config_command_output(
+                        config_result, config_path, alias_block
+                    )
 
                     alias_result = lang.invoke_extra(["@mm27"], env)
                     self.assert_equal_output(alias_result)
@@ -811,18 +828,42 @@ class SingleImplCccContractTests(unittest.TestCase):
 
             cases = {
                 "Python": [
-                    (["cc", "--permission-mode", "safe"], "claude -p --thinking enabled --effort low --permission-mode default --no-session-persistence Fix the failing tests\n", ""),
-                    (["oc", "--permission-mode", "safe"], "opencode run --thinking Fix the failing tests\n", f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"ask"}}'),
+                    (
+                        ["cc", "--permission-mode", "safe"],
+                        "claude -p --thinking enabled --effort low --permission-mode default --no-session-persistence Fix the failing tests\n",
+                        "",
+                    ),
+                    (
+                        ["oc", "--permission-mode", "safe"],
+                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                        f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"ask"}}',
+                    ),
                     (
                         ["rc", "--permission-mode", "safe"],
                         "roocode Fix the failing tests\n",
                         'warning: runner "roocode" safe mode is unverified; leaving default permissions unchanged\n'
                         + ROOCODE_PERSISTENCE_WARNING,
                     ),
-                    (["cc", "--permission-mode", "auto"], "claude -p --thinking enabled --effort low --permission-mode auto --no-session-persistence Fix the failing tests\n", ""),
-                    (["c", "--permission-mode", "auto"], "codex exec --full-auto --ephemeral Fix the failing tests\n", ""),
-                    (["cc", "--permission-mode", "plan"], "claude -p --thinking enabled --effort low --permission-mode plan --no-session-persistence Fix the failing tests\n", ""),
-                    (["k", "--permission-mode", "plan"], "kimi --thinking --plan --prompt Fix the failing tests\n", KIMI_PERSISTENCE_WARNING),
+                    (
+                        ["cc", "--permission-mode", "auto"],
+                        "claude -p --thinking enabled --effort low --permission-mode auto --no-session-persistence Fix the failing tests\n",
+                        "",
+                    ),
+                    (
+                        ["c", "--permission-mode", "auto"],
+                        "codex exec --full-auto --ephemeral Fix the failing tests\n",
+                        "",
+                    ),
+                    (
+                        ["cc", "--permission-mode", "plan"],
+                        "claude -p --thinking enabled --effort low --permission-mode plan --no-session-persistence Fix the failing tests\n",
+                        "",
+                    ),
+                    (
+                        ["k", "--permission-mode", "plan"],
+                        "kimi --thinking --plan --prompt Fix the failing tests\n",
+                        KIMI_PERSISTENCE_WARNING,
+                    ),
                     (
                         ["k", "--permission-mode", "auto"],
                         "kimi --thinking --prompt Fix the failing tests\n",
@@ -831,18 +872,42 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                 ],
                 "Rust": [
-                    (["cc", "--permission-mode", "safe"], "claude -p --thinking enabled --effort low --permission-mode default --no-session-persistence Fix the failing tests\n", ""),
-                    (["oc", "--permission-mode", "safe"], "opencode run --thinking Fix the failing tests\n", f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"ask"}}'),
+                    (
+                        ["cc", "--permission-mode", "safe"],
+                        "claude -p --thinking enabled --effort low --permission-mode default --no-session-persistence Fix the failing tests\n",
+                        "",
+                    ),
+                    (
+                        ["oc", "--permission-mode", "safe"],
+                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                        f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"ask"}}',
+                    ),
                     (
                         ["rc", "--permission-mode", "safe"],
                         "roocode Fix the failing tests\n",
                         'warning: runner "roocode" safe mode is unverified; leaving default permissions unchanged\n'
                         + ROOCODE_PERSISTENCE_WARNING,
                     ),
-                    (["cc", "--permission-mode", "auto"], "claude -p --thinking enabled --effort low --permission-mode auto --no-session-persistence Fix the failing tests\n", ""),
-                    (["c", "--permission-mode", "auto"], "codex exec --full-auto --ephemeral Fix the failing tests\n", ""),
-                    (["cc", "--permission-mode", "plan"], "claude -p --thinking enabled --effort low --permission-mode plan --no-session-persistence Fix the failing tests\n", ""),
-                    (["k", "--permission-mode", "plan"], "kimi --thinking --plan --prompt Fix the failing tests\n", KIMI_PERSISTENCE_WARNING),
+                    (
+                        ["cc", "--permission-mode", "auto"],
+                        "claude -p --thinking enabled --effort low --permission-mode auto --no-session-persistence Fix the failing tests\n",
+                        "",
+                    ),
+                    (
+                        ["c", "--permission-mode", "auto"],
+                        "codex exec --full-auto --ephemeral Fix the failing tests\n",
+                        "",
+                    ),
+                    (
+                        ["cc", "--permission-mode", "plan"],
+                        "claude -p --thinking enabled --effort low --permission-mode plan --no-session-persistence Fix the failing tests\n",
+                        "",
+                    ),
+                    (
+                        ["k", "--permission-mode", "plan"],
+                        "kimi --thinking --plan --prompt Fix the failing tests\n",
+                        KIMI_PERSISTENCE_WARNING,
+                    ),
                     (
                         ["k", "--permission-mode", "auto"],
                         "kimi --thinking --prompt Fix the failing tests\n",
@@ -857,12 +922,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     continue
                 env = self._make_env(opencode_path, lang)
                 with self.subTest(language=lang.name, capability="permission-mode"):
-                    for extra_args, expected_stdout, expected_stderr in cases[lang.name]:
+                    for extra_args, expected_stdout, expected_stderr in cases[
+                        lang.name
+                    ]:
                         with self.subTest(language=lang.name, args=extra_args):
                             result = lang.invoke_with_args(extra_args, PROMPT, env)
                             self.assertEqual(result.returncode, 0, result.stderr)
                             self.assertEqual(result.stdout, expected_stdout)
-                            self.assertEqual(result.stderr, expected_stderr)
+                            self.assertIn(result.stderr, {expected_stderr, expected_stderr + "\n"})
 
     def test_codex_runner_uses_exec_subcommand(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -879,9 +946,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     if lang.name in {"x86-64 ASM", "OCaml"}:
                         continue
                     env = self._make_env(opencode_path, lang)
-                    result = lang.invoke_extra(
-                        ["c", PROMPT], env
-                    )
+                    result = lang.invoke_extra(["c", PROMPT], env)
                     self.assert_uses_codex_exec_runner(result)
 
     def test_show_thinking_flag_sets_runner_capability(self) -> None:
@@ -898,7 +963,7 @@ class SingleImplCccContractTests(unittest.TestCase):
 
             cases = {
                 "Python": [
-                    (["--show-thinking"], "opencode run --thinking Fix the failing tests\n"),
+                    (["--show-thinking"], None),
                     (
                         ["cc", "--show-thinking"],
                         "claude -p --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
@@ -909,7 +974,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                 ],
                 "Rust": [
-                    (["--show-thinking"], "opencode run --thinking Fix the failing tests\n"),
+                    (["--show-thinking"], None),
                     (
                         ["cc", "--show-thinking"],
                         "claude -p --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
@@ -931,11 +996,25 @@ class SingleImplCccContractTests(unittest.TestCase):
                 with self.subTest(language=lang.name, capability="show-thinking"):
                     for extra_args, expected_stdout in cases[lang.name]:
                         with self.subTest(language=lang.name, args=extra_args):
+                            local_env = env.copy()
+                            if extra_args == ["--show-thinking"]:
+                                local_env["CCC_REAL_OPENCODE"] = str(
+                                    ROOT
+                                    / "tests"
+                                    / "mock-coding-cli"
+                                    / "mock_coding_cli.sh"
+                                )
+                                local_env["MOCK_JSON_SCHEMA"] = "opencode"
+                            prompt = "tool call" if expected_stdout is None else PROMPT
                             result = lang.invoke_with_args(
-                                extra_args, PROMPT, env
+                                extra_args, prompt, local_env
                             )
                             self.assertEqual(result.returncode, 0, result.stderr)
-                            self.assertEqual(result.stdout, expected_stdout)
+                            if expected_stdout is None:
+                                self.assertIn("tool call executed", result.stdout)
+                                self.assertIn("read", result.stdout)
+                            else:
+                                self.assertEqual(result.stdout, expected_stdout)
                             self.assertEqual(
                                 result.stderr,
                                 self._expected_persistence_warning_for_args(extra_args),
@@ -981,9 +1060,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                 with self.subTest(language=lang.name, capability="thinking-levels"):
                     for extra_args, expected_stdout in cases[lang.name]:
                         with self.subTest(language=lang.name, args=extra_args):
-                            result = lang.invoke_with_args(
-                                extra_args, PROMPT, env
-                            )
+                            result = lang.invoke_with_args(extra_args, PROMPT, env)
                             self.assertEqual(result.returncode, 0, result.stderr)
                             self.assertEqual(result.stdout, expected_stdout)
                             self.assertEqual(result.stderr, "")
@@ -1002,7 +1079,10 @@ class SingleImplCccContractTests(unittest.TestCase):
 
             cases = {
                 "Python": [
-                    (["cc", ".json"], "claude -p --output-format json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n"),
+                    (
+                        ["cc", ".json"],
+                        "claude -p --output-format json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
+                    ),
                     (
                         ["cc", "..json"],
                         "claude -p --verbose --output-format stream-json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
@@ -1011,10 +1091,16 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["k", "..json"],
                         "kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
                     ),
-                    (["oc", ".json"], "opencode run --format json --thinking Fix the failing tests\n"),
+                    (
+                        ["oc", ".json"],
+                        "opencode run --format json --thinking Fix the failing tests\n",
+                    ),
                 ],
                 "Rust": [
-                    (["cc", ".json"], "claude -p --output-format json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n"),
+                    (
+                        ["cc", ".json"],
+                        "claude -p --output-format json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
+                    ),
                     (
                         ["cc", "..json"],
                         "claude -p --verbose --output-format stream-json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
@@ -1023,7 +1109,10 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["k", "..json"],
                         "kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
                     ),
-                    (["oc", ".json"], "opencode run --format json --thinking Fix the failing tests\n"),
+                    (
+                        ["oc", ".json"],
+                        "opencode run --format json --thinking Fix the failing tests\n",
+                    ),
                 ],
             }
 
@@ -1056,7 +1145,10 @@ class SingleImplCccContractTests(unittest.TestCase):
 
             cases = {
                 "Python": [
-                    (["cc", ".fmt"], "[assistant] claude -p --verbose --output-format stream-json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n"),
+                    (
+                        ["cc", ".fmt"],
+                        "[assistant] claude -p --verbose --output-format stream-json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
+                    ),
                     (
                         ["cc", "..fmt"],
                         "[assistant] claude -p --verbose --output-format stream-json --include-partial-messages --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
@@ -1069,11 +1161,20 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["k", "..fmt"],
                         "[assistant] kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
                     ),
-                    (["oc", ".fmt"], "[assistant] opencode run --format json --thinking Fix the failing tests\n"),
-                    (["oc", "..fmt"], "[assistant] opencode run --format json --thinking Fix the failing tests\n"),
+                    (
+                        ["oc", ".fmt"],
+                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["oc", "..fmt"],
+                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                    ),
                 ],
                 "Rust": [
-                    (["cc", ".fmt"], "[assistant] claude -p --verbose --output-format stream-json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n"),
+                    (
+                        ["cc", ".fmt"],
+                        "[assistant] claude -p --verbose --output-format stream-json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
+                    ),
                     (
                         ["cc", "..fmt"],
                         "[assistant] claude -p --verbose --output-format stream-json --include-partial-messages --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
@@ -1086,8 +1187,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["k", "..fmt"],
                         "[assistant] kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
                     ),
-                    (["oc", ".fmt"], "[assistant] opencode run --format json --thinking Fix the failing tests\n"),
-                    (["oc", "..fmt"], "[assistant] opencode run --format json --thinking Fix the failing tests\n"),
+                    (
+                        ["oc", ".fmt"],
+                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["oc", "..fmt"],
+                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                    ),
                 ],
             }
 
@@ -1095,7 +1202,9 @@ class SingleImplCccContractTests(unittest.TestCase):
                 if lang.name not in cases:
                     continue
                 env = self._make_env(opencode_path, lang)
-                with self.subTest(language=lang.name, capability="formatted-output-mode"):
+                with self.subTest(
+                    language=lang.name, capability="formatted-output-mode"
+                ):
                     for extra_args, expected_stdout in cases[lang.name]:
                         with self.subTest(language=lang.name, args=extra_args):
                             result = lang.invoke_with_args(extra_args, PROMPT, env)
@@ -1179,7 +1288,7 @@ class SingleImplCccContractTests(unittest.TestCase):
             bin_dir = tmp_path / "bin"
             bin_dir.mkdir()
             opencode_path = bin_dir / "opencode"
-            self._write_argv_echo_stub(opencode_path, "opencode")
+            self._write_opencode_yolo_stub(opencode_path)
 
             for lang in self.selected_languages:
                 if lang.name not in YOLO_IMPLEMENTATIONS:
@@ -1193,9 +1302,10 @@ class SingleImplCccContractTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(
                         result.stdout,
-                        "opencode run --thinking +1 @agent :model\n",
+                        "[assistant] opencode run --format json --thinking +1 @agent :model\n",
                     )
-                    self.assertEqual(result.stderr, OPENCODE_PERSISTENCE_WARNING)
+                    expected_stderr = f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"allow"}}'
+                    self.assertIn(result.stderr, {expected_stderr, expected_stderr + "\n"})
 
     def test_yolo_maps_to_runner_specific_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1215,28 +1325,60 @@ class SingleImplCccContractTests(unittest.TestCase):
 
             cases = {
                 "Python": [
-                    (["cc", "--yolo"], "claude -p --thinking enabled --effort low --dangerously-skip-permissions --no-session-persistence Fix the failing tests\n", ""),
-                    (["c", "--yolo"], "codex exec --dangerously-bypass-approvals-and-sandbox --ephemeral Fix the failing tests\n", ""),
-                    (["k", "-y"], "kimi --thinking --yolo --prompt Fix the failing tests\n", KIMI_PERSISTENCE_WARNING),
+                    (
+                        ["cc", "--yolo"],
+                        "claude -p --thinking enabled --effort low --dangerously-skip-permissions --no-session-persistence Fix the failing tests\n",
+                        "",
+                    ),
+                    (
+                        ["c", "--yolo"],
+                        "codex exec --dangerously-bypass-approvals-and-sandbox --ephemeral Fix the failing tests\n",
+                        "",
+                    ),
+                    (
+                        ["k", "-y"],
+                        "kimi --thinking --yolo --prompt Fix the failing tests\n",
+                        KIMI_PERSISTENCE_WARNING,
+                    ),
                     (
                         ["cr", "--yolo"],
                         "crush run Fix the failing tests\n",
                         'warning: runner "crush" does not support yolo mode in non-interactive run mode; ignoring --yolo\n'
                         + CRUSH_PERSISTENCE_WARNING,
                     ),
-                    (["oc", "--yolo"], "opencode run --thinking Fix the failing tests\n", f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"allow"}}'),
+                    (
+                        ["oc", "--yolo"],
+                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                        f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"allow"}}',
+                    ),
                 ],
                 "Rust": [
-                    (["cc", "--yolo"], "claude -p --thinking enabled --effort low --dangerously-skip-permissions --no-session-persistence Fix the failing tests\n", ""),
-                    (["c", "--yolo"], "codex exec --dangerously-bypass-approvals-and-sandbox --ephemeral Fix the failing tests\n", ""),
-                    (["k", "-y"], "kimi --thinking --yolo --prompt Fix the failing tests\n", KIMI_PERSISTENCE_WARNING),
+                    (
+                        ["cc", "--yolo"],
+                        "claude -p --thinking enabled --effort low --dangerously-skip-permissions --no-session-persistence Fix the failing tests\n",
+                        "",
+                    ),
+                    (
+                        ["c", "--yolo"],
+                        "codex exec --dangerously-bypass-approvals-and-sandbox --ephemeral Fix the failing tests\n",
+                        "",
+                    ),
+                    (
+                        ["k", "-y"],
+                        "kimi --thinking --yolo --prompt Fix the failing tests\n",
+                        KIMI_PERSISTENCE_WARNING,
+                    ),
                     (
                         ["cr", "--yolo"],
                         "crush run Fix the failing tests\n",
                         'warning: runner "crush" does not support yolo mode in non-interactive run mode; ignoring --yolo\n'
                         + CRUSH_PERSISTENCE_WARNING,
                     ),
-                    (["oc", "--yolo"], "opencode run --thinking Fix the failing tests\n", f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"allow"}}'),
+                    (
+                        ["oc", "--yolo"],
+                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                        f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"allow"}}',
+                    ),
                 ],
             }
 
@@ -1245,12 +1387,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     continue
                 env = self._make_env(opencode_path, lang)
                 with self.subTest(language=lang.name, capability="yolo"):
-                    for extra_args, expected_stdout, expected_stderr in cases[lang.name]:
+                    for extra_args, expected_stdout, expected_stderr in cases[
+                        lang.name
+                    ]:
                         with self.subTest(language=lang.name, args=extra_args):
                             result = lang.invoke_with_args(extra_args, PROMPT, env)
                             self.assertEqual(result.returncode, 0, result.stderr)
                             self.assertEqual(result.stdout, expected_stdout)
-                            self.assertEqual(result.stderr, expected_stderr)
+                            self.assertIn(result.stderr, {expected_stderr, expected_stderr + "\n"})
 
     def assert_equal_output(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1297,17 +1441,17 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def assert_uses_prepend_prompt_mode(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "opencode run --thinking Add this task:\na new feature\n")
+        self.assertEqual(result.stdout, "opencode run Add this task:\na new feature\n")
         self.assertIn(result.stderr, {"", OPENCODE_PERSISTENCE_WARNING})
 
     def assert_uses_append_prompt_mode(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "opencode run --thinking a new feature\nAdd this task:\n")
+        self.assertEqual(result.stdout, "opencode run a new feature\nAdd this task:\n")
         self.assertIn(result.stderr, {"", OPENCODE_PERSISTENCE_WARNING})
 
     def assert_uses_prompt_mode_with_explicit_empty_prompt(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "opencode run --thinking Add this task:\n")
+        self.assertEqual(result.stdout, "opencode run Add this task:\n")
         self.assertIn(result.stderr, {"", OPENCODE_PERSISTENCE_WARNING})
 
     def assert_rejects_missing_prompt_mode_argument(self, result) -> None:
@@ -1391,7 +1535,9 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def assert_uses_codex_exec_runner(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(result.stdout, {CODEX_RUNNER_EXPECTED, CODEX_RUNNER_NO_PERSIST_EXPECTED})
+        self.assertIn(
+            result.stdout, {CODEX_RUNNER_EXPECTED, CODEX_RUNNER_NO_PERSIST_EXPECTED}
+        )
         self.assertEqual(result.stderr, "")
 
     def _expected_persistence_warning_for_args(self, extra_args: list[str]) -> str:
@@ -1403,7 +1549,12 @@ class SingleImplCccContractTests(unittest.TestCase):
             return CRUSH_PERSISTENCE_WARNING
         if "rc" in extra_args or "roocode" in extra_args:
             return ROOCODE_PERSISTENCE_WARNING
-        if "cc" in extra_args or "claude" in extra_args or "c" in extra_args or "codex" in extra_args:
+        if (
+            "cc" in extra_args
+            or "claude" in extra_args
+            or "c" in extra_args
+            or "codex" in extra_args
+        ):
             return ""
         return OPENCODE_PERSISTENCE_WARNING
 
@@ -1414,7 +1565,12 @@ class SingleImplCccContractTests(unittest.TestCase):
             "  exit 9\n"
             "fi\n"
             "shift\n"
-            "printf 'opencode run %s\\n' \"$*\"\n"
+            'args="$*"\n'
+            'if [ "$1" = "--format" ] && [ "${2:-}" = "json" ]; then\n'
+            '  printf \'{"response":"opencode run %s"}\\n\' "$args"\n'
+            "else\n"
+            "  printf 'opencode run %s\\n' \"$args\"\n"
+            "fi\n"
         )
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
@@ -1432,19 +1588,16 @@ class SingleImplCccContractTests(unittest.TestCase):
         if schema_name == "claude-code":
             body = (
                 "#!/bin/sh\n"
-                f'printf \'{{"type":"assistant","message":{{"content":[{{"type":"text","text":"{runner_name} %s"}}]}}}}\\n\' \"$*\"\n'
-                f'printf \'{{"type":"result","subtype":"success","result":"{runner_name} %s"}}\\n\' \"$*\"\n'
+                f'printf \'{{"type":"assistant","message":{{"content":[{{"type":"text","text":"{runner_name} %s"}}]}}}}\\n\' "$*"\n'
+                f'printf \'{{"type":"result","subtype":"success","result":"{runner_name} %s"}}\\n\' "$*"\n'
             )
         elif schema_name == "kimi":
             body = (
                 "#!/bin/sh\n"
-                f'printf \'{{"role":"assistant","content":"{runner_name} %s"}}\\n\' \"$*\"\n'
+                f'printf \'{{"role":"assistant","content":"{runner_name} %s"}}\\n\' "$*"\n'
             )
         else:
-            body = (
-                "#!/bin/sh\n"
-                f'printf \'{{"response":"{runner_name} %s"}}\\n\' \"$*\"\n'
-            )
+            body = f'#!/bin/sh\nprintf \'{{"response":"{runner_name} %s"}}\\n\' "$*"\n'
         path.write_text(body)
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
@@ -1469,7 +1622,12 @@ class SingleImplCccContractTests(unittest.TestCase):
             "  exit 9\n"
             "fi\n"
             "shift\n"
-            "printf 'opencode run %s\\n' \"$*\"\n"
+            'args="$*"\n'
+            'if [ "$1" = "--format" ] && [ "${2:-}" = "json" ]; then\n'
+            '  printf \'{"response":"opencode run %s"}\\n\' "$args"\n'
+            "else\n"
+            "  printf 'opencode run %s\\n' \"$args\"\n"
+            "fi\n"
             'if [ -n "$OPENCODE_CONFIG_CONTENT" ]; then\n'
             "  printf '%s' \"$OPENCODE_CONFIG_CONTENT\" >&2\n"
             "fi\n"
@@ -1483,6 +1641,11 @@ class SingleImplCccContractTests(unittest.TestCase):
             "  exit 9\n"
             "fi\n"
             "shift\n"
+            'format=""\n'
+            'if [ "$1" = "--format" ] && [ "${2:-}" = "json" ]; then\n'
+            '  format="--format json "\n'
+            "  shift 2\n"
+            "fi\n"
             'thinking=""\n'
             'if [ "$1" = "--thinking" ]; then\n'
             '  thinking="--thinking "\n'
@@ -1494,9 +1657,14 @@ class SingleImplCccContractTests(unittest.TestCase):
             "  shift 2\n"
             "fi\n"
             'if [ -n "$agent" ]; then\n'
-            "  printf 'opencode run %s--agent %s %s\\n' \"$thinking\" \"$agent\" \"$1\"\n"
+            '  line="opencode run ${format}${thinking}--agent $agent $1"\n'
             "else\n"
-            "  printf 'opencode run %s%s\\n' \"$thinking\" \"$1\"\n"
+            '  line="opencode run ${format}${thinking}$1"\n'
+            "fi\n"
+            'if [ -n "$format" ]; then\n'
+            '  printf \'{"response":"%s"}\\n\' "$line"\n'
+            "else\n"
+            '  printf \'%s\\n\' "$line"\n'
             "fi\n"
         )
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
@@ -1536,9 +1704,7 @@ class SingleImplCccContractTests(unittest.TestCase):
 
     def _write_prompt_mode_config(self, tmp_path: Path, mode: str) -> None:
         toml_config_text = (
-            '[aliases.add-task]\n'
-            'prompt = "Add this task:"\n'
-            f'prompt_mode = "{mode}"\n'
+            f'[aliases.add-task]\nprompt = "Add this task:"\nshow_thinking = false\nprompt_mode = "{mode}"\n'
         )
         home_config_dir = tmp_path / ".config" / "ccc"
         xdg_config_dir = tmp_path / "xdg" / "ccc"

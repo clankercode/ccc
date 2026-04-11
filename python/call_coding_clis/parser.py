@@ -36,6 +36,8 @@ class ParsedArgs:
     cleanup_session: bool = False
     yolo: bool = False
     permission_mode: str | None = None
+    allow_tool: list[str] = field(default_factory=list)
+    deny_tool: list[str] = field(default_factory=list)
     provider: str | None = None
     model: str | None = None
     alias: str | None = None
@@ -55,6 +57,8 @@ class AliasDef:
     agent: str | None = None
     prompt: str | None = None
     prompt_mode: str | None = None
+    allow_tool: list[str] = field(default_factory=list)
+    deny_tool: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -257,6 +261,18 @@ def parse_args(argv: list[str]) -> ParsedArgs:
             else:
                 parsed.permission_mode = argv[index + 1].lower()
                 parsed.yolo = parsed.permission_mode == "yolo"
+                index += 1
+        elif token == "--allow-tool":
+            if index + 1 >= len(argv):
+                parsed.allow_tool.append("")
+            else:
+                parsed.allow_tool.append(argv[index + 1])
+                index += 1
+        elif token == "--deny-tool":
+            if index + 1 >= len(argv):
+                parsed.deny_tool.append("")
+            else:
+                parsed.deny_tool.append(argv[index + 1])
                 index += 1
         elif PROVIDER_MODEL_RE.match(token):
             m = PROVIDER_MODEL_RE.match(token)

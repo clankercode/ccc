@@ -22,7 +22,7 @@ static const char* const kHelpText =
     "                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)\n"
     "  +thinking     Set thinking level: +0 (off) through +4 (max)\n"
     "  :provider:model  Override provider and model\n"
-    "  @name         Use a named preset from config; if no preset exists, treat it as an agent\n"
+    "  [@name]        Use a named preset from config; if no preset exists, treat it as an agent\n"
     "\n"
     "Examples:\n"
     "  ccc \"Fix the failing tests\"\n"
@@ -106,6 +106,6 @@ void printHelp() {
 }
 
 void printUsage() {
-    std::cerr << "usage: ccc [controls...] \"<Prompt>\"\n";
+    std::cerr << "usage: ccc [controls...] \"<Prompt>\" [@name]\n";
     std::cerr << runnerChecklist();
 }

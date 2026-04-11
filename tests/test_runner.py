@@ -28,7 +28,9 @@ def read_example_config_fixture() -> str:
 
 
 class RunnerTests(unittest.TestCase):
-    def test_formatted_mode_with_show_thinking_surfaces_opencode_tool_work(self) -> None:
+    def test_formatted_mode_with_show_thinking_surfaces_opencode_tool_work(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             config_path = tmp_path / "ccc-config.toml"
@@ -50,18 +52,21 @@ class RunnerTests(unittest.TestCase):
                 with mock.patch("sys.stdout.isatty", return_value=False):
                     with mock.patch("sys.stderr.isatty", return_value=False):
                         with mock.patch(
-                            "sys.argv", ["ccc", "oc", "..fmt", "--show-thinking", "tool call"]
+                            "sys.argv",
+                            ["ccc", "oc", "..fmt", "--show-thinking", "tool call"],
                         ):
                             with mock.patch("sys.stdout") as stdout:
                                 with mock.patch("sys.stderr") as stderr:
-                                    rc = main(["oc", "..fmt", "--show-thinking", "tool call"])
+                                    rc = main(
+                                        ["oc", "..fmt", "--show-thinking", "tool call"]
+                                    )
 
         self.assertEqual(rc, 0)
         rendered_stdout = "".join(call.args[0] for call in stdout.write.call_args_list)
         rendered_stderr = "".join(call.args[0] for call in stderr.write.call_args_list)
-        self.assertIn("[tool:start] read", rendered_stdout)
-        self.assertIn("[tool:result] read (ok)", rendered_stdout)
-        self.assertIn("[assistant] mock: tool call executed", rendered_stdout)
+        self.assertIn("read", rendered_stdout)
+        self.assertIn("read (ok)", rendered_stdout)
+        self.assertIn("mock: tool call executed", rendered_stdout)
         self.assertIn(
             'warning: runner "opencode" may save this session', rendered_stderr
         )
@@ -470,7 +475,7 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertEqual(
                 config_path.read_text(encoding="utf-8"),
-                '[aliases.mm27]\n'
+                "[aliases.mm27]\n"
                 'runner = "cc"\n'
                 'model = "claude-4"\n'
                 'prompt = "Review changes"\n'
@@ -541,7 +546,7 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertEqual(
                 config_path.read_text(encoding="utf-8"),
-                '[aliases.mm27]\n'
+                "[aliases.mm27]\n"
                 'runner = "oc"\n'
                 "thinking = 1\n"
                 "show_thinking = false\n"

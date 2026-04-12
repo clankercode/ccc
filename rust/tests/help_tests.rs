@@ -49,8 +49,9 @@ fn test_help_mentions_name_slot() {
     assert!(stdout.contains("XDG_CONFIG_HOME/ccc/config.toml"));
     assert!(stdout.contains("~/.config/ccc/config.toml"));
     assert!(stdout.contains("show_thinking"));
-    assert!(stdout
-        .contains("opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)"));
+    assert!(stdout.contains(
+        "opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu)"
+    ));
 }
 
 #[test]

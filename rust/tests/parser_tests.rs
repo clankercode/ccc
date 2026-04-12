@@ -50,6 +50,24 @@ fn test_parse_runner_selector_codex_cx() {
 }
 
 #[test]
+fn test_parse_runner_selector_cursor_and_cu() {
+    for selector in ["cursor", "cu"] {
+        let args: Vec<String> = vec![selector.into(), "fix bug".into()];
+        let parsed = parse_args(&args);
+        assert_eq!(parsed.runner.as_deref(), Some(selector));
+        assert_eq!(parsed.prompt, "fix bug");
+    }
+}
+
+#[test]
+fn test_parse_runner_selector_cr_remains_crush() {
+    let args: Vec<String> = vec!["cr".into(), "fix bug".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.runner.as_deref(), Some("cr"));
+    assert_eq!(parsed.prompt, "fix bug");
+}
+
+#[test]
 fn test_parse_thinking_level() {
     let args: Vec<String> = vec!["+2".into(), "hello".into()];
     let parsed = parse_args(&args);
@@ -458,7 +476,7 @@ fn test_resolve_cleanup_session_warning_policy() {
             .any(|warning| warning.contains("may save this session")));
     }
 
-    for (runner, display) in [("cr", "crush"), ("rc", "roocode")] {
+    for (runner, display) in [("cr", "crush"), ("rc", "roocode"), ("cu", "cursor")] {
         let parsed = ParsedArgs {
             runner: Some(runner.into()),
             cleanup_session: true,
@@ -481,6 +499,56 @@ fn test_resolve_codex_runner_via_cx() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(argv[..2], ["codex", "exec"]);
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_cursor_runner_via_cu() {
+    let parsed = ParsedArgs {
+        runner: Some("cu".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, env, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv, ["cursor-agent", "--print", "--trust", "hello"]);
+    assert!(env.is_empty());
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_cursor_runner_long_name_with_model() {
+    let parsed = ParsedArgs {
+        runner: Some("cursor".into()),
+        model: Some("gpt-5".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, env, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv,
+        [
+            "cursor-agent",
+            "--print",
+            "--trust",
+            "--model",
+            "gpt-5",
+            "hello"
+        ]
+    );
+    assert!(env.is_empty());
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_cr_still_resolves_to_crush() {
+    let parsed = ParsedArgs {
+        runner: Some("cr".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, env, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv, ["crush", "run", "hello"]);
+    assert!(env.is_empty());
     assert!(warnings.is_empty());
 }
 
@@ -1401,6 +1469,22 @@ fn test_resolve_yolo_for_roocode_warns() {
 }
 
 #[test]
+fn test_resolve_yolo_for_cursor() {
+    let parsed = ParsedArgs {
+        runner: Some("cu".into()),
+        yolo: true,
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv,
+        ["cursor-agent", "--print", "--trust", "--yolo", "hello"]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
 fn test_resolve_permission_mode_safe_for_claude() {
     let parsed = ParsedArgs {
         runner: Some("cc".into()),
@@ -1467,6 +1551,55 @@ fn test_resolve_permission_mode_safe_for_roocode_warns() {
                 .to_string()
         ]
     );
+}
+
+#[test]
+fn test_resolve_permission_modes_for_cursor() {
+    let cases = [
+        (
+            "safe",
+            vec![
+                "cursor-agent",
+                "--print",
+                "--trust",
+                "--sandbox",
+                "enabled",
+                "hello",
+            ],
+            Vec::<String>::new(),
+        ),
+        (
+            "plan",
+            vec![
+                "cursor-agent",
+                "--print",
+                "--trust",
+                "--mode",
+                "plan",
+                "hello",
+            ],
+            Vec::<String>::new(),
+        ),
+        (
+            "auto",
+            vec!["cursor-agent", "--print", "--trust", "hello"],
+            vec![
+                "warning: runner \"cu\" does not support permission mode \"auto\"; ignoring it"
+                    .to_string(),
+            ],
+        ),
+    ];
+    for (mode, expected_argv, expected_warnings) in cases {
+        let parsed = ParsedArgs {
+            runner: Some("cu".into()),
+            permission_mode: Some(mode.into()),
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+        assert_eq!(argv, expected_argv);
+        assert_eq!(warnings, expected_warnings);
+    }
 }
 
 #[test]
@@ -1684,6 +1817,44 @@ fn test_resolve_opencode_stream_json_output_plan() {
     assert!(!plan.formatted);
     assert_eq!(plan.schema.as_deref(), Some("opencode"));
     assert_eq!(plan.argv_flags, vec!["--format", "json"]);
+}
+
+#[test]
+fn test_resolve_cursor_output_plans() {
+    let cases = [
+        ("json", false, false, vec!["--output-format", "json"]),
+        (
+            "stream-json",
+            true,
+            false,
+            vec!["--output-format", "stream-json"],
+        ),
+        (
+            "formatted",
+            false,
+            true,
+            vec!["--output-format", "stream-json"],
+        ),
+        (
+            "stream-formatted",
+            true,
+            true,
+            vec!["--output-format", "stream-json"],
+        ),
+    ];
+    for (mode, stream, formatted, flags) in cases {
+        let parsed = ParsedArgs {
+            runner: Some("cu".into()),
+            output_mode: Some(mode.into()),
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let plan = resolve_output_plan(&parsed, None).unwrap();
+        assert_eq!(plan.stream, stream);
+        assert_eq!(plan.formatted, formatted);
+        assert_eq!(plan.schema.as_deref(), Some("cursor-agent"));
+        assert_eq!(plan.argv_flags, flags);
+    }
 }
 
 #[test]

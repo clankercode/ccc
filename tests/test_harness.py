@@ -554,6 +554,8 @@ class CrossLanguageHarness(unittest.TestCase):
         claude_link.symlink_to(MOCK_BIN)
         kimi_link = cls.bin_dir / "kimi"
         kimi_link.symlink_to(MOCK_BIN)
+        cursor_link = cls.bin_dir / "cursor-agent"
+        cursor_link.symlink_to(MOCK_BIN)
 
         cls.base_env = os.environ.copy()
         cls.base_env["PATH"] = f"{cls.bin_dir}:{cls.base_env.get('PATH', '')}"
@@ -665,6 +667,18 @@ class CrossLanguageHarness(unittest.TestCase):
                 "opencode",
                 ["[assistant] mock: tool call executed"],
             ),
+            (
+                ["cu", ".fmt"],
+                "tool call",
+                "cursor-agent",
+                ["[assistant] mock: tool call executed"],
+            ),
+            (
+                ["cursor", "..fmt"],
+                "tool call",
+                "cursor-agent",
+                ["[assistant] mock: tool call executed"],
+            ),
         ]
 
         for lang in self.selected_languages:
@@ -681,10 +695,12 @@ class CrossLanguageHarness(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     for fragment in expected_fragments:
                         self.assertIn(fragment, result.stdout)
-                    if lang.name in {"Python", "Rust"} and extra_args[0] in {"k", "oc"}:
+                    if lang.name in {"Python", "Rust"} and extra_args[0] in {"k", "oc", "cu", "cursor"}:
                         expected_stderr = (
                             KIMI_PERSISTENCE_WARNING
                             if extra_args[0] == "k"
+                            else 'warning: runner "cursor" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
+                            if extra_args[0] in {"cu", "cursor"}
                             else OPENCODE_PERSISTENCE_WARNING
                         )
                     else:

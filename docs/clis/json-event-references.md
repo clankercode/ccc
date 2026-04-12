@@ -105,6 +105,28 @@ Current `ccc` integration note:
 - Real smoke verification also confirms that `opencode run --format json` emits those events incrementally, so `ccc` uses that same upstream transport for both buffered `formatted` and live `stream-formatted`.
 - Real smoke verification also observed OSC terminal-title control sequences in buffered raw output, so Python and Rust now strip those sequences on the `ccc` side for OpenCode buffered raw modes.
 
+## Cursor Agent
+
+Primary reference:
+
+- Local `cursor-agent --help` verified on 2026-04-12.
+
+Relevant local CLI surface:
+
+- `cursor-agent --print --output-format text|json|stream-json`
+- `--model`
+- `--mode plan|ask`
+- `--yolo`
+- `--sandbox enabled|disabled`
+- `--trust`
+
+Current `ccc` integration note:
+
+- `ccc` uses `cursor-agent --print --trust`.
+- Real smoke verification with `--output-format json` observed a single `result` object with `type`, `subtype`, `result`, `session_id`, and token usage fields.
+- Real smoke verification with `--output-format stream-json` observed newline-delimited `system`, `user`, `assistant`, and `result` objects.
+- `ccc` does not pass `--stream-partial-output` for v1 Cursor support because local smoke verification showed duplicate assistant text events for the same final answer.
+
 ## How To Use These References
 
 When updating a parser or adding a new language implementation:

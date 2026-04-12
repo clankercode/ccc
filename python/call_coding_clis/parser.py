@@ -157,6 +157,17 @@ def _register_defaults() -> None:
         model_flag="",
         prompt_flag="",
     )
+    RUNNER_REGISTRY["cursor"] = RunnerInfo(
+        binary="cursor-agent",
+        extra_args=["--print", "--trust"],
+        no_persist_flags=[],
+        thinking_flags={},
+        show_thinking_flags={},
+        yolo_flags=["--yolo"],
+        provider_flag="",
+        model_flag="--model",
+        prompt_flag="",
+    )
 
     RUNNER_REGISTRY["oc"] = RUNNER_REGISTRY["opencode"]
     RUNNER_REGISTRY["cc"] = RUNNER_REGISTRY["claude"]
@@ -165,12 +176,13 @@ def _register_defaults() -> None:
     RUNNER_REGISTRY["k"] = RUNNER_REGISTRY["kimi"]
     RUNNER_REGISTRY["rc"] = RUNNER_REGISTRY["roocode"]
     RUNNER_REGISTRY["cr"] = RUNNER_REGISTRY["crush"]
+    RUNNER_REGISTRY["cu"] = RUNNER_REGISTRY["cursor"]
 
 
 _register_defaults()
 
 RUNNER_SELECTOR_RE = re.compile(
-    r"^(?:oc|cc|c|cx|k|rc|cr|codex|claude|opencode|kimi|roocode|crush|pi)$", re.IGNORECASE
+    r"^(?:oc|cc|c|cx|k|rc|cr|cu|codex|claude|opencode|kimi|roocode|crush|cursor|pi)$", re.IGNORECASE
 )
 THINKING_RE = re.compile(
     r"^\+(0|1|2|3|4|none|low|med|mid|medium|high|max|xhigh)$",
@@ -346,6 +358,15 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
             "formatted",
             "stream-formatted",
         }
+    if key in {"cu", "cursor"}:
+        return {
+            "text",
+            "stream-text",
+            "json",
+            "stream-json",
+            "formatted",
+            "stream-formatted",
+        }
     return {"text", "stream-text"}
 
 
@@ -461,6 +482,20 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
             schema="opencode",
             argv_flags=["--format", "json"],
         )
+    if key in {"cu", "cursor"}:
+        flags = (
+            ["--output-format", "json"]
+            if mode == "json"
+            else ["--output-format", "stream-json"]
+        )
+        return OutputPlan(
+            runner_name=effective_runner_name,
+            mode=mode,
+            stream=mode.startswith("stream-"),
+            formatted="formatted" in mode,
+            schema="cursor-agent",
+            argv_flags=flags,
+        )
     return OutputPlan(
         runner_name=effective_runner_name,
         mode=mode,
@@ -555,6 +590,8 @@ def resolve_command(
             argv.extend(["--permission-mode", "default"])
         elif effective_runner_name in {"oc", "opencode"}:
             env_overrides["OPENCODE_CONFIG_CONTENT"] = '{"permission":"ask"}'
+        elif effective_runner_name in {"cu", "cursor"}:
+            argv.extend(["--sandbox", "enabled"])
         elif effective_runner_name in {"rc", "roocode"}:
             warnings.append(
                 'warning: runner "roocode" safe mode is unverified; leaving default permissions unchanged'
@@ -586,6 +623,8 @@ def resolve_command(
             argv.extend(["--permission-mode", "plan"])
         elif effective_runner_name in {"k", "kimi"}:
             argv.append("--plan")
+        elif effective_runner_name in {"cu", "cursor"}:
+            argv.extend(["--mode", "plan"])
         else:
             warnings.append(
                 f'warning: runner "{effective_runner_name}" does not support permission mode "plan"; ignoring it'
@@ -619,6 +658,8 @@ def _canonical_runner_name(effective_runner_name: str, info: RunnerInfo) -> str:
         return "crush"
     if name in {"rc", "roocode"}:
         return "roocode"
+    if name in {"cu", "cursor"}:
+        return "cursor"
     return info.binary
 
 

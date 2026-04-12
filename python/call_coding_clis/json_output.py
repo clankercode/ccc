@@ -428,6 +428,69 @@ def _apply_kimi_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
     return False
 
 
+def _extract_message_text(message: dict[str, Any]) -> str:
+    content = message.get("content", [])
+    texts: list[str] = []
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                texts.append(str(block.get("text", "")))
+    elif isinstance(content, str):
+        texts.append(content)
+    return "\n".join(texts)
+
+
+def _normalize_cursor_text(text: str) -> str:
+    return text.strip("\n")
+
+
+def _apply_cursor_agent_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
+    result.raw_lines.append(obj)
+    msg_type = str(obj.get("type", ""))
+
+    if msg_type == "system":
+        if str(obj.get("subtype", "")) == "init":
+            result.session_id = str(obj.get("session_id", ""))
+            return True
+        return False
+
+    if msg_type == "assistant":
+        message = obj.get("message", {})
+        if not isinstance(message, dict):
+            return False
+        text = _normalize_cursor_text(_extract_message_text(message))
+        if text:
+            result.final_text = text
+            result.events.append(JsonEvent(event_type="assistant", text=text, raw=obj))
+        return True
+
+    if msg_type == "result":
+        session_id = obj.get("session_id")
+        if isinstance(session_id, str) and session_id:
+            result.session_id = session_id
+        duration = obj.get("duration_ms")
+        if isinstance(duration, int):
+            result.duration_ms = duration
+        usage = obj.get("usage", {})
+        if isinstance(usage, dict):
+            result.usage = {
+                str(k): int(v) for k, v in usage.items() if isinstance(v, int)
+        }
+        subtype = str(obj.get("subtype", ""))
+        if subtype == "success" and not bool(obj.get("is_error", False)):
+            text = _normalize_cursor_text(str(obj.get("result", result.final_text)))
+            result.final_text = text
+            if text:
+                result.events.append(JsonEvent(event_type="result", text=text, raw=obj))
+            return True
+        error = str(obj.get("error") or obj.get("result") or "")
+        result.error = error
+        result.events.append(JsonEvent(event_type="error", text=error, raw=obj))
+        return True
+
+    return False
+
+
 def parse_opencode_json(raw_stdout: str) -> ParsedJsonOutput:
     result = _new_output("opencode")
     for line in raw_stdout.splitlines():
@@ -455,10 +518,20 @@ def parse_kimi_json(raw_stdout: str) -> ParsedJsonOutput:
     return result
 
 
+def parse_cursor_agent_json(raw_stdout: str) -> ParsedJsonOutput:
+    result = _new_output("cursor-agent")
+    for line in raw_stdout.splitlines():
+        obj, raw_line = _parse_json_line(line)
+        if obj is not None and not _apply_cursor_agent_obj(result, obj):
+            result.unknown_json_lines.append(raw_line)
+    return result
+
+
 PARSERS = {
     "opencode": parse_opencode_json,
     "claude-code": parse_claude_code_json,
     "kimi": parse_kimi_json,
+    "cursor-agent": parse_cursor_agent_json,
 }
 
 
@@ -682,6 +755,7 @@ class StructuredStreamProcessor:
             "opencode": _apply_opencode_obj,
             "claude-code": _apply_claude_obj,
             "kimi": _apply_kimi_obj,
+            "cursor-agent": _apply_cursor_agent_obj,
         }.get(schema)
         self._buffer = ""
         self._unknown_lines: list[str] = []

@@ -610,6 +610,113 @@ fn apply_kimi_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
     }
 }
 
+fn message_text(message: &serde_json::Value) -> String {
+    if let Some(text) = message.get("content").and_then(|value| value.as_str()) {
+        return text.to_string();
+    }
+    let Some(content) = message.get("content").and_then(|value| value.as_array()) else {
+        return String::new();
+    };
+    content
+        .iter()
+        .filter(|block| block.get("type").and_then(|value| value.as_str()) == Some("text"))
+        .filter_map(|block| block.get("text").and_then(|value| value.as_str()))
+        .map(str::to_string)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn normalize_cursor_text(text: &str) -> String {
+    text.trim_matches('\n').to_string()
+}
+
+fn apply_cursor_agent_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
+    match obj
+        .get("type")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+    {
+        "system" => {
+            if obj.get("subtype").and_then(|value| value.as_str()) == Some("init") {
+                result.session_id = obj
+                    .get("session_id")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("")
+                    .to_string();
+            }
+        }
+        "assistant" => {
+            let text =
+                normalize_cursor_text(&obj.get("message").map(message_text).unwrap_or_default());
+            if !text.is_empty() {
+                result.final_text = text.clone();
+                result.events.push(JsonEvent {
+                    event_type: "assistant".into(),
+                    text,
+                    thinking: String::new(),
+                    tool_call: None,
+                    tool_result: None,
+                });
+            }
+        }
+        "result" => {
+            if let Some(session_id) = obj.get("session_id").and_then(|value| value.as_str()) {
+                result.session_id = session_id.to_string();
+            }
+            if let Some(duration) = obj.get("duration_ms").and_then(|value| value.as_i64()) {
+                result.duration_ms = duration;
+            }
+            if let Some(usage) = obj.get("usage").and_then(|value| value.as_object()) {
+                result.usage = usage
+                    .iter()
+                    .filter_map(|(key, value)| value.as_i64().map(|number| (key.clone(), number)))
+                    .collect();
+            }
+            let is_error = obj
+                .get("is_error")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            let subtype = obj
+                .get("subtype")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
+            if subtype == "success" && !is_error {
+                let text = normalize_cursor_text(
+                    obj.get("result")
+                        .and_then(|value| value.as_str())
+                        .unwrap_or(&result.final_text),
+                );
+                result.final_text = text.clone();
+                if !text.is_empty() {
+                    result.events.push(JsonEvent {
+                        event_type: "result".into(),
+                        text,
+                        thinking: String::new(),
+                        tool_call: None,
+                        tool_result: None,
+                    });
+                }
+            } else {
+                let text = obj
+                    .get("error")
+                    .or_else(|| obj.get("result"))
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                result.error = text.clone();
+                result.events.push(JsonEvent {
+                    event_type: "error".into(),
+                    text,
+                    thinking: String::new(),
+                    tool_call: None,
+                    tool_result: None,
+                });
+            }
+        }
+        _ => {}
+    }
+}
+
 pub fn parse_opencode_json(raw: &str) -> ParsedJsonOutput {
     let mut result = new_output("opencode");
     for line in raw.lines() {
@@ -685,11 +792,37 @@ pub fn parse_kimi_json(raw: &str) -> ParsedJsonOutput {
     result
 }
 
+pub fn parse_cursor_agent_json(raw: &str) -> ParsedJsonOutput {
+    let mut result = new_output("cursor-agent");
+    for line in raw.lines() {
+        if let Some(obj) = parse_json_line(line) {
+            let before = (
+                result.events.len(),
+                result.final_text.clone(),
+                result.error.clone(),
+                result.session_id.clone(),
+            );
+            apply_cursor_agent_obj(&mut result, &obj);
+            let after = (
+                result.events.len(),
+                result.final_text.clone(),
+                result.error.clone(),
+                result.session_id.clone(),
+            );
+            if before == after {
+                result.unknown_json_lines.push(line.trim().to_string());
+            }
+        }
+    }
+    result
+}
+
 pub fn parse_json_output(raw: &str, schema: &str) -> ParsedJsonOutput {
     match schema {
         "opencode" => parse_opencode_json(raw),
         "claude-code" => parse_claude_code_json(raw),
         "kimi" => parse_kimi_json(raw),
+        "cursor-agent" => parse_cursor_agent_json(raw),
         _ => ParsedJsonOutput {
             schema_name: schema.into(),
             events: Vec::new(),
@@ -1077,6 +1210,7 @@ impl StructuredStreamProcessor {
             "opencode" => apply_opencode_obj(&mut self.output, obj),
             "claude-code" => apply_claude_obj(&mut self.output, obj),
             "kimi" => apply_kimi_obj(&mut self.output, obj),
+            "cursor-agent" => apply_cursor_agent_obj(&mut self.output, obj),
             _ => {}
         }
     }

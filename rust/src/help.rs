@@ -22,6 +22,7 @@ const CANONICAL_RUNNERS: &[(&str, &str)] = &[
     ("codex", "c/cx"),
     ("roocode", "rc"),
     ("crush", "cr"),
+    ("cursor", "cu"),
 ];
 
 const HELP_TEXT: &str = r#"ccc — call coding CLIs
@@ -38,7 +39,7 @@ Usage:
 
 Controls (free order before the prompt):
   runner        Select which coding CLI to use (default: oc)
-                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr)
+                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu)
   +thinking     Set thinking level: +0..+4 or +none/+low/+med/+mid/+medium/+high/+max/+xhigh
                 Claude maps +0 to --thinking disabled and +1..+4 to --thinking enabled with matching --effort
                 Kimi maps +0 to --no-thinking and +1..+4 to --thinking

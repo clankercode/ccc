@@ -9,6 +9,7 @@ Python and Rust support these env overrides:
 - `CCC_REAL_OPENCODE`
 - `CCC_REAL_CLAUDE`
 - `CCC_REAL_KIMI`
+- `CCC_REAL_CURSOR`
 
 They replace the selected runner binary directly without needing temporary `PATH` symlinks.
 
@@ -48,6 +49,15 @@ env \
   MOCK_JSON_SCHEMA=kimi-code \
   CCC_REAL_KIMI="$PWD/tests/mock-coding-cli/mock_coding_cli.sh" \
   rust/target/debug/ccc k ..fmt "thinking"
+```
+
+## Cursor Formatted Smoke
+
+```sh
+env \
+  MOCK_JSON_SCHEMA=cursor-agent \
+  CCC_REAL_CURSOR="$PWD/tests/mock-coding-cli/mock_coding_cli.sh" \
+  rust/target/debug/ccc cu .fmt "tool call"
 ```
 
 ## Raw OpenCode JSON Smoke

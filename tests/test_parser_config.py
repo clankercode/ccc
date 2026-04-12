@@ -75,6 +75,18 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(parsed.runner, "opencode")
         self.assertEqual(parsed.prompt, "hello")
 
+    def test_runner_selector_cursor_and_cu(self):
+        for selector in ("cursor", "cu"):
+            with self.subTest(selector=selector):
+                parsed = parse_args([selector, "hello"])
+                self.assertEqual(parsed.runner, selector)
+                self.assertEqual(parsed.prompt, "hello")
+
+    def test_runner_selector_cr_remains_crush(self):
+        parsed = parse_args(["cr", "hello"])
+        self.assertEqual(parsed.runner, "cr")
+        self.assertEqual(parsed.prompt, "hello")
+
     def test_thinking_level(self):
         parsed = parse_args(["+2", "hello"])
         self.assertEqual(parsed.thinking, 2)
@@ -319,6 +331,30 @@ class ResolveCommandTests(unittest.TestCase):
         self.assertIn("--ephemeral", argv)
         self.assertEqual(warnings, [])
 
+    def test_cursor_runner_via_cu(self):
+        parsed = ParsedArgs(runner="cu", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(argv, ["cursor-agent", "--print", "--trust", "hello"])
+        self.assertEqual(env, {})
+        self.assertEqual(warnings, [])
+
+    def test_cursor_runner_long_name_with_model(self):
+        parsed = ParsedArgs(runner="cursor", model="gpt-5", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(
+            argv,
+            ["cursor-agent", "--print", "--trust", "--model", "gpt-5", "hello"],
+        )
+        self.assertEqual(env, {})
+        self.assertEqual(warnings, [])
+
+    def test_cr_still_resolves_to_crush(self):
+        parsed = ParsedArgs(runner="cr", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(argv, ["crush", "run", "hello"])
+        self.assertEqual(env, {})
+        self.assertEqual(warnings, [])
+
     def test_codex_runner_with_model_uses_exec(self):
         parsed = ParsedArgs(runner="c", model="gpt-5.4-mini", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
@@ -363,7 +399,7 @@ class ResolveCommandTests(unittest.TestCase):
                 self.assertNotIn("may save this session", "\n".join(warnings))
 
     def test_cleanup_session_warns_for_unsupported_cleanup_runners(self):
-        for runner, display in (("cr", "crush"), ("rc", "roocode")):
+        for runner, display in (("cr", "crush"), ("rc", "roocode"), ("cu", "cursor")):
             with self.subTest(runner=runner):
                 _argv, _env, warnings = resolve_command(
                     ParsedArgs(runner=runner, cleanup_session=True, prompt="hello")
@@ -793,6 +829,15 @@ class ResolveCommandTests(unittest.TestCase):
             ['warning: runner "roocode" yolo mode is unverified; ignoring --yolo'],
         )
 
+    def test_yolo_for_cursor(self):
+        parsed = ParsedArgs(runner="cu", yolo=True, prompt="hello")
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(
+            argv,
+            ["cursor-agent", "--print", "--trust", "--yolo", "hello"],
+        )
+        self.assertEqual(warnings, [])
+
     def test_permission_mode_safe_for_claude(self):
         parsed = ParsedArgs(runner="cc", permission_mode="safe", prompt="hello")
         argv, _env, warnings = resolve_command(parsed)
@@ -826,6 +871,33 @@ class ResolveCommandTests(unittest.TestCase):
             warnings,
             ['warning: runner "roocode" safe mode is unverified; leaving default permissions unchanged'],
         )
+
+    def test_permission_modes_for_cursor(self):
+        cases = [
+            (
+                "safe",
+                ["cursor-agent", "--print", "--trust", "--sandbox", "enabled", "hello"],
+                [],
+            ),
+            (
+                "plan",
+                ["cursor-agent", "--print", "--trust", "--mode", "plan", "hello"],
+                [],
+            ),
+            (
+                "auto",
+                ["cursor-agent", "--print", "--trust", "hello"],
+                [
+                    'warning: runner "cu" does not support permission mode "auto"; ignoring it'
+                ],
+            ),
+        ]
+        for mode, expected_argv, expected_warnings in cases:
+            with self.subTest(mode=mode):
+                parsed = ParsedArgs(runner="cu", permission_mode=mode, prompt="hello")
+                argv, _env, warnings = resolve_command(parsed)
+                self.assertEqual(argv, expected_argv)
+                self.assertEqual(warnings, expected_warnings)
 
     def test_permission_mode_auto_for_claude(self):
         parsed = ParsedArgs(runner="cc", permission_mode="auto", prompt="hello")
@@ -962,6 +1034,22 @@ class ResolveCommandTests(unittest.TestCase):
         self.assertTrue(plan.formatted)
         self.assertEqual(plan.schema, "opencode")
         self.assertEqual(plan.argv_flags, ["--format", "json"])
+
+    def test_cursor_output_plans(self):
+        cases = [
+            ("json", False, False, ["--output-format", "json"]),
+            ("stream-json", True, False, ["--output-format", "stream-json"]),
+            ("formatted", False, True, ["--output-format", "stream-json"]),
+            ("stream-formatted", True, True, ["--output-format", "stream-json"]),
+        ]
+        for mode, stream, formatted, flags in cases:
+            with self.subTest(mode=mode):
+                parsed = ParsedArgs(runner="cu", output_mode=mode, prompt="hello")
+                plan = resolve_output_plan(parsed)
+                self.assertEqual(plan.stream, stream)
+                self.assertEqual(plan.formatted, formatted)
+                self.assertEqual(plan.schema, "cursor-agent")
+                self.assertEqual(plan.argv_flags, flags)
 
     def test_show_thinking_resolution_uses_alias(self):
         config = CccConfig(aliases={"review": AliasDef(show_thinking=True)})
@@ -1360,6 +1448,8 @@ class RegistryTests(unittest.TestCase):
             "kimi",
             "roocode",
             "crush",
+            "cursor",
+            "cu",
         ]:
             self.assertIn(sel, RUNNER_REGISTRY, f"Missing selector: {sel}")
 
@@ -1370,6 +1460,8 @@ class RegistryTests(unittest.TestCase):
         self.assertIs(RUNNER_REGISTRY["cx"], RUNNER_REGISTRY["codex"])
         self.assertIs(RUNNER_REGISTRY["k"], RUNNER_REGISTRY["kimi"])
         self.assertIs(RUNNER_REGISTRY["rc"], RUNNER_REGISTRY["roocode"])
+        self.assertIs(RUNNER_REGISTRY["cr"], RUNNER_REGISTRY["crush"])
+        self.assertIs(RUNNER_REGISTRY["cu"], RUNNER_REGISTRY["cursor"])
 
 
 if __name__ == "__main__":

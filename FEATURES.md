@@ -45,13 +45,13 @@
 | F12 | Env override | CommandSpec.env merged with process environment |
 | F13 | Startup failure reporting | Missing binary produces stderr with "failed to start" |
 | F14 | Exit code forwarding | Child exit code returned as-is |
-| F15 | CCC_REAL_OPENCODE | Env var overrides opencode binary for testing |
+| F15 | Real runner overrides | Env vars override bundled runner binaries for testing, including `CCC_REAL_OPENCODE`, `CCC_REAL_CLAUDE`, `CCC_REAL_KIMI`, and `CCC_REAL_CURSOR` |
 
 ### v2 Parser/Config Features
 
 | ID | Feature | Description |
 |----|---------|-------------|
-| F16 | Runner selector | e.g., `cc`, `oc`, `k`, `claude`, `opencode`, `kimi` |
+| F16 | Runner selector | e.g., `cc`, `oc`, `k`, `cu`, `claude`, `opencode`, `kimi`, `cursor` |
 | F17 | Thinking level | `+0` through `+4` selector |
 | F18 | Provider/model selector | `:provider:model` and `:model` syntax |
 | F19 | Alias/preset | `@alias` named presets |
@@ -72,6 +72,7 @@
 | F25 | JSON schema: claude-code | Parse Claude Code JSON streaming format |
 | F26 | JSON schema: kimi | Parse Kimi JSON streaming format |
 | F27 | JSON render | Render parsed JSON output consistently |
+| F36 | JSON schema: cursor-agent | Parse Cursor Agent JSON and stream-json output |
 
 ### v4 Testing & Infrastructure
 
@@ -102,7 +103,7 @@
 | F12 Env override | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | no | yes | yes |
 | F13 Startup failure | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
 | F14 Exit code fwd | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
-| F15 CCC_REAL_OPENCODE | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| F15 Real runner overrides | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
 | F28 Unit tests | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
 | F29 Contract tests | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | - | yes | - | - | yes | - | yes |
 | F30 Harness tests | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | - | yes | - | - | yes | - | yes |
@@ -129,6 +130,7 @@
 | F25 Schema: claude | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | - | n/a | yes | yes |
 | F26 Schema: kimi | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | - | n/a | yes | yes |
 | F27 JSON render | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | - | n/a | yes | yes |
+| F36 Schema: cursor-agent | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | n/a | - | - |
 
 ## Progress Tracking
 

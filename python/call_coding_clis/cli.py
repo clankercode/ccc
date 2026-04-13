@@ -28,7 +28,7 @@ try:
     )
     from .config import (
         find_alias_write_path,
-        find_config_command_path,
+        find_config_command_paths,
         load_config,
         normalize_alias_name,
         render_alias_block,
@@ -55,7 +55,7 @@ except ImportError:
     )
     from config import (
         find_alias_write_path,
-        find_config_command_path,
+        find_config_command_paths,
         load_config,
         normalize_alias_name,
         render_alias_block,
@@ -138,8 +138,8 @@ def main(argv: list[str] | None = None) -> int:
         return _add_alias_command(args[1:])
 
     if args == ["config"]:
-        config_path = find_config_command_path()
-        if config_path is None:
+        config_paths = find_config_command_paths()
+        if not config_paths:
             explicit = os.environ.get("CCC_CONFIG", "").strip()
             if explicit:
                 print(
@@ -152,13 +152,16 @@ def main(argv: list[str] | None = None) -> int:
                     file=sys.stderr,
                 )
             return 1
-        try:
-            content = config_path.read_text(encoding="utf-8")
-        except OSError as exc:
-            print(f"Failed to read config file {config_path}: {exc}", file=sys.stderr)
-            return 1
-        print(f"Config path: {config_path}")
-        print(content, end="")
+        for index, config_path in enumerate(config_paths):
+            try:
+                content = config_path.read_text(encoding="utf-8")
+            except OSError as exc:
+                print(f"Failed to read config file {config_path}: {exc}", file=sys.stderr)
+                return 1
+            if index > 0:
+                print()
+            print(f"Config path: {config_path}")
+            print(content, end="")
         return 0
 
     parsed = parse_args(args)

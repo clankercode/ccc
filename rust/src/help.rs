@@ -92,7 +92,7 @@ Examples:
   ccc --print-config
 
 Config:
-  ccc config                            — print the resolved config file path and contents
+  ccc config                            — print every resolved config file path and contents
   ccc add [-g] <alias>                  — prompt for alias settings and write them to config
   ccc add <alias> --runner cc --prompt "Review" --yes
                                         — write an alias non-interactively

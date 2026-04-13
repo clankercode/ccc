@@ -116,6 +116,16 @@ def find_config_command_path() -> Path | None:
     return None
 
 
+def find_config_command_paths() -> list[Path]:
+    explicit = os.environ.get("CCC_CONFIG", "").strip()
+    if explicit:
+        candidate = Path(explicit)
+        if candidate.is_file():
+            return [candidate]
+
+    return [candidate for candidate in _default_config_paths() if candidate.is_file()]
+
+
 def _xdg_config_path() -> Path | None:
     xdg = os.environ.get("XDG_CONFIG_HOME", "").strip()
     if not xdg:

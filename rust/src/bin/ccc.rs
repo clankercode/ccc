@@ -1,9 +1,9 @@
 use call_coding_clis::{
-    find_alias_write_path, find_config_command_path, load_config, normalize_alias_name, parse_args,
-    parse_json_output, print_help, print_usage, render_alias_block, render_example_config,
-    render_parsed, resolve_command, resolve_human_tty, resolve_output_plan, resolve_sanitize_osc,
-    resolve_show_thinking, write_alias_block, AliasDef, FormattedRenderer, Runner,
-    StructuredStreamProcessor,
+    find_alias_write_path, find_config_command_paths, load_config, normalize_alias_name,
+    parse_args, parse_json_output, print_help, print_usage, render_alias_block,
+    render_example_config, render_parsed, resolve_command, resolve_human_tty, resolve_output_plan,
+    resolve_sanitize_osc, resolve_show_thinking, write_alias_block, AliasDef, FormattedRenderer,
+    Runner, StructuredStreamProcessor,
 };
 use std::collections::BTreeMap;
 use std::env;
@@ -1285,7 +1285,8 @@ fn main() -> ExitCode {
     }
 
     if args == ["config"] {
-        let Some(config_path) = find_config_command_path() else {
+        let config_paths = find_config_command_paths();
+        if config_paths.is_empty() {
             if let Ok(explicit) = env::var("CCC_CONFIG") {
                 let trimmed = explicit.trim();
                 if !trimmed.is_empty() {
@@ -1301,19 +1302,24 @@ fn main() -> ExitCode {
                 );
             }
             return ExitCode::from(1);
-        };
-        let content = match std::fs::read_to_string(&config_path) {
-            Ok(content) => content,
-            Err(error) => {
-                eprintln!(
-                    "Failed to read config file {}: {error}",
-                    config_path.display()
-                );
-                return ExitCode::from(1);
+        }
+        for (index, config_path) in config_paths.iter().enumerate() {
+            let content = match std::fs::read_to_string(config_path) {
+                Ok(content) => content,
+                Err(error) => {
+                    eprintln!(
+                        "Failed to read config file {}: {error}",
+                        config_path.display()
+                    );
+                    return ExitCode::from(1);
+                }
+            };
+            if index > 0 {
+                println!();
             }
-        };
-        println!("Config path: {}", config_path.display());
-        print!("{content}");
+            println!("Config path: {}", config_path.display());
+            print!("{content}");
+        }
         return ExitCode::from(0);
     }
 

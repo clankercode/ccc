@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-13
 
+### `ccc config` now prints every resolved config path
+- Change: Python and Rust `ccc config` now prints each existing config file path plus that file's raw contents in normal merge order; an existing `CCC_CONFIG` override still wins alone, and a missing `CCC_CONFIG` still falls back to the default chain
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`
+- Notes: updated `README.md`, `docs/llms.txt`, `docs/index.html`, and the Python/Rust help text
+
 ### Cursor Agent version discovery now uses local release metadata
 - Change: Python and Rust now read Cursor Agent's bundled `agent-cli@...` release marker for the help runner checklist before falling back to `cursor-agent --version`
 - Required implementations: Python and Rust

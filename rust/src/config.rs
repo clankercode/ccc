@@ -71,6 +71,39 @@ pub fn find_config_command_path() -> Option<PathBuf> {
     home_path.filter(|path| path.is_file())
 }
 
+pub fn find_config_command_paths() -> Vec<PathBuf> {
+    if let Ok(explicit) = std::env::var("CCC_CONFIG") {
+        let trimmed = explicit.trim();
+        if !trimmed.is_empty() {
+            let candidate = PathBuf::from(trimmed);
+            if candidate.is_file() {
+                return vec![candidate];
+            }
+        }
+    }
+
+    let current_dir = std::env::current_dir().ok();
+    let home_path = std::env::var("HOME")
+        .ok()
+        .map(|home| PathBuf::from(home).join(".config/ccc/config.toml"));
+    let xdg_path = std::env::var("XDG_CONFIG_HOME").ok().and_then(|xdg| {
+        if xdg.trim().is_empty() {
+            None
+        } else {
+            Some(PathBuf::from(xdg).join("ccc/config.toml"))
+        }
+    });
+
+    default_config_paths_from(
+        current_dir.as_deref(),
+        home_path.as_deref(),
+        xdg_path.as_deref(),
+    )
+    .into_iter()
+    .filter(|path| path.is_file())
+    .collect()
+}
+
 pub fn find_alias_write_path(global_only: bool) -> PathBuf {
     if !global_only {
         if let Some(resolved) = find_config_command_path() {

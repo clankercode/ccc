@@ -116,7 +116,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - `@name` for preset lookup with agent fallback; presets can also define a default prompt, and alias `prompt_mode = "prepend"|"append"` can compose alias prompt text around an explicitly supplied prompt
   - `-h` / `--help` wins anywhere in argv and prints help immediately
   - Python and Rust search project-local `.ccc.toml` files upward from the current directory and override the global config chain
-  - `ccc config` prints the resolved config file path and raw contents, preferring `CCC_CONFIG`, then project-local `.ccc.toml`, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`
+  - `ccc config` prints every existing config file path and raw contents in merge order: `~/.config/ccc/config.toml`, `XDG_CONFIG_HOME/ccc/config.toml`, then the nearest project-local `.ccc.toml`; `CCC_CONFIG` still wins alone when it points at an existing file
   - `ccc add [-g] <alias>` starts a line-prompt wizard for writing `[aliases.<name>]` config; flags such as `--runner`, `--model`, `--prompt`, and `--prompt-mode` can prefill values, and `--yes` writes non-interactively
   - `formatted`, `stream-formatted`, and `ccc add` menu prompts honor `FORCE_COLOR` / `NO_COLOR` before falling back to TTY detection
   - `--print-config` to print the canonical example `config.toml`
@@ -129,8 +129,8 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - Python and Rust currently use `claude -p --no-session-persistence`, `codex exec --ephemeral`, `cursor-agent --print --trust`, and `crush run` for non-interactive invocation
 - By default Python and Rust avoid saved sessions where the selected CLI supports it; OpenCode, Kimi, Cursor, Crush, and RooCode warn that the runner may save a session unless `--save-session` or `--cleanup-session` is used
 - `ccc --print-config` is the source of truth for the current canonical config schema: `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
-- `ccc config` is the source of truth for which config file currently resolves in the active shell
-- `ccc add <alias>` writes the resolved config file shown by `ccc config`; when no config exists it creates a new global config under `XDG_CONFIG_HOME/ccc/config.toml` or `~/.config/ccc/config.toml`, and `-g` forces the effective global config instead of a project-local file
+- `ccc config` is the source of truth for which config files currently resolve in the active shell
+- `ccc add <alias>` writes the active write target: project-local config when present, otherwise the effective global config; when no config exists it creates a new global config under `XDG_CONFIG_HOME/ccc/config.toml` or `~/.config/ccc/config.toml`, and `-g` forces the effective global config instead of a project-local file
 
 ## Planned `ccc` Syntax Growth (design notes only, not fully rolled out yet)
 

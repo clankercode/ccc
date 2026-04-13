@@ -654,11 +654,64 @@ class SingleImplCccContractTests(unittest.TestCase):
                     env.pop("CCC_CONFIG", None)
                     env["HOME"] = str(tmp_path / "home")
                     env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+                    home_config_path = (
+                        Path(env["HOME"]) / ".config" / "ccc" / "config.toml"
+                    )
                     config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
                     config_path.parent.mkdir(parents=True, exist_ok=True)
                     config_path.write_text(config_body, encoding="utf-8")
                     result = lang.invoke_extra(["config"], env)
-                    self.assert_config_command_output(result, config_path, config_body)
+                    self.assert_config_command_outputs_paths(
+                        result,
+                        [
+                            (home_config_path, ""),
+                            (config_path, config_body),
+                        ],
+                    )
+
+    def test_config_command_outputs_all_default_config_paths(self) -> None:
+        home_body = '[defaults]\nrunner = "cc"\n'
+        xdg_body = '[defaults]\nmodel = "xdg-model"\n'
+        project_body = '[aliases.review]\nprompt = "Review"\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in CONFIG_COMMAND_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, command="config-all-paths"):
+                    env = self._make_env(opencode_path, lang)
+                    env.pop("CCC_CONFIG", None)
+                    env["HOME"] = str(tmp_path / "home")
+                    env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
+                    repo_path = tmp_path / f"repo-{lang.name}"
+                    nested_cwd = repo_path / "nested"
+                    nested_cwd.mkdir(parents=True)
+
+                    home_path = (
+                        Path(env["HOME"]) / ".config" / "ccc" / "config.toml"
+                    )
+                    xdg_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                    project_path = repo_path / ".ccc.toml"
+                    home_path.parent.mkdir(parents=True, exist_ok=True)
+                    xdg_path.parent.mkdir(parents=True, exist_ok=True)
+                    home_path.write_text(home_body, encoding="utf-8")
+                    xdg_path.write_text(xdg_body, encoding="utf-8")
+                    project_path.write_text(project_body, encoding="utf-8")
+
+                    result = lang.invoke_extra(["config"], env, cwd=nested_cwd)
+                    self.assert_config_command_outputs_paths(
+                        result,
+                        [
+                            (home_path, home_body),
+                            (xdg_path, xdg_body),
+                            (project_path, project_body),
+                        ],
+                    )
 
     def test_config_command_prefers_ccc_config_override(self) -> None:
         fallback_body = '[defaults]\nrunner = "k"\n'
@@ -707,12 +760,19 @@ class SingleImplCccContractTests(unittest.TestCase):
                     env["HOME"] = str(tmp_path / "home")
                     env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
                     fallback_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                    home_config_path = (
+                        Path(env["HOME"]) / ".config" / "ccc" / "config.toml"
+                    )
                     fallback_path.parent.mkdir(parents=True, exist_ok=True)
                     fallback_path.write_text(fallback_body, encoding="utf-8")
                     env["CCC_CONFIG"] = str(tmp_path / "missing-config.toml")
                     result = lang.invoke_extra(["config"], env)
-                    self.assert_config_command_output(
-                        result, fallback_path, fallback_body
+                    self.assert_config_command_outputs_paths(
+                        result,
+                        [
+                            (home_config_path, ""),
+                            (fallback_path, fallback_body),
+                        ],
                     )
 
     def test_config_command_reports_missing_config(self) -> None:
@@ -785,8 +845,15 @@ class SingleImplCccContractTests(unittest.TestCase):
                     )
 
                     config_result = lang.invoke_extra(["config"], env)
-                    self.assert_config_command_output(
-                        config_result, config_path, alias_block
+                    home_config_path = (
+                        Path(env["HOME"]) / ".config" / "ccc" / "config.toml"
+                    )
+                    self.assert_config_command_outputs_paths(
+                        config_result,
+                        [
+                            (home_config_path, ""),
+                            (config_path, alias_block),
+                        ],
                     )
 
                     alias_result = lang.invoke_extra(["@mm27"], env)
@@ -1629,10 +1696,18 @@ class SingleImplCccContractTests(unittest.TestCase):
     def assert_config_command_output(
         self, result, config_path: Path, config_body: str
     ) -> None:
+        self.assert_config_command_outputs_paths(result, [(config_path, config_body)])
+
+    def assert_config_command_outputs_paths(
+        self, result, path_bodies: list[tuple[Path, str]]
+    ) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             result.stdout,
-            f"Config path: {config_path}\n{config_body}",
+            "\n".join(
+                f"Config path: {config_path}\n{config_body}"
+                for config_path, config_body in path_bodies
+            ),
         )
         self.assertEqual(result.stderr, "")
 

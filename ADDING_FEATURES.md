@@ -33,6 +33,19 @@ When a change is intended to roll out beyond Python and Rust:
 7. Only after Python and Rust are working, optionally update the remaining languages with subagents.
 8. Re-run targeted per-language tests plus the shared contract suite before any broader rollout commit.
 
+## Adding A New CLI
+
+When adding a new upstream CLI runner, update the whole runner maintenance surface in the same change:
+
+- capture the real CLI help and version output directly from the installed binary
+- add or update the matching note under `docs/clis/`
+- document permission controls, session persistence, output modes, and the non-interactive argv shape
+- add runner command assembly tests and shared contract coverage
+- add the fastest reliable runner-version discovery path for the help checklist, then keep the `<cli> --version` fallback
+- update mock fixtures, JSON schema parsing, and formatted output notes when the CLI exposes structured output
+
+Do not treat a new runner as complete while the help checklist still needs a slow or unsupported version probe that the local install layout can answer directly.
+
 ## Why Python First
 
 - Python is the fastest reference path for parser/config/help changes.

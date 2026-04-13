@@ -22,12 +22,11 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
   - Allow a single logical route to fan out across multiple providers, presets, aliases, or equivalent backends.
   - Detect `429` rate-limit responses and other retryable provider errors, then fail over or rotate according to policy.
   - Track enough usage/capacity state to avoid hammering an exhausted route and to make round-robin selection stable.
-- [ ] Graceful fallback when configured output_mode is unsupported by the selected runner
-  - Reproduce: set `output_mode = "stream-formatted"` in `[defaults]` of `~/.config/ccc/config.toml`, then run with `@gpt54` (runner = "c", codex). Result: `runner does not support requested output mode` hard error, exit 1.
-  - `NO_COLOR=1` does not help — it only affects TTY detection, not an explicitly configured output_mode.
-  - Expected: warn and fall back to `text` (or `stream-text`) rather than hard-failing, so programmatic callers and aliases that don't override output_mode still work.
-  - Workaround: callers (e.g. looper) must explicitly pass `-o text` on every invocation to override the global config.
 - [ ] Capture real Kimi rate-limit and provider-error samples across every surface `ccc` reads
   - Collect representative `429` and nearby failure cases from plain stdout/stderr, `json`, and `stream-json` modes.
   - Save the observed payloads and transcripts in the same fixture style used for other real runner captures so parser and retry logic can target actual shapes.
   - Note which signals are stable enough for automated detection versus human-facing text that should stay best-effort only.
+- [ ] Add Codex `--json` output-mode support
+  - Local `codex exec --help` exposes `--json` as JSONL event output, so `ccc` should be able to support at least raw `stream-json` for Codex.
+  - Capture real Codex JSONL event samples before adding formatted rendering; do not assume the Claude/OpenCode/Cursor schemas match.
+  - Keep configured `stream-formatted` fallback conservative until a Codex formatted renderer path is implemented.

@@ -371,14 +371,24 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
 
 
 def resolve_output_mode(parsed: ParsedArgs, config: CccConfig | None = None) -> str:
+    mode, _ = _resolve_output_mode_with_source(parsed, config)
+    return mode
+
+
+def _resolve_output_mode_with_source(
+    parsed: ParsedArgs, config: CccConfig | None = None
+) -> tuple[str, str]:
     if config is None:
         config = CccConfig()
     _, _, alias_def = resolve_effective_runner(parsed, config)
     mode = parsed.output_mode
+    source = "argument"
     if mode is None and alias_def and alias_def.output_mode:
         mode = alias_def.output_mode
+        source = "alias"
     if mode is None:
         mode = config.default_output_mode
+        source = "configured"
     if mode == "":
         raise ValueError(
             "output mode requires one of: text, stream-text, json, stream-json, formatted, stream-formatted"
@@ -388,7 +398,11 @@ def resolve_output_mode(parsed: ParsedArgs, config: CccConfig | None = None) -> 
         raise ValueError(
             "output mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted"
         )
-    return mode
+    return mode, source
+
+
+def _fallback_output_mode(supported: set[str]) -> str:
+    return "text" if "text" in supported else "stream-text"
 
 
 def resolve_show_thinking(parsed: ParsedArgs, config: CccConfig | None = None) -> bool:
@@ -413,7 +427,7 @@ def resolve_sanitize_osc(parsed: ParsedArgs, config: CccConfig | None = None) ->
     if value is None:
         value = config.default_sanitize_osc
     if value is None:
-        value = "formatted" in resolve_output_mode(parsed, config)
+        value = "formatted" in resolve_output_plan(parsed, config).mode
     return bool(value)
 
 
@@ -425,18 +439,28 @@ class OutputPlan:
     formatted: bool
     schema: str | None
     argv_flags: list[str]
+    warnings: list[str] = field(default_factory=list)
 
 
 def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> OutputPlan:
     if config is None:
         config = CccConfig()
-    effective_runner_name, _, _ = resolve_effective_runner(parsed, config)
-    mode = resolve_output_mode(parsed, config)
+    effective_runner_name, info, _ = resolve_effective_runner(parsed, config)
+    mode, mode_source = _resolve_output_mode_with_source(parsed, config)
     supported = _supported_output_modes(effective_runner_name)
+    warnings: list[str] = []
     if mode not in supported:
-        raise ValueError(
-            f'runner "{effective_runner_name}" does not support output mode "{mode}"'
+        if mode_source == "argument":
+            raise ValueError(
+                f'runner "{effective_runner_name}" does not support output mode "{mode}"'
+            )
+        fallback = _fallback_output_mode(supported)
+        runner_display = _canonical_runner_name(effective_runner_name, info)
+        warnings.append(
+            f'warning: runner "{runner_display}" does not support {mode_source} output mode "{mode}"; '
+            f'falling back to "{fallback}"'
         )
+        mode = fallback
 
     key = effective_runner_name.lower()
     if mode in {"text", "stream-text"}:
@@ -447,6 +471,7 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
             formatted=False,
             schema=None,
             argv_flags=[],
+            warnings=warnings,
         )
     if key in {"cc", "claude"}:
         flags = (
@@ -463,6 +488,7 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
             formatted="formatted" in mode,
             schema="claude-code",
             argv_flags=flags,
+            warnings=warnings,
         )
     if key in {"k", "kimi"}:
         return OutputPlan(
@@ -472,6 +498,7 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
             formatted="formatted" in mode,
             schema="kimi",
             argv_flags=["--print", "--output-format", "stream-json"],
+            warnings=warnings,
         )
     if key in {"oc", "opencode"}:
         return OutputPlan(
@@ -481,6 +508,7 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
             formatted="formatted" in mode,
             schema="opencode",
             argv_flags=["--format", "json"],
+            warnings=warnings,
         )
     if key in {"cu", "cursor"}:
         flags = (
@@ -495,6 +523,7 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
             formatted="formatted" in mode,
             schema="cursor-agent",
             argv_flags=flags,
+            warnings=warnings,
         )
     return OutputPlan(
         runner_name=effective_runner_name,
@@ -503,6 +532,7 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
         formatted=False,
         schema=None,
         argv_flags=[],
+        warnings=warnings,
     )
 
 
@@ -523,6 +553,7 @@ def resolve_command(
     argv = [info.binary] + list(info.extra_args)
     warnings.extend(_session_persistence_warnings(parsed, effective_runner_name, info))
     output_plan = resolve_output_plan(parsed, config)
+    warnings.extend(output_plan.warnings)
     argv.extend(output_plan.argv_flags)
 
     effective_thinking = parsed.thinking

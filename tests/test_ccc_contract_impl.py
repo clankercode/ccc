@@ -1421,6 +1421,64 @@ class SingleImplCccContractTests(unittest.TestCase):
                     self.assertEqual(result.stdout, "")
                     self.assertIn("output mode", result.stderr)
 
+    def test_configured_unsupported_output_mode_warns_and_falls_back(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            codex_path = bin_dir / "codex"
+            self._write_opencode_stub(opencode_path)
+            self._write_codex_stub(codex_path)
+            expected_warning = (
+                'warning: runner "codex" does not support configured output mode '
+                '"stream-formatted"; falling back to "text"\n'
+            )
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                config_path.write_text(
+                    '[defaults]\noutput_mode = "stream-formatted"\n',
+                    encoding="utf-8",
+                )
+                with self.subTest(language=lang.name):
+                    result = lang.invoke_with_args(["c"], PROMPT, env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, CODEX_RUNNER_EXPECTED)
+                    self.assertEqual(result.stderr, expected_warning)
+
+    def test_alias_unsupported_output_mode_warns_and_falls_back(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            codex_path = bin_dir / "codex"
+            self._write_opencode_stub(opencode_path)
+            self._write_codex_stub(codex_path)
+            expected_warning = (
+                'warning: runner "codex" does not support alias output mode '
+                '"stream-formatted"; falling back to "text"\n'
+            )
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                config_path.write_text(
+                    '[aliases.fast]\nrunner = "c"\noutput_mode = "stream-formatted"\n',
+                    encoding="utf-8",
+                )
+                with self.subTest(language=lang.name):
+                    result = lang.invoke_with_args(["@fast"], PROMPT, env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, CODEX_RUNNER_EXPECTED)
+                    self.assertEqual(result.stderr, expected_warning)
+
     def test_control_tokens_are_order_independent_before_prompt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

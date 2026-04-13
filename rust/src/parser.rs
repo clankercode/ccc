@@ -115,6 +115,7 @@ pub struct OutputPlan {
     pub formatted: bool,
     pub schema: Option<String>,
     pub argv_flags: Vec<String>,
+    pub warnings: Vec<String>,
 }
 
 pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = LazyLock::new(|| {
@@ -468,6 +469,7 @@ pub fn resolve_command(
         effective_runner,
     ));
     let output_plan = resolve_output_plan(parsed, Some(&config)).map_err(str::to_string)?;
+    warnings.extend(output_plan.warnings.clone());
     argv.extend(output_plan.argv_flags.iter().cloned());
 
     let effective_thinking = parsed
@@ -802,28 +804,50 @@ fn supported_output_modes(runner_name: &str) -> &'static [&'static str] {
     }
 }
 
+fn fallback_output_mode(supported: &[&str]) -> &'static str {
+    if supported.iter().any(|mode| *mode == "text") {
+        "text"
+    } else {
+        "stream-text"
+    }
+}
+
 pub fn resolve_output_mode(
     parsed: &ParsedArgs,
     config: Option<&CccConfig>,
 ) -> Result<String, &'static str> {
+    resolve_output_mode_with_source(parsed, config).map(|(mode, _)| mode)
+}
+
+fn resolve_output_mode_with_source(
+    parsed: &ParsedArgs,
+    config: Option<&CccConfig>,
+) -> Result<(String, &'static str), &'static str> {
     let config = config.cloned().unwrap_or_default();
     let alias_def = resolve_alias_def(parsed, &config);
     let mut mode = parsed.output_mode.clone();
+    let mut source = "argument";
     if mode.is_none() {
         mode = alias_def.and_then(|alias| alias.output_mode.clone());
+        if mode.is_some() {
+            source = "alias";
+        }
     }
-    let mode = mode.unwrap_or_else(|| config.default_output_mode.clone());
+    let mode = mode.unwrap_or_else(|| {
+        source = "configured";
+        config.default_output_mode.clone()
+    });
     if mode.is_empty() {
         return Err(
             "output mode requires one of: text, stream-text, json, stream-json, formatted, stream-formatted",
         );
     }
-    if parse_output_mode(&mode).is_none() {
-        return Err(
+    match parse_output_mode(&mode) {
+        Some(mode) => Ok((mode, source)),
+        None => Err(
             "output mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted",
-        );
+        ),
     }
-    Ok(mode)
 }
 
 pub fn resolve_show_thinking(parsed: &ParsedArgs, config: Option<&CccConfig>) -> bool {
@@ -841,8 +865,8 @@ pub fn resolve_sanitize_osc(parsed: &ParsedArgs, config: Option<&CccConfig>) -> 
         .or_else(|| resolve_alias_def(parsed, &config).and_then(|alias| alias.sanitize_osc))
         .or(config.default_sanitize_osc)
         .unwrap_or_else(|| {
-            resolve_output_mode(parsed, Some(&config))
-                .map(|mode| mode.contains("formatted"))
+            resolve_output_plan(parsed, Some(&config))
+                .map(|plan| plan.mode.contains("formatted"))
                 .unwrap_or(false)
         })
 }
@@ -853,14 +877,24 @@ pub fn resolve_output_plan(
 ) -> Result<OutputPlan, &'static str> {
     let config = config.cloned().unwrap_or_default();
     let registry = RUNNER_REGISTRY.read().unwrap();
-    let (runner_name, _, _) =
+    let (runner_name, info, _) =
         resolve_effective_runner(parsed, &config, &registry).ok_or("no runner found")?;
-    let mode = resolve_output_mode(parsed, Some(&config))?;
-    if !supported_output_modes(&runner_name)
-        .iter()
-        .any(|candidate| *candidate == mode)
-    {
-        return Err("runner does not support requested output mode");
+    let (mut mode, mode_source) = resolve_output_mode_with_source(parsed, Some(&config))?;
+    let supported = supported_output_modes(&runner_name);
+    let mut warnings = Vec::new();
+    if !supported.iter().any(|candidate| *candidate == mode) {
+        if mode_source == "argument" {
+            return Err("runner does not support requested output mode");
+        }
+        let fallback = fallback_output_mode(supported);
+        warnings.push(format!(
+            "warning: runner \"{}\" does not support {} output mode \"{}\"; falling back to \"{}\"",
+            canonical_runner_name(&runner_name, info),
+            mode_source,
+            mode,
+            fallback,
+        ));
+        mode = fallback.to_string();
     }
 
     if matches!(mode.as_str(), "text" | "stream-text") {
@@ -871,6 +905,7 @@ pub fn resolve_output_plan(
             formatted: false,
             schema: None,
             argv_flags: Vec::new(),
+            warnings,
         });
     }
 
@@ -894,6 +929,7 @@ pub fn resolve_output_plan(
             formatted: mode.contains("formatted"),
             schema: Some("claude-code".into()),
             argv_flags,
+            warnings,
         });
     }
 
@@ -909,6 +945,7 @@ pub fn resolve_output_plan(
                 "--output-format".into(),
                 "stream-json".into(),
             ],
+            warnings,
         });
     }
 
@@ -920,6 +957,7 @@ pub fn resolve_output_plan(
             formatted: mode.contains("formatted"),
             schema: Some("opencode".into()),
             argv_flags: vec!["--format".into(), "json".into()],
+            warnings,
         });
     }
 
@@ -936,6 +974,7 @@ pub fn resolve_output_plan(
             formatted: mode.contains("formatted"),
             schema: Some("cursor-agent".into()),
             argv_flags,
+            warnings,
         });
     }
 
@@ -946,5 +985,6 @@ pub fn resolve_output_plan(
         formatted: false,
         schema: None,
         argv_flags: Vec::new(),
+        warnings,
     })
 }

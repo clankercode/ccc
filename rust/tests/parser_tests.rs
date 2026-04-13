@@ -666,6 +666,20 @@ fn test_resolve_sanitize_osc_defaults_on_for_formatted_modes() {
 }
 
 #[test]
+fn test_resolve_sanitize_osc_defaults_off_after_output_mode_fallback() {
+    let config = CccConfig {
+        default_output_mode: "stream-formatted".into(),
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        runner: Some("c".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    assert!(!resolve_sanitize_osc(&parsed, Some(&config)));
+}
+
+#[test]
 fn test_resolve_sanitize_osc_defaults_off_for_raw_modes() {
     let parsed = ParsedArgs {
         output_mode: Some("json".into()),
@@ -1855,6 +1869,55 @@ fn test_resolve_cursor_output_plans() {
         assert_eq!(plan.schema.as_deref(), Some("cursor-agent"));
         assert_eq!(plan.argv_flags, flags);
     }
+}
+
+#[test]
+fn test_configured_unsupported_output_mode_falls_back_to_text() {
+    let config = CccConfig {
+        default_output_mode: "stream-formatted".into(),
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        runner: Some("c".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let plan = resolve_output_plan(&parsed, Some(&config)).unwrap();
+    assert_eq!(plan.mode, "text");
+    assert!(plan.argv_flags.is_empty());
+    assert_eq!(
+        plan.warnings,
+        vec![
+            "warning: runner \"codex\" does not support configured output mode \"stream-formatted\"; falling back to \"text\""
+        ]
+    );
+}
+
+#[test]
+fn test_alias_unsupported_output_mode_falls_back_to_text() {
+    let mut config = CccConfig::default();
+    config.aliases.insert(
+        "fast".into(),
+        AliasDef {
+            runner: Some("c".into()),
+            output_mode: Some("stream-formatted".into()),
+            ..Default::default()
+        },
+    );
+    let parsed = ParsedArgs {
+        alias: Some("fast".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let plan = resolve_output_plan(&parsed, Some(&config)).unwrap();
+    assert_eq!(plan.runner_name, "c");
+    assert_eq!(plan.mode, "text");
+    assert_eq!(
+        plan.warnings,
+        vec![
+            "warning: runner \"codex\" does not support alias output mode \"stream-formatted\"; falling back to \"text\""
+        ]
+    );
 }
 
 #[test]

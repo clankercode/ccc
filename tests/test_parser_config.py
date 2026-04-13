@@ -980,6 +980,11 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(output_mode="formatted", prompt="hello")
         self.assertTrue(resolve_sanitize_osc(parsed))
 
+    def test_sanitize_osc_defaults_off_after_output_mode_fallback(self):
+        config = CccConfig(default_output_mode="stream-formatted")
+        parsed = ParsedArgs(runner="c", prompt="hello")
+        self.assertFalse(resolve_sanitize_osc(parsed, config))
+
     def test_sanitize_osc_defaults_off_for_raw_modes(self):
         parsed = ParsedArgs(output_mode="json", prompt="hello")
         self.assertFalse(resolve_sanitize_osc(parsed))
@@ -1050,6 +1055,34 @@ class ResolveCommandTests(unittest.TestCase):
                 self.assertEqual(plan.formatted, formatted)
                 self.assertEqual(plan.schema, "cursor-agent")
                 self.assertEqual(plan.argv_flags, flags)
+
+    def test_configured_unsupported_output_mode_falls_back_to_text(self):
+        config = CccConfig(default_output_mode="stream-formatted")
+        parsed = ParsedArgs(runner="c", prompt="hello")
+        plan = resolve_output_plan(parsed, config)
+        self.assertEqual(plan.mode, "text")
+        self.assertEqual(plan.argv_flags, [])
+        self.assertEqual(
+            plan.warnings,
+            [
+                'warning: runner "codex" does not support configured output mode "stream-formatted"; falling back to "text"'
+            ],
+        )
+
+    def test_alias_unsupported_output_mode_falls_back_to_text(self):
+        config = CccConfig(
+            aliases={"fast": AliasDef(runner="c", output_mode="stream-formatted")}
+        )
+        parsed = ParsedArgs(alias="fast", prompt="hello")
+        plan = resolve_output_plan(parsed, config)
+        self.assertEqual(plan.runner_name, "c")
+        self.assertEqual(plan.mode, "text")
+        self.assertEqual(
+            plan.warnings,
+            [
+                'warning: runner "codex" does not support alias output mode "stream-formatted"; falling back to "text"'
+            ],
+        )
 
     def test_show_thinking_resolution_uses_alias(self):
         config = CccConfig(aliases={"review": AliasDef(show_thinking=True)})

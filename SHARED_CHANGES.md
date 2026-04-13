@@ -20,6 +20,15 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-04-14
+
+### Configured unsupported output modes now fall back to text
+- Change: Python and Rust now warn and fall back to `text` when a `[defaults]` or alias `output_mode` is unsupported by the selected runner; explicit `--output-mode` and dot-sugar requests still hard-fail when unsupported
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `rust/tests/parser_tests.rs`, `tests/test_ccc_contract_impl.py`
+- Notes: updated `docs/clis/README.md`, `docs/clis/codex.md`, `docs/clis/output-mode-compatibility.md`, and `docs/clis/output-mode-porting.md`; removed the completed backlog item from `TASKS.md` and added a follow-up for Codex `--json`
+
 ## 2026-04-13
 
 ### `ccc config` now prints every resolved config path

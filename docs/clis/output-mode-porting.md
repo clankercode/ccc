@@ -48,6 +48,11 @@ Keep an `OutputPlan`-style resolved shape with:
 - `formatted`
 - `schema`
 - `argv_flags`
+- `warnings`
+
+If an explicit CLI selector requests an unsupported mode for the resolved runner, fail with an output-mode error.
+
+If an alias or config default requests an unsupported mode for the resolved runner, add a warning and fall back to `text` when available, otherwise `stream-text`. This keeps global formatted defaults from breaking text-only runners while preserving hard failures for explicit CLI requests.
 
 Do not mix raw and formatted semantics:
 

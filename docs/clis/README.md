@@ -152,6 +152,8 @@ See [output-mode-compatibility.md](output-mode-compatibility.md) for the runner 
 
 Human-formatted output honors `FORCE_COLOR` and `NO_COLOR` before falling back to TTY detection; raw modes are unchanged.
 
+Explicit unsupported output-mode selectors fail. Unsupported `output_mode` values inherited from config defaults or aliases warn and fall back to text when `ccc` has only mapped text support for the selected runner.
+
 Implementation notes for future language ports live in [output-mode-porting.md](output-mode-porting.md).
 
 Upstream structured-output references live in [json-event-references.md](json-event-references.md).

@@ -219,6 +219,102 @@ fn test_cursor_agent_error_response() {
 }
 
 #[test]
+fn test_codex_simple_response() {
+    let raw = concat!(
+        "{\"type\":\"thread.started\",\"thread_id\":\"thread-1\"}\n",
+        "{\"type\":\"turn.started\"}\n",
+        "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Hello from Codex\"}}\n",
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":10,\"cached_input_tokens\":3,\"output_tokens\":2}}\n",
+    );
+    let parsed = parse_json_output(raw, "codex");
+    assert_eq!(parsed.schema_name, "codex");
+    assert_eq!(parsed.session_id, "thread-1");
+    assert_eq!(parsed.final_text, "Hello from Codex");
+    assert_eq!(parsed.usage.get("input_tokens").copied(), Some(10));
+    assert_eq!(parsed.usage.get("cached_input_tokens").copied(), Some(3));
+    assert_eq!(parsed.usage.get("output_tokens").copied(), Some(2));
+    assert!(parsed.unknown_json_lines.is_empty());
+}
+
+#[test]
+fn test_codex_tool_use_and_result_response() {
+    let raw = concat!(
+        "{\"type\":\"thread.started\",\"thread_id\":\"thread-2\"}\n",
+        "{\"type\":\"turn.started\"}\n",
+        "{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/usr/bin/bash -lc pwd\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n",
+        "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/usr/bin/bash -lc pwd\",\"aggregated_output\":\"/home/xertrov/src/call-coding-clis\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n",
+        "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"agent_message\",\"text\":\"done\"}}\n",
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20,\"cached_input_tokens\":4,\"output_tokens\":5}}\n",
+    );
+    let parsed = parse_codex_json(raw);
+    assert_eq!(parsed.final_text, "done");
+    let tool_use_events: Vec<_> = parsed
+        .events
+        .iter()
+        .filter(|event| event.event_type == "tool_use_start")
+        .collect();
+    let tool_result_events: Vec<_> = parsed
+        .events
+        .iter()
+        .filter(|event| event.event_type == "tool_result")
+        .collect();
+    assert_eq!(tool_use_events.len(), 1);
+    assert_eq!(tool_result_events.len(), 1);
+    assert_eq!(
+        tool_use_events[0].tool_call.as_ref().unwrap().name,
+        "command_execution"
+    );
+    assert!(tool_use_events[0]
+        .tool_call
+        .as_ref()
+        .unwrap()
+        .arguments
+        .contains("pwd"));
+    assert_eq!(
+        tool_result_events[0].tool_result.as_ref().unwrap().content,
+        "/home/xertrov/src/call-coding-clis\n"
+    );
+    assert!(!tool_result_events[0].tool_result.as_ref().unwrap().is_error);
+    assert!(parsed.unknown_json_lines.is_empty());
+}
+
+#[test]
+fn test_render_codex_tool_use() {
+    let raw = concat!(
+        "{\"type\":\"thread.started\",\"thread_id\":\"thread-3\"}\n",
+        "{\"type\":\"turn.started\"}\n",
+        "{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/usr/bin/bash -lc pwd\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n",
+        "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/usr/bin/bash -lc pwd\",\"aggregated_output\":\"/tmp/project\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n",
+        "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"agent_message\",\"text\":\"done\"}}\n",
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20,\"cached_input_tokens\":4,\"output_tokens\":5}}\n",
+    );
+    let parsed = parse_codex_json(raw);
+    let rendered = render_parsed(&parsed, true, false);
+    assert!(rendered.contains("[tool:start] command_execution: /usr/bin/bash -lc pwd"));
+    assert!(rendered.contains("[tool:result] command_execution (ok): /usr/bin/bash -lc pwd"));
+    assert!(rendered.contains("[assistant] done"));
+}
+
+#[test]
+fn test_codex_stream_processor_renders_incrementally() {
+    let raw = concat!(
+        "{\"type\":\"thread.started\",\"thread_id\":\"thread-4\"}\n",
+        "{\"type\":\"turn.started\"}\n",
+        "{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/usr/bin/bash -lc pwd\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n",
+        "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/usr/bin/bash -lc pwd\",\"aggregated_output\":\"/tmp/project\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n",
+        "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"agent_message\",\"text\":\"done\"}}\n",
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20,\"cached_input_tokens\":4,\"output_tokens\":5}}\n",
+    );
+    let mut processor =
+        StructuredStreamProcessor::new("codex", FormattedRenderer::new(true, false));
+    let rendered = processor.feed(raw);
+    assert!(rendered.contains("[tool:start] command_execution: /usr/bin/bash -lc pwd"));
+    assert!(rendered.contains("[tool:result] command_execution (ok): /usr/bin/bash -lc pwd"));
+    assert!(rendered.contains("[assistant] done"));
+    assert!(processor.take_unknown_json_lines().is_empty());
+}
+
+#[test]
 fn test_render_opencode() {
     let raw = "{\"response\":\"hello\"}\n";
     let parsed = parse_opencode_json(raw);

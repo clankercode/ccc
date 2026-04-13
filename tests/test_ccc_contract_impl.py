@@ -1200,10 +1200,12 @@ class SingleImplCccContractTests(unittest.TestCase):
             kimi_path = bin_dir / "kimi"
             opencode_path = bin_dir / "opencode"
             cursor_path = bin_dir / "cursor-agent"
+            codex_path = bin_dir / "codex"
             self._write_argv_echo_stub(claude_path, "claude")
             self._write_argv_echo_stub(kimi_path, "kimi")
             self._write_argv_echo_stub(opencode_path, "opencode")
             self._write_argv_echo_stub(cursor_path, "cursor-agent")
+            self._write_argv_echo_stub(codex_path, "codex")
 
             cases = {
                 "Python": [
@@ -1222,6 +1224,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     (
                         ["oc", ".json"],
                         "opencode run --format json --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["c", ".json"],
+                        "codex exec --json --ephemeral Fix the failing tests\n",
+                    ),
+                    (
+                        ["codex", "..json"],
+                        "codex exec --json --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["cu", ".json"],
@@ -1248,6 +1258,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     (
                         ["oc", ".json"],
                         "opencode run --format json --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["c", ".json"],
+                        "codex exec --json --ephemeral Fix the failing tests\n",
+                    ),
+                    (
+                        ["codex", "..json"],
+                        "codex exec --json --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["cu", ".json"],
@@ -1284,12 +1302,14 @@ class SingleImplCccContractTests(unittest.TestCase):
             kimi_path = bin_dir / "kimi"
             opencode_path = bin_dir / "opencode"
             cursor_path = bin_dir / "cursor-agent"
+            codex_path = bin_dir / "codex"
             self._write_structured_argv_echo_stub(claude_path, "claude", "claude-code")
             self._write_structured_argv_echo_stub(kimi_path, "kimi", "kimi")
             self._write_structured_argv_echo_stub(opencode_path, "opencode", "opencode")
             self._write_structured_argv_echo_stub(
                 cursor_path, "cursor-agent", "cursor-agent"
             )
+            self._write_structured_argv_echo_stub(codex_path, "codex", "codex")
 
             cases = {
                 "Python": [
@@ -1316,6 +1336,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     (
                         ["oc", "..fmt"],
                         "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["c", ".fmt"],
+                        "[assistant] codex exec --json --ephemeral Fix the failing tests\n",
+                    ),
+                    (
+                        ["codex", "..fmt"],
+                        "[assistant] codex exec --json --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["cu", ".fmt"],
@@ -1350,6 +1378,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     (
                         ["oc", "..fmt"],
                         "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["c", ".fmt"],
+                        "[assistant] codex exec --json --ephemeral Fix the failing tests\n",
+                    ),
+                    (
+                        ["codex", "..fmt"],
+                        "[assistant] codex exec --json --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["cu", ".fmt"],
@@ -1408,15 +1444,15 @@ class SingleImplCccContractTests(unittest.TestCase):
             tmp_path = Path(tmp)
             bin_dir = tmp_path / "bin"
             bin_dir.mkdir()
-            codex_path = bin_dir / "codex"
-            self._write_argv_echo_stub(codex_path, "codex")
+            roocode_path = bin_dir / "roocode"
+            self._write_argv_echo_stub(roocode_path, "roocode")
 
             for lang in self.selected_languages:
                 if lang.name not in {"Python", "Rust"}:
                     continue
                 env = self._make_env(bin_dir / "opencode", lang)
                 with self.subTest(language=lang.name):
-                    result = lang.invoke_with_args(["c", "..json"], PROMPT, env)
+                    result = lang.invoke_with_args(["rc", "..json"], PROMPT, env)
                     self.assertEqual(result.returncode, 1)
                     self.assertEqual(result.stdout, "")
                     self.assertIn("output mode", result.stderr)
@@ -1427,12 +1463,13 @@ class SingleImplCccContractTests(unittest.TestCase):
             bin_dir = tmp_path / "bin"
             bin_dir.mkdir()
             opencode_path = bin_dir / "opencode"
-            codex_path = bin_dir / "codex"
+            roocode_path = bin_dir / "roocode"
             self._write_opencode_stub(opencode_path)
-            self._write_codex_stub(codex_path)
+            self._write_argv_echo_stub(roocode_path, "roocode")
             expected_warning = (
-                'warning: runner "codex" does not support configured output mode '
+                'warning: runner "roocode" does not support configured output mode '
                 '"stream-formatted"; falling back to "text"\n'
+                + ROOCODE_PERSISTENCE_WARNING
             )
 
             for lang in self.selected_languages:
@@ -1445,9 +1482,9 @@ class SingleImplCccContractTests(unittest.TestCase):
                     encoding="utf-8",
                 )
                 with self.subTest(language=lang.name):
-                    result = lang.invoke_with_args(["c"], PROMPT, env)
+                    result = lang.invoke_with_args(["rc"], PROMPT, env)
                     self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertEqual(result.stdout, CODEX_RUNNER_EXPECTED)
+                    self.assertEqual(result.stdout, f"roocode {PROMPT}\n")
                     self.assertEqual(result.stderr, expected_warning)
 
     def test_alias_unsupported_output_mode_warns_and_falls_back(self) -> None:
@@ -1456,12 +1493,13 @@ class SingleImplCccContractTests(unittest.TestCase):
             bin_dir = tmp_path / "bin"
             bin_dir.mkdir()
             opencode_path = bin_dir / "opencode"
-            codex_path = bin_dir / "codex"
+            roocode_path = bin_dir / "roocode"
             self._write_opencode_stub(opencode_path)
-            self._write_codex_stub(codex_path)
+            self._write_argv_echo_stub(roocode_path, "roocode")
             expected_warning = (
-                'warning: runner "codex" does not support alias output mode '
+                'warning: runner "roocode" does not support alias output mode '
                 '"stream-formatted"; falling back to "text"\n'
+                + ROOCODE_PERSISTENCE_WARNING
             )
 
             for lang in self.selected_languages:
@@ -1470,13 +1508,13 @@ class SingleImplCccContractTests(unittest.TestCase):
                 env = self._make_env(opencode_path, lang)
                 config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
                 config_path.write_text(
-                    '[aliases.fast]\nrunner = "c"\noutput_mode = "stream-formatted"\n',
+                    '[aliases.fast]\nrunner = "rc"\noutput_mode = "stream-formatted"\n',
                     encoding="utf-8",
                 )
                 with self.subTest(language=lang.name):
                     result = lang.invoke_with_args(["@fast"], PROMPT, env)
                     self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertEqual(result.stdout, CODEX_RUNNER_EXPECTED)
+                    self.assertEqual(result.stdout, f"roocode {PROMPT}\n")
                     self.assertEqual(result.stderr, expected_warning)
 
     def test_control_tokens_are_order_independent_before_prompt(self) -> None:
@@ -1846,6 +1884,13 @@ class SingleImplCccContractTests(unittest.TestCase):
                 f'printf \'{{"type":"system","subtype":"init","session_id":"mock-cursor"}}\\n\'\n'
                 f'printf \'{{"type":"assistant","message":{{"content":[{{"type":"text","text":"{runner_name} %s"}}]}},"session_id":"mock-cursor"}}\\n\' "$*"\n'
                 f'printf \'{{"type":"result","subtype":"success","result":"{runner_name} %s","session_id":"mock-cursor"}}\\n\' "$*"\n'
+            )
+        elif schema_name == "codex":
+            body = (
+                "#!/bin/sh\n"
+                f'printf \'{{"type":"thread.started","thread_id":"mock-codex"}}\\n\'\n'
+                f'printf \'{{"type":"item.completed","item":{{"id":"item_0","type":"agent_message","text":"{runner_name} %s"}}}}\\n\' "$*"\n'
+                f'printf \'{{"type":"turn.completed","usage":{{"input_tokens":1,"output_tokens":2}}}}\\n\'\n'
             )
         else:
             body = f'#!/bin/sh\nprintf \'{{"response":"{runner_name} %s"}}\\n\' "$*"\n'

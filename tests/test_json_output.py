@@ -9,6 +9,7 @@ from call_coding_clis.json_output import (
     render_parsed,
     parse_opencode_json,
     parse_claude_code_json,
+    parse_codex_json,
     parse_cursor_agent_json,
     parse_kimi_json,
     ParsedJsonOutput,
@@ -86,6 +87,22 @@ CURSOR_AGENT_STDOUT = (
     '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Hello from Cursor"}]},"session_id":"cursor-1"}\n'
     '{"type":"result","subtype":"success","duration_ms":7319,"duration_api_ms":7319,"is_error":false,'
     '"result":"Hello from Cursor","session_id":"cursor-1","usage":{"inputTokens":1,"outputTokens":2,"cacheReadTokens":3,"cacheWriteTokens":4}}\n'
+)
+
+CODEX_STDOUT = (
+    '{"type":"thread.started","thread_id":"thread-1"}\n'
+    '{"type":"turn.started"}\n'
+    '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Hello from Codex"}}\n'
+    '{"type":"turn.completed","usage":{"input_tokens":10,"cached_input_tokens":3,"output_tokens":2}}\n'
+)
+
+CODEX_TOOL_STDOUT = (
+    '{"type":"thread.started","thread_id":"thread-2"}\n'
+    '{"type":"turn.started"}\n'
+    '{"type":"item.started","item":{"id":"item_0","type":"command_execution","command":"/usr/bin/bash -lc pwd","aggregated_output":"","exit_code":null,"status":"in_progress"}}\n'
+    '{"type":"item.completed","item":{"id":"item_0","type":"command_execution","command":"/usr/bin/bash -lc pwd","aggregated_output":"/home/xertrov/src/call-coding-clis\\n","exit_code":0,"status":"completed"}}\n'
+    '{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"done"}}\n'
+    '{"type":"turn.completed","usage":{"input_tokens":20,"cached_input_tokens":4,"output_tokens":5}}\n'
 )
 
 
@@ -204,6 +221,46 @@ class ParseCursorAgentJsonTests(unittest.TestCase):
         self.assertEqual(result.session_id, "cursor-2")
         self.assertEqual(result.error, "blocked")
         self.assertEqual(result.events[0].event_type, "error")
+
+
+class ParseCodexJsonTests(unittest.TestCase):
+    def test_simple_response(self):
+        result = parse_json_output(CODEX_STDOUT, "codex")
+        self.assertEqual(result.schema_name, "codex")
+        self.assertEqual(result.session_id, "thread-1")
+        self.assertEqual(result.final_text, "Hello from Codex")
+        self.assertEqual(result.usage["input_tokens"], 10)
+        self.assertEqual(result.usage["cached_input_tokens"], 3)
+        self.assertEqual(result.usage["output_tokens"], 2)
+        self.assertEqual(result.unknown_json_lines, [])
+
+    def test_tool_use_and_result_response(self):
+        result = parse_codex_json(CODEX_TOOL_STDOUT)
+        self.assertEqual(result.final_text, "done")
+        tool_use_events = [e for e in result.events if e.event_type == "tool_use_start"]
+        tool_result_events = [e for e in result.events if e.event_type == "tool_result"]
+        self.assertEqual(len(tool_use_events), 1)
+        self.assertEqual(len(tool_result_events), 1)
+        self.assertEqual(tool_use_events[0].tool_call.name, "command_execution")
+        self.assertIn("pwd", tool_use_events[0].tool_call.arguments)
+        self.assertEqual(tool_result_events[0].tool_result.content, "/home/xertrov/src/call-coding-clis\n")
+        self.assertFalse(tool_result_events[0].tool_result.is_error)
+        self.assertEqual(result.unknown_json_lines, [])
+
+    def test_render_codex_tool_use(self):
+        result = parse_codex_json(CODEX_TOOL_STDOUT)
+        rendered = render_parsed(result)
+        self.assertIn("[tool:start] command_execution: /usr/bin/bash -lc pwd", rendered)
+        self.assertIn("[tool:result] command_execution (ok): /usr/bin/bash -lc pwd", rendered)
+        self.assertIn("[assistant] done", rendered)
+
+    def test_stream_processor_renders_codex_incrementally(self):
+        processor = StructuredStreamProcessor("codex", FormattedRenderer())
+        rendered = processor.feed(CODEX_TOOL_STDOUT)
+        self.assertIn("[tool:start] command_execution: /usr/bin/bash -lc pwd", rendered)
+        self.assertIn("[tool:result] command_execution (ok): /usr/bin/bash -lc pwd", rendered)
+        self.assertIn("[assistant] done", rendered)
+        self.assertEqual(processor.take_unknown_json_lines(), [])
 
 
 class RenderParsedTests(unittest.TestCase):

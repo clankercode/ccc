@@ -672,7 +672,7 @@ fn test_resolve_sanitize_osc_defaults_off_after_output_mode_fallback() {
         ..Default::default()
     };
     let parsed = ParsedArgs {
-        runner: Some("c".into()),
+        runner: Some("rc".into()),
         prompt: "hello".into(),
         ..Default::default()
     };
@@ -1834,6 +1834,29 @@ fn test_resolve_opencode_stream_json_output_plan() {
 }
 
 #[test]
+fn test_resolve_codex_output_plans() {
+    let cases = [
+        ("json", false, false),
+        ("stream-json", true, false),
+        ("formatted", false, true),
+        ("stream-formatted", true, true),
+    ];
+    for (mode, stream, formatted) in cases {
+        let parsed = ParsedArgs {
+            runner: Some("c".into()),
+            output_mode: Some(mode.into()),
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let plan = resolve_output_plan(&parsed, None).unwrap();
+        assert_eq!(plan.stream, stream);
+        assert_eq!(plan.formatted, formatted);
+        assert_eq!(plan.schema.as_deref(), Some("codex"));
+        assert_eq!(plan.argv_flags, vec!["--json"]);
+    }
+}
+
+#[test]
 fn test_resolve_cursor_output_plans() {
     let cases = [
         ("json", false, false, vec!["--output-format", "json"]),
@@ -1878,7 +1901,7 @@ fn test_configured_unsupported_output_mode_falls_back_to_text() {
         ..Default::default()
     };
     let parsed = ParsedArgs {
-        runner: Some("c".into()),
+        runner: Some("rc".into()),
         prompt: "hello".into(),
         ..Default::default()
     };
@@ -1888,7 +1911,7 @@ fn test_configured_unsupported_output_mode_falls_back_to_text() {
     assert_eq!(
         plan.warnings,
         vec![
-            "warning: runner \"codex\" does not support configured output mode \"stream-formatted\"; falling back to \"text\""
+            "warning: runner \"roocode\" does not support configured output mode \"stream-formatted\"; falling back to \"text\""
         ]
     );
 }
@@ -1899,7 +1922,7 @@ fn test_alias_unsupported_output_mode_falls_back_to_text() {
     config.aliases.insert(
         "fast".into(),
         AliasDef {
-            runner: Some("c".into()),
+            runner: Some("rc".into()),
             output_mode: Some("stream-formatted".into()),
             ..Default::default()
         },
@@ -1910,12 +1933,12 @@ fn test_alias_unsupported_output_mode_falls_back_to_text() {
         ..Default::default()
     };
     let plan = resolve_output_plan(&parsed, Some(&config)).unwrap();
-    assert_eq!(plan.runner_name, "c");
+    assert_eq!(plan.runner_name, "rc");
     assert_eq!(plan.mode, "text");
     assert_eq!(
         plan.warnings,
         vec![
-            "warning: runner \"codex\" does not support alias output mode \"stream-formatted\"; falling back to \"text\""
+            "warning: runner \"roocode\" does not support alias output mode \"stream-formatted\"; falling back to \"text\""
         ]
     );
 }

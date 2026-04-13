@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-14
 
+### Codex JSONL output modes added
+- Change: Python and Rust now support Codex `json`, `stream-json`, `formatted`, and `stream-formatted` modes by passing `codex exec --json` and parsing Codex JSONL thread, assistant, command execution, and usage events
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_json_output.py`, `tests/test_parser_config.py`, `tests/test_ccc_contract_impl.py`, `tests/test_harness.py`, `tests/mock-coding-cli/mock_coding_cli.sh`, `rust/tests/json_output_tests.rs`, `rust/tests/parser_tests.rs`
+- Notes: updated `docs/clis/codex.md`, `docs/clis/output-mode-compatibility.md`, `docs/clis/json-event-references.md`, and `JSON_PARSING_MAP.md`; removed the completed Codex JSONL backlog item from `TASKS.md`
+
 ### Configured unsupported output modes now fall back to text
 - Change: Python and Rust now warn and fall back to `text` when a `[defaults]` or alias `output_mode` is unsupported by the selected runner; explicit `--output-mode` and dot-sugar requests still hard-fail when unsupported
 - Required implementations: Python and Rust

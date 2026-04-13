@@ -982,7 +982,7 @@ class ResolveCommandTests(unittest.TestCase):
 
     def test_sanitize_osc_defaults_off_after_output_mode_fallback(self):
         config = CccConfig(default_output_mode="stream-formatted")
-        parsed = ParsedArgs(runner="c", prompt="hello")
+        parsed = ParsedArgs(runner="rc", prompt="hello")
         self.assertFalse(resolve_sanitize_osc(parsed, config))
 
     def test_sanitize_osc_defaults_off_for_raw_modes(self):
@@ -1040,6 +1040,22 @@ class ResolveCommandTests(unittest.TestCase):
         self.assertEqual(plan.schema, "opencode")
         self.assertEqual(plan.argv_flags, ["--format", "json"])
 
+    def test_codex_output_plans(self):
+        cases = [
+            ("json", False, False),
+            ("stream-json", True, False),
+            ("formatted", False, True),
+            ("stream-formatted", True, True),
+        ]
+        for mode, stream, formatted in cases:
+            with self.subTest(mode=mode):
+                parsed = ParsedArgs(runner="c", output_mode=mode, prompt="hello")
+                plan = resolve_output_plan(parsed)
+                self.assertEqual(plan.stream, stream)
+                self.assertEqual(plan.formatted, formatted)
+                self.assertEqual(plan.schema, "codex")
+                self.assertEqual(plan.argv_flags, ["--json"])
+
     def test_cursor_output_plans(self):
         cases = [
             ("json", False, False, ["--output-format", "json"]),
@@ -1058,29 +1074,29 @@ class ResolveCommandTests(unittest.TestCase):
 
     def test_configured_unsupported_output_mode_falls_back_to_text(self):
         config = CccConfig(default_output_mode="stream-formatted")
-        parsed = ParsedArgs(runner="c", prompt="hello")
+        parsed = ParsedArgs(runner="rc", prompt="hello")
         plan = resolve_output_plan(parsed, config)
         self.assertEqual(plan.mode, "text")
         self.assertEqual(plan.argv_flags, [])
         self.assertEqual(
             plan.warnings,
             [
-                'warning: runner "codex" does not support configured output mode "stream-formatted"; falling back to "text"'
+                'warning: runner "roocode" does not support configured output mode "stream-formatted"; falling back to "text"'
             ],
         )
 
     def test_alias_unsupported_output_mode_falls_back_to_text(self):
         config = CccConfig(
-            aliases={"fast": AliasDef(runner="c", output_mode="stream-formatted")}
+            aliases={"fast": AliasDef(runner="rc", output_mode="stream-formatted")}
         )
         parsed = ParsedArgs(alias="fast", prompt="hello")
         plan = resolve_output_plan(parsed, config)
-        self.assertEqual(plan.runner_name, "c")
+        self.assertEqual(plan.runner_name, "rc")
         self.assertEqual(plan.mode, "text")
         self.assertEqual(
             plan.warnings,
             [
-                'warning: runner "codex" does not support alias output mode "stream-formatted"; falling back to "text"'
+                'warning: runner "roocode" does not support alias output mode "stream-formatted"; falling back to "text"'
             ],
         )
 

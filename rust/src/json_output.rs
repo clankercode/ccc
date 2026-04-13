@@ -60,6 +60,28 @@ fn new_output(schema_name: &str) -> ParsedJsonOutput {
     }
 }
 
+fn parser_state(
+    result: &ParsedJsonOutput,
+) -> (
+    usize,
+    String,
+    String,
+    String,
+    BTreeMap<String, i64>,
+    i64,
+    u64,
+) {
+    (
+        result.events.len(),
+        result.final_text.clone(),
+        result.error.clone(),
+        result.session_id.clone(),
+        result.usage.clone(),
+        result.duration_ms,
+        result.cost_usd.to_bits(),
+    )
+}
+
 fn parse_json_line(line: &str) -> Option<serde_json::Value> {
     let trimmed = line.trim();
     if trimmed.is_empty() {
@@ -717,23 +739,118 @@ fn apply_cursor_agent_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value
     }
 }
 
+fn apply_codex_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) -> bool {
+    match obj
+        .get("type")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+    {
+        "thread.started" => {
+            result.session_id = obj
+                .get("thread_id")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .to_string();
+            true
+        }
+        "turn.started" => true,
+        "turn.completed" => {
+            if let Some(usage) = obj.get("usage").and_then(|value| value.as_object()) {
+                result.usage = usage
+                    .iter()
+                    .filter_map(|(key, value)| value.as_i64().map(|count| (key.clone(), count)))
+                    .collect();
+            }
+            true
+        }
+        "item.started" | "item.completed" => {
+            let Some(item) = obj.get("item").and_then(|value| value.as_object()) else {
+                return false;
+            };
+            let item_type = item
+                .get("type")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
+            if item_type == "agent_message"
+                && obj.get("type").and_then(|value| value.as_str()) == Some("item.completed")
+            {
+                let text = item
+                    .get("text")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                result.final_text = text.clone();
+                result.events.push(JsonEvent {
+                    event_type: "assistant".into(),
+                    text,
+                    thinking: String::new(),
+                    tool_call: None,
+                    tool_result: None,
+                });
+                true
+            } else if item_type == "command_execution" {
+                let call_id = item
+                    .get("id")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let command = item
+                    .get("command")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if obj.get("type").and_then(|value| value.as_str()) == Some("item.started") {
+                    result.events.push(JsonEvent {
+                        event_type: "tool_use_start".into(),
+                        text: String::new(),
+                        thinking: String::new(),
+                        tool_call: Some(ToolCall {
+                            id: call_id,
+                            name: "command_execution".into(),
+                            arguments: serde_json::json!({ "command": command }).to_string(),
+                        }),
+                        tool_result: None,
+                    });
+                    true
+                } else {
+                    let status = item
+                        .get("status")
+                        .and_then(|value| value.as_str())
+                        .unwrap_or("");
+                    let exit_code = item.get("exit_code").and_then(|value| value.as_i64());
+                    result.events.push(JsonEvent {
+                        event_type: "tool_result".into(),
+                        text: String::new(),
+                        thinking: String::new(),
+                        tool_call: None,
+                        tool_result: Some(ToolResult {
+                            tool_call_id: call_id,
+                            content: item
+                                .get("aggregated_output")
+                                .and_then(|value| value.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            is_error: exit_code.is_some_and(|code| code != 0)
+                                || (!status.is_empty() && status != "completed"),
+                        }),
+                    });
+                    true
+                }
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
 pub fn parse_opencode_json(raw: &str) -> ParsedJsonOutput {
     let mut result = new_output("opencode");
     for line in raw.lines() {
         if let Some(obj) = parse_json_line(line) {
-            let before = (
-                result.events.len(),
-                result.final_text.clone(),
-                result.error.clone(),
-                result.session_id.clone(),
-            );
+            let before = parser_state(&result);
             apply_opencode_obj(&mut result, &obj);
-            let after = (
-                result.events.len(),
-                result.final_text.clone(),
-                result.error.clone(),
-                result.session_id.clone(),
-            );
+            let after = parser_state(&result);
             if before == after {
                 result.unknown_json_lines.push(line.trim().to_string());
             }
@@ -746,19 +863,9 @@ pub fn parse_claude_code_json(raw: &str) -> ParsedJsonOutput {
     let mut result = new_output("claude-code");
     for line in raw.lines() {
         if let Some(obj) = parse_json_line(line) {
-            let before = (
-                result.events.len(),
-                result.final_text.clone(),
-                result.error.clone(),
-                result.session_id.clone(),
-            );
+            let before = parser_state(&result);
             apply_claude_obj(&mut result, &obj);
-            let after = (
-                result.events.len(),
-                result.final_text.clone(),
-                result.error.clone(),
-                result.session_id.clone(),
-            );
+            let after = parser_state(&result);
             if before == after {
                 result.unknown_json_lines.push(line.trim().to_string());
             }
@@ -771,19 +878,9 @@ pub fn parse_kimi_json(raw: &str) -> ParsedJsonOutput {
     let mut result = new_output("kimi");
     for line in raw.lines() {
         if let Some(obj) = parse_json_line(line) {
-            let before = (
-                result.events.len(),
-                result.final_text.clone(),
-                result.error.clone(),
-                result.session_id.clone(),
-            );
+            let before = parser_state(&result);
             apply_kimi_obj(&mut result, &obj);
-            let after = (
-                result.events.len(),
-                result.final_text.clone(),
-                result.error.clone(),
-                result.session_id.clone(),
-            );
+            let after = parser_state(&result);
             if before == after {
                 result.unknown_json_lines.push(line.trim().to_string());
             }
@@ -796,20 +893,22 @@ pub fn parse_cursor_agent_json(raw: &str) -> ParsedJsonOutput {
     let mut result = new_output("cursor-agent");
     for line in raw.lines() {
         if let Some(obj) = parse_json_line(line) {
-            let before = (
-                result.events.len(),
-                result.final_text.clone(),
-                result.error.clone(),
-                result.session_id.clone(),
-            );
+            let before = parser_state(&result);
             apply_cursor_agent_obj(&mut result, &obj);
-            let after = (
-                result.events.len(),
-                result.final_text.clone(),
-                result.error.clone(),
-                result.session_id.clone(),
-            );
+            let after = parser_state(&result);
             if before == after {
+                result.unknown_json_lines.push(line.trim().to_string());
+            }
+        }
+    }
+    result
+}
+
+pub fn parse_codex_json(raw: &str) -> ParsedJsonOutput {
+    let mut result = new_output("codex");
+    for line in raw.lines() {
+        if let Some(obj) = parse_json_line(line) {
+            if !apply_codex_obj(&mut result, &obj) {
                 result.unknown_json_lines.push(line.trim().to_string());
             }
         }
@@ -823,6 +922,7 @@ pub fn parse_json_output(raw: &str, schema: &str) -> ParsedJsonOutput {
         "claude-code" => parse_claude_code_json(raw),
         "kimi" => parse_kimi_json(raw),
         "cursor-agent" => parse_cursor_agent_json(raw),
+        "codex" => parse_codex_json(raw),
         _ => ParsedJsonOutput {
             schema_name: schema.into(),
             events: Vec::new(),
@@ -1144,23 +1244,14 @@ impl StructuredStreamProcessor {
             let line = self.buffer[..index].to_string();
             self.buffer = self.buffer[index + 1..].to_string();
             if let Some(obj) = parse_json_line(&line) {
-                let before = (
-                    self.output.events.len(),
-                    self.output.final_text.clone(),
-                    self.output.error.clone(),
-                    self.output.session_id.clone(),
-                );
-                self.apply(&obj);
-                let after = (
-                    self.output.events.len(),
-                    self.output.final_text.clone(),
-                    self.output.error.clone(),
-                    self.output.session_id.clone(),
-                );
-                if before == after {
+                let before = parser_state(&self.output);
+                let event_count = self.output.events.len();
+                let recognized = self.apply(&obj);
+                let after = parser_state(&self.output);
+                if before == after && !recognized {
                     self.unknown_json_lines.push(line.trim().to_string());
                 }
-                for event in &self.output.events[before.0..] {
+                for event in &self.output.events[event_count..] {
                     if let Some(text) = self.renderer.render_event(event) {
                         rendered.push(text);
                     }
@@ -1176,23 +1267,14 @@ impl StructuredStreamProcessor {
         }
         let line = std::mem::take(&mut self.buffer);
         if let Some(obj) = parse_json_line(&line) {
-            let before = (
-                self.output.events.len(),
-                self.output.final_text.clone(),
-                self.output.error.clone(),
-                self.output.session_id.clone(),
-            );
-            self.apply(&obj);
-            let after = (
-                self.output.events.len(),
-                self.output.final_text.clone(),
-                self.output.error.clone(),
-                self.output.session_id.clone(),
-            );
-            if before == after {
+            let before = parser_state(&self.output);
+            let event_count = self.output.events.len();
+            let recognized = self.apply(&obj);
+            let after = parser_state(&self.output);
+            if before == after && !recognized {
                 self.unknown_json_lines.push(line.trim().to_string());
             }
-            return self.output.events[before.0..]
+            return self.output.events[event_count..]
                 .iter()
                 .filter_map(|event| self.renderer.render_event(event))
                 .collect::<Vec<_>>()
@@ -1205,13 +1287,26 @@ impl StructuredStreamProcessor {
         std::mem::take(&mut self.unknown_json_lines)
     }
 
-    fn apply(&mut self, obj: &serde_json::Value) {
+    fn apply(&mut self, obj: &serde_json::Value) -> bool {
         match self.schema.as_str() {
-            "opencode" => apply_opencode_obj(&mut self.output, obj),
-            "claude-code" => apply_claude_obj(&mut self.output, obj),
-            "kimi" => apply_kimi_obj(&mut self.output, obj),
-            "cursor-agent" => apply_cursor_agent_obj(&mut self.output, obj),
-            _ => {}
+            "opencode" => {
+                apply_opencode_obj(&mut self.output, obj);
+                false
+            }
+            "claude-code" => {
+                apply_claude_obj(&mut self.output, obj);
+                false
+            }
+            "kimi" => {
+                apply_kimi_obj(&mut self.output, obj);
+                false
+            }
+            "cursor-agent" => {
+                apply_cursor_agent_obj(&mut self.output, obj);
+                false
+            }
+            "codex" => apply_codex_obj(&mut self.output, obj),
+            _ => false,
         }
     }
 }

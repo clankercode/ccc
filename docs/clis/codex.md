@@ -13,6 +13,12 @@
 codex exec --ephemeral "your prompt"
 ```
 
+Structured output shape:
+
+```sh
+codex exec --json --ephemeral "your prompt"
+```
+
 Useful flags from local help:
 
 - `--model`
@@ -59,6 +65,7 @@ codex exec --help | rg "sandbox|full-auto|dangerously"
 - `ccc` uses `codex exec`
 - Python and Rust add `--ephemeral` by default so `ccc` runs do not persist Codex session files
 - `ccc --save-session c ...` omits `--ephemeral` and restores normal Codex session saving
-- upstream `codex exec --json` emits JSONL events, but `ccc` does not yet map that transport to `json`, `stream-json`, or formatted modes
+- Python and Rust map `json`, `stream-json`, `formatted`, and `stream-formatted` to `codex exec --json`
+- the Codex JSONL parser extracts `thread.started.thread_id`, completed assistant messages, command execution start/result events, and `turn.completed.usage`
 - do not depend on undocumented aliases that may happen to work locally
 - if we add finer controls, Codex is a good fit for `--sandbox` style options

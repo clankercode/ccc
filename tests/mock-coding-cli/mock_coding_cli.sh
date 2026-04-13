@@ -6,7 +6,7 @@
 # If stdin starts with "PROMPT:", echo the remainder and exit.
 # Otherwise, match argv against the prompt table below.
 #
-# JSON output mode: set MOCK_JSON_SCHEMA to "opencode", "claude-code", "kimi-code", or "cursor-agent"
+# JSON output mode: set MOCK_JSON_SCHEMA to "opencode", "claude-code", "kimi-code", "cursor-agent", or "codex"
 # Default (unset): plain text mode (backward compatible)
 
 SCHEMA="${MOCK_JSON_SCHEMA:-}"
@@ -93,6 +93,31 @@ json_cursor_result() {
     printf '{"type":"result","subtype":"%s","duration_ms":100,"duration_api_ms":80,"is_error":false,"result":"%s","session_id":"mock-cursor","usage":{"inputTokens":10,"outputTokens":5}}\n' "$_subtype" "$_text"
 }
 
+json_codex_init() {
+    printf '{"type":"thread.started","thread_id":"mock-codex"}\n'
+    printf '{"type":"turn.started"}\n'
+}
+
+json_codex_assistant() {
+    _text="$1"
+    printf '{"type":"item.completed","item":{"id":"item_mock_message","type":"agent_message","text":"%s"}}\n' "$_text"
+}
+
+json_codex_result() {
+    printf '{"type":"turn.completed","usage":{"input_tokens":10,"cached_input_tokens":3,"output_tokens":5}}\n'
+}
+
+json_codex_command_start() {
+    _command="$1"
+    printf '{"type":"item.started","item":{"id":"item_mock_command","type":"command_execution","command":"%s","aggregated_output":"","exit_code":null,"status":"in_progress"}}\n' "$_command"
+}
+
+json_codex_command_result() {
+    _command="$1"
+    _content="$2"
+    printf '{"type":"item.completed","item":{"id":"item_mock_command","type":"command_execution","command":"%s","aggregated_output":"%s","exit_code":0,"status":"completed"}}\n' "$_command" "$_content"
+}
+
 # --- output dispatcher ---
 
 emit_stdout() {
@@ -102,6 +127,7 @@ emit_stdout() {
         claude-code) json_claude_init; json_claude_assistant "$_text"; json_claude_result "$_text" 0 ;;
         kimi-code)   json_kimi_assistant "$_text" ;;
         cursor-agent) json_cursor_init; json_cursor_assistant "$_text"; json_cursor_result "$_text" 0 ;;
+        codex)       json_codex_init; json_codex_assistant "$_text"; json_codex_result ;;
         *)           printf '%s\n' "$_text" ;;
     esac
 }
@@ -113,6 +139,7 @@ emit_stderr() {
         claude-code) printf '{"type":"result","subtype":"error","error":"%s","session_id":"mock-session"}\n' "$_text" >&2 ;;
         kimi-code)   printf '{"role":"tool","content":[{"type":"text","text":"<system>ERROR: %s</system>"}]}\n' "$_text" >&2 ;;
         cursor-agent) printf '{"type":"result","subtype":"error","error":"%s","session_id":"mock-cursor"}\n' "$_text" >&2 ;;
+        codex)       printf '{"type":"item.completed","item":{"id":"item_mock_error","type":"agent_message","text":"%s"}}\n' "$_text" >&2 ;;
         *)           printf '%s\n' "$_text" >&2 ;;
     esac
 }
@@ -133,6 +160,11 @@ emit_exit_42() {
         cursor-agent)
             json_cursor_init
             json_cursor_result "$_text" 42 >&2
+            ;;
+        codex)
+            json_codex_init >&2
+            json_codex_assistant "$_text" >&2
+            json_codex_result >&2
             ;;
         *)
             printf 'mock: intentional failure\n' >&2
@@ -161,6 +193,12 @@ emit_mixed_streams() {
             json_cursor_assistant "mock: out"
             printf '{"type":"result","subtype":"error","error":"mock: err","session_id":"mock-cursor"}\n' >&2
             ;;
+        codex)
+            json_codex_init
+            json_codex_assistant "mock: out"
+            json_codex_result
+            printf '{"type":"item.completed","item":{"id":"item_mock_error","type":"agent_message","text":"mock: err"}}\n' >&2
+            ;;
         *)
             printf 'mock: out\n'
             printf 'mock: err\n' >&2
@@ -183,6 +221,11 @@ emit_multiline() {
             json_cursor_assistant "line1\nline2\nline3"
             json_cursor_result "line1\nline2\nline3" 0
             ;;
+        codex)
+            json_codex_init
+            json_codex_assistant "line1\nline2\nline3"
+            json_codex_result
+            ;;
         *)           printf 'line1\nline2\nline3\n' ;;
     esac
     exit 0
@@ -202,6 +245,11 @@ emit_large_output() {
             json_cursor_init
             json_cursor_assistant "$_large"
             json_cursor_result "$_large" 0
+            ;;
+        codex)
+            json_codex_init
+            json_codex_assistant "$_large"
+            json_codex_result
             ;;
         *)           printf '%s\n' "$_large" ;;
     esac
@@ -230,6 +278,12 @@ emit_stderr_test() {
             json_cursor_result "mock: stdout output" 0
             printf '{"type":"system","subtype":"api_retry","error":"mock: stderr output","session_id":"mock-cursor"}\n' >&2
             ;;
+        codex)
+            json_codex_init
+            json_codex_assistant "mock: stdout output"
+            json_codex_result
+            printf '{"type":"item.completed","item":{"id":"item_mock_error","type":"agent_message","text":"mock: stderr output"}}\n' >&2
+            ;;
         *)
             printf 'mock: stdout output\n'
             printf 'mock: stderr output\n' >&2
@@ -252,6 +306,11 @@ emit_stdin() {
             json_cursor_init
             json_cursor_assistant "mock: stdin received: $_text"
             json_cursor_result "mock: stdin received: $_text" 0
+            ;;
+        codex)
+            json_codex_init
+            json_codex_assistant "mock: stdin received: $_text"
+            json_codex_result
             ;;
         *)           printf 'mock: stdin received: %s\n' "$_text" ;;
     esac
@@ -280,6 +339,12 @@ emit_unknown() {
             json_cursor_assistant "$_escaped"
             json_cursor_result "$_escaped" 0
             ;;
+        codex)
+            _escaped=$(json_escape "mock: unknown prompt '$_prompt'")
+            json_codex_init
+            json_codex_assistant "$_escaped"
+            json_codex_result
+            ;;
         *)           printf "mock: unknown prompt '%s'\n" "$_prompt" ;;
     esac
     exit 0
@@ -291,6 +356,7 @@ emit_usage_error() {
         claude-code) printf '{"type":"result","subtype":"error","error":"usage: opencode run \\"<Prompt>\\"","session_id":"mock-session"}\n' >&2 ;;
         kimi-code)   printf '{"role":"tool","content":[{"type":"text","text":"<system>ERROR: usage: opencode run \\"<Prompt>\\"</system>"}]}\n' >&2 ;;
         cursor-agent) printf '{"type":"result","subtype":"error","error":"usage: cursor-agent --print \\"<Prompt>\\"","session_id":"mock-cursor"}\n' >&2 ;;
+        codex)       printf '{"type":"item.completed","item":{"id":"item_mock_error","type":"agent_message","text":"usage: codex exec \\"<Prompt>\\""}}\n' >&2 ;;
         *)           printf 'usage: opencode run "<Prompt>"\n' >&2 ;;
     esac
     exit 1
@@ -319,6 +385,13 @@ emit_tool_call() {
             json_cursor_init
             json_cursor_assistant "mock: tool call executed"
             json_cursor_result "mock: tool call executed" 0
+            ;;
+        codex)
+            json_codex_init
+            json_codex_command_start "/usr/bin/bash -lc pwd"
+            json_codex_command_result "/usr/bin/bash -lc pwd" "/tmp/project\\n"
+            json_codex_assistant "mock: tool call executed"
+            json_codex_result
             ;;
         *)
             printf 'mock: tool call executed\n'
@@ -390,14 +463,14 @@ case "$stdin_data" in
 esac
 
 # --- argv parsing ---
-if [ "$1" = "run" ]; then
+if [ "$1" = "run" ] || [ "$1" = "exec" ]; then
     shift
 fi
 
 prompt=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        -p|--print|--trust|--verbose|--include-partial-messages|--no-thinking|--yolo|--plan|--full-auto|--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox|--no-session-persistence|--ephemeral|--save-session|--cleanup-session)
+        -p|--print|--trust|--verbose|--include-partial-messages|--no-thinking|--yolo|--plan|--full-auto|--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox|--no-session-persistence|--ephemeral|--save-session|--cleanup-session|--json)
             shift
             ;;
         --thinking)

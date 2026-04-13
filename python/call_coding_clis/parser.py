@@ -358,6 +358,15 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
             "formatted",
             "stream-formatted",
         }
+    if key in {"c", "cx", "codex"}:
+        return {
+            "text",
+            "stream-text",
+            "json",
+            "stream-json",
+            "formatted",
+            "stream-formatted",
+        }
     if key in {"cu", "cursor"}:
         return {
             "text",
@@ -508,6 +517,16 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
             formatted="formatted" in mode,
             schema="opencode",
             argv_flags=["--format", "json"],
+            warnings=warnings,
+        )
+    if key in {"c", "cx", "codex"}:
+        return OutputPlan(
+            runner_name=effective_runner_name,
+            mode=mode,
+            stream=mode.startswith("stream-"),
+            formatted="formatted" in mode,
+            schema="codex",
+            argv_flags=["--json"],
             warnings=warnings,
         )
     if key in {"cu", "cursor"}:

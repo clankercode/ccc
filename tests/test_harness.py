@@ -556,6 +556,8 @@ class CrossLanguageHarness(unittest.TestCase):
         kimi_link.symlink_to(MOCK_BIN)
         cursor_link = cls.bin_dir / "cursor-agent"
         cursor_link.symlink_to(MOCK_BIN)
+        codex_link = cls.bin_dir / "codex"
+        codex_link.symlink_to(MOCK_BIN)
 
         cls.base_env = os.environ.copy()
         cls.base_env["PATH"] = f"{cls.bin_dir}:{cls.base_env.get('PATH', '')}"
@@ -666,6 +668,26 @@ class CrossLanguageHarness(unittest.TestCase):
                 "tool call",
                 "opencode",
                 ["[assistant] mock: tool call executed"],
+            ),
+            (
+                ["c", ".fmt"],
+                "tool call",
+                "codex",
+                [
+                    "[tool:start] command_execution: /usr/bin/bash -lc pwd",
+                    "[tool:result] command_execution (ok): /usr/bin/bash -lc pwd",
+                    "[assistant] mock: tool call executed",
+                ],
+            ),
+            (
+                ["codex", "..fmt"],
+                "tool call",
+                "codex",
+                [
+                    "[tool:start] command_execution: /usr/bin/bash -lc pwd",
+                    "[tool:result] command_execution (ok): /usr/bin/bash -lc pwd",
+                    "[assistant] mock: tool call executed",
+                ],
             ),
             (
                 ["cu", ".fmt"],

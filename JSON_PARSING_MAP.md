@@ -7,7 +7,7 @@ All 17 implementations share the same data model and parsing behavior.
 
 ```
 ParsedJsonOutput
-  schema_name : str          # "opencode" | "claude-code" | "kimi"
+  schema_name : str          # "opencode" | "claude-code" | "kimi" | "cursor-agent" | "codex"
   events      : [JsonEvent]
   final_text  : str
   session_id  : str
@@ -30,23 +30,27 @@ ToolResult → tool_call_id, content, is_error
 
 ## Which ParsedJsonOutput fields each schema populates
 
-| Field | opencode | claude-code | kimi |
-|---|:---:|:---:|:---:|
-| final_text | `response` | message text or result | content text parts |
-| session_id | — | system.init | — |
-| error | top-level key | result.error | — |
-| usage | — | message + result | — |
-| cost_usd | — | result | — |
-| duration_ms | — | result | — |
+| Field | opencode | claude-code | kimi | cursor-agent | codex |
+|---|:---:|:---:|:---:|:---:|:---:|
+| final_text | `response` | message text or result | content text parts | assistant/result text | completed agent message |
+| session_id | `sessionID` | system.init | — | system/result | thread.started |
+| error | top-level key | result.error | — | result.error | — |
+| usage | tokens | message + result | — | result | turn.completed |
+| cost_usd | step_finish | result | — | — | — |
+| duration_ms | — | result | — | result | — |
 
 ## OpenCode
 
-Single JSON object, no streaming.
+JSON event stream (`--format json`), with legacy one-shot `response` and `error` objects still accepted.
 
 | Wire key | Extracted | → Event type |
 |---|---|---|
 | `response` | yes | `text` |
 | `error` | yes | `error` |
+| `step_start` | `sessionID` | (sets `session_id`) |
+| `text` | `part.text` | `text` |
+| `tool_use` | tool name, call id, input, output | `tool_use`, `tool_result` |
+| `step_finish` | token usage, cost | (sets output fields) |
 | everything else | raw_lines only | — |
 
 ## Claude Code
@@ -106,3 +110,29 @@ All produce events with type = wire `type` lowercased. **No payload fields are e
 **Filtered out**: Kimi tool result text parts starting with `<system>` are dropped (includes error markers like `<system>ERROR:...</system>`). `is_error` always defaults to `false`.
 
 **Ignored wire shapes** (no handler): `notification`, `plan_display`, `role=user`
+
+## Cursor Agent
+
+NDJSON (`--output-format json` or `--output-format stream-json`).
+
+| Wire line type | Extracted fields | → Event type |
+|---|---|---|
+| `system` subtype=`init` | `session_id` | (sets output field) |
+| `assistant` | message content text | `assistant` |
+| `result` subtype=`success` | `result`, `session_id`, `duration_ms`, `usage` | `result` |
+| `result` subtype=`error` or `is_error=true` | `error` or `result` | `error` |
+
+## Codex
+
+JSONL (`codex exec --json`).
+
+| Wire line type | Extracted fields | → Event type |
+|---|---|---|
+| `thread.started` | `thread_id` | (sets `session_id`) |
+| `turn.started` | — | — |
+| `item.started`, item type=`command_execution` | `item.id`, `item.command` | `tool_use_start` |
+| `item.completed`, item type=`command_execution` | `item.id`, `aggregated_output`, `exit_code`, `status` | `tool_result` |
+| `item.completed`, item type=`agent_message` | `item.text` | `assistant` |
+| `turn.completed` | `usage` counters | (sets output field) |
+
+Codex command execution items use normalized tool name `command_execution` and store the command preview in `ToolCall.arguments` as `{"command": "..."}` so formatted rendering can show the shell command consistently.

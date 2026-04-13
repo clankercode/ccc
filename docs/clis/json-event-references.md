@@ -127,6 +127,28 @@ Current `ccc` integration note:
 - Real smoke verification with `--output-format stream-json` observed newline-delimited `system`, `user`, `assistant`, and `result` objects.
 - `ccc` does not pass `--stream-partial-output` for v1 Cursor support because local smoke verification showed duplicate assistant text events for the same final answer.
 
+## Codex
+
+Primary reference:
+
+- Local `codex exec --help` verified on 2026-04-14.
+
+Relevant local CLI surface:
+
+- `codex exec --json`
+- `--ephemeral`
+- `--model`
+- `--sandbox read-only|workspace-write|danger-full-access`
+- `--dangerously-bypass-approvals-and-sandbox`
+
+Current `ccc` integration note:
+
+- `ccc` uses `codex exec --json` for `json`, `stream-json`, `formatted`, and `stream-formatted`.
+- Real smoke verification observed `thread.started`, `turn.started`, `item.started`, `item.completed`, and `turn.completed` JSONL objects.
+- Assistant output is carried by completed `agent_message` items.
+- Shell/tool work is carried by `command_execution` items with `command`, `aggregated_output`, `exit_code`, and `status`.
+- Usage counters are carried by `turn.completed.usage`, including observed `input_tokens`, `cached_input_tokens`, and `output_tokens`.
+
 ## How To Use These References
 
 When updating a parser or adding a new language implementation:

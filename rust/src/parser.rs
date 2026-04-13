@@ -12,6 +12,14 @@ const OUTPUT_MODES: &[&str] = &[
     "formatted",
     "stream-formatted",
 ];
+const KIMI_OUTPUT_MODES: &[&str] = &[
+    "text",
+    "stream-text",
+    "stream-json",
+    "formatted",
+    "stream-formatted",
+];
+const TEXT_OUTPUT_MODES: &[&str] = &["text", "stream-text"];
 
 #[derive(Clone, Debug)]
 pub struct RunnerInfo {
@@ -769,38 +777,11 @@ fn resolve_effective_runner<'a>(
 
 fn supported_output_modes(runner_name: &str) -> &'static [&'static str] {
     match runner_name {
-        "cc" | "claude" => &[
-            "text",
-            "stream-text",
-            "json",
-            "stream-json",
-            "formatted",
-            "stream-formatted",
-        ],
-        "k" | "kimi" => &[
-            "text",
-            "stream-text",
-            "stream-json",
-            "formatted",
-            "stream-formatted",
-        ],
-        "oc" | "opencode" => &[
-            "text",
-            "stream-text",
-            "json",
-            "stream-json",
-            "formatted",
-            "stream-formatted",
-        ],
-        "cu" | "cursor" => &[
-            "text",
-            "stream-text",
-            "json",
-            "stream-json",
-            "formatted",
-            "stream-formatted",
-        ],
-        _ => &["text", "stream-text"],
+        "cc" | "claude" | "oc" | "opencode" | "c" | "cx" | "codex" | "cu" | "cursor" => {
+            OUTPUT_MODES
+        }
+        "k" | "kimi" => KIMI_OUTPUT_MODES,
+        _ => TEXT_OUTPUT_MODES,
     }
 }
 
@@ -957,6 +938,18 @@ pub fn resolve_output_plan(
             formatted: mode.contains("formatted"),
             schema: Some("opencode".into()),
             argv_flags: vec!["--format".into(), "json".into()],
+            warnings,
+        });
+    }
+
+    if matches!(runner_name.as_str(), "c" | "cx" | "codex") {
+        return Ok(OutputPlan {
+            runner_name,
+            mode: mode.clone(),
+            stream: mode.starts_with("stream-"),
+            formatted: mode.contains("formatted"),
+            schema: Some("codex".into()),
+            argv_flags: vec!["--json".into()],
             warnings,
         });
     }

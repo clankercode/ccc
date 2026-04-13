@@ -491,6 +491,75 @@ def _apply_cursor_agent_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bo
     return False
 
 
+def _apply_codex_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
+    result.raw_lines.append(obj)
+    msg_type = str(obj.get("type", ""))
+
+    if msg_type == "thread.started":
+        result.session_id = str(obj.get("thread_id", ""))
+        return True
+
+    if msg_type == "turn.started":
+        return True
+
+    if msg_type == "turn.completed":
+        usage = obj.get("usage", {})
+        if isinstance(usage, dict):
+            result.usage = {
+                str(key): int(value)
+                for key, value in usage.items()
+                if isinstance(value, int)
+            }
+        return True
+
+    if msg_type in {"item.started", "item.completed"}:
+        item = obj.get("item", {})
+        if not isinstance(item, dict):
+            return False
+        item_type = str(item.get("type", ""))
+        if item_type == "agent_message" and msg_type == "item.completed":
+            text = str(item.get("text", ""))
+            result.final_text = text
+            result.events.append(JsonEvent(event_type="assistant", text=text, raw=obj))
+            return True
+        if item_type == "command_execution":
+            command = str(item.get("command", ""))
+            call_id = str(item.get("id", ""))
+            if msg_type == "item.started":
+                result.events.append(
+                    JsonEvent(
+                        event_type="tool_use_start",
+                        tool_call=ToolCall(
+                            id=call_id,
+                            name="command_execution",
+                            arguments=json.dumps({"command": command}),
+                        ),
+                        raw=obj,
+                    )
+                )
+                return True
+            exit_code = item.get("exit_code")
+            status = str(item.get("status", ""))
+            is_error = (
+                isinstance(exit_code, int)
+                and exit_code != 0
+                or bool(status and status != "completed")
+            )
+            result.events.append(
+                JsonEvent(
+                    event_type="tool_result",
+                    tool_result=ToolResult(
+                        tool_call_id=call_id,
+                        content=str(item.get("aggregated_output", "")),
+                        is_error=is_error,
+                    ),
+                    raw=obj,
+                )
+            )
+            return True
+    return False
+
+
 def parse_opencode_json(raw_stdout: str) -> ParsedJsonOutput:
     result = _new_output("opencode")
     for line in raw_stdout.splitlines():
@@ -527,11 +596,21 @@ def parse_cursor_agent_json(raw_stdout: str) -> ParsedJsonOutput:
     return result
 
 
+def parse_codex_json(raw_stdout: str) -> ParsedJsonOutput:
+    result = _new_output("codex")
+    for line in raw_stdout.splitlines():
+        obj, raw_line = _parse_json_line(line)
+        if obj is not None and not _apply_codex_obj(result, obj):
+            result.unknown_json_lines.append(raw_line)
+    return result
+
+
 PARSERS = {
     "opencode": parse_opencode_json,
     "claude-code": parse_claude_code_json,
     "kimi": parse_kimi_json,
     "cursor-agent": parse_cursor_agent_json,
+    "codex": parse_codex_json,
 }
 
 
@@ -756,6 +835,7 @@ class StructuredStreamProcessor:
             "claude-code": _apply_claude_obj,
             "kimi": _apply_kimi_obj,
             "cursor-agent": _apply_cursor_agent_obj,
+            "codex": _apply_codex_obj,
         }.get(schema)
         self._buffer = ""
         self._unknown_lines: list[str] = []

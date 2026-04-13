@@ -873,7 +873,10 @@ fn session_persistence_pre_run_warnings(
         return Vec::new();
     }
     let display = canonical_session_runner_name(runner_name);
-    if !matches!(display.as_str(), "opencode" | "kimi" | "crush" | "roocode") {
+    if !matches!(
+        display.as_str(),
+        "opencode" | "kimi" | "crush" | "roocode" | "cursor"
+    ) {
         return Vec::new();
     }
     vec![format!(
@@ -887,6 +890,7 @@ fn canonical_session_runner_name(runner_name: &str) -> String {
         "k" | "kimi" => "kimi".to_string(),
         "cr" | "crush" => "crush".to_string(),
         "rc" | "roocode" => "roocode".to_string(),
+        "cu" | "cursor" => "cursor".to_string(),
         _ => runner_name.to_string(),
     }
 }
@@ -1034,6 +1038,7 @@ fn apply_real_runner_override(spec: &mut call_coding_clis::CommandSpec) {
         "opencode" => Some("CCC_REAL_OPENCODE"),
         "claude" => Some("CCC_REAL_CLAUDE"),
         "kimi" => Some("CCC_REAL_KIMI"),
+        "cursor-agent" => Some("CCC_REAL_CURSOR"),
         _ => None,
     };
     if let Some(env_var) = env_var {
@@ -1165,6 +1170,10 @@ mod tests {
         assert!(session_persistence_pre_run_warnings(true, false, "oc").is_empty());
         assert!(session_persistence_pre_run_warnings(false, true, "oc").is_empty());
         assert!(session_persistence_pre_run_warnings(false, false, "cc").is_empty());
+        assert_eq!(
+            session_persistence_pre_run_warnings(false, false, "cu"),
+            vec!["warning: runner \"cursor\" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup".to_string()]
+        );
     }
 
     fn unique_tmp_dir(name: &str) -> PathBuf {
@@ -1239,6 +1248,21 @@ mod tests {
         let mut spec = call_coding_clis::CommandSpec::new(["kimi", "--prompt", "hello"]);
         apply_real_runner_override(&mut spec);
         assert_eq!(spec.argv[0], "/tmp/mock-kimi");
+        if let Some(value) = original {
+            unsafe { std::env::set_var(key, value) };
+        } else {
+            unsafe { std::env::remove_var(key) };
+        }
+    }
+
+    #[test]
+    fn apply_real_runner_override_for_cursor() {
+        let key = "CCC_REAL_CURSOR";
+        let original = std::env::var(key).ok();
+        unsafe { std::env::set_var(key, "/tmp/mock-cursor") };
+        let mut spec = call_coding_clis::CommandSpec::new(["cursor-agent", "--print", "hello"]);
+        apply_real_runner_override(&mut spec);
+        assert_eq!(spec.argv[0], "/tmp/mock-cursor");
         if let Some(value) = original {
             unsafe { std::env::set_var(key, value) };
         } else {

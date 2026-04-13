@@ -32,6 +32,7 @@ OPENCODE_PERSISTENCE_WARNING = 'warning: runner "opencode" may save this session
 KIMI_PERSISTENCE_WARNING = 'warning: runner "kimi" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
 CRUSH_PERSISTENCE_WARNING = 'warning: runner "crush" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
 ROOCODE_PERSISTENCE_WARNING = 'warning: runner "roocode" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
+CURSOR_PERSISTENCE_WARNING = 'warning: runner "cursor" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
 HELP_USAGE_LINE = 'ccc [controls...] "<Prompt>"'
 HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, treat it as an agent"
@@ -342,6 +343,30 @@ class SingleImplCccContractTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(result.stdout, KIMI_RUNNER_EXPECTED)
                     self.assertIn(result.stderr, {"", KIMI_PERSISTENCE_WARNING})
+
+    def test_env_override_can_replace_cursor_binary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            cursor_path = bin_dir / "cursor-mock"
+            self._write_opencode_stub(opencode_path)
+            self._write_runner_stub(cursor_path, "cursor-agent")
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                with self.subTest(language=lang.name, env="CCC_REAL_CURSOR"):
+                    env = self._make_env(opencode_path, lang)
+                    env["CCC_REAL_CURSOR"] = str(cursor_path)
+                    result = lang.invoke_extra(["cu", "--save-session", PROMPT], env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(
+                        result.stdout,
+                        "cursor-agent --print --trust Fix the failing tests\n",
+                    )
+                    self.assertEqual(result.stderr, "")
 
     def test_name_without_preset_falls_back_to_agent(self) -> None:
         self._run_with_agent_stub_extra_args_assertion(
@@ -820,11 +845,13 @@ class SingleImplCccContractTests(unittest.TestCase):
             kimi_path = bin_dir / "kimi"
             opencode_path = bin_dir / "opencode"
             roocode_path = bin_dir / "roocode"
+            cursor_path = bin_dir / "cursor-agent"
             self._write_argv_echo_stub(claude_path, "claude")
             self._write_argv_echo_stub(codex_path, "codex")
             self._write_argv_echo_stub(kimi_path, "kimi")
             self._write_opencode_yolo_stub(opencode_path)
             self._write_argv_echo_stub(roocode_path, "roocode")
+            self._write_argv_echo_stub(cursor_path, "cursor-agent")
 
             cases = {
                 "Python": [
@@ -870,6 +897,22 @@ class SingleImplCccContractTests(unittest.TestCase):
                         'warning: runner "k" does not support permission mode "auto"; ignoring it\n'
                         + KIMI_PERSISTENCE_WARNING,
                     ),
+                    (
+                        ["cu", "--permission-mode", "safe"],
+                        "cursor-agent --print --trust --sandbox enabled Fix the failing tests\n",
+                        CURSOR_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["cursor", "--permission-mode", "plan"],
+                        "cursor-agent --print --trust --mode plan Fix the failing tests\n",
+                        CURSOR_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["cu", "--permission-mode", "auto"],
+                        "cursor-agent --print --trust Fix the failing tests\n",
+                        'warning: runner "cu" does not support permission mode "auto"; ignoring it\n'
+                        + CURSOR_PERSISTENCE_WARNING,
+                    ),
                 ],
                 "Rust": [
                     (
@@ -913,6 +956,22 @@ class SingleImplCccContractTests(unittest.TestCase):
                         "kimi --thinking --prompt Fix the failing tests\n",
                         'warning: runner "k" does not support permission mode "auto"; ignoring it\n'
                         + KIMI_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["cu", "--permission-mode", "safe"],
+                        "cursor-agent --print --trust --sandbox enabled Fix the failing tests\n",
+                        CURSOR_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["cursor", "--permission-mode", "plan"],
+                        "cursor-agent --print --trust --mode plan Fix the failing tests\n",
+                        CURSOR_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["cu", "--permission-mode", "auto"],
+                        "cursor-agent --print --trust Fix the failing tests\n",
+                        'warning: runner "cu" does not support permission mode "auto"; ignoring it\n'
+                        + CURSOR_PERSISTENCE_WARNING,
                     ),
                 ],
             }
@@ -1073,9 +1132,11 @@ class SingleImplCccContractTests(unittest.TestCase):
             claude_path = bin_dir / "claude"
             kimi_path = bin_dir / "kimi"
             opencode_path = bin_dir / "opencode"
+            cursor_path = bin_dir / "cursor-agent"
             self._write_argv_echo_stub(claude_path, "claude")
             self._write_argv_echo_stub(kimi_path, "kimi")
             self._write_argv_echo_stub(opencode_path, "opencode")
+            self._write_argv_echo_stub(cursor_path, "cursor-agent")
 
             cases = {
                 "Python": [
@@ -1095,6 +1156,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["oc", ".json"],
                         "opencode run --format json --thinking Fix the failing tests\n",
                     ),
+                    (
+                        ["cu", ".json"],
+                        "cursor-agent --print --trust --output-format json Fix the failing tests\n",
+                    ),
+                    (
+                        ["cursor", "..json"],
+                        "cursor-agent --print --trust --output-format stream-json Fix the failing tests\n",
+                    ),
                 ],
                 "Rust": [
                     (
@@ -1112,6 +1181,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     (
                         ["oc", ".json"],
                         "opencode run --format json --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["cu", ".json"],
+                        "cursor-agent --print --trust --output-format json Fix the failing tests\n",
+                    ),
+                    (
+                        ["cursor", "..json"],
+                        "cursor-agent --print --trust --output-format stream-json Fix the failing tests\n",
                     ),
                 ],
             }
@@ -1139,9 +1216,13 @@ class SingleImplCccContractTests(unittest.TestCase):
             claude_path = bin_dir / "claude"
             kimi_path = bin_dir / "kimi"
             opencode_path = bin_dir / "opencode"
+            cursor_path = bin_dir / "cursor-agent"
             self._write_structured_argv_echo_stub(claude_path, "claude", "claude-code")
             self._write_structured_argv_echo_stub(kimi_path, "kimi", "kimi")
             self._write_structured_argv_echo_stub(opencode_path, "opencode", "opencode")
+            self._write_structured_argv_echo_stub(
+                cursor_path, "cursor-agent", "cursor-agent"
+            )
 
             cases = {
                 "Python": [
@@ -1169,6 +1250,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["oc", "..fmt"],
                         "[assistant] opencode run --format json --thinking Fix the failing tests\n",
                     ),
+                    (
+                        ["cu", ".fmt"],
+                        "[assistant] cursor-agent --print --trust --output-format stream-json Fix the failing tests\n",
+                    ),
+                    (
+                        ["cursor", "..fmt"],
+                        "[assistant] cursor-agent --print --trust --output-format stream-json Fix the failing tests\n",
+                    ),
                 ],
                 "Rust": [
                     (
@@ -1194,6 +1283,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     (
                         ["oc", "..fmt"],
                         "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["cu", ".fmt"],
+                        "[assistant] cursor-agent --print --trust --output-format stream-json Fix the failing tests\n",
+                    ),
+                    (
+                        ["cursor", "..fmt"],
+                        "[assistant] cursor-agent --print --trust --output-format stream-json Fix the failing tests\n",
                     ),
                 ],
             }
@@ -1317,11 +1414,13 @@ class SingleImplCccContractTests(unittest.TestCase):
             kimi_path = bin_dir / "kimi"
             crush_path = bin_dir / "crush"
             opencode_path = bin_dir / "opencode"
+            cursor_path = bin_dir / "cursor-agent"
             self._write_argv_echo_stub(claude_path, "claude")
             self._write_argv_echo_stub(codex_path, "codex")
             self._write_argv_echo_stub(kimi_path, "kimi")
             self._write_argv_echo_stub(crush_path, "crush")
             self._write_opencode_yolo_stub(opencode_path)
+            self._write_argv_echo_stub(cursor_path, "cursor-agent")
 
             cases = {
                 "Python": [
@@ -1351,6 +1450,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                         "[assistant] opencode run --format json --thinking Fix the failing tests\n",
                         f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"allow"}}',
                     ),
+                    (
+                        ["cu", "--yolo"],
+                        "cursor-agent --print --trust --yolo Fix the failing tests\n",
+                        CURSOR_PERSISTENCE_WARNING,
+                    ),
                 ],
                 "Rust": [
                     (
@@ -1378,6 +1482,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["oc", "--yolo"],
                         "[assistant] opencode run --format json --thinking Fix the failing tests\n",
                         f'{OPENCODE_PERSISTENCE_WARNING}{{"permission":"allow"}}',
+                    ),
+                    (
+                        ["cu", "--yolo"],
+                        "cursor-agent --print --trust --yolo Fix the failing tests\n",
+                        CURSOR_PERSISTENCE_WARNING,
                     ),
                 ],
             }
@@ -1549,6 +1658,8 @@ class SingleImplCccContractTests(unittest.TestCase):
             return CRUSH_PERSISTENCE_WARNING
         if "rc" in extra_args or "roocode" in extra_args:
             return ROOCODE_PERSISTENCE_WARNING
+        if "cu" in extra_args or "cursor" in extra_args:
+            return CURSOR_PERSISTENCE_WARNING
         if (
             "cc" in extra_args
             or "claude" in extra_args
@@ -1595,6 +1706,13 @@ class SingleImplCccContractTests(unittest.TestCase):
             body = (
                 "#!/bin/sh\n"
                 f'printf \'{{"role":"assistant","content":"{runner_name} %s"}}\\n\' "$*"\n'
+            )
+        elif schema_name == "cursor-agent":
+            body = (
+                "#!/bin/sh\n"
+                f'printf \'{{"type":"system","subtype":"init","session_id":"mock-cursor"}}\\n\'\n'
+                f'printf \'{{"type":"assistant","message":{{"content":[{{"type":"text","text":"{runner_name} %s"}}]}},"session_id":"mock-cursor"}}\\n\' "$*"\n'
+                f'printf \'{{"type":"result","subtype":"success","result":"{runner_name} %s","session_id":"mock-cursor"}}\\n\' "$*"\n'
             )
         else:
             body = f'#!/bin/sh\nprintf \'{{"response":"{runner_name} %s"}}\\n\' "$*"\n'

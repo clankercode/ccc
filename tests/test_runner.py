@@ -261,6 +261,12 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(_session_persistence_pre_run_warnings(True, False, "oc"), [])
         self.assertEqual(_session_persistence_pre_run_warnings(False, True, "oc"), [])
         self.assertEqual(_session_persistence_pre_run_warnings(False, False, "cc"), [])
+        self.assertEqual(
+            _session_persistence_pre_run_warnings(False, False, "cu"),
+            [
+                'warning: runner "cursor" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup'
+            ],
+        )
 
     def test_sanitize_raw_output_strips_opencode_osc_title(self) -> None:
         stdout = (
@@ -406,6 +412,14 @@ class RunnerTests(unittest.TestCase):
         with mock.patch.dict("os.environ", {"CCC_REAL_KIMI": "/tmp/mock-kimi"}):
             _apply_real_runner_override(spec)
         self.assertEqual(spec.argv[0], "/tmp/mock-kimi")
+
+    def test_apply_real_runner_override_for_cursor(self) -> None:
+        from call_coding_clis import CommandSpec
+
+        spec = CommandSpec(argv=["cursor-agent", "--print", "hello"])
+        with mock.patch.dict("os.environ", {"CCC_REAL_CURSOR": "/tmp/mock-cursor"}):
+            _apply_real_runner_override(spec)
+        self.assertEqual(spec.argv[0], "/tmp/mock-cursor")
 
     def test_ccc_rejects_empty_prompt(self) -> None:
         from call_coding_clis.cli import build_prompt_spec

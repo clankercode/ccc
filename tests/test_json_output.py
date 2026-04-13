@@ -9,6 +9,7 @@ from call_coding_clis.json_output import (
     render_parsed,
     parse_opencode_json,
     parse_claude_code_json,
+    parse_cursor_agent_json,
     parse_kimi_json,
     ParsedJsonOutput,
     JsonEvent,
@@ -78,6 +79,13 @@ CLAUDE_CODE_STREAM = (
 CLAUDE_UNKNOWN_EVENT = (
     '{"type":"system","subtype":"init","session_id":"sess-3"}\n'
     '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"}}\n'
+)
+
+CURSOR_AGENT_STDOUT = (
+    '{"type":"system","subtype":"init","session_id":"cursor-1","model":"Composer 2","permissionMode":"default"}\n'
+    '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Hello from Cursor"}]},"session_id":"cursor-1"}\n'
+    '{"type":"result","subtype":"success","duration_ms":7319,"duration_api_ms":7319,"is_error":false,'
+    '"result":"Hello from Cursor","session_id":"cursor-1","usage":{"inputTokens":1,"outputTokens":2,"cacheReadTokens":3,"cacheWriteTokens":4}}\n'
 )
 
 
@@ -180,6 +188,24 @@ class ParseKimiJsonTests(unittest.TestCase):
         self.assertEqual(result.final_text, "Here is my answer")
 
 
+class ParseCursorAgentJsonTests(unittest.TestCase):
+    def test_simple_response(self):
+        result = parse_json_output(CURSOR_AGENT_STDOUT, "cursor-agent")
+        self.assertEqual(result.schema_name, "cursor-agent")
+        self.assertEqual(result.final_text, "Hello from Cursor")
+        self.assertEqual(result.session_id, "cursor-1")
+        self.assertEqual(result.duration_ms, 7319)
+        self.assertEqual(result.usage["inputTokens"], 1)
+        self.assertEqual(result.usage["outputTokens"], 2)
+
+    def test_error_result(self):
+        stdout = '{"type":"result","subtype":"error","is_error":true,"error":"blocked","session_id":"cursor-2"}\n'
+        result = parse_cursor_agent_json(stdout)
+        self.assertEqual(result.session_id, "cursor-2")
+        self.assertEqual(result.error, "blocked")
+        self.assertEqual(result.events[0].event_type, "error")
+
+
 class RenderParsedTests(unittest.TestCase):
     def test_render_opencode(self):
         result = parse_opencode_json(OPENCODE_STDOUT)
@@ -207,6 +233,20 @@ class RenderParsedTests(unittest.TestCase):
         result = parse_kimi_json(KIMI_STDOUT)
         rendered = render_parsed(result)
         self.assertEqual(rendered, "[assistant] Hello from Kimi")
+
+    def test_render_cursor_dedupes_assistant_and_result(self):
+        result = parse_cursor_agent_json(CURSOR_AGENT_STDOUT)
+        rendered = render_parsed(result)
+        self.assertEqual(rendered, "[assistant] Hello from Cursor")
+
+    def test_render_cursor_trims_outer_newlines_from_real_text(self):
+        stdout = (
+            '{"type":"assistant","message":{"content":[{"type":"text","text":"\\npong"}]}}\n'
+            '{"type":"result","subtype":"success","result":"\\npong"}\n'
+        )
+        result = parse_cursor_agent_json(stdout)
+        rendered = render_parsed(result)
+        self.assertEqual(rendered, "[assistant] pong")
 
     def test_render_with_thinking(self):
         result = parse_kimi_json(KIMI_THINKING)
@@ -260,6 +300,34 @@ class RenderParsedTests(unittest.TestCase):
         self.assertTrue(any("[tool:start] Bash" in chunk for chunk in chunks))
         self.assertTrue(any("[thinking] checking..." in chunk for chunk in chunks))
         self.assertTrue(any("[assistant] hello world" in chunk for chunk in chunks))
+
+    def test_cursor_stream_processor_dedupes_assistant_and_result(self):
+        processor = StructuredStreamProcessor(
+            "cursor-agent",
+            FormattedRenderer(show_thinking=False, tty=False),
+        )
+        chunks = []
+        for line in CURSOR_AGENT_STDOUT.splitlines(keepends=True):
+            rendered = processor.feed(line)
+            if rendered:
+                chunks.append(rendered)
+        self.assertEqual(chunks, ["[assistant] Hello from Cursor"])
+
+    def test_cursor_stream_processor_trims_outer_newlines(self):
+        processor = StructuredStreamProcessor(
+            "cursor-agent",
+            FormattedRenderer(show_thinking=False, tty=False),
+        )
+        raw = (
+            '{"type":"assistant","message":{"content":[{"type":"text","text":"\\npong"}]}}\n'
+            '{"type":"result","subtype":"success","result":"\\npong"}\n'
+        )
+        chunks = []
+        for line in raw.splitlines(keepends=True):
+            rendered = processor.feed(line)
+            if rendered:
+                chunks.append(rendered)
+        self.assertEqual(chunks, ["[assistant] pong"])
 
     def test_stream_processor_dedupes_final_assistant_and_result_after_text_deltas(
         self,

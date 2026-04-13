@@ -194,6 +194,31 @@ fn test_kimi_passthrough_events() {
 }
 
 #[test]
+fn test_cursor_agent_simple_response() {
+    let raw = concat!(
+        "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"cursor-1\",\"model\":\"Composer 2\"}\n",
+        "{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Hello from Cursor\"}]},\"session_id\":\"cursor-1\"}\n",
+        "{\"type\":\"result\",\"subtype\":\"success\",\"duration_ms\":7319,\"is_error\":false,\"result\":\"Hello from Cursor\",\"session_id\":\"cursor-1\",\"usage\":{\"inputTokens\":1,\"outputTokens\":2}}\n"
+    );
+    let parsed = parse_json_output(raw, "cursor-agent");
+    assert_eq!(parsed.schema_name, "cursor-agent");
+    assert_eq!(parsed.session_id, "cursor-1");
+    assert_eq!(parsed.final_text, "Hello from Cursor");
+    assert_eq!(parsed.duration_ms, 7319);
+    assert_eq!(parsed.usage.get("inputTokens").copied(), Some(1));
+    assert_eq!(parsed.usage.get("outputTokens").copied(), Some(2));
+}
+
+#[test]
+fn test_cursor_agent_error_response() {
+    let raw = "{\"type\":\"result\",\"subtype\":\"error\",\"is_error\":true,\"error\":\"blocked\",\"session_id\":\"cursor-2\"}\n";
+    let parsed = parse_cursor_agent_json(raw);
+    assert_eq!(parsed.session_id, "cursor-2");
+    assert_eq!(parsed.error, "blocked");
+    assert_eq!(parsed.events[0].event_type, "error");
+}
+
+#[test]
 fn test_render_opencode() {
     let raw = "{\"response\":\"hello\"}\n";
     let parsed = parse_opencode_json(raw);
@@ -273,6 +298,28 @@ fn test_render_kimi_thinking() {
     let rendered = render_parsed(&parsed, true, false);
     assert!(rendered.contains("[thinking] hmm"));
     assert!(rendered.contains("ok"));
+}
+
+#[test]
+fn test_render_cursor_agent_dedupes_assistant_and_result() {
+    let raw = concat!(
+        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Hello from Cursor\"}]}}\n",
+        "{\"type\":\"result\",\"subtype\":\"success\",\"result\":\"Hello from Cursor\"}\n"
+    );
+    let parsed = parse_cursor_agent_json(raw);
+    let rendered = render_parsed(&parsed, true, false);
+    assert_eq!(rendered, "[assistant] Hello from Cursor");
+}
+
+#[test]
+fn test_render_cursor_agent_trims_outer_newlines_from_real_text() {
+    let raw = concat!(
+        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"\\npong\"}]}}\n",
+        "{\"type\":\"result\",\"subtype\":\"success\",\"result\":\"\\npong\"}\n"
+    );
+    let parsed = parse_cursor_agent_json(raw);
+    let rendered = render_parsed(&parsed, true, false);
+    assert_eq!(rendered, "[assistant] pong");
 }
 
 #[test]
@@ -374,6 +421,43 @@ fn test_stream_processor_dedupes_final_assistant_and_result_after_text_deltas() 
         }
     }
     assert_eq!(chunks, vec!["[assistant] DONE"]);
+}
+
+#[test]
+fn test_cursor_stream_processor_dedupes_assistant_and_result() {
+    let raw = concat!(
+        "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"cursor-1\"}\n",
+        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Hello from Cursor\"}]}}\n",
+        "{\"type\":\"result\",\"subtype\":\"success\",\"result\":\"Hello from Cursor\"}\n"
+    );
+    let mut processor =
+        StructuredStreamProcessor::new("cursor-agent", FormattedRenderer::new(false, false));
+    let mut chunks = Vec::new();
+    for line in raw.lines() {
+        let rendered = processor.feed(&(line.to_string() + "\n"));
+        if !rendered.is_empty() {
+            chunks.push(rendered);
+        }
+    }
+    assert_eq!(chunks, vec!["[assistant] Hello from Cursor"]);
+}
+
+#[test]
+fn test_cursor_stream_processor_trims_outer_newlines() {
+    let raw = concat!(
+        "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"\\npong\"}]}}\n",
+        "{\"type\":\"result\",\"subtype\":\"success\",\"result\":\"\\npong\"}\n"
+    );
+    let mut processor =
+        StructuredStreamProcessor::new("cursor-agent", FormattedRenderer::new(false, false));
+    let mut chunks = Vec::new();
+    for line in raw.lines() {
+        let rendered = processor.feed(&(line.to_string() + "\n"));
+        if !rendered.is_empty() {
+            chunks.push(rendered);
+        }
+    }
+    assert_eq!(chunks, vec!["[assistant] pong"]);
 }
 
 #[test]

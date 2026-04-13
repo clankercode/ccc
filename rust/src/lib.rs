@@ -16,9 +16,10 @@ pub use config::{
 };
 pub use help::{print_help, print_usage};
 pub use json_output::{
-    parse_claude_code_json, parse_json_output, parse_kimi_json, parse_opencode_json, render_parsed,
-    resolve_human_tty, FormattedRenderer, JsonEvent, ParsedJsonOutput, StructuredStreamProcessor,
-    TextContent, ThinkingContent, ToolCall, ToolResult,
+    parse_claude_code_json, parse_cursor_agent_json, parse_json_output, parse_kimi_json,
+    parse_opencode_json, render_parsed, resolve_human_tty, FormattedRenderer, JsonEvent,
+    ParsedJsonOutput, StructuredStreamProcessor, TextContent, ThinkingContent, ToolCall,
+    ToolResult,
 };
 pub use parser::{
     parse_args, resolve_command, resolve_output_mode, resolve_output_plan, resolve_sanitize_osc,

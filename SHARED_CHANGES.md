@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-12
 
+### Cursor Agent runner support
+- Change: Python and Rust now support Cursor Agent via the canonical runner `cursor` and short selector `cu`, using `cursor-agent --print --trust` for non-interactive runs; `cr` remains Crush
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `tests/test_runner.py`, `tests/test_json_output.py`, `tests/test_ccc_contract_impl.py`, `tests/test_harness.py`, `tests/mock-coding-cli/mock_coding_cli.sh`, `rust/tests/parser_tests.rs`, `rust/tests/json_output_tests.rs`, `rust/tests/help_tests.rs`
+- Notes: Cursor supports `--output-format json` and `--output-format stream-json`; `ccc` maps `--permission-mode safe` to `--sandbox enabled`, `plan` to `--mode plan`, `yolo` to `--yolo`, warns about possible session persistence by default, and adds `CCC_REAL_CURSOR` for direct mock or smoke overrides
+
 ### Thinking is visible by default with low effort
 - Change: Python and Rust now default `show_thinking` to on and default `thinking` to level `1`; OpenCode receives `--thinking` by default, Claude receives `--thinking enabled --effort low`, and Kimi receives `--thinking`
 - Required implementations: Python and Rust

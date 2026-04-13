@@ -259,6 +259,18 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         agent_flag: String::new(),
         prompt_flag: String::new(),
     };
+    let cursor = RunnerInfo {
+        binary: "cursor-agent".into(),
+        extra_args: vec!["--print".into(), "--trust".into()],
+        no_persist_flags: vec![],
+        thinking_flags: BTreeMap::new(),
+        show_thinking_flags: BTreeMap::new(),
+        yolo_flags: vec!["--yolo".into()],
+        provider_flag: String::new(),
+        model_flag: "--model".into(),
+        agent_flag: String::new(),
+        prompt_flag: String::new(),
+    };
 
     let claude_clone = claude.clone();
     let kimi_clone = kimi.clone();
@@ -267,6 +279,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let codex_clone = codex.clone();
     let roocode_clone = roocode.clone();
     let crush_clone = crush.clone();
+    let cursor_clone = cursor.clone();
 
     m.insert("opencode".into(), opencode);
     m.insert("claude".into(), claude);
@@ -274,6 +287,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     m.insert("codex".into(), codex);
     m.insert("roocode".into(), roocode);
     m.insert("crush".into(), crush);
+    m.insert("cursor".into(), cursor);
 
     m.insert("oc".into(), opencode_clone);
     m.insert("cc".into(), claude_clone.clone());
@@ -282,13 +296,14 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     m.insert("k".into(), kimi_clone);
     m.insert("rc".into(), roocode_clone.clone());
     m.insert("cr".into(), crush_clone);
+    m.insert("cu".into(), cursor_clone);
 
     RwLock::new(m)
 });
 
 static RUNNER_SELECTOR_STRS: &[&str] = &[
-    "oc", "cc", "c", "cx", "k", "rc", "cr", "codex", "claude", "opencode", "kimi", "roocode",
-    "crush", "pi",
+    "oc", "cc", "c", "cx", "k", "rc", "cr", "cu", "codex", "claude", "opencode", "kimi", "roocode",
+    "crush", "cursor", "pi",
 ];
 
 fn is_runner_selector(s: &str) -> bool {
@@ -561,6 +576,9 @@ pub fn resolve_command(
                 "OPENCODE_CONFIG_CONTENT".to_string(),
                 "{\"permission\":\"ask\"}".to_string(),
             );
+        } else if matches!(effective_runner_name.as_str(), "cu" | "cursor") {
+            argv.push("--sandbox".to_string());
+            argv.push("enabled".to_string());
         } else if matches!(effective_runner_name.as_str(), "rc" | "roocode") {
             warnings.push(
                 "warning: runner \"roocode\" safe mode is unverified; leaving default permissions unchanged"
@@ -602,6 +620,9 @@ pub fn resolve_command(
             argv.push("plan".to_string());
         } else if matches!(effective_runner_name.as_str(), "k" | "kimi") {
             argv.push("--plan".to_string());
+        } else if matches!(effective_runner_name.as_str(), "cu" | "cursor") {
+            argv.push("--mode".to_string());
+            argv.push("plan".to_string());
         } else {
             warnings.push(format!(
                 "warning: runner \"{}\" does not support permission mode \"plan\"; ignoring it",
@@ -633,6 +654,7 @@ fn canonical_runner_name(effective_runner_name: &str, info: &RunnerInfo) -> Stri
         "k" | "kimi" => "kimi".to_string(),
         "cr" | "crush" => "crush".to_string(),
         "rc" | "roocode" => "roocode".to_string(),
+        "cu" | "cursor" => "cursor".to_string(),
         _ => info.binary.clone(),
     }
 }
@@ -768,6 +790,14 @@ fn supported_output_modes(runner_name: &str) -> &'static [&'static str] {
             "formatted",
             "stream-formatted",
         ],
+        "cu" | "cursor" => &[
+            "text",
+            "stream-text",
+            "json",
+            "stream-json",
+            "formatted",
+            "stream-formatted",
+        ],
         _ => &["text", "stream-text"],
     }
 }
@@ -890,6 +920,22 @@ pub fn resolve_output_plan(
             formatted: mode.contains("formatted"),
             schema: Some("opencode".into()),
             argv_flags: vec!["--format".into(), "json".into()],
+        });
+    }
+
+    if matches!(runner_name.as_str(), "cu" | "cursor") {
+        let argv_flags = if mode == "json" {
+            vec!["--output-format".into(), "json".into()]
+        } else {
+            vec!["--output-format".into(), "stream-json".into()]
+        };
+        return Ok(OutputPlan {
+            runner_name,
+            mode: mode.clone(),
+            stream: mode.starts_with("stream-"),
+            formatted: mode.contains("formatted"),
+            schema: Some("cursor-agent".into()),
+            argv_flags,
         });
     }
 

@@ -61,8 +61,8 @@ This runs that implementation's unit tests plus the targeted cross-language cont
 
 ### Implemented (full runner + ccc CLI + cross-language tests)
 
-- **Python** — `call_coding_clis` package, `CCC_REAL_OPENCODE` support
-- **Rust** — `call-coding-clis` crate, concurrent streaming, `CCC_REAL_OPENCODE` support
+- **Python** — `call_coding_clis` package, real-runner override env support
+- **Rust** — `call-coding-clis` crate, concurrent streaming, real-runner override env support
 - **TypeScript** — runner + `ccc` CLI with streaming, `CCC_REAL_OPENCODE` support
 - **C** — reusable runner library (`runner.c`/`runner.h`) plus `ccc` binary
 - **Go** — `go/ccc.go` library with goroutine-based streaming, `ccc` CLI
@@ -110,7 +110,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 ## Current Python/Rust Extended `ccc` Syntax
 
 - Python and Rust currently accept control tokens in any order before the prompt:
-  - runner selectors such as `c`, `cx`, `cc`, `oc`, `k`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `roocode`, `crush`, and `pi`
+  - runner selectors such as `c`, `cx`, `cc`, `oc`, `k`, `cu`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `cursor`, `roocode`, `crush`, and `pi`
   - `+0..+4` thinking levels
   - `:provider:model` and `:model`
   - `@name` for preset lookup with agent fallback; presets can also define a default prompt, and alias `prompt_mode = "prepend"|"append"` can compose alias prompt text around an explicitly supplied prompt
@@ -126,8 +126,8 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - `--show-thinking` / `--no-show-thinking`
   - `--yolo` / `-y`
 - `--` forces the rest of argv to be treated as prompt text, even if it starts with control-like tokens
-- Python and Rust currently use `claude -p --no-session-persistence`, `codex exec --ephemeral`, and `crush run` for non-interactive invocation
-- By default Python and Rust avoid saved sessions where the selected CLI supports it; OpenCode, Kimi, Crush, and RooCode warn that the runner may save a session unless `--save-session` or `--cleanup-session` is used
+- Python and Rust currently use `claude -p --no-session-persistence`, `codex exec --ephemeral`, `cursor-agent --print --trust`, and `crush run` for non-interactive invocation
+- By default Python and Rust avoid saved sessions where the selected CLI supports it; OpenCode, Kimi, Cursor, Crush, and RooCode warn that the runner may save a session unless `--save-session` or `--cleanup-session` is used
 - `ccc --print-config` is the source of truth for the current canonical config schema: `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 - `ccc config` is the source of truth for which config file currently resolves in the active shell
 - `ccc add <alias>` writes the resolved config file shown by `ccc config`; when no config exists it creates a new global config under `XDG_CONFIG_HOME/ccc/config.toml` or `~/.config/ccc/config.toml`, and `-g` forces the effective global config instead of a project-local file

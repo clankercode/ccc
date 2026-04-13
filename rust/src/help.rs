@@ -44,7 +44,7 @@ Controls (free order before the prompt):
                 Claude maps +0 to --thinking disabled and +1..+4 to --thinking enabled with matching --effort
                 Kimi maps +0 to --no-thinking and +1..+4 to --thinking
   :provider:model  Override provider and model
-  @name         Use a named preset from config; if no preset exists, treat it as an agent
+  @name         Use a named preset from config; if no preset exists, runner names select runners before agent fallback
                 Presets can also define a default prompt when the user leaves prompt text blank
                 prompt_mode lets alias prompts prepend or append text; prepend/append require an explicit prompt argument
   .mode / ..mode

@@ -35,7 +35,7 @@ ROOCODE_PERSISTENCE_WARNING = 'warning: runner "roocode" may save this session; 
 CURSOR_PERSISTENCE_WARNING = 'warning: runner "cursor" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
 HELP_USAGE_LINE = 'ccc [controls...] "<Prompt>"'
 HELP_SLOT_LINE = (
-    "Use a named preset from config; if no preset exists, treat it as an agent"
+    "Use a named preset from config; if no preset exists, runner names select runners before agent fallback"
 )
 HELP_PRINT_CONFIG_SNIPPET = "--print-config"
 HELP_CONFIG_COMMAND_SNIPPET = "ccc config"
@@ -372,6 +372,55 @@ class SingleImplCccContractTests(unittest.TestCase):
         self._run_with_agent_stub_extra_args_assertion(
             ["@reviewer", PROMPT], self.assert_uses_agent_fallback
         )
+
+    def test_name_matching_runner_selector_uses_runner_not_agent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            kimi_path = bin_dir / "kimi"
+            self._write_opencode_stub(opencode_path)
+            self._write_structured_argv_echo_stub(kimi_path, "kimi", "kimi")
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                config_path.write_text(
+                    '[defaults]\nrunner = "k"\noutput_mode = "stream-formatted"\n',
+                    encoding="utf-8",
+                )
+                with self.subTest(language=lang.name):
+                    result = lang.invoke_extra(["@k", PROMPT], env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(
+                        result.stdout,
+                        "[assistant] kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
+                    )
+                    self.assertEqual(result.stderr, KIMI_PERSISTENCE_WARNING)
+
+    def test_preset_named_like_runner_selector_wins(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                config_path.write_text(
+                    '[aliases.k]\nagent = "specialist"\n',
+                    encoding="utf-8",
+                )
+                with self.subTest(language=lang.name):
+                    result = lang.invoke_extra(["@k", PROMPT], env)
+                    self.assert_uses_preset_agent(result)
 
     def test_preset_agent_wins_over_name_fallback(self) -> None:
         self._run_with_agent_preset_assertion(self.assert_uses_preset_agent)

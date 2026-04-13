@@ -312,7 +312,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
 
 static RUNNER_SELECTOR_STRS: &[&str] = &[
     "oc", "cc", "c", "cx", "k", "rc", "cr", "cu", "codex", "claude", "opencode", "kimi", "roocode",
-    "crush", "cursor", "pi",
+    "crush", "cursor",
 ];
 
 fn is_runner_selector(s: &str) -> bool {
@@ -545,6 +545,8 @@ pub fn resolve_command(
 
     let effective_agent = if let Some(alias_def) = alias_def {
         alias_def.agent.clone()
+    } else if unresolved_alias_runner_name(parsed, &config, &registry).is_some() {
+        None
     } else {
         parsed.alias.clone()
     };
@@ -747,6 +749,27 @@ fn resolve_alias_def<'a>(parsed: &'a ParsedArgs, config: &'a CccConfig) -> Optio
         .and_then(|alias| config.aliases.get(alias))
 }
 
+fn unresolved_alias_runner_name(
+    parsed: &ParsedArgs,
+    config: &CccConfig,
+    registry: &BTreeMap<String, RunnerInfo>,
+) -> Option<String> {
+    if parsed.runner.is_some() {
+        return None;
+    }
+    let alias = parsed.alias.as_ref()?;
+    if config.aliases.contains_key(alias) {
+        return None;
+    }
+    let exact = resolve_runner_name(Some(alias), config);
+    if registry.contains_key(&exact) {
+        return Some(exact);
+    }
+    let lower_alias = alias.to_ascii_lowercase();
+    let lower = resolve_runner_name(Some(&lower_alias), config);
+    registry.contains_key(&lower).then_some(lower)
+}
+
 fn resolve_runner_name(parsed_runner: Option<&str>, config: &CccConfig) -> String {
     let runner_name = parsed_runner.unwrap_or(&config.default_runner);
     config
@@ -766,6 +789,8 @@ fn resolve_effective_runner<'a>(
     if parsed.runner.is_none() {
         if let Some(alias_runner) = alias_def.and_then(|alias| alias.runner.as_deref()) {
             runner_name = resolve_runner_name(Some(alias_runner), config);
+        } else if let Some(alias_runner) = unresolved_alias_runner_name(parsed, config, registry) {
+            runner_name = alias_runner;
         }
     }
     let info = registry

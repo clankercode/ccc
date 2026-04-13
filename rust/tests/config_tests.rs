@@ -4,7 +4,14 @@ use call_coding_clis::{
 };
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static CONFIG_ENV_LOCK: Mutex<()> = Mutex::new(());
+
+fn lock_config_env() -> MutexGuard<'static, ()> {
+    CONFIG_ENV_LOCK.lock().unwrap()
+}
 
 fn example_config_fixture() -> String {
     let path =
@@ -147,6 +154,7 @@ runner = "cc"
 
 #[test]
 fn test_find_config_command_path_prefers_explicit_ccc_config() {
+    let _guard = lock_config_env();
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -170,6 +178,7 @@ fn test_find_config_command_path_prefers_explicit_ccc_config() {
 
 #[test]
 fn test_find_config_command_path_prefers_project_local_then_xdg_then_home() {
+    let _guard = lock_config_env();
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -224,6 +233,7 @@ fn test_find_config_command_path_prefers_project_local_then_xdg_then_home() {
 
 #[test]
 fn test_find_config_command_path_falls_back_when_ccc_config_is_missing() {
+    let _guard = lock_config_env();
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -325,6 +335,7 @@ prompt = \"keep\"\n"
 
 #[test]
 fn test_find_alias_write_path_global_ignores_project_and_prefers_xdg() {
+    let _guard = lock_config_env();
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()

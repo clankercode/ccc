@@ -110,10 +110,10 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 ## Current Python/Rust Extended `ccc` Syntax
 
 - Python and Rust currently accept control tokens in any order before the prompt:
-  - runner selectors such as `c`, `cx`, `cc`, `oc`, `k`, `cu`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `cursor`, `roocode`, `crush`, and `pi`
+  - runner selectors such as `c`, `cx`, `cc`, `oc`, `k`, `cu`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `cursor`, `roocode`, and `crush`
   - `+0..+4` thinking levels
   - `:provider:model` and `:model`
-  - `@name` for preset lookup with agent fallback; presets can also define a default prompt, and alias `prompt_mode = "prepend"|"append"` can compose alias prompt text around an explicitly supplied prompt
+  - `@name` for preset lookup; if no preset exists, runner names such as `@k` select that runner before ordinary agent fallback; presets can also define a default prompt, and alias `prompt_mode = "prepend"|"append"` can compose alias prompt text around an explicitly supplied prompt
   - `-h` / `--help` wins anywhere in argv and prints help immediately
   - Python and Rust search project-local `.ccc.toml` files upward from the current directory and override the global config chain
   - `ccc config` prints every existing config file path and raw contents in merge order: `~/.config/ccc/config.toml`, `XDG_CONFIG_HOME/ccc/config.toml`, then the nearest project-local `.ccc.toml`; `CCC_CONFIG` still wins alone when it points at an existing file

@@ -23,7 +23,7 @@ fn test_help_mentions_name_slot() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Usage:\n  ccc [controls...] \"<Prompt>\""));
     assert!(stdout.contains(
-        "@name         Use a named preset from config; if no preset exists, treat it as an agent"
+        "@name         Use a named preset from config; if no preset exists, runner names select runners before agent fallback"
     ));
     assert!(stdout.contains(
         "Presets can also define a default prompt when the user leaves prompt text blank"

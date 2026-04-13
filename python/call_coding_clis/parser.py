@@ -182,7 +182,8 @@ def _register_defaults() -> None:
 _register_defaults()
 
 RUNNER_SELECTOR_RE = re.compile(
-    r"^(?:oc|cc|c|cx|k|rc|cr|cu|codex|claude|opencode|kimi|roocode|crush|cursor|pi)$", re.IGNORECASE
+    r"^(?:oc|cc|c|cx|k|rc|cr|cu|codex|claude|opencode|kimi|roocode|crush|cursor)$",
+    re.IGNORECASE,
 )
 THINKING_RE = re.compile(
     r"^\+(0|1|2|3|4|none|low|med|mid|medium|high|max|xhigh)$",
@@ -319,6 +320,16 @@ def _resolve_alias_def(parsed: ParsedArgs, config: CccConfig) -> AliasDef | None
     return None
 
 
+def _unresolved_alias_runner_name(parsed: ParsedArgs, config: CccConfig) -> str | None:
+    if parsed.runner is not None or not parsed.alias or parsed.alias in config.aliases:
+        return None
+    for alias_name in (parsed.alias, parsed.alias.lower()):
+        runner_name = resolve_runner_name(alias_name, config)
+        if runner_name in RUNNER_REGISTRY:
+            return runner_name
+    return None
+
+
 def resolve_effective_runner(
     parsed: ParsedArgs, config: CccConfig
 ) -> tuple[str, RunnerInfo, AliasDef | None]:
@@ -332,6 +343,9 @@ def resolve_effective_runner(
     effective_runner_name = runner_name
     if alias_def and alias_def.runner and parsed.runner is None:
         effective_runner_name = resolve_runner_name(alias_def.runner, config)
+        info = RUNNER_REGISTRY.get(effective_runner_name, info)
+    elif alias_runner_name := _unresolved_alias_runner_name(parsed, config):
+        effective_runner_name = alias_runner_name
         info = RUNNER_REGISTRY.get(effective_runner_name, info)
     return effective_runner_name, info, alias_def
 
@@ -565,7 +579,13 @@ def resolve_command(
     effective_runner_name, info, alias_def = resolve_effective_runner(parsed, config)
 
     warnings: list[str] = []
-    requested_agent = parsed.alias if parsed.alias and alias_def is None else None
+    requested_agent = (
+        parsed.alias
+        if parsed.alias
+        and alias_def is None
+        and _unresolved_alias_runner_name(parsed, config) is None
+        else None
+    )
     if parsed.save_session and parsed.cleanup_session:
         raise ValueError("--save-session and --cleanup-session are mutually exclusive")
 

@@ -68,6 +68,14 @@ fn test_parse_runner_selector_cr_remains_crush() {
 }
 
 #[test]
+fn test_parse_unregistered_pi_as_prompt_text() {
+    let args: Vec<String> = vec!["pi".into(), "fix bug".into()];
+    let parsed = parse_args(&args);
+    assert!(parsed.runner.is_none());
+    assert_eq!(parsed.prompt, "pi fix bug");
+}
+
+#[test]
 fn test_parse_thinking_level() {
     let args: Vec<String> = vec!["+2".into(), "hello".into()];
     let parsed = parse_args(&args);
@@ -1338,6 +1346,78 @@ fn test_resolve_name_falls_back_to_agent() {
     assert_eq!(argv[0], "opencode");
     assert!(argv.contains(&"--agent".to_string()));
     assert!(argv.contains(&"reviewer".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_unresolved_alias_matching_runner_selector_selects_runner() {
+    let config = CccConfig {
+        default_runner: "k".into(),
+        default_output_mode: "stream-formatted".into(),
+        ..Default::default()
+    };
+    let parsed = ParsedArgs {
+        alias: Some("k".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(
+        argv,
+        vec![
+            "kimi",
+            "--print",
+            "--output-format",
+            "stream-json",
+            "--thinking",
+            "--prompt",
+            "hello"
+        ]
+    );
+    assert!(!argv.contains(&"--agent".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_explicit_runner_keeps_runner_like_alias_as_agent() {
+    let args: Vec<String> = vec!["oc".into(), "@k".into(), "hello".into()];
+    let parsed = parse_args(&args);
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv,
+        vec![
+            "opencode".to_string(),
+            "run".to_string(),
+            "--thinking".to_string(),
+            "--agent".to_string(),
+            "k".to_string(),
+            "hello".to_string(),
+        ]
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_configured_alias_named_like_runner_selector_wins() {
+    let mut config = CccConfig::default();
+    config.aliases.insert(
+        "k".into(),
+        AliasDef {
+            runner: Some("oc".into()),
+            agent: Some("specialist".into()),
+            ..Default::default()
+        },
+    );
+    let parsed = ParsedArgs {
+        alias: Some("k".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(
+        argv[..5],
+        ["opencode", "run", "--thinking", "--agent", "specialist"]
+    );
     assert!(warnings.is_empty());
 }
 

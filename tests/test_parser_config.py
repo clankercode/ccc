@@ -75,6 +75,11 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(parsed.runner, "opencode")
         self.assertEqual(parsed.prompt, "hello")
 
+    def test_unregistered_pi_is_prompt_text(self):
+        parsed = parse_args(["pi", "hello"])
+        self.assertIsNone(parsed.runner)
+        self.assertEqual(parsed.prompt, "pi hello")
+
     def test_runner_selector_cursor_and_cu(self):
         for selector in ("cursor", "cu"):
             with self.subTest(selector=selector):
@@ -752,6 +757,35 @@ class ResolveCommandTests(unittest.TestCase):
         argv, env, warnings = resolve_command(parsed)
         self.assertEqual(argv[:4], ["kimi", "--thinking", "--agent", "reviewer"])
         self.assertEqual(argv[-2:], ["--prompt", "hello"])
+        self.assertEqual(warnings, [])
+
+    def test_unresolved_alias_matching_runner_selector_selects_runner(self):
+        config = CccConfig(default_runner="k", default_output_mode="stream-formatted")
+        parsed = ParsedArgs(alias="k", prompt="hello")
+        argv, _env, warnings = resolve_command(parsed, config)
+        self.assertEqual(
+            argv,
+            ["kimi", "--print", "--output-format", "stream-json", "--thinking", "--prompt", "hello"],
+        )
+        self.assertNotIn("--agent", argv)
+        self.assertEqual(warnings, [])
+
+    def test_explicit_runner_keeps_runner_like_alias_as_agent(self):
+        parsed = parse_args(["oc", "@k", "hello"])
+        argv, _env, warnings = resolve_command(parsed)
+        self.assertEqual(
+            argv,
+            ["opencode", "run", "--thinking", "--agent", "k", "hello"],
+        )
+        self.assertEqual(warnings, [])
+
+    def test_configured_alias_named_like_runner_selector_wins(self):
+        config = CccConfig(
+            aliases={"k": AliasDef(runner="oc", agent="specialist")}
+        )
+        parsed = ParsedArgs(alias="k", prompt="hello")
+        argv, _env, warnings = resolve_command(parsed, config)
+        self.assertEqual(argv[:5], ["opencode", "run", "--thinking", "--agent", "specialist"])
         self.assertEqual(warnings, [])
 
     def test_alias_falls_back_to_agent_with_warning_when_runner_lacks_support(self):

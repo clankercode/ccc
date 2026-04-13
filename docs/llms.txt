@@ -22,7 +22,7 @@ Slots are parsed in free order before the prompt, except that `-h` / `--help` wi
   Dot-sugar aliases are available before the prompt: `.text` / `..text`, `.json` / `..json`, `.fmt` / `..fmt`.
   Human-formatted modes honor `FORCE_COLOR` and `NO_COLOR` before falling back to TTY detection.
 - :provider:model: Override provider and model
-- @name: Use a named preset from the loaded config layers, or treat it as an agent when no preset exists; in Python and Rust, presets can also provide a default prompt when the user leaves prompt text blank, and alias `prompt_mode = "prepend"|"append"` can wrap explicitly supplied prompt text with alias prompt text
+- @name: Use a named preset from the loaded config layers; when no preset exists, runner names such as `@k` select that runner before ordinary agent fallback; in Python and Rust, presets can also provide a default prompt when the user leaves prompt text blank, and alias `prompt_mode = "prepend"|"append"` can wrap explicitly supplied prompt text with alias prompt text
 - Config: in Python and Rust, project-local `.ccc.toml` files are searched upward from the current directory, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`
 - Generated config: `ccc --print-config` prints the canonical schema using `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 - Resolved config: `ccc config` prints all active config file paths and their raw contents in merge order; `CCC_CONFIG` wins alone when it points at an existing file

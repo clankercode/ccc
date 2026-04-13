@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-14
 
+### Runner-selector `@name` tokens no longer fall through to agents
+- Change: Python and Rust now treat unresolved `@k`, `@oc`, and other registered runner selector names as runner selections when no same-name alias exists and no explicit runner was provided; configured aliases with the same name still win, and unresolved non-runner names still fall back to agents
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `rust/tests/parser_tests.rs`, `tests/test_ccc_contract_impl.py`
+- Notes: fixes `ccc @k ...` with a default Kimi config so it no longer passes `--agent k`; also removes the stale unregistered `pi` selector from Python/Rust parsing docs
+
 ### Codex JSONL output modes added
 - Change: Python and Rust now support Codex `json`, `stream-json`, `formatted`, and `stream-formatted` modes by passing `codex exec --json` and parsing Codex JSONL thread, assistant, command execution, and usage events
 - Required implementations: Python and Rust

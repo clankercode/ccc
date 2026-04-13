@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -167,6 +168,23 @@ def _discover_kimi_version(binary_path: str) -> str:
     return ""
 
 
+def _discover_cursor_version(binary_path: str) -> str:
+    package_root = Path(os.path.realpath(binary_path)).parent
+    try:
+        package = json.loads((package_root / "package.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    if package.get("name") != "@anysphere/agent-cli-runtime":
+        return ""
+    try:
+        with (package_root / "index.js").open(encoding="utf-8") as handle:
+            text = handle.read(32768)
+    except OSError:
+        return ""
+    match = re.search(r"agent-cli@([A-Za-z0-9._-]+)", text)
+    return match.group(1) if match else ""
+
+
 def _get_runner_version(runner_name: str, binary: str, binary_path: str) -> str:
     if runner_name == "opencode":
         version = _discover_opencode_version(binary_path)
@@ -176,6 +194,8 @@ def _get_runner_version(runner_name: str, binary: str, binary_path: str) -> str:
         version = _discover_claude_version(binary_path)
     elif runner_name == "kimi":
         version = _discover_kimi_version(binary_path)
+    elif runner_name == "cursor":
+        version = _discover_cursor_version(binary_path)
     else:
         version = ""
     return version if version else _get_version(binary)

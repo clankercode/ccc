@@ -133,7 +133,7 @@ Then update the corresponding file here before changing `ccc` runner assembly.
 
 When adding a new CLI, its note should record the verified non-interactive argv shape, permission controls, session persistence behavior, output modes, structured-output schema, version command behavior, and any faster local metadata source that can keep the `ccc --help` runner checklist from spawning a slow CLI.
 
-For the Python and Rust help checklist, runner version discovery now prefers trusted install metadata when the local layout is known, then falls back to `<cli> --version`. Current fast paths cover OpenCode and Codex `package.json`, Kimi `dist-info/METADATA`, and Claude versioned local install paths.
+For the Python and Rust help checklist, runner version discovery now prefers trusted install metadata when the local layout is known, then falls back to `<cli> --version`. Current fast paths cover OpenCode and Codex `package.json`, Kimi `dist-info/METADATA`, Claude versioned local install paths, and Cursor Agent's bundled `agent-cli@...` release marker.
 
 ## Output Modes
 

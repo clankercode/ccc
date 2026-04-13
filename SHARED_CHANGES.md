@@ -20,6 +20,15 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-04-13
+
+### Cursor Agent version discovery now uses local release metadata
+- Change: Python and Rust now read Cursor Agent's bundled `agent-cli@...` release marker for the help runner checklist before falling back to `cursor-agent --version`
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_runner.py`, `rust/src/help.rs`
+- Notes: updated `docs/clis/README.md` and `docs/clis/cursor.md`; local `cursor-agent --version` was verified to return `2026.03.30-a5d3e17`
+
 ## 2026-04-12
 
 ### Cursor Agent runner support

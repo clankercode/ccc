@@ -45,6 +45,15 @@ What this means for `ccc`:
 - `--cleanup-session` warns that automatic cleanup is unsupported for Cursor
 - `ccc` does not delete guessed Cursor state
 
+## Version discovery
+
+`cursor-agent --version` is supported but starts the bundled Node runtime. Python and Rust avoid that slow path when the local install layout is recognizable:
+
+- resolve `cursor-agent` through symlinks
+- verify the adjacent `package.json` has `name = "@anysphere/agent-cli-runtime"`
+- read the bundled `index.js` release marker such as `agent-cli@2026.03.30-a5d3e17`
+- fall back to `cursor-agent --version` if that metadata is missing
+
 ## Output modes
 
 Cursor Agent supports all current Python and Rust output modes:

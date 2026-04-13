@@ -142,6 +142,29 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(version, "kimi, version 1.30.0")
             fallback.assert_not_called()
 
+    def test_runner_version_reads_cursor_release_marker_before_command(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            package_root = Path(tmp) / "cursor-agent"
+            binary_path = package_root / "cursor-agent"
+            package_root.mkdir(parents=True)
+            (package_root / "package.json").write_text(
+                '{"name":"@anysphere/agent-cli-runtime","private":true}',
+                encoding="utf-8",
+            )
+            (package_root / "index.js").write_text(
+                'globalThis.SENTRY_RELEASE={id:"agent-cli@2026.03.30-a5d3e17"};',
+                encoding="utf-8",
+            )
+            binary_path.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")
+
+            with mock.patch("call_coding_clis.help._get_version") as fallback:
+                version = _get_runner_version(
+                    "cursor", "cursor-agent", str(binary_path)
+                )
+
+            self.assertEqual(version, "2026.03.30-a5d3e17")
+            fallback.assert_not_called()
+
     def test_runner_version_falls_back_when_metadata_is_missing(self) -> None:
         with mock.patch(
             "call_coding_clis.help._get_version", return_value="fallback 9.9.9"

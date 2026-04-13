@@ -232,6 +232,44 @@ fn discover_kimi_version(binary_path: &Path) -> String {
     String::new()
 }
 
+fn json_name_matches(package_json_path: &Path, expected_name: &str) -> bool {
+    let payload = match fs::read_to_string(package_json_path) {
+        Ok(text) => text,
+        Err(_) => return false,
+    };
+    let parsed: Value = match serde_json::from_str(&payload) {
+        Ok(value) => value,
+        Err(_) => return false,
+    };
+    parsed.get("name").and_then(Value::as_str) == Some(expected_name)
+}
+
+fn read_cursor_release_version(index_path: &Path) -> String {
+    let text = match fs::read_to_string(index_path) {
+        Ok(text) => text,
+        Err(_) => return String::new(),
+    };
+    let marker = "agent-cli@";
+    let Some(start) = text.find(marker) else {
+        return String::new();
+    };
+    text[start + marker.len()..]
+        .chars()
+        .take_while(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
+        .collect()
+}
+
+fn discover_cursor_version(binary_path: &Path) -> String {
+    let package_root = binary_path.parent().unwrap_or(binary_path);
+    if !json_name_matches(
+        &package_root.join("package.json"),
+        "@anysphere/agent-cli-runtime",
+    ) {
+        return String::new();
+    }
+    read_cursor_release_version(&package_root.join("index.js"))
+}
+
 fn get_runner_version(runner_name: &str, binary: &str, binary_path: &Path) -> String {
     let real_path = match fs::canonicalize(binary_path) {
         Ok(path) => path,
@@ -242,6 +280,7 @@ fn get_runner_version(runner_name: &str, binary: &str, binary_path: &Path) -> St
         "codex" => discover_codex_version(&real_path),
         "claude" => discover_claude_version(&real_path),
         "kimi" => discover_kimi_version(&real_path),
+        "cursor" => discover_cursor_version(&real_path),
         _ => String::new(),
     };
     if version.is_empty() {
@@ -419,6 +458,30 @@ mod tests {
         assert_eq!(
             get_runner_version("kimi", "definitely-missing-binary", &binary_path),
             "kimi, version 1.30.0"
+        );
+    }
+
+    #[test]
+    fn test_get_runner_version_reads_cursor_release_marker_before_command() {
+        let root = unique_temp_dir("cursor");
+        let package_root = root.join("cursor-agent");
+        let binary_path = package_root.join("cursor-agent");
+        fs::create_dir_all(&package_root).unwrap();
+        fs::write(
+            package_root.join("package.json"),
+            r#"{"name":"@anysphere/agent-cli-runtime","private":true}"#,
+        )
+        .unwrap();
+        fs::write(
+            package_root.join("index.js"),
+            r#"globalThis.SENTRY_RELEASE={id:"agent-cli@2026.03.30-a5d3e17"};"#,
+        )
+        .unwrap();
+        fs::write(&binary_path, "#!/bin/sh\nexit 99\n").unwrap();
+
+        assert_eq!(
+            get_runner_version("cursor", "definitely-missing-binary", &binary_path),
+            "2026.03.30-a5d3e17"
         );
     }
 

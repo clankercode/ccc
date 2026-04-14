@@ -59,7 +59,7 @@ Python and Rust also support real-runner override env vars for local smoke/debug
 - `CCC_REAL_CURSOR`
 - `CCC_REAL_GEMINI`
 
-18 of 20 languages also implement: v2 parser/config (runner selector, thinking levels, provider/model override, preset and agent resolution, config loading) and v3 JSON output parsing (OpenCode, Claude Code, Kimi schemas). Python and Rust also parse Cursor Agent JSON output and support raw Gemini JSON modes.
+18 of 20 languages also implement: v2 parser/config (runner selector, thinking levels, provider/model override, preset and agent resolution, config loading) and v3 JSON output parsing (OpenCode, Claude Code, Kimi schemas). Python and Rust also parse Cursor Agent and Gemini JSON output, including formatted Gemini transcript modes.
 
 ## Docs
 

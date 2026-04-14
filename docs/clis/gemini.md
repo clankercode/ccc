@@ -58,13 +58,12 @@ What this means for `ccc`:
 
 ## Output modes
 
-Gemini supports raw text and raw JSON modes in Python and Rust:
+Gemini supports raw text, raw JSON, and formatted transcript modes in Python and Rust:
 
 - raw text uses the default text output
 - raw JSON uses `--output-format json`
 - streaming JSON uses `--output-format stream-json`
-
-`formatted` and `stream-formatted` are intentionally unsupported until a real Gemini JSON event fixture is captured and a Gemini parser is added.
+- `formatted` and `stream-formatted` also use `--output-format stream-json`, parsing Gemini `message` events with `role: "assistant"` and result `stats`
 
 ## Quick checks
 

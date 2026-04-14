@@ -1164,22 +1164,19 @@ class ResolveCommandTests(unittest.TestCase):
 
     def test_gemini_output_plans(self):
         cases = [
-            ("json", False, ["--output-format", "json"]),
-            ("stream-json", True, ["--output-format", "stream-json"]),
+            ("json", False, False, ["--output-format", "json"]),
+            ("stream-json", True, False, ["--output-format", "stream-json"]),
+            ("formatted", False, True, ["--output-format", "stream-json"]),
+            ("stream-formatted", True, True, ["--output-format", "stream-json"]),
         ]
-        for mode, stream, flags in cases:
+        for mode, stream, formatted, flags in cases:
             with self.subTest(mode=mode):
                 parsed = ParsedArgs(runner="g", output_mode=mode, prompt="hello")
                 plan = resolve_output_plan(parsed)
                 self.assertEqual(plan.stream, stream)
-                self.assertFalse(plan.formatted)
+                self.assertEqual(plan.formatted, formatted)
                 self.assertEqual(plan.schema, "gemini")
                 self.assertEqual(plan.argv_flags, flags)
-
-    def test_gemini_formatted_output_mode_is_unsupported_until_schema_is_fixture_backed(self):
-        parsed = ParsedArgs(runner="g", output_mode="formatted", prompt="hello")
-        with self.assertRaisesRegex(ValueError, "gemini"):
-            resolve_output_plan(parsed)
 
     def test_configured_unsupported_output_mode_falls_back_to_text(self):
         config = CccConfig(default_output_mode="stream-formatted")

@@ -404,7 +404,14 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
             "stream-formatted",
         }
     if key in {"g", "gemini"}:
-        return {"text", "stream-text", "json", "stream-json"}
+        return {
+            "text",
+            "stream-text",
+            "json",
+            "stream-json",
+            "formatted",
+            "stream-formatted",
+        }
     return {"text", "stream-text"}
 
 
@@ -584,7 +591,7 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
             runner_name=effective_runner_name,
             mode=mode,
             stream=mode.startswith("stream-"),
-            formatted=False,
+            formatted="formatted" in mode,
             schema="gemini",
             argv_flags=flags,
             warnings=warnings,

@@ -835,7 +835,14 @@ fn supported_output_modes(runner_name: &str) -> &'static [&'static str] {
             OUTPUT_MODES
         }
         "k" | "kimi" => KIMI_OUTPUT_MODES,
-        "g" | "gemini" => &["text", "stream-text", "json", "stream-json"],
+        "g" | "gemini" => &[
+            "text",
+            "stream-text",
+            "json",
+            "stream-json",
+            "formatted",
+            "stream-formatted",
+        ],
         _ => TEXT_OUTPUT_MODES,
     }
 }
@@ -1036,7 +1043,7 @@ pub fn resolve_output_plan(
             runner_name,
             mode: mode.clone(),
             stream: mode.starts_with("stream-"),
-            formatted: false,
+            formatted: mode.contains("formatted"),
             schema: Some("gemini".into()),
             argv_flags,
             warnings,

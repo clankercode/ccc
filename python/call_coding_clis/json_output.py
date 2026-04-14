@@ -560,6 +560,62 @@ def _apply_codex_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
     return False
 
 
+def _apply_gemini_stats(result: ParsedJsonOutput, stats: dict[str, Any]) -> None:
+    usage = {
+        str(key): int(value) for key, value in stats.items() if isinstance(value, int)
+    }
+    if usage:
+        result.usage = usage
+    duration = stats.get("duration_ms")
+    if isinstance(duration, int):
+        result.duration_ms = duration
+
+
+def _apply_gemini_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
+    result.raw_lines.append(obj)
+    msg_type = str(obj.get("type", ""))
+
+    session_id = obj.get("session_id")
+    if isinstance(session_id, str) and session_id:
+        result.session_id = session_id
+
+    if "response" in obj:
+        text = str(obj.get("response", ""))
+        result.final_text = text
+        if text:
+            result.events.append(JsonEvent(event_type="assistant", text=text, raw=obj))
+        stats = obj.get("stats", {})
+        if isinstance(stats, dict):
+            _apply_gemini_stats(result, stats)
+        return True
+
+    if msg_type == "init":
+        return True
+
+    if msg_type == "message":
+        role = str(obj.get("role", ""))
+        if role == "assistant":
+            text = str(obj.get("content", ""))
+            result.final_text += text
+            if text:
+                event_type = "text_delta" if bool(obj.get("delta", False)) else "assistant"
+                result.events.append(JsonEvent(event_type=event_type, text=text, raw=obj))
+            return True
+        return role == "user"
+
+    if msg_type == "result":
+        stats = obj.get("stats", {})
+        if isinstance(stats, dict):
+            _apply_gemini_stats(result, stats)
+        status = str(obj.get("status", ""))
+        if status and status != "success":
+            result.error = str(obj.get("error") or status)
+            result.events.append(JsonEvent(event_type="error", text=result.error, raw=obj))
+        return True
+
+    return False
+
+
 def parse_opencode_json(raw_stdout: str) -> ParsedJsonOutput:
     result = _new_output("opencode")
     for line in raw_stdout.splitlines():
@@ -605,12 +661,22 @@ def parse_codex_json(raw_stdout: str) -> ParsedJsonOutput:
     return result
 
 
+def parse_gemini_json(raw_stdout: str) -> ParsedJsonOutput:
+    result = _new_output("gemini")
+    for line in raw_stdout.splitlines():
+        obj, raw_line = _parse_json_line(line)
+        if obj is not None and not _apply_gemini_obj(result, obj):
+            result.unknown_json_lines.append(raw_line)
+    return result
+
+
 PARSERS = {
     "opencode": parse_opencode_json,
     "claude-code": parse_claude_code_json,
     "kimi": parse_kimi_json,
     "cursor-agent": parse_cursor_agent_json,
     "codex": parse_codex_json,
+    "gemini": parse_gemini_json,
 }
 
 
@@ -836,6 +902,7 @@ class StructuredStreamProcessor:
             "kimi": _apply_kimi_obj,
             "cursor-agent": _apply_cursor_agent_obj,
             "codex": _apply_codex_obj,
+            "gemini": _apply_gemini_obj,
         }.get(schema)
         self._buffer = ""
         self._unknown_lines: list[str] = []

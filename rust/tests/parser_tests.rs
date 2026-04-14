@@ -2069,10 +2069,27 @@ fn test_resolve_cursor_output_plans() {
 #[test]
 fn test_resolve_gemini_output_plans() {
     let cases = [
-        ("json", false, vec!["--output-format", "json"]),
-        ("stream-json", true, vec!["--output-format", "stream-json"]),
+        ("json", false, false, vec!["--output-format", "json"]),
+        (
+            "stream-json",
+            true,
+            false,
+            vec!["--output-format", "stream-json"],
+        ),
+        (
+            "formatted",
+            false,
+            true,
+            vec!["--output-format", "stream-json"],
+        ),
+        (
+            "stream-formatted",
+            true,
+            true,
+            vec!["--output-format", "stream-json"],
+        ),
     ];
-    for (mode, stream, flags) in cases {
+    for (mode, stream, formatted, flags) in cases {
         let parsed = ParsedArgs {
             runner: Some("g".into()),
             output_mode: Some(mode.into()),
@@ -2081,22 +2098,10 @@ fn test_resolve_gemini_output_plans() {
         };
         let plan = resolve_output_plan(&parsed, None).unwrap();
         assert_eq!(plan.stream, stream);
-        assert!(!plan.formatted);
+        assert_eq!(plan.formatted, formatted);
         assert_eq!(plan.schema.as_deref(), Some("gemini"));
         assert_eq!(plan.argv_flags, flags);
     }
-}
-
-#[test]
-fn test_resolve_gemini_formatted_output_mode_is_unsupported_until_schema_is_fixture_backed() {
-    let parsed = ParsedArgs {
-        runner: Some("g".into()),
-        output_mode: Some("formatted".into()),
-        prompt: "hello".into(),
-        ..Default::default()
-    };
-    let error = resolve_output_plan(&parsed, None).unwrap_err();
-    assert!(error.contains("gemini"), "{error}");
 }
 
 #[test]

@@ -716,6 +716,18 @@ class CrossLanguageHarness(unittest.TestCase):
                 "cursor-agent",
                 ["[assistant] mock: tool call executed"],
             ),
+            (
+                ["g", ".fmt"],
+                "tool call",
+                "gemini",
+                ["[assistant] mock: tool call executed"],
+            ),
+            (
+                ["gemini", "..fmt"],
+                "tool call",
+                "gemini",
+                ["[assistant] mock: tool call executed"],
+            ),
         ]
 
         for lang in self.selected_languages:
@@ -732,10 +744,12 @@ class CrossLanguageHarness(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     for fragment in expected_fragments:
                         self.assertIn(fragment, result.stdout)
-                    if lang.name in {"Python", "Rust"} and extra_args[0] in {"k", "oc", "cu", "cursor"}:
+                    if lang.name in {"Python", "Rust"} and extra_args[0] in {"k", "oc", "cu", "cursor", "g", "gemini"}:
                         expected_stderr = (
                             KIMI_PERSISTENCE_WARNING
                             if extra_args[0] == "k"
+                            else 'warning: runner "gemini" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
+                            if extra_args[0] in {"g", "gemini"}
                             else 'warning: runner "cursor" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
                             if extra_args[0] in {"cu", "cursor"}
                             else OPENCODE_PERSISTENCE_WARNING

@@ -844,6 +844,113 @@ fn apply_codex_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) -> bo
     }
 }
 
+fn apply_gemini_stats(
+    result: &mut ParsedJsonOutput,
+    stats: &serde_json::Map<String, serde_json::Value>,
+) {
+    let usage: BTreeMap<String, i64> = stats
+        .iter()
+        .filter_map(|(key, value)| value.as_i64().map(|count| (key.clone(), count)))
+        .collect();
+    if !usage.is_empty() {
+        result.usage = usage;
+    }
+    if let Some(duration_ms) = stats.get("duration_ms").and_then(|value| value.as_i64()) {
+        result.duration_ms = duration_ms;
+    }
+}
+
+fn apply_gemini_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) -> bool {
+    if let Some(session_id) = obj.get("session_id").and_then(|value| value.as_str()) {
+        if !session_id.is_empty() {
+            result.session_id = session_id.to_string();
+        }
+    }
+
+    if let Some(response) = obj.get("response").and_then(|value| value.as_str()) {
+        result.final_text = response.to_string();
+        if !response.is_empty() {
+            result.events.push(JsonEvent {
+                event_type: "assistant".into(),
+                text: response.into(),
+                thinking: String::new(),
+                tool_call: None,
+                tool_result: None,
+            });
+        }
+        if let Some(stats) = obj.get("stats").and_then(|value| value.as_object()) {
+            apply_gemini_stats(result, stats);
+        }
+        return true;
+    }
+
+    match obj
+        .get("type")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+    {
+        "init" => true,
+        "message" => {
+            let role = obj
+                .get("role")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
+            if role == "assistant" {
+                let text = obj
+                    .get("content")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("");
+                result.final_text.push_str(text);
+                if !text.is_empty() {
+                    result.events.push(JsonEvent {
+                        event_type: if obj
+                            .get("delta")
+                            .and_then(|value| value.as_bool())
+                            .unwrap_or(false)
+                        {
+                            "text_delta".into()
+                        } else {
+                            "assistant".into()
+                        },
+                        text: text.into(),
+                        thinking: String::new(),
+                        tool_call: None,
+                        tool_result: None,
+                    });
+                }
+                true
+            } else {
+                role == "user"
+            }
+        }
+        "result" => {
+            if let Some(stats) = obj.get("stats").and_then(|value| value.as_object()) {
+                apply_gemini_stats(result, stats);
+            }
+            let status = obj
+                .get("status")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
+            if !status.is_empty() && status != "success" {
+                result.error = obj
+                    .get("error")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or(status)
+                    .to_string();
+                result.events.push(JsonEvent {
+                    event_type: "error".into(),
+                    text: result.error.clone(),
+                    thinking: String::new(),
+                    tool_call: None,
+                    tool_result: None,
+                });
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
 pub fn parse_opencode_json(raw: &str) -> ParsedJsonOutput {
     let mut result = new_output("opencode");
     for line in raw.lines() {
@@ -916,6 +1023,18 @@ pub fn parse_codex_json(raw: &str) -> ParsedJsonOutput {
     result
 }
 
+pub fn parse_gemini_json(raw: &str) -> ParsedJsonOutput {
+    let mut result = new_output("gemini");
+    for line in raw.lines() {
+        if let Some(obj) = parse_json_line(line) {
+            if !apply_gemini_obj(&mut result, &obj) {
+                result.unknown_json_lines.push(line.trim().to_string());
+            }
+        }
+    }
+    result
+}
+
 pub fn parse_json_output(raw: &str, schema: &str) -> ParsedJsonOutput {
     match schema {
         "opencode" => parse_opencode_json(raw),
@@ -923,6 +1042,7 @@ pub fn parse_json_output(raw: &str, schema: &str) -> ParsedJsonOutput {
         "kimi" => parse_kimi_json(raw),
         "cursor-agent" => parse_cursor_agent_json(raw),
         "codex" => parse_codex_json(raw),
+        "gemini" => parse_gemini_json(raw),
         _ => ParsedJsonOutput {
             schema_name: schema.into(),
             events: Vec::new(),
@@ -1306,6 +1426,7 @@ impl StructuredStreamProcessor {
                 false
             }
             "codex" => apply_codex_obj(&mut self.output, obj),
+            "gemini" => apply_gemini_obj(&mut self.output, obj),
             _ => false,
         }
     }

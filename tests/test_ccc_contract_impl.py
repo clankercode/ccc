@@ -1427,6 +1427,7 @@ class SingleImplCccContractTests(unittest.TestCase):
             opencode_path = bin_dir / "opencode"
             cursor_path = bin_dir / "cursor-agent"
             codex_path = bin_dir / "codex"
+            gemini_path = bin_dir / "gemini"
             self._write_structured_argv_echo_stub(claude_path, "claude", "claude-code")
             self._write_structured_argv_echo_stub(kimi_path, "kimi", "kimi")
             self._write_structured_argv_echo_stub(opencode_path, "opencode", "opencode")
@@ -1434,6 +1435,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                 cursor_path, "cursor-agent", "cursor-agent"
             )
             self._write_structured_argv_echo_stub(codex_path, "codex", "codex")
+            self._write_structured_argv_echo_stub(gemini_path, "gemini", "gemini")
 
             cases = {
                 "Python": [
@@ -1477,6 +1479,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["cursor", "..fmt"],
                         "[assistant] cursor-agent --print --trust --output-format stream-json Fix the failing tests\n",
                     ),
+                    (
+                        ["g", ".fmt"],
+                        "[assistant] gemini --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["gemini", "..fmt"],
+                        "[assistant] gemini --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
                 ],
                 "Rust": [
                     (
@@ -1518,6 +1528,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     (
                         ["cursor", "..fmt"],
                         "[assistant] cursor-agent --print --trust --output-format stream-json Fix the failing tests\n",
+                    ),
+                    (
+                        ["g", ".fmt"],
+                        "[assistant] gemini --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["gemini", "..fmt"],
+                        "[assistant] gemini --output-format stream-json --prompt Fix the failing tests\n",
                     ),
                 ],
             }
@@ -2029,6 +2047,13 @@ class SingleImplCccContractTests(unittest.TestCase):
                 f'printf \'{{"type":"thread.started","thread_id":"mock-codex"}}\\n\'\n'
                 f'printf \'{{"type":"item.completed","item":{{"id":"item_0","type":"agent_message","text":"{runner_name} %s"}}}}\\n\' "$*"\n'
                 f'printf \'{{"type":"turn.completed","usage":{{"input_tokens":1,"output_tokens":2}}}}\\n\'\n'
+            )
+        elif schema_name == "gemini":
+            body = (
+                "#!/bin/sh\n"
+                f'printf \'{{"type":"init","session_id":"mock-gemini"}}\\n\'\n'
+                f'printf \'{{"type":"message","role":"assistant","content":"{runner_name} %s","delta":true}}\\n\' "$*"\n'
+                f'printf \'{{"type":"result","status":"success","stats":{{"input_tokens":1,"output_tokens":2}}}}\\n\'\n'
             )
         else:
             body = f'#!/bin/sh\nprintf \'{{"response":"{runner_name} %s"}}\\n\' "$*"\n'

@@ -11,6 +11,7 @@ from call_coding_clis.json_output import (
     parse_claude_code_json,
     parse_codex_json,
     parse_cursor_agent_json,
+    parse_gemini_json,
     parse_kimi_json,
     ParsedJsonOutput,
     JsonEvent,
@@ -103,6 +104,13 @@ CODEX_TOOL_STDOUT = (
     '{"type":"item.completed","item":{"id":"item_0","type":"command_execution","command":"/usr/bin/bash -lc pwd","aggregated_output":"/home/xertrov/src/call-coding-clis\\n","exit_code":0,"status":"completed"}}\n'
     '{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"done"}}\n'
     '{"type":"turn.completed","usage":{"input_tokens":20,"cached_input_tokens":4,"output_tokens":5}}\n'
+)
+
+GEMINI_STREAM_JSON = (
+    '{"type":"init","timestamp":"2026-04-14T06:57:06.152Z","session_id":"gemini-1","model":"auto-gemini-3"}\n'
+    '{"type":"message","timestamp":"2026-04-14T06:57:06.153Z","role":"user","content":"Respond with exactly pong"}\n'
+    '{"type":"message","timestamp":"2026-04-14T06:57:20.472Z","role":"assistant","content":"pong","delta":true}\n'
+    '{"type":"result","timestamp":"2026-04-14T06:57:20.557Z","status":"success","stats":{"total_tokens":14587,"input_tokens":14550,"output_tokens":1,"cached":0,"duration_ms":14405,"tool_calls":0}}\n'
 )
 
 
@@ -260,6 +268,33 @@ class ParseCodexJsonTests(unittest.TestCase):
         self.assertIn("[tool:start] command_execution: /usr/bin/bash -lc pwd", rendered)
         self.assertIn("[tool:result] command_execution (ok): /usr/bin/bash -lc pwd", rendered)
         self.assertIn("[assistant] done", rendered)
+        self.assertEqual(processor.take_unknown_json_lines(), [])
+
+
+class ParseGeminiJsonTests(unittest.TestCase):
+    def test_stream_json_response(self):
+        result = parse_json_output(GEMINI_STREAM_JSON, "gemini")
+        self.assertEqual(result.schema_name, "gemini")
+        self.assertEqual(result.session_id, "gemini-1")
+        self.assertEqual(result.final_text, "pong")
+        self.assertEqual(result.usage["total_tokens"], 14587)
+        self.assertEqual(result.usage["output_tokens"], 1)
+        self.assertEqual(result.duration_ms, 14405)
+        self.assertEqual(result.unknown_json_lines, [])
+
+    def test_render_gemini_stream_json(self):
+        result = parse_gemini_json(GEMINI_STREAM_JSON)
+        rendered = render_parsed(result)
+        self.assertEqual(rendered, "[assistant] pong")
+
+    def test_stream_processor_renders_gemini_incrementally(self):
+        processor = StructuredStreamProcessor("gemini", FormattedRenderer())
+        chunks = []
+        for line in GEMINI_STREAM_JSON.splitlines(keepends=True):
+            rendered = processor.feed(line)
+            if rendered:
+                chunks.append(rendered)
+        self.assertEqual(chunks, ["[assistant] pong"])
         self.assertEqual(processor.take_unknown_json_lines(), [])
 
 

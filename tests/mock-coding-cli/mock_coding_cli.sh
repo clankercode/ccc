@@ -6,7 +6,7 @@
 # If stdin starts with "PROMPT:", echo the remainder and exit.
 # Otherwise, match argv against the prompt table below.
 #
-# JSON output mode: set MOCK_JSON_SCHEMA to "opencode", "claude-code", "kimi-code", "cursor-agent", or "codex"
+# JSON output mode: set MOCK_JSON_SCHEMA to "opencode", "claude-code", "kimi-code", "cursor-agent", "codex", or "gemini"
 # Default (unset): plain text mode (backward compatible)
 
 SCHEMA="${MOCK_JSON_SCHEMA:-}"
@@ -107,6 +107,19 @@ json_codex_result() {
     printf '{"type":"turn.completed","usage":{"input_tokens":10,"cached_input_tokens":3,"output_tokens":5}}\n'
 }
 
+json_gemini_init() {
+    printf '{"type":"init","session_id":"mock-gemini","model":"mock-gemini"}\n'
+}
+
+json_gemini_assistant() {
+    _text="$1"
+    printf '{"type":"message","role":"assistant","content":"%s","delta":true}\n' "$_text"
+}
+
+json_gemini_result() {
+    printf '{"type":"result","status":"success","stats":{"input_tokens":10,"output_tokens":5,"duration_ms":100}}\n'
+}
+
 json_codex_command_start() {
     _command="$1"
     printf '{"type":"item.started","item":{"id":"item_mock_command","type":"command_execution","command":"%s","aggregated_output":"","exit_code":null,"status":"in_progress"}}\n' "$_command"
@@ -128,6 +141,7 @@ emit_stdout() {
         kimi-code)   json_kimi_assistant "$_text" ;;
         cursor-agent) json_cursor_init; json_cursor_assistant "$_text"; json_cursor_result "$_text" 0 ;;
         codex)       json_codex_init; json_codex_assistant "$_text"; json_codex_result ;;
+        gemini)      json_gemini_init; json_gemini_assistant "$_text"; json_gemini_result ;;
         *)           printf '%s\n' "$_text" ;;
     esac
 }
@@ -140,6 +154,7 @@ emit_stderr() {
         kimi-code)   printf '{"role":"tool","content":[{"type":"text","text":"<system>ERROR: %s</system>"}]}\n' "$_text" >&2 ;;
         cursor-agent) printf '{"type":"result","subtype":"error","error":"%s","session_id":"mock-cursor"}\n' "$_text" >&2 ;;
         codex)       printf '{"type":"item.completed","item":{"id":"item_mock_error","type":"agent_message","text":"%s"}}\n' "$_text" >&2 ;;
+        gemini)      printf '{"type":"result","status":"error","error":"%s"}\n' "$_text" >&2 ;;
         *)           printf '%s\n' "$_text" >&2 ;;
     esac
 }
@@ -165,6 +180,9 @@ emit_exit_42() {
             json_codex_init >&2
             json_codex_assistant "$_text" >&2
             json_codex_result >&2
+            ;;
+        gemini)
+            printf '{"type":"result","status":"error","error":"mock: intentional failure"}\n' >&2
             ;;
         *)
             printf 'mock: intentional failure\n' >&2
@@ -199,6 +217,12 @@ emit_mixed_streams() {
             json_codex_result
             printf '{"type":"item.completed","item":{"id":"item_mock_error","type":"agent_message","text":"mock: err"}}\n' >&2
             ;;
+        gemini)
+            json_gemini_init
+            json_gemini_assistant "mock: out"
+            json_gemini_result
+            printf '{"type":"result","status":"error","error":"mock: err"}\n' >&2
+            ;;
         *)
             printf 'mock: out\n'
             printf 'mock: err\n' >&2
@@ -226,6 +250,11 @@ emit_multiline() {
             json_codex_assistant "line1\nline2\nline3"
             json_codex_result
             ;;
+        gemini)
+            json_gemini_init
+            json_gemini_assistant "line1\nline2\nline3"
+            json_gemini_result
+            ;;
         *)           printf 'line1\nline2\nline3\n' ;;
     esac
     exit 0
@@ -250,6 +279,11 @@ emit_large_output() {
             json_codex_init
             json_codex_assistant "$_large"
             json_codex_result
+            ;;
+        gemini)
+            json_gemini_init
+            json_gemini_assistant "$_large"
+            json_gemini_result
             ;;
         *)           printf '%s\n' "$_large" ;;
     esac
@@ -284,6 +318,12 @@ emit_stderr_test() {
             json_codex_result
             printf '{"type":"item.completed","item":{"id":"item_mock_error","type":"agent_message","text":"mock: stderr output"}}\n' >&2
             ;;
+        gemini)
+            json_gemini_init
+            json_gemini_assistant "mock: stdout output"
+            json_gemini_result
+            printf '{"type":"result","status":"error","error":"mock: stderr output"}\n' >&2
+            ;;
         *)
             printf 'mock: stdout output\n'
             printf 'mock: stderr output\n' >&2
@@ -311,6 +351,11 @@ emit_stdin() {
             json_codex_init
             json_codex_assistant "mock: stdin received: $_text"
             json_codex_result
+            ;;
+        gemini)
+            json_gemini_init
+            json_gemini_assistant "mock: stdin received: $_text"
+            json_gemini_result
             ;;
         *)           printf 'mock: stdin received: %s\n' "$_text" ;;
     esac
@@ -345,6 +390,12 @@ emit_unknown() {
             json_codex_assistant "$_escaped"
             json_codex_result
             ;;
+        gemini)
+            _escaped=$(json_escape "mock: unknown prompt '$_prompt'")
+            json_gemini_init
+            json_gemini_assistant "$_escaped"
+            json_gemini_result
+            ;;
         *)           printf "mock: unknown prompt '%s'\n" "$_prompt" ;;
     esac
     exit 0
@@ -357,6 +408,7 @@ emit_usage_error() {
         kimi-code)   printf '{"role":"tool","content":[{"type":"text","text":"<system>ERROR: usage: opencode run \\"<Prompt>\\"</system>"}]}\n' >&2 ;;
         cursor-agent) printf '{"type":"result","subtype":"error","error":"usage: cursor-agent --print \\"<Prompt>\\"","session_id":"mock-cursor"}\n' >&2 ;;
         codex)       printf '{"type":"item.completed","item":{"id":"item_mock_error","type":"agent_message","text":"usage: codex exec \\"<Prompt>\\""}}\n' >&2 ;;
+        gemini)      printf '{"type":"result","status":"error","error":"usage: gemini --prompt \\"<Prompt>\\""}\n' >&2 ;;
         *)           printf 'usage: opencode run "<Prompt>"\n' >&2 ;;
     esac
     exit 1
@@ -393,6 +445,11 @@ emit_tool_call() {
             json_codex_assistant "mock: tool call executed"
             json_codex_result
             ;;
+        gemini)
+            json_gemini_init
+            json_gemini_assistant "mock: tool call executed"
+            json_gemini_result
+            ;;
         *)
             printf 'mock: tool call executed\n'
             ;;
@@ -414,6 +471,11 @@ emit_thinking() {
             ;;
         kimi-code)
             printf '{"role":"assistant","content":[{"type":"think","think":"Let me think about this...","encrypted":null},{"type":"text","text":"mock: thinking done"}]}\n'
+            ;;
+        gemini)
+            json_gemini_init
+            json_gemini_assistant "mock: thinking done"
+            json_gemini_result
             ;;
         *)
             printf 'mock: thinking done\n'

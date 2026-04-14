@@ -315,6 +315,53 @@ fn test_codex_stream_processor_renders_incrementally() {
 }
 
 #[test]
+fn test_gemini_stream_json_response() {
+    let raw = concat!(
+        "{\"type\":\"init\",\"timestamp\":\"2026-04-14T06:57:06.152Z\",\"session_id\":\"gemini-1\",\"model\":\"auto-gemini-3\"}\n",
+        "{\"type\":\"message\",\"timestamp\":\"2026-04-14T06:57:06.153Z\",\"role\":\"user\",\"content\":\"Respond with exactly pong\"}\n",
+        "{\"type\":\"message\",\"timestamp\":\"2026-04-14T06:57:20.472Z\",\"role\":\"assistant\",\"content\":\"pong\",\"delta\":true}\n",
+        "{\"type\":\"result\",\"timestamp\":\"2026-04-14T06:57:20.557Z\",\"status\":\"success\",\"stats\":{\"total_tokens\":14587,\"input_tokens\":14550,\"output_tokens\":1,\"cached\":0,\"duration_ms\":14405,\"tool_calls\":0}}\n",
+    );
+    let parsed = parse_json_output(raw, "gemini");
+    assert_eq!(parsed.schema_name, "gemini");
+    assert_eq!(parsed.session_id, "gemini-1");
+    assert_eq!(parsed.final_text, "pong");
+    assert_eq!(parsed.usage.get("total_tokens").copied(), Some(14587));
+    assert_eq!(parsed.usage.get("output_tokens").copied(), Some(1));
+    assert_eq!(parsed.duration_ms, 14405);
+    assert!(parsed.unknown_json_lines.is_empty());
+}
+
+#[test]
+fn test_render_gemini_stream_json() {
+    let raw = "{\"type\":\"message\",\"role\":\"assistant\",\"content\":\"pong\",\"delta\":true}\n";
+    let parsed = parse_gemini_json(raw);
+    let rendered = render_parsed(&parsed, true, false);
+    assert_eq!(rendered, "[assistant] pong");
+}
+
+#[test]
+fn test_gemini_stream_processor_renders_incrementally() {
+    let raw = concat!(
+        "{\"type\":\"init\",\"session_id\":\"gemini-1\"}\n",
+        "{\"type\":\"message\",\"role\":\"user\",\"content\":\"Respond with exactly pong\"}\n",
+        "{\"type\":\"message\",\"role\":\"assistant\",\"content\":\"pong\",\"delta\":true}\n",
+        "{\"type\":\"result\",\"status\":\"success\",\"stats\":{\"duration_ms\":14405}}\n",
+    );
+    let mut processor =
+        StructuredStreamProcessor::new("gemini", FormattedRenderer::new(true, false));
+    let mut chunks = Vec::new();
+    for line in raw.lines() {
+        let rendered = processor.feed(&format!("{line}\n"));
+        if !rendered.is_empty() {
+            chunks.push(rendered);
+        }
+    }
+    assert_eq!(chunks, vec!["[assistant] pong"]);
+    assert!(processor.take_unknown_json_lines().is_empty());
+}
+
+#[test]
 fn test_render_opencode() {
     let raw = "{\"response\":\"hello\"}\n";
     let parsed = parse_opencode_json(raw);

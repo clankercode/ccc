@@ -132,6 +132,8 @@ let result = Runner::new().run(spec);
 | `cc`     | claude     |
 | `c`, `cx`| codex      |
 | `k`      | kimi       |
+| `cu`     | cursor     |
+| `g`      | gemini     |
 | `rc`     | roocode    |
 | `cr`     | crush      |
 
@@ -260,6 +262,8 @@ The `@reviewer` alias might resolve to claude with specific settings and a base 
 | `CCC_REAL_OPENCODE`   | Override opencode binary path (for testing) |
 | `CCC_REAL_CLAUDE`     | Override claude binary path (for testing)    |
 | `CCC_REAL_KIMI`       | Override kimi binary path (for testing)      |
+| `CCC_REAL_CURSOR`     | Override cursor-agent binary path (for testing) |
+| `CCC_REAL_GEMINI`     | Override gemini binary path (for testing)    |
 | `CCC_PROVIDER`        | Set provider for current run                  |
 | `CCC_CONFIG`          | Explicit config file path                     |
 | `FORCE_COLOR`         | Force colored output                          |
@@ -271,8 +275,10 @@ The `@reviewer` alias might resolve to claude with specific settings and a base 
 |-----------|----------|----------|--------|------------|-----------|
 | opencode  | opencode | ✓        | ✓      | ✓          | ✓         |
 | claude    | claude   | ✓        | ✓      | ✓          | ✓         |
-| codex     | codex    | —        | ✓      | —          | —         |
+| codex     | codex    | —        | ✓      | ✓          | ✓         |
 | kimi      | kimi     | ✓        | ✓      | ✓          | ✓         |
+| cursor    | cursor-agent | —    | ✓      | ✓          | ✓         |
+| gemini    | gemini   | —        | ✓      | ✓          | —         |
 | roocode   | roocode  | —        | —      | —          | —         |
 | crush     | crush    | —        | —      | —          | —         |
 

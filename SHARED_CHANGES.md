@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-14
 
+### Gemini CLI runner support
+- Change: Python and Rust now support Gemini CLI through canonical runner `gemini` and selector `g`, using `gemini --prompt` for non-interactive runs, `--model`, raw `json` / `stream-json` output flags, `--approval-mode` permission mappings, `CCC_REAL_GEMINI`, and metadata-first version discovery for `@google/gemini-cli`
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `tests/test_runner.py`, `tests/test_ccc_contract_impl.py`, `tests/test_harness.py`, `rust/tests/parser_tests.rs`, `rust/src/help.rs`, `rust/src/bin/ccc.rs`
+- Notes: updated `README.md`, `docs/llms.txt`, `docs/index.html`, `docs/clis/README.md`, `docs/clis/output-mode-compatibility.md`, `docs/clis/mock-smoke.md`, and added `docs/clis/gemini.md`; local `gemini --version` returned `0.37.2`; Gemini npx wrappers avoid slow version-command fallback by reporting the wrapper identity when cached package metadata is unavailable; formatted Gemini transcript modes are intentionally unsupported until a real JSON fixture and parser are added
+
 ### Runner-selector `@name` tokens no longer fall through to agents
 - Change: Python and Rust now treat unresolved `@k`, `@oc`, and other registered runner selector names as runner selections when no same-name alias exists and no explicit runner was provided; configured aliases with the same name still win, and unresolved non-runner names still fall back to agents
 - Required implementations: Python and Rust

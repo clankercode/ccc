@@ -1,9 +1,7 @@
 use crate::RUNNER_REGISTRY;
 use serde_json::Value;
 use std::fs;
-use std::path::Path;
-#[cfg(test)]
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 struct RunnerStatus {
@@ -23,6 +21,7 @@ const CANONICAL_RUNNERS: &[(&str, &str)] = &[
     ("roocode", "rc"),
     ("crush", "cr"),
     ("cursor", "cu"),
+    ("gemini", "g"),
 ];
 
 const HELP_TEXT: &str = r#"ccc — call coding CLIs
@@ -39,7 +38,7 @@ Usage:
 
 Controls (free order before the prompt):
   runner        Select which coding CLI to use (default: oc)
-                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu)
+                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g)
   +thinking     Set thinking level: +0..+4 or +none/+low/+med/+mid/+medium/+high/+max/+xhigh
                 Claude maps +0 to --thinking disabled and +1..+4 to --thinking enabled with matching --effort
                 Kimi maps +0 to --no-thinking and +1..+4 to --thinking
@@ -270,6 +269,57 @@ fn discover_cursor_version(binary_path: &Path) -> String {
     read_cursor_release_version(&package_root.join("index.js"))
 }
 
+fn discover_gemini_version(binary_path: &Path) -> String {
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    discover_gemini_version_with_home(binary_path, home.as_deref())
+}
+
+fn discover_gemini_version_with_home(binary_path: &Path, home: Option<&Path>) -> String {
+    let mut candidates = vec![
+        binary_path
+            .parent()
+            .unwrap_or(binary_path)
+            .join("package.json"),
+        binary_path
+            .parent()
+            .unwrap_or(binary_path)
+            .parent()
+            .unwrap_or(binary_path)
+            .join("package.json"),
+    ];
+    let mut is_npx_launcher = false;
+    if let Ok(launcher) = fs::read_to_string(binary_path) {
+        if launcher.contains("@google/gemini-cli") {
+            is_npx_launcher = true;
+            if let Some(home) = home {
+                let npx_root = home.join(".npm").join("_npx");
+                if let Ok(entries) = fs::read_dir(npx_root) {
+                    for entry in entries.flatten() {
+                        candidates.push(
+                            entry
+                                .path()
+                                .join("node_modules")
+                                .join("@google")
+                                .join("gemini-cli")
+                                .join("package.json"),
+                        );
+                    }
+                }
+            }
+        }
+    }
+    for candidate in candidates {
+        let version = read_json_version(&candidate, "@google/gemini-cli");
+        if !version.is_empty() {
+            return version;
+        }
+    }
+    if is_npx_launcher {
+        return "npx @google/gemini-cli".to_string();
+    }
+    String::new()
+}
+
 fn get_runner_version(runner_name: &str, binary: &str, binary_path: &Path) -> String {
     let real_path = match fs::canonicalize(binary_path) {
         Ok(path) => path,
@@ -281,6 +331,7 @@ fn get_runner_version(runner_name: &str, binary: &str, binary_path: &Path) -> St
         "claude" => discover_claude_version(&real_path),
         "kimi" => discover_kimi_version(&real_path),
         "cursor" => discover_cursor_version(&real_path),
+        "gemini" => discover_gemini_version(&real_path),
         _ => String::new(),
     };
     if version.is_empty() {
@@ -482,6 +533,41 @@ mod tests {
         assert_eq!(
             get_runner_version("cursor", "definitely-missing-binary", &binary_path),
             "2026.03.30-a5d3e17"
+        );
+    }
+
+    #[test]
+    fn test_get_runner_version_reads_gemini_package_json_before_command() {
+        let root = unique_temp_dir("gemini");
+        let package_root = root.join("node_modules").join("@google").join("gemini-cli");
+        let binary_path = package_root.join("dist").join("index.js");
+        fs::create_dir_all(binary_path.parent().unwrap()).unwrap();
+        fs::write(
+            package_root.join("package.json"),
+            r#"{"name":"@google/gemini-cli","version":"0.37.2"}"#,
+        )
+        .unwrap();
+        fs::write(&binary_path, "#!/usr/bin/env node\n").unwrap();
+
+        assert_eq!(
+            get_runner_version("gemini", "definitely-missing-binary", &binary_path),
+            "0.37.2"
+        );
+    }
+
+    #[test]
+    fn test_get_runner_version_identifies_gemini_npx_launcher_without_command() {
+        let root = unique_temp_dir("gemini-npx");
+        let binary_path = root.join("gemini");
+        fs::write(
+            &binary_path,
+            "#!/bin/bash\nexec npx --yes @google/gemini-cli \"$@\"\n",
+        )
+        .unwrap();
+
+        assert_eq!(
+            discover_gemini_version_with_home(&binary_path, Some(&root)),
+            "npx @google/gemini-cli"
         );
     }
 

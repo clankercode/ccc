@@ -20,6 +20,7 @@ This matrix is the current Python and Rust contract for `ccc --output-mode` and 
 | Claude | yes | yes | yes | yes | yes | yes | `--output-format json` or `--verbose --output-format stream-json --include-partial-messages` |
 | Kimi | yes | yes | no | yes | yes | yes | `--print --output-format stream-json` |
 | Cursor Agent | yes | yes | yes | yes | yes | yes | `--print --trust --output-format json` or `--print --trust --output-format stream-json` |
+| Gemini CLI | yes | yes | yes | yes | no | no | `--prompt ... --output-format json` or `--prompt ... --output-format stream-json` |
 | OpenCode | yes | yes | yes | no | yes | yes | `--format json` |
 | Codex | yes | yes | yes | yes | yes | yes | `codex exec --json` |
 | Crush | yes | yes | no | no | no | no | native text only |
@@ -33,6 +34,7 @@ This matrix is the current Python and Rust contract for `ccc --output-mode` and 
 - OpenCode uses `--format json`, not `-f json`. `-f` is the file-attach flag upstream.
 - OpenCode `--format json` is a live JSON-event stream, so `ccc` can drive both buffered `formatted` and live `stream-formatted` from the same upstream transport.
 - Cursor Agent uses one-shot `--output-format json` for raw `json` and `--output-format stream-json` for NDJSON and formatted transcript modes.
+- Gemini uses one-shot `--output-format json` for raw `json` and `--output-format stream-json` for NDJSON. Formatted transcript modes stay unsupported until a real Gemini JSON fixture and parser are added.
 - Codex uses `codex exec --json` for raw JSONL and formatted transcript modes; `ccc` maps assistant messages, command execution items, thread ids, and usage totals from that stream.
 - `formatted` and `stream-formatted` are normalized transcript modes, not raw passthrough.
 - `stream-text` is intentionally separate from `stream-formatted`: it prints native runner output as it arrives.

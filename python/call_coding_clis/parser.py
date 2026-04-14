@@ -168,6 +168,18 @@ def _register_defaults() -> None:
         model_flag="--model",
         prompt_flag="",
     )
+    RUNNER_REGISTRY["gemini"] = RunnerInfo(
+        binary="gemini",
+        extra_args=[],
+        no_persist_flags=[],
+        thinking_flags={},
+        show_thinking_flags={},
+        yolo_flags=[],
+        provider_flag="",
+        model_flag="--model",
+        agent_flag="",
+        prompt_flag="--prompt",
+    )
 
     RUNNER_REGISTRY["oc"] = RUNNER_REGISTRY["opencode"]
     RUNNER_REGISTRY["cc"] = RUNNER_REGISTRY["claude"]
@@ -177,12 +189,13 @@ def _register_defaults() -> None:
     RUNNER_REGISTRY["rc"] = RUNNER_REGISTRY["roocode"]
     RUNNER_REGISTRY["cr"] = RUNNER_REGISTRY["crush"]
     RUNNER_REGISTRY["cu"] = RUNNER_REGISTRY["cursor"]
+    RUNNER_REGISTRY["g"] = RUNNER_REGISTRY["gemini"]
 
 
 _register_defaults()
 
 RUNNER_SELECTOR_RE = re.compile(
-    r"^(?:oc|cc|c|cx|k|rc|cr|cu|codex|claude|opencode|kimi|roocode|crush|cursor)$",
+    r"^(?:oc|cc|c|cx|k|rc|cr|cu|g|codex|claude|opencode|kimi|roocode|crush|cursor|gemini)$",
     re.IGNORECASE,
 )
 THINKING_RE = re.compile(
@@ -390,6 +403,8 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
             "formatted",
             "stream-formatted",
         }
+    if key in {"g", "gemini"}:
+        return {"text", "stream-text", "json", "stream-json"}
     return {"text", "stream-text"}
 
 
@@ -474,8 +489,9 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
     warnings: list[str] = []
     if mode not in supported:
         if mode_source == "argument":
+            runner_display = _canonical_runner_name(effective_runner_name, info)
             raise ValueError(
-                f'runner "{effective_runner_name}" does not support output mode "{mode}"'
+                f'runner "{runner_display}" does not support output mode "{mode}"'
             )
         fallback = _fallback_output_mode(supported)
         runner_display = _canonical_runner_name(effective_runner_name, info)
@@ -555,6 +571,21 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
             stream=mode.startswith("stream-"),
             formatted="formatted" in mode,
             schema="cursor-agent",
+            argv_flags=flags,
+            warnings=warnings,
+        )
+    if key in {"g", "gemini"}:
+        flags = (
+            ["--output-format", "json"]
+            if mode == "json"
+            else ["--output-format", "stream-json"]
+        )
+        return OutputPlan(
+            runner_name=effective_runner_name,
+            mode=mode,
+            stream=mode.startswith("stream-"),
+            formatted=False,
+            schema="gemini",
             argv_flags=flags,
             warnings=warnings,
         )
@@ -662,6 +693,8 @@ def resolve_command(
             env_overrides["OPENCODE_CONFIG_CONTENT"] = '{"permission":"ask"}'
         elif effective_runner_name in {"cu", "cursor"}:
             argv.extend(["--sandbox", "enabled"])
+        elif effective_runner_name in {"g", "gemini"}:
+            argv.extend(["--approval-mode", "default", "--sandbox"])
         elif effective_runner_name in {"rc", "roocode"}:
             warnings.append(
                 'warning: runner "roocode" safe mode is unverified; leaving default permissions unchanged'
@@ -671,12 +704,16 @@ def resolve_command(
             argv.extend(["--permission-mode", "auto"])
         elif effective_runner_name in {"c", "cx", "codex"}:
             argv.append("--full-auto")
+        elif effective_runner_name in {"g", "gemini"}:
+            argv.extend(["--approval-mode", "auto_edit"])
         else:
             warnings.append(
                 f'warning: runner "{effective_runner_name}" does not support permission mode "auto"; ignoring it'
             )
     elif effective_permission_mode == "yolo":
-        if info.yolo_flags:
+        if effective_runner_name in {"g", "gemini"}:
+            argv.extend(["--approval-mode", "yolo"])
+        elif info.yolo_flags:
             argv.extend(info.yolo_flags)
         elif effective_runner_name in {"oc", "opencode"}:
             env_overrides["OPENCODE_CONFIG_CONTENT"] = '{"permission":"allow"}'
@@ -695,6 +732,8 @@ def resolve_command(
             argv.append("--plan")
         elif effective_runner_name in {"cu", "cursor"}:
             argv.extend(["--mode", "plan"])
+        elif effective_runner_name in {"g", "gemini"}:
+            argv.extend(["--approval-mode", "plan"])
         else:
             warnings.append(
                 f'warning: runner "{effective_runner_name}" does not support permission mode "plan"; ignoring it'
@@ -730,6 +769,8 @@ def _canonical_runner_name(effective_runner_name: str, info: RunnerInfo) -> str:
         return "roocode"
     if name in {"cu", "cursor"}:
         return "cursor"
+    if name in {"g", "gemini"}:
+        return "gemini"
     return info.binary
 
 

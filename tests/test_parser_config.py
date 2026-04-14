@@ -87,6 +87,13 @@ class ParseArgsTests(unittest.TestCase):
                 self.assertEqual(parsed.runner, selector)
                 self.assertEqual(parsed.prompt, "hello")
 
+    def test_runner_selector_gemini_and_g(self):
+        for selector in ("gemini", "g"):
+            with self.subTest(selector=selector):
+                parsed = parse_args([selector, "hello"])
+                self.assertEqual(parsed.runner, selector)
+                self.assertEqual(parsed.prompt, "hello")
+
     def test_runner_selector_cr_remains_crush(self):
         parsed = parse_args(["cr", "hello"])
         self.assertEqual(parsed.runner, "cr")
@@ -353,6 +360,23 @@ class ResolveCommandTests(unittest.TestCase):
         self.assertEqual(env, {})
         self.assertEqual(warnings, [])
 
+    def test_gemini_runner_via_g_uses_prompt_flag(self):
+        parsed = ParsedArgs(runner="g", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(argv, ["gemini", "--prompt", "hello"])
+        self.assertEqual(env, {})
+        self.assertEqual(warnings, [])
+
+    def test_gemini_runner_long_name_with_model(self):
+        parsed = ParsedArgs(runner="gemini", model="gemini-2.5-pro", prompt="hello")
+        argv, env, warnings = resolve_command(parsed)
+        self.assertEqual(
+            argv,
+            ["gemini", "--model", "gemini-2.5-pro", "--prompt", "hello"],
+        )
+        self.assertEqual(env, {})
+        self.assertEqual(warnings, [])
+
     def test_cr_still_resolves_to_crush(self):
         parsed = ParsedArgs(runner="cr", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
@@ -404,7 +428,12 @@ class ResolveCommandTests(unittest.TestCase):
                 self.assertNotIn("may save this session", "\n".join(warnings))
 
     def test_cleanup_session_warns_for_unsupported_cleanup_runners(self):
-        for runner, display in (("cr", "crush"), ("rc", "roocode"), ("cu", "cursor")):
+        for runner, display in (
+            ("cr", "crush"),
+            ("rc", "roocode"),
+            ("cu", "cursor"),
+            ("g", "gemini"),
+        ):
             with self.subTest(runner=runner):
                 _argv, _env, warnings = resolve_command(
                     ParsedArgs(runner=runner, cleanup_session=True, prompt="hello")
@@ -933,6 +962,33 @@ class ResolveCommandTests(unittest.TestCase):
                 self.assertEqual(argv, expected_argv)
                 self.assertEqual(warnings, expected_warnings)
 
+    def test_permission_modes_for_gemini(self):
+        cases = [
+            (
+                "safe",
+                ["gemini", "--approval-mode", "default", "--sandbox", "--prompt", "hello"],
+            ),
+            (
+                "auto",
+                ["gemini", "--approval-mode", "auto_edit", "--prompt", "hello"],
+            ),
+            (
+                "yolo",
+                ["gemini", "--approval-mode", "yolo", "--prompt", "hello"],
+            ),
+            (
+                "plan",
+                ["gemini", "--approval-mode", "plan", "--prompt", "hello"],
+            ),
+        ]
+        for mode, expected_argv in cases:
+            with self.subTest(mode=mode):
+                parsed = ParsedArgs(runner="g", permission_mode=mode, prompt="hello")
+                argv, env, warnings = resolve_command(parsed)
+                self.assertEqual(argv, expected_argv)
+                self.assertEqual(env, {})
+                self.assertEqual(warnings, [])
+
     def test_permission_mode_auto_for_claude(self):
         parsed = ParsedArgs(runner="cc", permission_mode="auto", prompt="hello")
         argv, _env, warnings = resolve_command(parsed)
@@ -1105,6 +1161,25 @@ class ResolveCommandTests(unittest.TestCase):
                 self.assertEqual(plan.formatted, formatted)
                 self.assertEqual(plan.schema, "cursor-agent")
                 self.assertEqual(plan.argv_flags, flags)
+
+    def test_gemini_output_plans(self):
+        cases = [
+            ("json", False, ["--output-format", "json"]),
+            ("stream-json", True, ["--output-format", "stream-json"]),
+        ]
+        for mode, stream, flags in cases:
+            with self.subTest(mode=mode):
+                parsed = ParsedArgs(runner="g", output_mode=mode, prompt="hello")
+                plan = resolve_output_plan(parsed)
+                self.assertEqual(plan.stream, stream)
+                self.assertFalse(plan.formatted)
+                self.assertEqual(plan.schema, "gemini")
+                self.assertEqual(plan.argv_flags, flags)
+
+    def test_gemini_formatted_output_mode_is_unsupported_until_schema_is_fixture_backed(self):
+        parsed = ParsedArgs(runner="g", output_mode="formatted", prompt="hello")
+        with self.assertRaisesRegex(ValueError, "gemini"):
+            resolve_output_plan(parsed)
 
     def test_configured_unsupported_output_mode_falls_back_to_text(self):
         config = CccConfig(default_output_mode="stream-formatted")

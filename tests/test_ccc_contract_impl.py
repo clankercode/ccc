@@ -33,6 +33,7 @@ KIMI_PERSISTENCE_WARNING = 'warning: runner "kimi" may save this session; pass -
 CRUSH_PERSISTENCE_WARNING = 'warning: runner "crush" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
 ROOCODE_PERSISTENCE_WARNING = 'warning: runner "roocode" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
 CURSOR_PERSISTENCE_WARNING = 'warning: runner "cursor" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
+GEMINI_PERSISTENCE_WARNING = 'warning: runner "gemini" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
 HELP_USAGE_LINE = 'ccc [controls...] "<Prompt>"'
 HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, runner names select runners before agent fallback"
@@ -365,6 +366,30 @@ class SingleImplCccContractTests(unittest.TestCase):
                     self.assertEqual(
                         result.stdout,
                         "cursor-agent --print --trust Fix the failing tests\n",
+                    )
+                    self.assertEqual(result.stderr, "")
+
+    def test_env_override_can_replace_gemini_binary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            gemini_path = bin_dir / "gemini-mock"
+            self._write_opencode_stub(opencode_path)
+            self._write_runner_stub(gemini_path, "gemini")
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                with self.subTest(language=lang.name, env="CCC_REAL_GEMINI"):
+                    env = self._make_env(opencode_path, lang)
+                    env["CCC_REAL_GEMINI"] = str(gemini_path)
+                    result = lang.invoke_extra(["g", "--save-session", PROMPT], env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(
+                        result.stdout,
+                        "gemini --prompt Fix the failing tests\n",
                     )
                     self.assertEqual(result.stderr, "")
 
@@ -962,12 +987,14 @@ class SingleImplCccContractTests(unittest.TestCase):
             opencode_path = bin_dir / "opencode"
             roocode_path = bin_dir / "roocode"
             cursor_path = bin_dir / "cursor-agent"
+            gemini_path = bin_dir / "gemini"
             self._write_argv_echo_stub(claude_path, "claude")
             self._write_argv_echo_stub(codex_path, "codex")
             self._write_argv_echo_stub(kimi_path, "kimi")
             self._write_opencode_yolo_stub(opencode_path)
             self._write_argv_echo_stub(roocode_path, "roocode")
             self._write_argv_echo_stub(cursor_path, "cursor-agent")
+            self._write_argv_echo_stub(gemini_path, "gemini")
 
             cases = {
                 "Python": [
@@ -1029,6 +1056,21 @@ class SingleImplCccContractTests(unittest.TestCase):
                         'warning: runner "cu" does not support permission mode "auto"; ignoring it\n'
                         + CURSOR_PERSISTENCE_WARNING,
                     ),
+                    (
+                        ["g", "--permission-mode", "safe"],
+                        "gemini --approval-mode default --sandbox --prompt Fix the failing tests\n",
+                        GEMINI_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["gemini", "--permission-mode", "auto"],
+                        "gemini --approval-mode auto_edit --prompt Fix the failing tests\n",
+                        GEMINI_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["g", "--permission-mode", "plan"],
+                        "gemini --approval-mode plan --prompt Fix the failing tests\n",
+                        GEMINI_PERSISTENCE_WARNING,
+                    ),
                 ],
                 "Rust": [
                     (
@@ -1088,6 +1130,21 @@ class SingleImplCccContractTests(unittest.TestCase):
                         "cursor-agent --print --trust Fix the failing tests\n",
                         'warning: runner "cu" does not support permission mode "auto"; ignoring it\n'
                         + CURSOR_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["g", "--permission-mode", "safe"],
+                        "gemini --approval-mode default --sandbox --prompt Fix the failing tests\n",
+                        GEMINI_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["gemini", "--permission-mode", "auto"],
+                        "gemini --approval-mode auto_edit --prompt Fix the failing tests\n",
+                        GEMINI_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["g", "--permission-mode", "plan"],
+                        "gemini --approval-mode plan --prompt Fix the failing tests\n",
+                        GEMINI_PERSISTENCE_WARNING,
                     ),
                 ],
             }
@@ -1250,11 +1307,13 @@ class SingleImplCccContractTests(unittest.TestCase):
             opencode_path = bin_dir / "opencode"
             cursor_path = bin_dir / "cursor-agent"
             codex_path = bin_dir / "codex"
+            gemini_path = bin_dir / "gemini"
             self._write_argv_echo_stub(claude_path, "claude")
             self._write_argv_echo_stub(kimi_path, "kimi")
             self._write_argv_echo_stub(opencode_path, "opencode")
             self._write_argv_echo_stub(cursor_path, "cursor-agent")
             self._write_argv_echo_stub(codex_path, "codex")
+            self._write_argv_echo_stub(gemini_path, "gemini")
 
             cases = {
                 "Python": [
@@ -1290,6 +1349,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["cursor", "..json"],
                         "cursor-agent --print --trust --output-format stream-json Fix the failing tests\n",
                     ),
+                    (
+                        ["g", ".json"],
+                        "gemini --output-format json --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["gemini", "..json"],
+                        "gemini --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
                 ],
                 "Rust": [
                     (
@@ -1323,6 +1390,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     (
                         ["cursor", "..json"],
                         "cursor-agent --print --trust --output-format stream-json Fix the failing tests\n",
+                    ),
+                    (
+                        ["g", ".json"],
+                        "gemini --output-format json --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["gemini", "..json"],
+                        "gemini --output-format stream-json --prompt Fix the failing tests\n",
                     ),
                 ],
             }
@@ -1627,12 +1702,14 @@ class SingleImplCccContractTests(unittest.TestCase):
             crush_path = bin_dir / "crush"
             opencode_path = bin_dir / "opencode"
             cursor_path = bin_dir / "cursor-agent"
+            gemini_path = bin_dir / "gemini"
             self._write_argv_echo_stub(claude_path, "claude")
             self._write_argv_echo_stub(codex_path, "codex")
             self._write_argv_echo_stub(kimi_path, "kimi")
             self._write_argv_echo_stub(crush_path, "crush")
             self._write_opencode_yolo_stub(opencode_path)
             self._write_argv_echo_stub(cursor_path, "cursor-agent")
+            self._write_argv_echo_stub(gemini_path, "gemini")
 
             cases = {
                 "Python": [
@@ -1667,6 +1744,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                         "cursor-agent --print --trust --yolo Fix the failing tests\n",
                         CURSOR_PERSISTENCE_WARNING,
                     ),
+                    (
+                        ["g", "--yolo"],
+                        "gemini --approval-mode yolo --prompt Fix the failing tests\n",
+                        GEMINI_PERSISTENCE_WARNING,
+                    ),
                 ],
                 "Rust": [
                     (
@@ -1699,6 +1781,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["cu", "--yolo"],
                         "cursor-agent --print --trust --yolo Fix the failing tests\n",
                         CURSOR_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["g", "--yolo"],
+                        "gemini --approval-mode yolo --prompt Fix the failing tests\n",
+                        GEMINI_PERSISTENCE_WARNING,
                     ),
                 ],
             }
@@ -1880,6 +1967,8 @@ class SingleImplCccContractTests(unittest.TestCase):
             return ROOCODE_PERSISTENCE_WARNING
         if "cu" in extra_args or "cursor" in extra_args:
             return CURSOR_PERSISTENCE_WARNING
+        if "g" in extra_args or "gemini" in extra_args:
+            return GEMINI_PERSISTENCE_WARNING
         if (
             "cc" in extra_args
             or "claude" in extra_args

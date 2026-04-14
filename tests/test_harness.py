@@ -558,6 +558,8 @@ class CrossLanguageHarness(unittest.TestCase):
         cursor_link.symlink_to(MOCK_BIN)
         codex_link = cls.bin_dir / "codex"
         codex_link.symlink_to(MOCK_BIN)
+        gemini_link = cls.bin_dir / "gemini"
+        gemini_link.symlink_to(MOCK_BIN)
 
         cls.base_env = os.environ.copy()
         cls.base_env["PATH"] = f"{cls.bin_dir}:{cls.base_env.get('PATH', '')}"
@@ -630,6 +632,19 @@ class CrossLanguageHarness(unittest.TestCase):
                         self.fail(
                             f"[{lang.name}] extra args: exit code {result.returncode}, expected 0 or 1"
                         )
+
+    def test_gemini_runner_uses_prompt_flag_for_python_and_rust(self):
+        for lang in self.selected_languages:
+            if lang.name not in {"Python", "Rust"}:
+                continue
+            env = self._make_env(lang)
+            with self.subTest(language=lang.name):
+                if not lang.build_ok:
+                    self.skipTest(lang.build_error)
+                result = lang.invoke_with_args(["g", "--save-session"], "Fix the failing tests", env)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, "opencode run Fix the failing tests\n")
+                self.assertEqual(result.stderr, "")
 
     def test_formatted_output_mode_sugar_for_supported_languages(self):
         cases = [

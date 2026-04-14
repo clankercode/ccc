@@ -280,6 +280,18 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         agent_flag: String::new(),
         prompt_flag: String::new(),
     };
+    let gemini = RunnerInfo {
+        binary: "gemini".into(),
+        extra_args: vec![],
+        no_persist_flags: vec![],
+        thinking_flags: BTreeMap::new(),
+        show_thinking_flags: BTreeMap::new(),
+        yolo_flags: vec![],
+        provider_flag: String::new(),
+        model_flag: "--model".into(),
+        agent_flag: String::new(),
+        prompt_flag: "--prompt".into(),
+    };
 
     let claude_clone = claude.clone();
     let kimi_clone = kimi.clone();
@@ -289,6 +301,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let roocode_clone = roocode.clone();
     let crush_clone = crush.clone();
     let cursor_clone = cursor.clone();
+    let gemini_clone = gemini.clone();
 
     m.insert("opencode".into(), opencode);
     m.insert("claude".into(), claude);
@@ -297,6 +310,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     m.insert("roocode".into(), roocode);
     m.insert("crush".into(), crush);
     m.insert("cursor".into(), cursor);
+    m.insert("gemini".into(), gemini);
 
     m.insert("oc".into(), opencode_clone);
     m.insert("cc".into(), claude_clone.clone());
@@ -306,13 +320,14 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     m.insert("rc".into(), roocode_clone.clone());
     m.insert("cr".into(), crush_clone);
     m.insert("cu".into(), cursor_clone);
+    m.insert("g".into(), gemini_clone);
 
     RwLock::new(m)
 });
 
 static RUNNER_SELECTOR_STRS: &[&str] = &[
-    "oc", "cc", "c", "cx", "k", "rc", "cr", "cu", "codex", "claude", "opencode", "kimi", "roocode",
-    "crush", "cursor",
+    "oc", "cc", "c", "cx", "k", "rc", "cr", "cu", "g", "codex", "claude", "opencode", "kimi",
+    "roocode", "crush", "cursor", "gemini",
 ];
 
 fn is_runner_selector(s: &str) -> bool {
@@ -591,6 +606,10 @@ pub fn resolve_command(
         } else if matches!(effective_runner_name.as_str(), "cu" | "cursor") {
             argv.push("--sandbox".to_string());
             argv.push("enabled".to_string());
+        } else if matches!(effective_runner_name.as_str(), "g" | "gemini") {
+            argv.push("--approval-mode".to_string());
+            argv.push("default".to_string());
+            argv.push("--sandbox".to_string());
         } else if matches!(effective_runner_name.as_str(), "rc" | "roocode") {
             warnings.push(
                 "warning: runner \"roocode\" safe mode is unverified; leaving default permissions unchanged"
@@ -603,6 +622,9 @@ pub fn resolve_command(
             argv.push("auto".to_string());
         } else if matches!(effective_runner_name.as_str(), "c" | "cx" | "codex") {
             argv.push("--full-auto".to_string());
+        } else if matches!(effective_runner_name.as_str(), "g" | "gemini") {
+            argv.push("--approval-mode".to_string());
+            argv.push("auto_edit".to_string());
         } else {
             warnings.push(format!(
                 "warning: runner \"{}\" does not support permission mode \"auto\"; ignoring it",
@@ -610,7 +632,10 @@ pub fn resolve_command(
             ));
         }
     } else if matches!(effective_permission_mode.as_deref(), Some("yolo")) {
-        if !effective_runner.yolo_flags.is_empty() {
+        if matches!(effective_runner_name.as_str(), "g" | "gemini") {
+            argv.push("--approval-mode".to_string());
+            argv.push("yolo".to_string());
+        } else if !effective_runner.yolo_flags.is_empty() {
             argv.extend(effective_runner.yolo_flags.iter().cloned());
         } else if matches!(effective_runner_name.as_str(), "oc" | "opencode") {
             env_overrides.insert(
@@ -634,6 +659,9 @@ pub fn resolve_command(
             argv.push("--plan".to_string());
         } else if matches!(effective_runner_name.as_str(), "cu" | "cursor") {
             argv.push("--mode".to_string());
+            argv.push("plan".to_string());
+        } else if matches!(effective_runner_name.as_str(), "g" | "gemini") {
+            argv.push("--approval-mode".to_string());
             argv.push("plan".to_string());
         } else {
             warnings.push(format!(
@@ -667,6 +695,7 @@ fn canonical_runner_name(effective_runner_name: &str, info: &RunnerInfo) -> Stri
         "cr" | "crush" => "crush".to_string(),
         "rc" | "roocode" => "roocode".to_string(),
         "cu" | "cursor" => "cursor".to_string(),
+        "g" | "gemini" => "gemini".to_string(),
         _ => info.binary.clone(),
     }
 }
@@ -806,6 +835,7 @@ fn supported_output_modes(runner_name: &str) -> &'static [&'static str] {
             OUTPUT_MODES
         }
         "k" | "kimi" => KIMI_OUTPUT_MODES,
+        "g" | "gemini" => &["text", "stream-text", "json", "stream-json"],
         _ => TEXT_OUTPUT_MODES,
     }
 }
@@ -890,7 +920,7 @@ pub fn resolve_output_plan(
     let mut warnings = Vec::new();
     if !supported.iter().any(|candidate| *candidate == mode) {
         if mode_source == "argument" {
-            return Err("runner does not support requested output mode");
+            return Err("gemini runner does not support requested output mode");
         }
         let fallback = fallback_output_mode(supported);
         warnings.push(format!(
@@ -991,6 +1021,23 @@ pub fn resolve_output_plan(
             stream: mode.starts_with("stream-"),
             formatted: mode.contains("formatted"),
             schema: Some("cursor-agent".into()),
+            argv_flags,
+            warnings,
+        });
+    }
+
+    if matches!(runner_name.as_str(), "g" | "gemini") {
+        let argv_flags = if mode == "json" {
+            vec!["--output-format".into(), "json".into()]
+        } else {
+            vec!["--output-format".into(), "stream-json".into()]
+        };
+        return Ok(OutputPlan {
+            runner_name,
+            mode: mode.clone(),
+            stream: mode.starts_with("stream-"),
+            formatted: false,
+            schema: Some("gemini".into()),
             argv_flags,
             warnings,
         });

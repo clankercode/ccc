@@ -2,7 +2,7 @@
 
 > One command to run any coding CLI. A unified interface implemented in 20 programming languages.
 
-ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Claude Code, Codex, Kimi, Cursor Agent, Crush) behind a single consistent interface. Each of the 20 language implementations bundles an identical `ccc` CLI binary and a reusable library with `CommandSpec`, `CompletedRun`, and `Runner` types.
+ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Claude Code, Codex, Kimi, Cursor Agent, Gemini CLI, Crush) behind a single consistent interface. Each of the 20 language implementations bundles an identical `ccc` CLI binary and a reusable library with `CommandSpec`, `CompletedRun`, and `Runner` types.
 Python and Rust also expose `ccc --print-config`, which prints the canonical example config with the current supported keys, and `ccc config`, which prints every existing resolved config file path and contents.
 Python and Rust also expose `ccc add [-g] <alias>`, a line-prompt alias wizard that writes `[aliases.<name>]` entries to config; scriptable flags plus `--yes` can write aliases non-interactively.
 
@@ -11,7 +11,7 @@ Python and Rust also expose `ccc add [-g] <alias>`, a line-prompt alias wizard t
 ccc [controls...] "<Prompt>"
 
 Slots are parsed in free order before the prompt, except that `-h` / `--help` wins anywhere in argv and prints help immediately:
-- runner: Select which coding CLI (default: oc). Options: opencode (oc), claude (cc), kimi (k), cursor (cu), codex (c/cx), roocode (rc), crush (cr)
+- runner: Select which coding CLI (default: oc). Options: opencode (oc), claude (cc), kimi (k), cursor (cu), gemini (g), codex (c/cx), roocode (rc), crush (cr)
 - +thinking: Set thinking level from +0 (off) to +4 (max)
   Claude keeps the same `ccc` scale: `+0` becomes `--thinking disabled`, and `+1..+4` become `--thinking enabled` with matching `--effort`.
   Kimi keeps the same `ccc` scale: `+0` becomes `--no-thinking`, and `+1..+4` become `--thinking`.
@@ -30,8 +30,8 @@ Slots are parsed in free order before the prompt, except that `-h` / `--help` wi
 
 Session persistence:
 - Python and Rust add Claude `--no-session-persistence` and Codex `--ephemeral` by default.
-- OpenCode, Kimi, Cursor, Crush, and RooCode may still save sessions by default; Python and Rust warn unless `--save-session` or `--cleanup-session` is used.
-- `--cleanup-session` currently tries safe cleanup for OpenCode and Kimi only. Cursor, Crush, and RooCode warn because cleanup would require guessing.
+- OpenCode, Kimi, Cursor, Gemini, Crush, and RooCode may still save sessions by default; Python and Rust warn unless `--save-session` or `--cleanup-session` is used.
+- `--cleanup-session` currently tries safe cleanup for OpenCode and Kimi only. Cursor, Gemini, Crush, and RooCode warn because cleanup would require guessing.
 
 Examples:
 - ccc "Fix the failing tests"
@@ -57,8 +57,9 @@ Python and Rust also support real-runner override env vars for local smoke/debug
 - `CCC_REAL_CLAUDE`
 - `CCC_REAL_KIMI`
 - `CCC_REAL_CURSOR`
+- `CCC_REAL_GEMINI`
 
-18 of 20 languages also implement: v2 parser/config (runner selector, thinking levels, provider/model override, preset and agent resolution, config loading) and v3 JSON output parsing (OpenCode, Claude Code, Kimi schemas). Python and Rust also parse Cursor Agent JSON output.
+18 of 20 languages also implement: v2 parser/config (runner selector, thinking levels, provider/model override, preset and agent resolution, config loading) and v3 JSON output parsing (OpenCode, Claude Code, Kimi schemas). Python and Rust also parse Cursor Agent JSON output and support raw Gemini JSON modes.
 
 ## Docs
 

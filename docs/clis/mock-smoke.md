@@ -10,6 +10,7 @@ Python and Rust support these env overrides:
 - `CCC_REAL_CLAUDE`
 - `CCC_REAL_KIMI`
 - `CCC_REAL_CURSOR`
+- `CCC_REAL_GEMINI`
 
 They replace the selected runner binary directly without needing temporary `PATH` symlinks.
 

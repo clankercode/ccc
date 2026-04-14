@@ -22,6 +22,7 @@ CANONICAL_RUNNERS = [
     ("roocode", "rc"),
     ("crush", "cr"),
     ("cursor", "cu"),
+    ("gemini", "g"),
 ]
 
 
@@ -40,7 +41,7 @@ Usage:
 
 Controls (free order before the prompt):
   runner        Select which coding CLI to use (default: oc)
-                  opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu)
+                  opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g)
   +thinking     Set thinking level: +0..+4 or +none/+low/+med/+mid/+medium/+high/+max/+xhigh
                 Claude maps +0 to --thinking disabled and +1..+4 to --thinking enabled with matching --effort
                 Kimi maps +0 to --no-thinking and +1..+4 to --thinking
@@ -185,6 +186,34 @@ def _discover_cursor_version(binary_path: str) -> str:
     return match.group(1) if match else ""
 
 
+def _discover_gemini_version(binary_path: str) -> str:
+    real_path = Path(os.path.realpath(binary_path))
+    candidates = [
+        real_path.parent / "package.json",
+        real_path.parent.parent / "package.json",
+    ]
+    try:
+        launcher = real_path.read_text(encoding="utf-8")
+    except OSError:
+        launcher = ""
+    is_npx_launcher = "@google/gemini-cli" in launcher
+    if is_npx_launcher:
+        candidates.extend(
+            sorted(
+                Path.home().glob(
+                    ".npm/_npx/*/node_modules/@google/gemini-cli/package.json"
+                )
+            )
+        )
+    for package_json in candidates:
+        version = _read_json_version(package_json, "@google/gemini-cli")
+        if version:
+            return version
+    if is_npx_launcher:
+        return "npx @google/gemini-cli"
+    return ""
+
+
 def _get_runner_version(runner_name: str, binary: str, binary_path: str) -> str:
     if runner_name == "opencode":
         version = _discover_opencode_version(binary_path)
@@ -196,6 +225,8 @@ def _get_runner_version(runner_name: str, binary: str, binary_path: str) -> str:
         version = _discover_kimi_version(binary_path)
     elif runner_name == "cursor":
         version = _discover_cursor_version(binary_path)
+    elif runner_name == "gemini":
+        version = _discover_gemini_version(binary_path)
     else:
         version = ""
     return version if version else _get_version(binary)

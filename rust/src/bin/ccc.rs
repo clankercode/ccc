@@ -875,7 +875,7 @@ fn session_persistence_pre_run_warnings(
     let display = canonical_session_runner_name(runner_name);
     if !matches!(
         display.as_str(),
-        "opencode" | "kimi" | "crush" | "roocode" | "cursor"
+        "opencode" | "kimi" | "crush" | "roocode" | "cursor" | "gemini"
     ) {
         return Vec::new();
     }
@@ -891,6 +891,7 @@ fn canonical_session_runner_name(runner_name: &str) -> String {
         "cr" | "crush" => "crush".to_string(),
         "rc" | "roocode" => "roocode".to_string(),
         "cu" | "cursor" => "cursor".to_string(),
+        "g" | "gemini" => "gemini".to_string(),
         _ => runner_name.to_string(),
     }
 }
@@ -1039,6 +1040,7 @@ fn apply_real_runner_override(spec: &mut call_coding_clis::CommandSpec) {
         "claude" => Some("CCC_REAL_CLAUDE"),
         "kimi" => Some("CCC_REAL_KIMI"),
         "cursor-agent" => Some("CCC_REAL_CURSOR"),
+        "gemini" => Some("CCC_REAL_GEMINI"),
         _ => None,
     };
     if let Some(env_var) = env_var {
@@ -1174,6 +1176,10 @@ mod tests {
             session_persistence_pre_run_warnings(false, false, "cu"),
             vec!["warning: runner \"cursor\" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup".to_string()]
         );
+        assert_eq!(
+            session_persistence_pre_run_warnings(false, false, "g"),
+            vec!["warning: runner \"gemini\" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup".to_string()]
+        );
     }
 
     fn unique_tmp_dir(name: &str) -> PathBuf {
@@ -1263,6 +1269,21 @@ mod tests {
         let mut spec = call_coding_clis::CommandSpec::new(["cursor-agent", "--print", "hello"]);
         apply_real_runner_override(&mut spec);
         assert_eq!(spec.argv[0], "/tmp/mock-cursor");
+        if let Some(value) = original {
+            unsafe { std::env::set_var(key, value) };
+        } else {
+            unsafe { std::env::remove_var(key) };
+        }
+    }
+
+    #[test]
+    fn apply_real_runner_override_for_gemini() {
+        let key = "CCC_REAL_GEMINI";
+        let original = std::env::var(key).ok();
+        unsafe { std::env::set_var(key, "/tmp/mock-gemini") };
+        let mut spec = call_coding_clis::CommandSpec::new(["gemini", "--prompt", "hello"]);
+        apply_real_runner_override(&mut spec);
+        assert_eq!(spec.argv[0], "/tmp/mock-gemini");
         if let Some(value) = original {
             unsafe { std::env::set_var(key, value) };
         } else {

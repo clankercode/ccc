@@ -165,6 +165,38 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(version, "2026.03.30-a5d3e17")
             fallback.assert_not_called()
 
+    def test_runner_version_reads_gemini_package_json_before_command(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            package_root = Path(tmp) / "node_modules" / "@google" / "gemini-cli"
+            binary_path = package_root / "dist" / "index.js"
+            binary_path.parent.mkdir(parents=True)
+            (package_root / "package.json").write_text(
+                '{"name":"@google/gemini-cli","version":"0.37.2"}',
+                encoding="utf-8",
+            )
+            binary_path.write_text("#!/usr/bin/env node\n", encoding="utf-8")
+
+            with mock.patch("call_coding_clis.help._get_version") as fallback:
+                version = _get_runner_version("gemini", "gemini", str(binary_path))
+
+            self.assertEqual(version, "0.37.2")
+            fallback.assert_not_called()
+
+    def test_runner_version_identifies_gemini_npx_launcher_without_command(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            binary_path = Path(tmp) / "gemini"
+            binary_path.write_text(
+                '#!/bin/bash\nexec npx --yes @google/gemini-cli "$@"\n',
+                encoding="utf-8",
+            )
+
+            with mock.patch("call_coding_clis.help.Path.home", return_value=Path(tmp)):
+                with mock.patch("call_coding_clis.help._get_version") as fallback:
+                    version = _get_runner_version("gemini", "gemini", str(binary_path))
+
+            self.assertEqual(version, "npx @google/gemini-cli")
+            fallback.assert_not_called()
+
     def test_runner_version_falls_back_when_metadata_is_missing(self) -> None:
         with mock.patch(
             "call_coding_clis.help._get_version", return_value="fallback 9.9.9"
@@ -288,6 +320,12 @@ class RunnerTests(unittest.TestCase):
             _session_persistence_pre_run_warnings(False, False, "cu"),
             [
                 'warning: runner "cursor" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup'
+            ],
+        )
+        self.assertEqual(
+            _session_persistence_pre_run_warnings(False, False, "g"),
+            [
+                'warning: runner "gemini" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup'
             ],
         )
 
@@ -443,6 +481,14 @@ class RunnerTests(unittest.TestCase):
         with mock.patch.dict("os.environ", {"CCC_REAL_CURSOR": "/tmp/mock-cursor"}):
             _apply_real_runner_override(spec)
         self.assertEqual(spec.argv[0], "/tmp/mock-cursor")
+
+    def test_apply_real_runner_override_for_gemini(self) -> None:
+        from call_coding_clis import CommandSpec
+
+        spec = CommandSpec(argv=["gemini", "--prompt", "hello"])
+        with mock.patch.dict("os.environ", {"CCC_REAL_GEMINI": "/tmp/mock-gemini"}):
+            _apply_real_runner_override(spec)
+        self.assertEqual(spec.argv[0], "/tmp/mock-gemini")
 
     def test_ccc_rejects_empty_prompt(self) -> None:
         from call_coding_clis.cli import build_prompt_spec

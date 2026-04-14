@@ -15,6 +15,7 @@ Current files:
 - [codex.md](codex.md)
 - [kimi.md](kimi.md)
 - [cursor.md](cursor.md)
+- [gemini.md](gemini.md)
 - [crush.md](crush.md)
 - [roocode.md](roocode.md)
 - [allow-deny-tool-plan.md](allow-deny-tool-plan.md)
@@ -47,6 +48,7 @@ This table describes the current `ccc` mapping and the likely future shape for f
 | Codex | `--dangerously-bypass-approvals-and-sandbox` | Partly | `--permission-mode` or `--sandbox` |
 | Kimi | `--yolo` | Not much beyond yolo/plan | maybe `--plan` |
 | Cursor Agent | `--yolo` | Partly | `--permission-mode` or `--sandbox` |
+| Gemini CLI | `--approval-mode yolo` | Yes | `--permission-mode` |
 | Crush | warn and ignore | Not reliable for non-interactive run mode | none until upstream CLI is clearer |
 | RooCode | warn and ignore | Unverified | none until upstream CLI is verified |
 
@@ -92,12 +94,12 @@ If you update thinking-capability notes, follow [updating-model-capabilities.md]
 
 Python and Rust now implement `--permission-mode <safe|auto|yolo|plan>` with partial runner-specific mappings. The matrix below distinguishes explicit upstream controls from honest default passthroughs and unverified cases that warn.
 
-| Proposed `ccc` mode | OpenCode | Claude | Codex | Kimi | Cursor | Crush | RooCode |
-|---|---|---|---|---|---|---|---|
-| `safe` | `OPENCODE_CONFIG_CONTENT='{"permission":"ask"}'` | `--permission-mode default` | leave default permissions unchanged | leave default permissions unchanged | `--sandbox enabled` | leave default permissions unchanged | unverified; warn and leave defaults |
-| `auto` | likely config-driven `ask`/`allow` mix | `--permission-mode auto` | `--full-auto` | no honest mapping yet | no honest mapping yet | no honest mapping yet | unverified |
-| `yolo` | `OPENCODE_CONFIG_CONTENT='{"permission":"allow"}'` | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--yolo` | `--yolo` | unsupported in `run`; warn | unverified; warn |
-| `plan` | no verified equivalent yet | `--permission-mode plan` | no verified equivalent yet | `--plan` | `--mode plan` | no verified equivalent yet | unverified |
+| Proposed `ccc` mode | OpenCode | Claude | Codex | Kimi | Cursor | Gemini | Crush | RooCode |
+|---|---|---|---|---|---|---|---|---|
+| `safe` | `OPENCODE_CONFIG_CONTENT='{"permission":"ask"}'` | `--permission-mode default` | leave default permissions unchanged | leave default permissions unchanged | `--sandbox enabled` | `--approval-mode default --sandbox` | leave default permissions unchanged | unverified; warn and leave defaults |
+| `auto` | likely config-driven `ask`/`allow` mix | `--permission-mode auto` | `--full-auto` | no honest mapping yet | no honest mapping yet | `--approval-mode auto_edit` | no honest mapping yet | unverified |
+| `yolo` | `OPENCODE_CONFIG_CONTENT='{"permission":"allow"}'` | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--yolo` | `--yolo` | `--approval-mode yolo` | unsupported in `run`; warn | unverified; warn |
+| `plan` | no verified equivalent yet | `--permission-mode plan` | no verified equivalent yet | `--plan` | `--mode plan` | `--approval-mode plan` | no verified equivalent yet | unverified |
 
 ## Session Persistence
 
@@ -110,6 +112,7 @@ Python and Rust now default to avoiding user-visible saved sessions where the up
 | OpenCode | warns that the run may save a session | suppresses the warning | deletes the emitted `sessionID` with `opencode session delete <id>` when available |
 | Kimi | warns that the run may save a session | suppresses the warning | removes the matching session file under `KIMI_SHARE_DIR` or `~/.kimi` when the resume hint exposes an ID |
 | Cursor Agent | warns that the run may save a session | suppresses the warning | warns that automatic cleanup is unsupported |
+| Gemini CLI | warns that the run may save a session | suppresses the warning | warns that automatic cleanup is unsupported |
 | Crush | warns that the run may save a session | suppresses the warning | warns that automatic cleanup is unsupported |
 | RooCode | warns that the run may save a session | suppresses the warning | warns that automatic cleanup is unsupported |
 
@@ -118,7 +121,7 @@ Cleanup is best-effort and only uses session IDs produced by the run itself. It 
 ## Tool Control Outlook
 
 - OpenCode and Claude are the real candidates for `--allow-tool` / `--deny-tool`.
-- Codex and Cursor Agent are better fits for sandbox/approval controls than per-tool allow/deny.
+- Codex, Cursor Agent, and Gemini are better fits for sandbox/approval controls than per-tool allow/deny.
 - Kimi is mostly binary yolo/non-yolo from the currently documented surface.
 - Crush and RooCode should stay conservative until the non-interactive permission surfaces are verified.
 
@@ -133,7 +136,7 @@ Then update the corresponding file here before changing `ccc` runner assembly.
 
 When adding a new CLI, its note should record the verified non-interactive argv shape, permission controls, session persistence behavior, output modes, structured-output schema, version command behavior, and any faster local metadata source that can keep the `ccc --help` runner checklist from spawning a slow CLI.
 
-For the Python and Rust help checklist, runner version discovery now prefers trusted install metadata when the local layout is known, then falls back to `<cli> --version`. Current fast paths cover OpenCode and Codex `package.json`, Kimi `dist-info/METADATA`, Claude versioned local install paths, and Cursor Agent's bundled `agent-cli@...` release marker.
+For the Python and Rust help checklist, runner version discovery now prefers trusted install metadata when the local layout is known, then falls back to `<cli> --version`. Current fast paths cover OpenCode, Codex, and Gemini `package.json`, Kimi `dist-info/METADATA`, Claude versioned local install paths, Cursor Agent's bundled `agent-cli@...` release marker, and Gemini's local npm `_npx` cache when the launcher uses `@google/gemini-cli`. Gemini npx wrappers report the wrapper identity instead of spawning npm when cached metadata is unavailable.
 
 ## Output Modes
 

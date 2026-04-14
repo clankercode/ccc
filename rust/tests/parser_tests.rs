@@ -60,6 +60,16 @@ fn test_parse_runner_selector_cursor_and_cu() {
 }
 
 #[test]
+fn test_parse_runner_selector_gemini_and_g() {
+    for selector in ["gemini", "g"] {
+        let args: Vec<String> = vec![selector.into(), "fix bug".into()];
+        let parsed = parse_args(&args);
+        assert_eq!(parsed.runner.as_deref(), Some(selector));
+        assert_eq!(parsed.prompt, "fix bug");
+    }
+}
+
+#[test]
 fn test_parse_runner_selector_cr_remains_crush() {
     let args: Vec<String> = vec!["cr".into(), "fix bug".into()];
     let parsed = parse_args(&args);
@@ -470,6 +480,36 @@ fn test_resolve_command_does_not_emit_default_persistence_warnings() {
 }
 
 #[test]
+fn test_resolve_gemini_runner_via_g_uses_prompt_flag() {
+    let parsed = ParsedArgs {
+        runner: Some("g".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, env, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(argv, vec!["gemini", "--prompt", "hello"]);
+    assert!(env.is_empty());
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_gemini_runner_long_name_with_model() {
+    let parsed = ParsedArgs {
+        runner: Some("gemini".into()),
+        model: Some("gemini-2.5-pro".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, env, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv,
+        vec!["gemini", "--model", "gemini-2.5-pro", "--prompt", "hello"]
+    );
+    assert!(env.is_empty());
+    assert!(warnings.is_empty());
+}
+
+#[test]
 fn test_resolve_cleanup_session_warning_policy() {
     for runner in ["oc", "k"] {
         let parsed = ParsedArgs {
@@ -484,7 +524,12 @@ fn test_resolve_cleanup_session_warning_policy() {
             .any(|warning| warning.contains("may save this session")));
     }
 
-    for (runner, display) in [("cr", "crush"), ("rc", "roocode"), ("cu", "cursor")] {
+    for (runner, display) in [
+        ("cr", "crush"),
+        ("rc", "roocode"),
+        ("cu", "cursor"),
+        ("g", "gemini"),
+    ] {
         let parsed = ParsedArgs {
             runner: Some(runner.into()),
             cleanup_session: true,
@@ -1697,6 +1742,53 @@ fn test_resolve_permission_modes_for_cursor() {
 }
 
 #[test]
+fn test_resolve_permission_modes_for_gemini() {
+    let cases = [
+        (
+            "safe",
+            vec![
+                "gemini",
+                "--approval-mode",
+                "default",
+                "--sandbox",
+                "--prompt",
+                "hello",
+            ],
+        ),
+        (
+            "auto",
+            vec![
+                "gemini",
+                "--approval-mode",
+                "auto_edit",
+                "--prompt",
+                "hello",
+            ],
+        ),
+        (
+            "yolo",
+            vec!["gemini", "--approval-mode", "yolo", "--prompt", "hello"],
+        ),
+        (
+            "plan",
+            vec!["gemini", "--approval-mode", "plan", "--prompt", "hello"],
+        ),
+    ];
+    for (mode, expected_argv) in cases {
+        let parsed = ParsedArgs {
+            runner: Some("g".into()),
+            permission_mode: Some(mode.into()),
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let (argv, env, warnings) = resolve_command(&parsed, None).unwrap();
+        assert_eq!(argv, expected_argv);
+        assert!(env.is_empty());
+        assert!(warnings.is_empty());
+    }
+}
+
+#[test]
 fn test_resolve_permission_mode_auto_for_claude() {
     let parsed = ParsedArgs {
         runner: Some("cc".into()),
@@ -1972,6 +2064,39 @@ fn test_resolve_cursor_output_plans() {
         assert_eq!(plan.schema.as_deref(), Some("cursor-agent"));
         assert_eq!(plan.argv_flags, flags);
     }
+}
+
+#[test]
+fn test_resolve_gemini_output_plans() {
+    let cases = [
+        ("json", false, vec!["--output-format", "json"]),
+        ("stream-json", true, vec!["--output-format", "stream-json"]),
+    ];
+    for (mode, stream, flags) in cases {
+        let parsed = ParsedArgs {
+            runner: Some("g".into()),
+            output_mode: Some(mode.into()),
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let plan = resolve_output_plan(&parsed, None).unwrap();
+        assert_eq!(plan.stream, stream);
+        assert!(!plan.formatted);
+        assert_eq!(plan.schema.as_deref(), Some("gemini"));
+        assert_eq!(plan.argv_flags, flags);
+    }
+}
+
+#[test]
+fn test_resolve_gemini_formatted_output_mode_is_unsupported_until_schema_is_fixture_backed() {
+    let parsed = ParsedArgs {
+        runner: Some("g".into()),
+        output_mode: Some("formatted".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let error = resolve_output_plan(&parsed, None).unwrap_err();
+    assert!(error.contains("gemini"), "{error}");
 }
 
 #[test]

@@ -114,6 +114,7 @@ def _apply_real_runner_override(spec: CommandSpec) -> None:
         "claude": "CCC_REAL_CLAUDE",
         "kimi": "CCC_REAL_KIMI",
         "cursor-agent": "CCC_REAL_CURSOR",
+        "gemini": "CCC_REAL_GEMINI",
     }
     env_var = env_var_by_binary.get(spec.argv[0])
     if not env_var:
@@ -785,7 +786,7 @@ def _session_persistence_pre_run_warnings(
     if save_session or cleanup_session:
         return []
     display = _canonical_session_runner_name(runner_name)
-    if display not in {"opencode", "kimi", "crush", "roocode", "cursor"}:
+    if display not in {"opencode", "kimi", "crush", "roocode", "cursor", "gemini"}:
         return []
     return [
         f'warning: runner "{display}" may save this session; '
@@ -805,6 +806,8 @@ def _canonical_session_runner_name(runner_name: str) -> str:
         return "roocode"
     if key in {"cu", "cursor"}:
         return "cursor"
+    if key in {"g", "gemini"}:
+        return "gemini"
     return key
 
 

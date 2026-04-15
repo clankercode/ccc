@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 use std::process::Stdio;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -14,6 +15,13 @@ fn example_config_fixture() -> String {
         env!("CARGO_MANIFEST_DIR")
     ))
     .unwrap()
+}
+
+fn version_fixture() -> String {
+    std::fs::read_to_string(format!("{}/../VERSION", env!("CARGO_MANIFEST_DIR")))
+        .unwrap()
+        .trim()
+        .to_string()
 }
 
 #[test]
@@ -42,6 +50,7 @@ fn test_help_mentions_name_slot() {
     assert!(stdout.contains(".text / ..text, .json / ..json, .fmt / ..fmt"));
     assert!(stdout.contains("--permission-mode <safe|auto|yolo|plan>"));
     assert!(stdout.contains("--yolo / -y"));
+    assert!(stdout.contains("--version / -v"));
     assert!(stdout.contains("--save-session"));
     assert!(stdout.contains("--cleanup-session"));
     assert!(stdout.contains("Treat all remaining args as prompt text"));
@@ -52,6 +61,58 @@ fn test_help_mentions_name_slot() {
     assert!(stdout.contains(
         "opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g)"
     ));
+}
+
+#[test]
+fn test_version_prints_build_version_and_resolved_clients() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-version-{unique}"));
+    let bin_dir = base_dir.join("bin");
+    let package_root = base_dir.join("node_modules").join("opencode-ai");
+    let package_bin = package_root.join("bin");
+    fs::create_dir_all(&package_bin).unwrap();
+    fs::create_dir_all(&bin_dir).unwrap();
+    fs::write(
+        package_root.join("package.json"),
+        r#"{"name":"opencode-ai","version":"1.3.17"}"#,
+    )
+    .unwrap();
+    fs::write(&package_bin.join("opencode"), "#!/bin/sh\nexit 99\n").unwrap();
+    fs::write(
+        bin_dir.join("which"),
+        format!(
+            "#!/bin/sh\nif [ \"$1\" = \"opencode\" ]; then\n  printf '%s\\n' '{}'\n  exit 0\nfi\nexit 1\n",
+            package_bin.join("opencode").display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(
+        bin_dir.join("which"),
+        fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+
+    for flag in ["--version", "-v"] {
+        let output = Command::new(ccc_bin())
+            .arg(flag)
+            .env("PATH", bin_dir.display().to_string())
+            .output()
+            .unwrap();
+
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(output.stderr.is_empty());
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let lines: Vec<_> = stdout.trim().lines().collect();
+        assert!(lines.len() >= 3, "{stdout}");
+        assert_eq!(lines[0], format!("ccc version {}", version_fixture()));
+        assert_eq!(lines[1], "Resolved clients:");
+        assert!(stdout.contains("[+] opencode"));
+        assert!(stdout.contains("1.3.17"));
+        assert!(stdout.contains("(and 7 unresolved)"));
+    }
 }
 
 #[test]

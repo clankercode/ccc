@@ -36,7 +36,7 @@ try:
         render_example_config,
         write_alias_block,
     )
-    from .help import print_help, print_usage
+    from .help import print_help, print_usage, print_version
 except ImportError:
     import artifacts
     from json_output import (
@@ -64,7 +64,7 @@ except ImportError:
         render_example_config,
         write_alias_block,
     )
-    from help import print_help, print_usage
+    from help import print_help, print_usage, print_version
 
 
 ALIAS_FIELDS = {
@@ -135,6 +135,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if any(token in {"--help", "-h"} for token in args):
         print_help()
+        return 0
+
+    if any(token in {"--version", "-v"} for token in args):
+        print_version()
         return 0
 
     if args and args[0] == "add":

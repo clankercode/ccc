@@ -4,11 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "call-coding-clis"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Minimal subprocess wrappers for coding CLIs"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Unlicense" }
+
+[tool.setuptools.dynamic]
+version = {file = ["VERSION"]}
 
 [project.scripts]
 ccc = "call_coding_clis.cli:main"

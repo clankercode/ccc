@@ -2,6 +2,7 @@
 name = "ccc"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
 description = "Call coding CLIs (opencode, claude, codex, kimi, etc.) from Rust programs"
 license = "Unlicense"
 repository = "https://github.com/xertrov/call-coding-clis"

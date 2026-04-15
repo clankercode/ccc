@@ -20,7 +20,7 @@ pub use config::{
     normalize_alias_name, render_alias_block, render_example_config, upsert_alias_block,
     write_alias_block,
 };
-pub use help::{print_help, print_usage};
+pub use help::{print_help, print_usage, print_version};
 pub use json_output::{
     parse_claude_code_json, parse_codex_json, parse_cursor_agent_json, parse_gemini_json,
     parse_json_output, parse_kimi_json, parse_opencode_json, render_parsed, resolve_human_tty,

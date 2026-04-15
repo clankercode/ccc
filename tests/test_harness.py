@@ -60,10 +60,18 @@ class LanguageSpec:
     def _supports_output_log_path(self) -> bool:
         return self.name in OUTPUT_LOG_PATH_IMPLEMENTATIONS
 
+    @staticmethod
+    def _contains_version_flag(tokens: List[str]) -> bool:
+        return any(token in {"--version", "-v"} for token in tokens)
+
     def _maybe_insert_output_log_path_for_prompt(
         self, command: List[str], include_output_log_path: bool
     ) -> List[str]:
-        if include_output_log_path or not self._supports_output_log_path():
+        if (
+            include_output_log_path
+            or not self._supports_output_log_path()
+            or self._contains_version_flag(command)
+        ):
             return command
         if not command:
             return command
@@ -72,7 +80,11 @@ class LanguageSpec:
     def _maybe_insert_output_log_path_for_extra_args(
         self, extra_args: List[str], include_output_log_path: bool
     ) -> List[str]:
-        if include_output_log_path or not self._supports_output_log_path():
+        if (
+            include_output_log_path
+            or not self._supports_output_log_path()
+            or self._contains_version_flag(extra_args)
+        ):
             return extra_args
         if not extra_args:
             return extra_args

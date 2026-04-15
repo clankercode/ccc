@@ -60,6 +60,7 @@ Controls (free order before the prompt):
 Flags:
   --print-config                         Print the canonical example config.toml and exit
   --help / -h                           Print help and exit, even when mixed with other args
+  --version / -v                        Print the ccc version and resolved client versions
   --show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it
                                         (default: on; config key: show_thinking)
   --sanitize-osc / --no-sanitize-osc    Strip disruptive OSC control output in human-facing modes
@@ -117,6 +118,12 @@ fn get_version(binary: &str) -> String {
             .to_string(),
         _ => String::new(),
     }
+}
+
+fn ccc_version() -> String {
+    option_env!("CCC_VERSION")
+        .unwrap_or(env!("CARGO_PKG_VERSION"))
+        .to_string()
 }
 
 fn read_json_version(package_json_path: &Path, expected_name: &str) -> String {
@@ -413,9 +420,33 @@ fn format_runner_checklist() -> String {
     out
 }
 
+fn format_version_report(version: &str, statuses: &[RunnerStatus]) -> String {
+    let mut out = format!("ccc version {version}\nResolved clients:\n");
+    let mut resolved = 0usize;
+    for s in statuses {
+        if s.version.is_empty() {
+            continue;
+        }
+        resolved += 1;
+        out.push_str(&format!(
+            "  [+] {:10} ({})  {}\n",
+            s.name, s.binary, s.version
+        ));
+    }
+    let unresolved = statuses.len().saturating_sub(resolved);
+    if unresolved > 0 {
+        out.push_str(&format!("  (and {unresolved} unresolved)\n"));
+    }
+    out.trim_end_matches('\n').to_string()
+}
+
 pub fn print_help() {
     print!("{}", HELP_TEXT);
     print!("{}", format_runner_checklist());
+}
+
+pub fn print_version() {
+    println!("{}", format_version_report(&ccc_version(), &runner_checklist()));
 }
 
 pub fn print_usage() {

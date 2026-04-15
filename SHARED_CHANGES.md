@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-15
 
+### Build-time version source and `ccc --version`
+- Change: Python and Rust now read the repo-root `VERSION` file for the shared `ccc` version at build time, and `ccc -v` / `ccc --version` prints that build version plus the resolved supported client versions with a trailing unresolved-count summary
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_runner.py`, `tests/test_ccc_contract_impl.py`, `tests/test_harness.py`, `rust/tests/help_tests.rs`
+- Notes: added `just build` in the repo root, switched Python to dynamic package version metadata sourced from `VERSION`, and kept Rust in sync via `rust/build.rs`; docs updated in `README.md`, `docs/llms.txt`, and `docs/clis/README.md`
+
 ### Run artifact footer and output log paths added
 - Change: Python and Rust now create a stable per-run artifact directory under the platform state root, prefix each run directory with the canonical client type such as `opencode-<run-id>`, write `output.txt` plus exactly one transcript file per run (`transcript.txt` for text and human transcript paths, `transcript.jsonl` for JSON-oriented paths), and print the parseable stderr footer `>> ccc:output-log >> /abs/path/to/run-dir` with `--output-log-path` / `--no-output-log-path`
 - Required implementations: Python and Rust

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from importlib import metadata as importlib_metadata
 import json
 import os
 from pathlib import Path
@@ -24,6 +26,18 @@ CANONICAL_RUNNERS = [
     ("cursor", "cu"),
     ("gemini", "g"),
 ]
+
+ROOT = Path(__file__).resolve().parents[2]
+VERSION_FILE = ROOT / "VERSION"
+
+
+@dataclass(frozen=True)
+class RunnerStatus:
+    name: str
+    alias: str
+    binary: str
+    found: bool
+    version: str
 
 
 HELP_TEXT = """\
@@ -63,6 +77,7 @@ Controls (free order before the prompt):
 Flags:
   --print-config                         Print the canonical example config.toml and exit
   --help / -h                           Print help and exit, even when mixed with other args
+  --version / -v                        Print the ccc version and resolved client versions
   --show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it
                                         (default: on; config key: show_thinking)
   --sanitize-osc / --no-sanitize-osc    Strip disruptive OSC control output in human-facing modes
@@ -121,6 +136,23 @@ def _get_version(binary: str) -> str:
     except (OSError, subprocess.TimeoutExpired):
         pass
     return ""
+
+
+def _read_ccc_version(version_path: Path) -> str:
+    try:
+        return version_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def _get_ccc_version() -> str:
+    version = _read_ccc_version(VERSION_FILE)
+    if version:
+        return version
+    try:
+        return importlib_metadata.version("call-coding-clis")
+    except importlib_metadata.PackageNotFoundError:
+        return "unknown"
 
 
 def _read_json_version(package_json_path: Path, expected_name: str) -> str:
@@ -217,6 +249,26 @@ def _discover_gemini_version(binary_path: str) -> str:
     return ""
 
 
+def _runner_statuses() -> list[RunnerStatus]:
+    statuses: list[RunnerStatus] = []
+    for name, alias in CANONICAL_RUNNERS:
+        info = RUNNER_REGISTRY.get(name)
+        binary = info.binary if info else name
+        binary_path = shutil.which(binary)
+        found = binary_path is not None
+        version = _get_runner_version(name, binary, binary_path) if found and binary_path else ""
+        statuses.append(
+            RunnerStatus(
+                name=name,
+                alias=alias,
+                binary=binary,
+                found=found,
+                version=version,
+            )
+        )
+    return statuses
+
+
 def _get_runner_version(runner_name: str, binary: str, binary_path: str) -> str:
     if runner_name == "opencode":
         version = _discover_opencode_version(binary_path)
@@ -237,18 +289,31 @@ def _get_runner_version(runner_name: str, binary: str, binary_path: str) -> str:
 
 def runner_checklist() -> str:
     lines = ["Runners:"]
-    for name, alias in CANONICAL_RUNNERS:
-        info = RUNNER_REGISTRY.get(name)
-        binary = info.binary if info else name
-        binary_path = shutil.which(binary)
-        found = binary_path is not None
-        if found:
-            version = _get_runner_version(name, binary, binary_path)
-            tag = version if version else "found"
-            lines.append(f"  [+] {name:10s} ({binary})  {tag}")
+    for status in _runner_statuses():
+        if status.found:
+            tag = status.version if status.version else "found"
+            lines.append(f"  [+] {status.name:10s} ({status.binary})  {tag}")
         else:
-            lines.append(f"  [-] {name:10s} ({binary})  not found")
+            lines.append(f"  [-] {status.name:10s} ({status.binary})  not found")
     return "\n".join(lines)
+
+
+def _format_version_report(version: str, statuses: list[RunnerStatus]) -> str:
+    lines = [f"ccc version {version}", "Resolved clients:"]
+    resolved = 0
+    for status in statuses:
+        if not status.version:
+            continue
+        resolved += 1
+        lines.append(f"  [+] {status.name:10s} ({status.binary})  {status.version}")
+    unresolved = len(statuses) - resolved
+    if unresolved:
+        lines.append(f"  (and {unresolved} unresolved)")
+    return "\n".join(lines)
+
+
+def print_version() -> None:
+    print(_format_version_report(_get_ccc_version(), _runner_statuses()))
 
 
 def print_help() -> None:

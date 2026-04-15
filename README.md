@@ -43,6 +43,14 @@ Examples:
 
 This runs that implementation's unit tests plus the targeted cross-language contract and mock harness checks for the same language only. Use `./run_all_tests.sh` only when you intentionally want the whole repository run.
 
+## Build
+
+```bash
+just build
+```
+
+This builds the Rust binary and runs a Python compile check. Both Python and Rust read the repo-root `VERSION` file for `ccc --version`, so update that file when you want to bump the reported build version.
+
 ### Individual Test Commands
 
 | Language | Command |
@@ -100,6 +108,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - library and CLI design should stay aligned so `precurl` can use the library layer while humans can use the same runner shape directly
 - `precurl` uses the Rust library layer for delegated LLM analysis — see the [precurl SECURITY.md](../precurl/SECURITY.md) for threat model and prompt-injection mitigation details
 - Python and Rust also support free-order control tokens before the prompt, `--` to force literal prompt text, `--show-thinking` / `--no-show-thinking`, and `--yolo` / `-y`
+- `-v` / `--version` prints the shared build version plus resolved client versions
 
 ## First-Pass `ccc` Contract
 

@@ -64,16 +64,19 @@ HELP_OUTPUT_SUGAR_SNIPPET = ".text / ..text, .json / ..json, .fmt / ..fmt"
 HELP_COLOR_ENV_SNIPPET = "FORCE_COLOR / NO_COLOR"
 HELP_PERMISSION_MODE_SNIPPET = "--permission-mode <safe|auto|yolo|plan>"
 HELP_YOLO_SNIPPET = "--yolo / -y"
+HELP_VERSION_SNIPPET = "--version / -v"
 HELP_SAVE_SESSION_SNIPPET = "--save-session"
 HELP_CLEANUP_SESSION_SNIPPET = "--cleanup-session"
 HELP_DELIMITER_SNIPPET = "Treat all remaining args as prompt text"
 SHOW_THINKING_IMPLEMENTATIONS = {"Python", "Rust"}
 YOLO_IMPLEMENTATIONS = {"Python", "Rust"}
+VERSION_IMPLEMENTATIONS = {"Python", "Rust"}
 PROMPT_PRESET_IMPLEMENTATIONS = {"Python", "Rust"}
 PRINT_CONFIG_IMPLEMENTATIONS = {"Python", "Rust"}
 CONFIG_COMMAND_IMPLEMENTATIONS = {"Python", "Rust"}
 ADD_ALIAS_IMPLEMENTATIONS = {"Python", "Rust"}
 RUN_ARTIFACT_IMPLEMENTATIONS = OUTPUT_LOG_PATH_IMPLEMENTATIONS
+CCC_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 EXAMPLE_CONFIG_EXPECTED = (
     ROOT / "tests" / "fixtures" / "config-example.toml"
 ).read_text(encoding="utf-8")
@@ -543,6 +546,24 @@ class SingleImplCccContractTests(unittest.TestCase):
                         result, HELP_USAGE_LINE
                     )
 
+    def test_help_surface_mentions_version_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in VERSION_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(HELP_VERSION_SNIPPET, result.stdout)
+
     def test_help_surface_reads_opencode_package_metadata_when_version_command_fails(
         self,
     ) -> None:
@@ -588,6 +609,62 @@ class SingleImplCccContractTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertIn("[+] opencode", result.stdout)
                     self.assertIn("1.3.17", result.stdout)
+
+    def test_version_command_reports_build_version_and_resolved_clients(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            package_root = tmp_path / "node_modules" / "opencode-ai"
+            package_bin = package_root / "bin"
+            package_bin.mkdir(parents=True)
+            bin_dir.mkdir()
+            opencode_path = package_bin / "opencode"
+            (bin_dir / "python3").symlink_to(Path(sys.executable))
+            (package_root / "package.json").write_text(
+                '{"name":"opencode-ai","version":"1.3.17"}',
+                encoding="utf-8",
+            )
+            opencode_path.write_text(
+                "#!/bin/sh\nexit 99\n",
+                encoding="utf-8",
+            )
+            opencode_path.chmod(opencode_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            (bin_dir / "which").write_text(
+                "#!/bin/sh\n"
+                'if [ "$1" = "opencode" ]; then\n'
+                f"  printf '%s\\n' '{opencode_path}'\n"
+                "  exit 0\n"
+                "fi\n"
+                "exit 1\n",
+                encoding="utf-8",
+            )
+            (bin_dir / "which").chmod(
+                (bin_dir / "which").stat().st_mode
+                | stat.S_IXUSR
+                | stat.S_IXGRP
+                | stat.S_IXOTH
+            )
+
+            for lang in self.selected_languages:
+                if lang.name not in VERSION_IMPLEMENTATIONS:
+                    continue
+                for flag in ("--version", "-v"):
+                    with self.subTest(language=lang.name, flag=flag):
+                        env = self._make_env(opencode_path, lang)
+                        if lang.name == "Python":
+                            env["PATH"] = f"{bin_dir}:{package_bin}"
+                        else:
+                            env["PATH"] = str(bin_dir)
+                        result = lang.invoke_extra([flag], env)
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertEqual(result.stderr, "")
+                        stdout = result.stdout.strip().splitlines()
+                        self.assertGreaterEqual(len(stdout), 3)
+                        self.assertEqual(stdout[0], f"ccc version {CCC_VERSION}")
+                        self.assertEqual(stdout[1], "Resolved clients:")
+                        self.assertIn("[+] opencode", result.stdout)
+                        self.assertIn("1.3.17", result.stdout)
+                        self.assertIn("(and 7 unresolved)", result.stdout)
 
     def test_help_surface_mentions_show_thinking_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

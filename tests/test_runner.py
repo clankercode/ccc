@@ -18,6 +18,7 @@ from call_coding_clis.cli import (
     _session_persistence_pre_run_warnings,
 )
 from call_coding_clis.help import _get_runner_version
+from call_coding_clis.help import RunnerStatus, _format_version_report
 
 
 FIXTURE_CONFIG_PATH = Path(__file__).parent / "fixtures" / "config-example.toml"
@@ -207,6 +208,35 @@ class RunnerTests(unittest.TestCase):
 
         self.assertEqual(version, "fallback 9.9.9")
         fallback.assert_called_once_with("opencode")
+
+    def test_version_report_lists_resolved_clients_and_summary(self) -> None:
+        report = _format_version_report(
+            "0.1.0",
+            [
+                RunnerStatus(
+                    name="opencode",
+                    alias="oc",
+                    binary="opencode",
+                    found=True,
+                    version="1.3.17",
+                ),
+                RunnerStatus(
+                    name="claude",
+                    alias="cc",
+                    binary="claude",
+                    found=True,
+                    version="",
+                ),
+            ],
+        )
+
+        self.assertEqual(
+            report,
+            "ccc version 0.1.0\n"
+            "Resolved clients:\n"
+            "  [+] opencode   (opencode)  1.3.17\n"
+            "  (and 1 unresolved)",
+        )
 
     def test_filtered_human_stderr_strips_kimi_resume_hint(self) -> None:
         stderr = (

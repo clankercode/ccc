@@ -1,7 +1,7 @@
 use call_coding_clis::{
     find_alias_write_path, find_config_command_paths, load_config, normalize_alias_name,
     output_write_warning, parse_args, parse_json_output, print_help, print_usage,
-    render_alias_block, render_example_config, render_parsed, resolve_command,
+    print_version, render_alias_block, render_example_config, render_parsed, resolve_command,
     resolve_human_tty, resolve_output_plan, resolve_sanitize_osc, resolve_show_thinking,
     transcript_io_warning, write_alias_block, AliasDef, FormattedRenderer, RunArtifacts, Runner,
     StructuredStreamProcessor, TranscriptKind,
@@ -1338,6 +1338,11 @@ fn main() -> ExitCode {
 
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         print_help();
+        return ExitCode::from(0);
+    }
+
+    if args.iter().any(|arg| arg == "--version" || arg == "-v") {
+        print_version();
         return ExitCode::from(0);
     }
 

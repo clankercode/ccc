@@ -26,3 +26,6 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
   - Collect representative `429` and nearby failure cases from plain stdout/stderr, `json`, and `stream-json` modes.
   - Save the observed payloads and transcripts in the same fixture style used for other real runner captures so parser and retry logic can target actual shapes.
   - Note which signals are stable enough for automated detection versus human-facing text that should stay best-effort only.
+- [ ] Add HTTP/HTTPS delivery for final-message sinks
+  - Keep the first pass focused on local file and stdio destinations for scripts.
+  - Reuse the final-output sink abstraction so remote delivery can land later without changing the CLI surface again.

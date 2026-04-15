@@ -5,6 +5,7 @@
 ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Claude Code, Codex, Kimi, Cursor Agent, Gemini CLI, Crush) behind a single consistent interface. Each of the 20 language implementations bundles an identical `ccc` CLI binary and a reusable library with `CommandSpec`, `CompletedRun`, and `Runner` types.
 Python and Rust also expose `ccc --print-config`, which prints the canonical example config with the current supported keys, and `ccc config`, which prints every existing resolved config file path and contents.
 Python and Rust also expose `ccc add [-g] <alias>`, a line-prompt alias wizard that writes `[aliases.<name>]` entries to config; scriptable flags plus `--yes` can write aliases non-interactively.
+Python and Rust also write a per-run artifact directory under the platform state root, with a client-prefixed run folder such as `opencode-<run-id>`, `output.txt`, exactly one transcript file, and a stable stderr footer line that scripts can parse as `>> ccc:output-log >> /abs/path/to/run-dir`; `--output-log-path` enables the footer and `--no-output-log-path` suppresses it.
 
 ## Usage
 
@@ -18,6 +19,7 @@ Slots are parsed in free order before the prompt, except that `-h` / `--help` wi
 - --show-thinking: Request visible thinking output when supported; default on. Implemented in Python and Rust for now.
 - --save-session: Explicitly allow the selected runner's normal session persistence. Implemented in Python and Rust for now.
 - --cleanup-session: Try post-run cleanup when the selected runner lacks a no-persist flag. Implemented in Python and Rust for now.
+- --output-log-path / --no-output-log-path: emit or suppress the final run-directory footer for scripts
 - --output-mode: Choose `text`, `stream-text`, `json`, `stream-json`, `formatted`, or `stream-formatted`
   Dot-sugar aliases are available before the prompt: `.text` / `..text`, `.json` / `..json`, `.fmt` / `..fmt`.
   Human-formatted modes honor `FORCE_COLOR` and `NO_COLOR` before falling back to TTY detection.
@@ -27,6 +29,7 @@ Slots are parsed in free order before the prompt, except that `-h` / `--help` wi
 - Generated config: `ccc --print-config` prints the canonical schema using `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 - Resolved config: `ccc config` prints all active config file paths and their raw contents in merge order; `CCC_CONFIG` wins alone when it points at an existing file
 - Alias wizard: `ccc add <alias>` writes the active write target; `-g` forces the effective global config instead of project-local config; blank/default answers omit alias keys; menu prompt color follows TTY detection and honors FORCE_COLOR/NO_COLOR
+- `ccc` writes `transcript.txt` for text and human transcript paths, `transcript.jsonl` for JSON-oriented paths, keeps `text` requests upgraded into structured streaming on `transcript.txt`, and places the files under a client-prefixed run directory such as `opencode-<run-id>`
 
 Session persistence:
 - Python and Rust add Claude `--no-session-persistence` and Codex `--ephemeral` by default.

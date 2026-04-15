@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 
 ROOT = Path(__file__).resolve().parent.parent
 MOCK_BIN = ROOT / "tests" / "mock-coding-cli" / "mock_coding_cli.sh"
+OUTPUT_LOG_PATH_IMPLEMENTATIONS = {"Python", "Rust"}
 
 
 class LanguageSpec:
@@ -56,6 +57,32 @@ class LanguageSpec:
     def prepared_env(self, env: Dict[str, str]) -> Dict[str, str]:
         return self._ensure_env_dirs({**self.env_extra, **env})
 
+    def _supports_output_log_path(self) -> bool:
+        return self.name in OUTPUT_LOG_PATH_IMPLEMENTATIONS
+
+    def _maybe_insert_output_log_path_for_prompt(
+        self, command: List[str], include_output_log_path: bool
+    ) -> List[str]:
+        if include_output_log_path or not self._supports_output_log_path():
+            return command
+        if not command:
+            return command
+        return command[:-1] + ["--no-output-log-path", command[-1]]
+
+    def _maybe_insert_output_log_path_for_extra_args(
+        self, extra_args: List[str], include_output_log_path: bool
+    ) -> List[str]:
+        if include_output_log_path or not self._supports_output_log_path():
+            return extra_args
+        if not extra_args:
+            return extra_args
+        if extra_args[0] in {"config", "add", "--help", "-h", "--print-config"}:
+            return extra_args
+        if "--" in extra_args:
+            index = extra_args.index("--")
+            return extra_args[:index] + ["--no-output-log-path"] + extra_args[index:]
+        return extra_args[:-1] + ["--no-output-log-path", extra_args[-1]]
+
     def build(self, env: Dict[str, str]) -> None:
         self.build_ok = True
         if self.build_cmds:
@@ -75,9 +102,17 @@ class LanguageSpec:
                     return
 
     def invoke(
-        self, prompt: str, env: Dict[str, str], cwd: Optional[Path] = None
+        self,
+        prompt: str,
+        env: Dict[str, str],
+        cwd: Optional[Path] = None,
+        *,
+        include_output_log_path: bool = False,
     ) -> subprocess.CompletedProcess:
         cmd = self.invoke_fn(prompt)
+        cmd = self._maybe_insert_output_log_path_for_prompt(
+            cmd, include_output_log_path
+        )
         return subprocess.run(
             cmd,
             cwd=cwd or ROOT,
@@ -88,10 +123,17 @@ class LanguageSpec:
         )
 
     def invoke_extra(
-        self, extra_args: List[str], env: Dict[str, str], cwd: Optional[Path] = None
+        self,
+        extra_args: List[str],
+        env: Dict[str, str],
+        cwd: Optional[Path] = None,
+        *,
+        include_output_log_path: bool = False,
     ) -> subprocess.CompletedProcess:
         cmd = self.invoke_fn("__placeholder__")
-        cmd = cmd[:-1] + extra_args
+        cmd = cmd[:-1] + self._maybe_insert_output_log_path_for_extra_args(
+            extra_args, include_output_log_path
+        )
         return subprocess.run(
             cmd,
             cwd=cwd or ROOT,
@@ -107,9 +149,14 @@ class LanguageSpec:
         prompt: str,
         env: Dict[str, str],
         cwd: Optional[Path] = None,
+        *,
+        include_output_log_path: bool = False,
     ) -> subprocess.CompletedProcess:
         cmd = self.invoke_fn(prompt)
         cmd = cmd[:-1] + extra_args + [prompt]
+        cmd = self._maybe_insert_output_log_path_for_prompt(
+            cmd, include_output_log_path
+        )
         return subprocess.run(
             cmd,
             cwd=cwd or ROOT,

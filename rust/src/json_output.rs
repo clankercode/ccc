@@ -1357,6 +1357,10 @@ impl StructuredStreamProcessor {
         }
     }
 
+    pub fn output(&self) -> &ParsedJsonOutput {
+        &self.output
+    }
+
     pub fn feed(&mut self, chunk: &str) -> String {
         self.buffer.push_str(chunk);
         let mut rendered = Vec::new();

@@ -30,6 +30,7 @@ class ParsedArgs:
     show_thinking: bool | None = None
     print_config: bool = False
     sanitize_osc: bool | None = None
+    output_log_path: bool | None = None
     output_mode: str | None = None
     forward_unknown_json: bool = False
     save_session: bool = False
@@ -264,6 +265,8 @@ def parse_args(argv: list[str]) -> ParsedArgs:
             parsed.print_config = True
         elif token in {"--sanitize-osc", "--no-sanitize-osc"}:
             parsed.sanitize_osc = token == "--sanitize-osc"
+        elif token in {"--output-log-path", "--no-output-log-path"}:
+            parsed.output_log_path = token == "--output-log-path"
         elif token in {"--output-mode", "-o"}:
             if index + 1 >= len(argv):
                 parsed.output_mode = ""

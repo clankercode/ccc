@@ -5,11 +5,16 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+mod artifacts;
 mod config;
 mod help;
 mod json_output;
 mod parser;
 
+pub use artifacts::{
+    output_write_warning, resolve_state_root, transcript_io_warning, RunArtifacts,
+    TranscriptKind,
+};
 pub use config::{
     find_alias_write_path, find_config_command_path, find_config_command_paths, load_config,
     normalize_alias_name, render_alias_block, render_example_config, upsert_alias_block,

@@ -68,6 +68,9 @@ Flags:
   --sanitize-osc / --no-sanitize-osc    Strip disruptive OSC control output in human-facing modes
                                         while preserving OSC 8 hyperlinks
                                         (config key: defaults.sanitize_osc)
+  --output-log-path / --no-output-log-path
+                                        Emit or suppress the parseable run footer on stderr
+                                        (default: on; No TOML config key)
   --output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>
                                         Select raw, streamed, or formatted output handling
                                         (config key: defaults.output_mode)

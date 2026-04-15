@@ -20,6 +20,15 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-04-15
+
+### Run artifact footer and output log paths added
+- Change: Python and Rust now create a stable per-run artifact directory under the platform state root, prefix each run directory with the canonical client type such as `opencode-<run-id>`, write `output.txt` plus exactly one transcript file per run (`transcript.txt` for text and human transcript paths, `transcript.jsonl` for JSON-oriented paths), and print the parseable stderr footer `>> ccc:output-log >> /abs/path/to/run-dir` with `--output-log-path` / `--no-output-log-path`
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_run_artifacts.py`, `tests/test_ccc_contract_impl.py`, `tests/test_harness.py`, `rust/tests/run_artifacts_tests.rs`
+- Notes: `text` requests that are upgraded into structured streaming still write `transcript.txt`; HTTP/HTTPS delivery for run artifacts and final output logs remains a deferred follow-up tracked in `TASKS.md`
+
 ## 2026-04-14
 
 ### Gemini formatted JSON output support

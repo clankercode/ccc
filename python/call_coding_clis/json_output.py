@@ -907,6 +907,10 @@ class StructuredStreamProcessor:
         self._buffer = ""
         self._unknown_lines: list[str] = []
 
+    @property
+    def output(self) -> ParsedJsonOutput:
+        return self._result
+
     def feed(self, chunk: str) -> str:
         if self._apply is None:
             return ""

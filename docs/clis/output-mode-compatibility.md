@@ -40,3 +40,11 @@ This matrix is the current Python and Rust contract for `ccc --output-mode` and 
 - `stream-text` is intentionally separate from `stream-formatted`: it prints native runner output as it arrives.
 - `formatted` and `stream-formatted` sanitize disruptive OSC output by default while preserving OSC 8 hyperlinks.
 - `--no-sanitize-osc` disables that human-facing cleanup; raw machine modes stay unchanged apart from the always-on OpenCode raw JSON cleanup.
+
+## Run Artifacts
+
+- Every `ccc` run creates a stable per-run artifact directory under the platform state root.
+- The run directory name is client-prefixed, for example `opencode-<run-id>`.
+- The directory always contains `output.txt`.
+- The transcript file is `transcript.txt` for text and human transcript paths, including `text` requests that are upgraded into structured streaming, and `transcript.jsonl` for JSON-oriented paths.
+- The CLI prints a parseable stderr footer in the form `>> ccc:output-log >> /abs/path/to/run-dir` unless `--no-output-log-path` is set.

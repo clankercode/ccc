@@ -157,6 +157,8 @@ Human-formatted output honors `FORCE_COLOR` and `NO_COLOR` before falling back t
 
 Explicit unsupported output-mode selectors fail. Unsupported `output_mode` values inherited from config defaults or aliases warn and fall back to text when `ccc` has only mapped text support for the selected runner.
 
+Each run also creates a stable artifact directory under the platform state root. The directory always contains `output.txt` plus exactly one transcript file: `transcript.txt` for text and human transcript paths, or `transcript.jsonl` for JSON-oriented paths. The run directory itself is client-prefixed, for example `opencode-<run-id>`. `text` requests that are upgraded into structured streaming still write `transcript.txt`, and the CLI prints a parseable footer on stderr with the run directory path unless disabled with `--no-output-log-path`.
+
 Implementation notes for future language ports live in [output-mode-porting.md](output-mode-porting.md).
 
 Upstream structured-output references live in [json-event-references.md](json-event-references.md).

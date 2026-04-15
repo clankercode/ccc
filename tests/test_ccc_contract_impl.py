@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 import stat
 import sys
 import tempfile
@@ -10,7 +11,11 @@ from typing import Dict, List
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tests.test_harness import LanguageSpec, _resolve_selected_languages
+from tests.test_harness import (
+    OUTPUT_LOG_PATH_IMPLEMENTATIONS,
+    LanguageSpec,
+    _resolve_selected_languages,
+)
 
 
 PROMPT = "Fix the failing tests"
@@ -68,11 +73,13 @@ PROMPT_PRESET_IMPLEMENTATIONS = {"Python", "Rust"}
 PRINT_CONFIG_IMPLEMENTATIONS = {"Python", "Rust"}
 CONFIG_COMMAND_IMPLEMENTATIONS = {"Python", "Rust"}
 ADD_ALIAS_IMPLEMENTATIONS = {"Python", "Rust"}
+RUN_ARTIFACT_IMPLEMENTATIONS = OUTPUT_LOG_PATH_IMPLEMENTATIONS
 EXAMPLE_CONFIG_EXPECTED = (
     ROOT / "tests" / "fixtures" / "config-example.toml"
 ).read_text(encoding="utf-8")
 PROJECT_LOCAL_CONFIG_IMPLEMENTATIONS = {"Python", "Rust"}
 PROMPT_MODE_IMPLEMENTATIONS = {"Python", "Rust"}
+FOOTER_RE = re.compile(r"^>> ccc:output-log >> (?P<path>.+)$", re.MULTILINE)
 
 
 class SingleImplCccContractTests(unittest.TestCase):
@@ -122,6 +129,38 @@ class SingleImplCccContractTests(unittest.TestCase):
         if lang.name in {"x86-64 ASM", "OCaml"}:
             env["CCC_REAL_OPENCODE"] = str(opencode_path)
         return env
+
+    def _footer_run_dir(self, stderr: str) -> Path:
+        match = FOOTER_RE.search(stderr)
+        self.assertIsNotNone(match, stderr)
+        return Path(match.group("path"))
+
+    def _assert_footer_artifacts(
+        self,
+        result,
+        transcript_name: str,
+        expected_warning: str | None = None,
+        expected_prefix: str | None = None,
+    ) -> Path:
+        self.assertEqual(result.returncode, 0, result.stderr)
+        if expected_warning is not None:
+            self.assertIn(expected_warning, result.stderr)
+        run_dir = self._footer_run_dir(result.stderr)
+        if expected_prefix is not None:
+            self.assertTrue(run_dir.name.startswith(expected_prefix), run_dir)
+        footer_line = f">> ccc:output-log >> {run_dir}"
+        self.assertTrue(run_dir.is_absolute())
+        self.assertTrue((run_dir / "output.txt").exists(), run_dir)
+        self.assertNotEqual((run_dir / "output.txt").read_text(encoding="utf-8"), "")
+        self.assertTrue((run_dir / transcript_name).exists(), run_dir)
+        other_transcript = (
+            "transcript.jsonl" if transcript_name == "transcript.txt" else "transcript.txt"
+        )
+        self.assertFalse((run_dir / other_transcript).exists(), run_dir)
+        self.assertIn(footer_line, result.stderr)
+        self.assertTrue(result.stderr.rstrip().endswith(footer_line), result.stderr)
+        self.assertEqual(result.stderr.rstrip().splitlines()[-1], footer_line)
+        return run_dir
 
     def _run_with_prompt_assertion(self, prompt: str, assertion) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1581,6 +1620,183 @@ class SingleImplCccContractTests(unittest.TestCase):
                     self.assertEqual(result.stdout, expected_stdout)
                     self.assertEqual(result.stderr, OPENCODE_PERSISTENCE_WARNING)
 
+    def test_output_log_footer_writes_transcript_txt_for_text_and_formatted_modes(
+        self,
+    ) -> None:
+        cases = [
+            (
+                "text",
+                lambda lang, env: lang.invoke(
+                    PROMPT,
+                    env,
+                    include_output_log_path=True,
+                ),
+                OPENCODE_PERSISTENCE_WARNING,
+            ),
+            (
+                "formatted",
+                lambda lang, env: lang.invoke_with_args(
+                    ["--save-session", ".fmt"],
+                    PROMPT,
+                    env,
+                    include_output_log_path=True,
+                ),
+                None,
+            ),
+            (
+                "stream-formatted",
+                lambda lang, env: lang.invoke_with_args(
+                    ["--save-session", "..fmt"],
+                    PROMPT,
+                    env,
+                    include_output_log_path=True,
+                ),
+                None,
+            ),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in RUN_ARTIFACT_IMPLEMENTATIONS:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                env["XDG_STATE_HOME"] = str(tmp_path / f"xdg-state-{lang.name}")
+                for mode_name, invoke, expected_warning in cases:
+                    with self.subTest(language=lang.name, mode=mode_name):
+                        result = invoke(lang, env)
+                        run_dir = self._assert_footer_artifacts(
+                            result,
+                            "transcript.txt",
+                            expected_warning=expected_warning,
+                            expected_prefix="opencode-",
+                        )
+                        self.assertEqual(
+                            (run_dir / "transcript.txt").read_text(
+                                encoding="utf-8"
+                            ),
+                            result.stdout,
+                        )
+
+    def test_output_log_footer_writes_transcript_jsonl_for_json_modes(self) -> None:
+        cases = [
+            (
+                "json",
+                lambda lang, env: lang.invoke_with_args(
+                    ["--save-session", ".json"],
+                    PROMPT,
+                    env,
+                    include_output_log_path=True,
+                ),
+            ),
+            (
+                "stream-json",
+                lambda lang, env: lang.invoke_with_args(
+                    ["--save-session", "..json"],
+                    PROMPT,
+                    env,
+                    include_output_log_path=True,
+                ),
+            ),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in RUN_ARTIFACT_IMPLEMENTATIONS:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                env["XDG_STATE_HOME"] = str(tmp_path / f"xdg-state-{lang.name}")
+                for mode_name, invoke in cases:
+                    with self.subTest(language=lang.name, mode=mode_name):
+                        result = invoke(lang, env)
+                        run_dir = self._assert_footer_artifacts(
+                            result,
+                            "transcript.jsonl",
+                            expected_prefix="opencode-",
+                        )
+                        self.assertEqual(
+                            (run_dir / "transcript.jsonl").read_text(
+                                encoding="utf-8"
+                            ),
+                            result.stdout,
+                        )
+
+    def test_footer_follows_cleanup_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_cleanup_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in RUN_ARTIFACT_IMPLEMENTATIONS:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                env["XDG_STATE_HOME"] = str(tmp_path / f"xdg-state-{lang.name}")
+                with self.subTest(language=lang.name, mode="cleanup-session"):
+                    result = lang.invoke_with_args(
+                        ["--cleanup-session"],
+                        PROMPT,
+                        env,
+                        include_output_log_path=True,
+                    )
+                    run_dir = self._assert_footer_artifacts(
+                        result,
+                        "transcript.txt",
+                        expected_warning="warning: failed to cleanup OpenCode session cleanup-session-1",
+                        expected_prefix="opencode-",
+                    )
+                    self.assertTrue((run_dir / "transcript.txt").exists())
+
+    def test_no_output_log_path_suppresses_only_footer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in RUN_ARTIFACT_IMPLEMENTATIONS:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                env["XDG_STATE_HOME"] = str(tmp_path / f"xdg-state-{lang.name}")
+                with self.subTest(language=lang.name, mode="no-output-log-path"):
+                    result = lang.invoke_with_args(
+                        ["--save-session", "--no-output-log-path", ".fmt"],
+                        PROMPT,
+                        env,
+                        include_output_log_path=True,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stderr, "")
+                    run_root = (
+                        Path(env["XDG_STATE_HOME"]) / "ccc" / "runs"
+                    )
+                    run_dirs = list(run_root.iterdir())
+                    self.assertEqual(len(run_dirs), 1)
+                    self.assertTrue(run_dirs[0].name.startswith("opencode-"), run_dirs[0])
+                    run_dir = run_dirs[0]
+                    self.assertTrue((run_dir / "output.txt").exists(), run_dir)
+                    self.assertTrue((run_dir / "transcript.txt").exists(), run_dir)
+                    self.assertFalse((run_dir / "transcript.jsonl").exists(), run_dir)
+                    self.assertEqual(
+                        (run_dir / "transcript.txt").read_text(encoding="utf-8"),
+                        result.stdout,
+                    )
+
     def test_unsupported_output_mode_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -2009,6 +2225,22 @@ class SingleImplCccContractTests(unittest.TestCase):
             "else\n"
             "  printf 'opencode run %s\\n' \"$args\"\n"
             "fi\n"
+        )
+        path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    def _write_opencode_cleanup_stub(self, path: Path) -> None:
+        path.write_text(
+            "#!/bin/sh\n"
+            'if [ "$1" = "session" ] && [ "${2:-}" = "delete" ]; then\n'
+            '  printf "cleanup failed\\n" >&2\n'
+            "  exit 17\n"
+            "fi\n"
+            'if [ "$1" != "run" ]; then\n'
+            "  exit 9\n"
+            "fi\n"
+            "shift\n"
+            'args="$*"\n'
+            'printf \'{"response":"opencode run %s","sessionID":"cleanup-session-1"}\\n\' "$args"\n'
         )
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 

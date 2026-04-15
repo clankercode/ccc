@@ -90,6 +90,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - capture stdout/stderr and exit status
 - expose a small streaming interface
 - keep the abstraction subprocess-oriented and easy to mock in tests
+- write a stable per-run artifact directory under the platform state root, with a client-prefixed run folder such as `opencode-<run-id>` and a parseable stderr footer for scripts
 
 ## Cross-Language CLI Requirement
 
@@ -123,6 +124,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - `--permission-mode safe|auto|yolo|plan`
   - `--save-session` to explicitly allow normal runner session persistence
   - `--cleanup-session` to try post-run cleanup when a runner lacks a no-persist flag
+  - `--output-log-path` / `--no-output-log-path` to enable or suppress the final stderr footer that points at the run artifact directory
   - `--show-thinking` / `--no-show-thinking`
   - `--yolo` / `-y`
 - `--` forces the rest of argv to be treated as prompt text, even if it starts with control-like tokens
@@ -131,6 +133,9 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - `ccc --print-config` is the source of truth for the current canonical config schema: `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 - `ccc config` is the source of truth for which config files currently resolve in the active shell
 - `ccc add <alias>` writes the active write target: project-local config when present, otherwise the effective global config; when no config exists it creates a new global config under `XDG_CONFIG_HOME/ccc/config.toml` or `~/.config/ccc/config.toml`, and `-g` forces the effective global config instead of a project-local file
+- `ccc` writes `output.txt` plus exactly one transcript file in each run directory: `transcript.txt` for text and human transcript paths, `transcript.jsonl` for JSON-oriented paths; `text` requests that are upgraded into structured streaming still use `transcript.txt`
+- each run directory is client-prefixed, for example `opencode-<run-id>`
+- `ccc` prints a stable stderr footer in the form `>> ccc:output-log >> /abs/path/to/run-dir` unless `--no-output-log-path` is set
 
 ## Planned `ccc` Syntax Growth (design notes only, not fully rolled out yet)
 
@@ -170,6 +175,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - richer stdin/cwd/env coverage and docs for every implementation
 - v2: parse structured JSON output from supported runners and render it consistently
 - v2: templated or user-customizable rendering for structured output
+- v2: HTTP/HTTPS delivery of run artifacts and final output logs, tracked in [TASKS.md](TASKS.md)
 
 ## Licensing
 

@@ -10,6 +10,7 @@ import sys
 import re
 
 try:
+    from . import artifacts
     from .json_output import (
         FormattedRenderer,
         StructuredStreamProcessor,
@@ -37,6 +38,7 @@ try:
     )
     from .help import print_help, print_usage
 except ImportError:
+    import artifacts
     from json_output import (
         FormattedRenderer,
         StructuredStreamProcessor,
@@ -196,6 +198,21 @@ def main(argv: list[str] | None = None) -> int:
 
     _apply_real_runner_override(spec)
 
+    footer_enabled = (
+        parsed.output_log_path if parsed.output_log_path is not None else True
+    )
+    artifact_writer = artifacts.create_run_artifact_writer(
+        transcript_filename=_transcript_filename_for_mode(output_plan.mode),
+        footer_enabled=footer_enabled,
+        runner_name=output_plan.runner_name,
+    )
+    if artifact_writer is None:
+        print("warning: could not create artifact directory", file=sys.stderr)
+    else:
+        transcript_warning = getattr(artifact_writer, "transcript_warning", None)
+        if transcript_warning is not None:
+            print(transcript_warning, file=sys.stderr)
+
     for warning in warnings:
         print(warning, file=sys.stderr)
     for warning in _session_persistence_pre_run_warnings(
@@ -227,11 +244,15 @@ def main(argv: list[str] | None = None) -> int:
                 False,
                 stderr_filter,
                 sanitize_osc,
+                artifact_writer,
             ),
         )
         trailing = processor.finish()
         if trailing:
-            print(_sanitize_human_output(trailing, sanitize_osc))
+            _emit_stdout(
+                _sanitize_human_output(trailing, sanitize_osc),
+                artifact_writer=artifact_writer,
+            )
         trailing_stderr = stderr_filter.finish()
         if trailing_stderr:
             print(
@@ -239,9 +260,14 @@ def main(argv: list[str] | None = None) -> int:
                 end="",
                 file=sys.stderr,
             )
+        footer_line = _finalize_run_artifacts(
+            artifact_writer, processor.output.final_text
+        )
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
+        if footer_line:
+            print(footer_line, file=sys.stderr)
         return result.exit_code
 
     if output_plan.mode == "json":
@@ -249,12 +275,16 @@ def main(argv: list[str] | None = None) -> int:
         stdout = _sanitize_raw_output(result.stdout, output_plan.runner_name)
         stderr = _sanitize_raw_output(result.stderr, output_plan.runner_name)
         if stdout:
-            print(stdout, end="")
+            _emit_stdout(stdout, artifact_writer=artifact_writer, newline=False)
         if stderr:
             print(stderr, end="", file=sys.stderr)
+        parsed_output = parse_json_output(result.stdout, output_plan.schema or "")
+        footer_line = _finalize_run_artifacts(artifact_writer, parsed_output.final_text)
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
+        if footer_line:
+            print(footer_line, file=sys.stderr)
         return result.exit_code
 
     if output_plan.mode == "text":
@@ -262,26 +292,36 @@ def main(argv: list[str] | None = None) -> int:
         stdout = _sanitize_raw_output(result.stdout, output_plan.runner_name)
         stderr = _sanitize_raw_output(result.stderr, output_plan.runner_name)
         if stdout:
-            print(stdout, end="")
+            _emit_stdout(stdout, artifact_writer=artifact_writer, newline=False)
         if stderr:
             print(stderr, end="", file=sys.stderr)
+        footer_line = _finalize_run_artifacts(artifact_writer, stdout)
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
+        if footer_line:
+            print(footer_line, file=sys.stderr)
         return result.exit_code
 
     if output_plan.mode in {"stream-text", "stream-json"}:
         result = runner.stream(
             spec,
-            lambda channel, chunk: print(
-                chunk,
-                end="",
-                file=sys.stdout if channel == "stdout" else sys.stderr,
+            lambda channel, chunk: _handle_raw_stream_chunk(
+                channel, chunk, artifact_writer
             ),
         )
+        if output_plan.mode == "stream-json":
+            output_text = parse_json_output(
+                result.stdout, output_plan.schema or ""
+            ).final_text
+        else:
+            output_text = _sanitize_raw_output(result.stdout, output_plan.runner_name)
+        footer_line = _finalize_run_artifacts(artifact_writer, output_text)
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
+        if footer_line:
+            print(footer_line, file=sys.stderr)
         return result.exit_code
 
     if output_plan.mode == "formatted":
@@ -296,13 +336,21 @@ def main(argv: list[str] | None = None) -> int:
             tty=human_tty,
         )
         if rendered:
-            print(_sanitize_human_output(rendered, sanitize_osc))
+            _emit_stdout(
+                _sanitize_human_output(rendered, sanitize_osc),
+                artifact_writer=artifact_writer,
+            )
         if forward_unknown_json:
             for raw_line in parsed_output.unknown_json_lines:
                 print(raw_line, file=sys.stderr)
+        footer_line = _finalize_run_artifacts(
+            artifact_writer, parsed_output.final_text
+        )
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
+        if footer_line:
+            print(footer_line, file=sys.stderr)
         return result.exit_code
 
     renderer = FormattedRenderer(
@@ -320,11 +368,15 @@ def main(argv: list[str] | None = None) -> int:
             forward_unknown_json,
             stderr_filter,
             sanitize_osc,
+            artifact_writer,
         ),
     )
     trailing = processor.finish()
     if trailing:
-        print(_sanitize_human_output(trailing, sanitize_osc))
+        _emit_stdout(
+            _sanitize_human_output(trailing, sanitize_osc),
+            artifact_writer=artifact_writer,
+        )
     trailing_stderr = stderr_filter.finish()
     if trailing_stderr:
         print(
@@ -335,9 +387,14 @@ def main(argv: list[str] | None = None) -> int:
     if forward_unknown_json:
         for raw_line in processor.take_unknown_json_lines():
             print(raw_line, file=sys.stderr)
+    footer_line = _finalize_run_artifacts(
+        artifact_writer, processor.output.final_text
+    )
     _print_cleanup_warnings(
         parsed.cleanup_session, output_plan.runner_name, spec, result
     )
+    if footer_line:
+        print(footer_line, file=sys.stderr)
     return result.exit_code
 
 
@@ -697,6 +754,59 @@ def _alias_has_any_field(alias: AliasDef) -> bool:
     return any(getattr(alias, field) is not None for field in ALIAS_FIELDS)
 
 
+def _transcript_filename_for_mode(mode: str) -> str:
+    return (
+        artifacts.TRANSCRIPT_JSONL_FILE_NAME
+        if mode in {"json", "stream-json"}
+        else artifacts.TRANSCRIPT_TEXT_FILE_NAME
+    )
+
+
+def _emit_stdout(
+    text: str,
+    *,
+    artifact_writer: artifacts.RunArtifactWriter | None = None,
+    newline: bool = True,
+) -> None:
+    print(text, end="\n" if newline else "")
+    if artifact_writer is not None:
+        try:
+            artifact_writer.write_transcript(text + ("\n" if newline else ""))
+        except OSError as exc:
+            print(
+                f"warning: could not write {artifact_writer.transcript_name}: {exc}",
+                file=sys.stderr,
+            )
+
+
+def _handle_raw_stream_chunk(
+    channel: str,
+    chunk: str,
+    artifact_writer: artifacts.RunArtifactWriter | None,
+) -> None:
+    if channel == "stdout":
+        _emit_stdout(chunk, artifact_writer=artifact_writer, newline=False)
+    else:
+        print(chunk, end="", file=sys.stderr)
+
+
+def _finalize_run_artifacts(
+    artifact_writer: artifacts.RunArtifactWriter | None,
+    output_text: str,
+) -> str | None:
+    if artifact_writer is None:
+        return None
+    try:
+        artifact_writer.write_output(output_text)
+    except OSError as exc:
+        print(f"warning: could not write output.txt: {exc}", file=sys.stderr)
+    try:
+        artifact_writer.close()
+    except OSError:
+        pass
+    return artifact_writer.footer_line()
+
+
 def _handle_structured_chunk(
     channel: str,
     chunk: str,
@@ -704,6 +814,7 @@ def _handle_structured_chunk(
     forward_unknown_json: bool,
     stderr_filter: "_HumanStderrFilter",
     sanitize_osc: bool,
+    artifact_writer: artifacts.RunArtifactWriter | None,
 ) -> None:
     if channel == "stderr":
         filtered = stderr_filter.feed(chunk)
@@ -714,7 +825,8 @@ def _handle_structured_chunk(
         return
     rendered = processor.feed(chunk)
     if rendered:
-        print(_sanitize_human_output(rendered, sanitize_osc))
+        emitted = _sanitize_human_output(rendered, sanitize_osc)
+        _emit_stdout(emitted, artifact_writer=artifact_writer)
     if forward_unknown_json:
         for raw_line in processor.take_unknown_json_lines():
             print(raw_line, file=sys.stderr)

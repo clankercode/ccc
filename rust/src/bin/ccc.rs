@@ -1,9 +1,10 @@
 use call_coding_clis::{
     find_alias_write_path, find_config_command_paths, load_config, normalize_alias_name,
-    parse_args, parse_json_output, print_help, print_usage, render_alias_block,
-    render_example_config, render_parsed, resolve_command, resolve_human_tty, resolve_output_plan,
-    resolve_sanitize_osc, resolve_show_thinking, write_alias_block, AliasDef, FormattedRenderer,
-    Runner, StructuredStreamProcessor,
+    output_write_warning, parse_args, parse_json_output, print_help, print_usage,
+    render_alias_block, render_example_config, render_parsed, resolve_command,
+    resolve_human_tty, resolve_output_plan, resolve_sanitize_osc, resolve_show_thinking,
+    transcript_io_warning, write_alias_block, AliasDef, FormattedRenderer, RunArtifacts, Runner,
+    StructuredStreamProcessor, TranscriptKind,
 };
 use std::collections::BTreeMap;
 use std::env;
@@ -843,6 +844,41 @@ fn sanitize_human_output(text: &str, sanitize_osc: bool) -> String {
     sanitized
 }
 
+fn emit_stdout(artifacts: Option<&RunArtifacts>, text: &str) {
+    print!("{text}");
+    if let Some(artifacts) = artifacts {
+        if let Err(error) = artifacts.record_stdout(text) {
+            eprintln!(
+                "{}",
+                transcript_io_warning("write", artifacts.transcript_path(), &error)
+            );
+        }
+    }
+}
+
+fn emit_stdout_line(artifacts: Option<&RunArtifacts>, text: &str) {
+    println!("{text}");
+    if let Some(artifacts) = artifacts {
+        let mut chunk = String::with_capacity(text.len() + 1);
+        chunk.push_str(text);
+        chunk.push('\n');
+        if let Err(error) = artifacts.record_stdout(&chunk) {
+            eprintln!(
+                "{}",
+                transcript_io_warning("write", artifacts.transcript_path(), &error)
+            );
+        }
+    }
+}
+
+fn write_output_text(artifacts: Option<&RunArtifacts>, text: &str) {
+    if let Some(artifacts) = artifacts {
+        if let Err(error) = artifacts.write_output_text(text) {
+            eprintln!("{}", output_write_warning(&error));
+        }
+    }
+}
+
 fn print_cleanup_warnings(
     cleanup_session: bool,
     runner_name: &str,
@@ -1421,24 +1457,53 @@ fn main() -> ExitCode {
         env::var("FORCE_COLOR").ok().as_deref(),
         env::var("NO_COLOR").ok().as_deref(),
     );
+    let footer_enabled = parsed.output_log_path.unwrap_or(true);
+    let transcript_kind = if matches!(output_plan.mode.as_str(), "json" | "stream-json") {
+        TranscriptKind::Jsonl
+    } else {
+        TranscriptKind::Text
+    };
+    let artifacts = match RunArtifacts::create_for_runner(
+        output_plan.runner_name.as_str(),
+        transcript_kind,
+    ) {
+        Ok(artifacts) => Some(Arc::new(artifacts)),
+        Err(error) => {
+            eprintln!("warning: could not create artifact directory: {error}");
+            None
+        }
+    };
+    if let Some(artifacts) = artifacts.as_deref() {
+        if let Some(warning) = artifacts.transcript_warning() {
+            eprintln!("{warning}");
+        }
+    }
 
     match output_plan.mode.as_str() {
         "json" => {
             let result = runner.run(spec);
+            let parsed_output =
+                parse_json_output(&result.stdout, output_plan.schema.as_deref().unwrap_or(""));
             let stdout = sanitize_raw_output(&result.stdout, &output_plan.runner_name);
             let stderr = sanitize_raw_output(&result.stderr, &output_plan.runner_name);
             if !stdout.is_empty() {
-                print!("{}", stdout);
+                emit_stdout(artifacts.as_deref(), &stdout);
             }
             if !stderr.is_empty() {
                 eprint!("{}", stderr);
             }
+            write_output_text(artifacts.as_deref(), &parsed_output.final_text);
             print_cleanup_warnings(
                 parsed.cleanup_session,
                 &output_plan.runner_name,
                 &cleanup_spec,
                 &result,
             );
+            if footer_enabled {
+                if let Some(artifacts) = artifacts.as_deref() {
+                    eprintln!("{}", artifacts.footer_line());
+                }
+            }
             std::process::exit(result.exit_code)
         }
         _ if text_mode_with_visible_work => {
@@ -1448,6 +1513,7 @@ fn main() -> ExitCode {
                 FormattedRenderer::new(show_thinking, human_tty),
             )));
             let callback_processor = Arc::clone(&processor);
+            let artifacts_for_stream = artifacts.clone();
             let result = runner.stream(spec, move |channel, chunk| {
                 if channel == "stderr" {
                     let filtered = filtered_human_stderr(chunk, &stream_runner_name);
@@ -1459,22 +1525,33 @@ fn main() -> ExitCode {
                 if let Ok(mut processor) = callback_processor.lock() {
                     let rendered = processor.feed(chunk);
                     if !rendered.is_empty() {
-                        println!("{}", sanitize_human_output(&rendered, sanitize_osc));
+                        let rendered = sanitize_human_output(&rendered, sanitize_osc);
+                        emit_stdout_line(artifacts_for_stream.as_deref(), &rendered);
                     }
                 }
             });
-            if let Ok(mut processor) = processor.lock() {
+            let final_output_text = if let Ok(mut processor) = processor.lock() {
                 let trailing = processor.finish();
                 if !trailing.is_empty() {
-                    println!("{}", sanitize_human_output(&trailing, sanitize_osc));
+                    let trailing = sanitize_human_output(&trailing, sanitize_osc);
+                    emit_stdout_line(artifacts.as_deref(), &trailing);
                 }
-            }
+                processor.output().final_text.clone()
+            } else {
+                String::new()
+            };
+            write_output_text(artifacts.as_deref(), &final_output_text);
             print_cleanup_warnings(
                 parsed.cleanup_session,
                 &command_output_plan.runner_name,
                 &cleanup_spec,
                 &result,
             );
+            if footer_enabled {
+                if let Some(artifacts) = artifacts.as_deref() {
+                    eprintln!("{}", artifacts.footer_line());
+                }
+            }
             std::process::exit(result.exit_code)
         }
         "text" => {
@@ -1482,33 +1559,52 @@ fn main() -> ExitCode {
             let stdout = sanitize_raw_output(&result.stdout, &output_plan.runner_name);
             let stderr = sanitize_raw_output(&result.stderr, &output_plan.runner_name);
             if !stdout.is_empty() {
-                print!("{}", stdout);
+                emit_stdout(artifacts.as_deref(), &stdout);
             }
             if !stderr.is_empty() {
                 eprint!("{}", stderr);
             }
+            write_output_text(artifacts.as_deref(), &stdout);
             print_cleanup_warnings(
                 parsed.cleanup_session,
                 &output_plan.runner_name,
                 &cleanup_spec,
                 &result,
             );
+            if footer_enabled {
+                if let Some(artifacts) = artifacts.as_deref() {
+                    eprintln!("{}", artifacts.footer_line());
+                }
+            }
             std::process::exit(result.exit_code)
         }
         "stream-text" | "stream-json" => {
-            let result = runner.stream(spec, |channel, chunk| {
+            let artifacts_for_stream = artifacts.clone();
+            let result = runner.stream(spec, move |channel, chunk| {
                 if channel == "stdout" {
-                    print!("{}", chunk);
+                    emit_stdout(artifacts_for_stream.as_deref(), chunk);
                 } else {
                     eprint!("{}", chunk);
                 }
             });
+            let final_output_text = if output_plan.mode == "stream-json" {
+                parse_json_output(&result.stdout, output_plan.schema.as_deref().unwrap_or(""))
+                    .final_text
+            } else {
+                sanitize_raw_output(&result.stdout, &output_plan.runner_name)
+            };
+            write_output_text(artifacts.as_deref(), &final_output_text);
             print_cleanup_warnings(
                 parsed.cleanup_session,
                 &output_plan.runner_name,
                 &cleanup_spec,
                 &result,
             );
+            if footer_enabled {
+                if let Some(artifacts) = artifacts.as_deref() {
+                    eprintln!("{}", artifacts.footer_line());
+                }
+            }
             std::process::exit(result.exit_code)
         }
         "formatted" => {
@@ -1517,19 +1613,17 @@ fn main() -> ExitCode {
             if !stderr.is_empty() {
                 eprint!("{}", sanitize_human_output(&stderr, sanitize_osc));
             }
-            let rendered = render_parsed(
-                &parse_json_output(&result.stdout, output_plan.schema.as_deref().unwrap_or("")),
-                show_thinking,
-                human_tty,
-            );
+            let parsed_output =
+                parse_json_output(&result.stdout, output_plan.schema.as_deref().unwrap_or(""));
+            let output_text = parsed_output.final_text.clone();
+            let rendered = render_parsed(&parsed_output, show_thinking, human_tty);
             if !rendered.is_empty() {
-                println!("{}", sanitize_human_output(&rendered, sanitize_osc));
+                let rendered = sanitize_human_output(&rendered, sanitize_osc);
+                emit_stdout_line(artifacts.as_deref(), &rendered);
             }
+            write_output_text(artifacts.as_deref(), &output_text);
             if forward_unknown_json {
-                for raw_line in
-                    parse_json_output(&result.stdout, output_plan.schema.as_deref().unwrap_or(""))
-                        .unknown_json_lines
-                {
+                for raw_line in parsed_output.unknown_json_lines {
                     eprintln!("{}", raw_line);
                 }
             }
@@ -1539,6 +1633,11 @@ fn main() -> ExitCode {
                 &cleanup_spec,
                 &result,
             );
+            if footer_enabled {
+                if let Some(artifacts) = artifacts.as_deref() {
+                    eprintln!("{}", artifacts.footer_line());
+                }
+            }
             std::process::exit(result.exit_code)
         }
         "stream-formatted" => {
@@ -1548,6 +1647,7 @@ fn main() -> ExitCode {
                 FormattedRenderer::new(show_thinking, human_tty),
             )));
             let callback_processor = Arc::clone(&processor);
+            let artifacts_for_stream = artifacts.clone();
             let result = runner.stream(spec, move |channel, chunk| {
                 if channel == "stderr" {
                     let filtered = filtered_human_stderr(chunk, &stream_runner_name);
@@ -1559,7 +1659,8 @@ fn main() -> ExitCode {
                 if let Ok(mut processor) = callback_processor.lock() {
                     let rendered = processor.feed(chunk);
                     if !rendered.is_empty() {
-                        println!("{}", sanitize_human_output(&rendered, sanitize_osc));
+                        let rendered = sanitize_human_output(&rendered, sanitize_osc);
+                        emit_stdout_line(artifacts_for_stream.as_deref(), &rendered);
                     }
                     if forward_unknown_json {
                         for raw_line in processor.take_unknown_json_lines() {
@@ -1568,23 +1669,33 @@ fn main() -> ExitCode {
                     }
                 }
             });
-            if let Ok(mut processor) = processor.lock() {
+            let final_output_text = if let Ok(mut processor) = processor.lock() {
                 let trailing = processor.finish();
                 if !trailing.is_empty() {
-                    println!("{}", sanitize_human_output(&trailing, sanitize_osc));
+                    let trailing = sanitize_human_output(&trailing, sanitize_osc);
+                    emit_stdout_line(artifacts.as_deref(), &trailing);
                 }
                 if forward_unknown_json {
                     for raw_line in processor.take_unknown_json_lines() {
                         eprintln!("{}", raw_line);
                     }
                 }
-            }
+                processor.output().final_text.clone()
+            } else {
+                String::new()
+            };
+            write_output_text(artifacts.as_deref(), &final_output_text);
             print_cleanup_warnings(
                 parsed.cleanup_session,
                 &output_plan.runner_name,
                 &cleanup_spec,
                 &result,
             );
+            if footer_enabled {
+                if let Some(artifacts) = artifacts.as_deref() {
+                    eprintln!("{}", artifacts.footer_line());
+                }
+            }
             std::process::exit(result.exit_code)
         }
         _ => {

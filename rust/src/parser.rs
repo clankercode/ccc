@@ -42,6 +42,7 @@ pub struct ParsedArgs {
     pub show_thinking: Option<bool>,
     pub print_config: bool,
     pub sanitize_osc: Option<bool>,
+    pub output_log_path: Option<bool>,
     pub output_mode: Option<String>,
     pub forward_unknown_json: bool,
     pub save_session: bool,
@@ -424,6 +425,8 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
             parsed.print_config = true;
         } else if token == "--sanitize-osc" || token == "--no-sanitize-osc" {
             parsed.sanitize_osc = Some(token == "--sanitize-osc");
+        } else if token == "--output-log-path" || token == "--no-output-log-path" {
+            parsed.output_log_path = Some(token == "--output-log-path");
         } else if token == "--output-mode" || token == "-o" {
             if index + 1 >= argv.len() {
                 parsed.output_mode = Some(String::new());

@@ -1,10 +1,11 @@
 use call_coding_clis::{
     find_alias_write_path, find_config_command_paths, find_config_edit_path, load_config,
-    normalize_alias_name, output_write_warning, parse_args, parse_json_output, print_help,
-    print_usage, print_version, render_alias_block, render_example_config, render_parsed,
-    resolve_command, resolve_human_tty, resolve_output_plan, resolve_sanitize_osc,
-    resolve_show_thinking, transcript_io_warning, write_alias_block, AliasDef, FormattedRenderer,
-    RunArtifacts, Runner, StructuredStreamProcessor, TranscriptKind,
+    normalize_alias_name, output_write_warning, parse_args, parse_json_output,
+    parse_tokens_with_config, print_help, print_usage, print_version, render_alias_block,
+    render_example_config, render_parsed, resolve_human_tty, resolve_output_plan,
+    resolve_sanitize_osc, resolve_show_thinking, transcript_io_warning, write_alias_block,
+    AliasDef, Client, FormattedRenderer, OutputMode, RunArtifacts, Runner, RunnerKind,
+    StructuredStreamProcessor, TranscriptKind,
 };
 use std::collections::BTreeMap;
 use std::env;
@@ -458,6 +459,19 @@ fn format_written_alias(name: &str, block: &str) -> String {
         .map(|line| format!("  {line}\n"))
         .collect::<String>();
     format!("\n{heading}\n\n{indented_block}")
+}
+
+fn runner_kind_name(kind: RunnerKind) -> &'static str {
+    match kind {
+        RunnerKind::OpenCode => "opencode",
+        RunnerKind::Claude => "claude",
+        RunnerKind::Codex => "codex",
+        RunnerKind::Kimi => "kimi",
+        RunnerKind::Cursor => "cursor",
+        RunnerKind::Gemini => "gemini",
+        RunnerKind::RooCode => "roocode",
+        RunnerKind::Crush => "crush",
+    }
 }
 
 fn choose(
@@ -1538,22 +1552,29 @@ fn main() -> ExitCode {
         }
     };
     let output_plan = requested_output_plan.clone();
-    let spec = match resolve_command(&command_parsed, Some(&config)) {
-        Ok((argv, env_overrides, warnings)) => {
-            let mut spec = call_coding_clis::CommandSpec::new(argv);
-            for (k, v) in env_overrides {
-                spec = spec.with_env(k, v);
-            }
-            for warning in warnings {
-                eprintln!("{warning}");
-            }
-            spec
-        }
-        Err(msg) => {
-            eprintln!("{msg}");
+    let parsed_request = match parse_tokens_with_config(args.iter().cloned(), &config) {
+        Ok(parsed_request) => parsed_request,
+        Err(error) => {
+            eprintln!("{error}");
             return ExitCode::from(1);
         }
     };
+    let mut command_request = parsed_request.request;
+    if text_mode_with_visible_work {
+        command_request = command_request.with_output_mode(OutputMode::StreamFormatted);
+    }
+    let client = Client::new().with_config(config.clone());
+    let command_plan = match client.plan(&command_request) {
+        Ok(plan) => plan,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::from(1);
+        }
+    };
+    for warning in command_plan.warnings() {
+        eprintln!("{warning}");
+    }
+    let spec = command_plan.command_spec().clone();
 
     let mut spec = spec;
     apply_real_runner_override(&mut spec);

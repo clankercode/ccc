@@ -39,6 +39,7 @@ pub enum OutputMode {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Request {
     prompt: String,
+    prompt_supplied: bool,
     runner: Option<RunnerKind>,
     agent: Option<String>,
     thinking: Option<i32>,
@@ -56,6 +57,7 @@ impl Request {
     pub fn new(prompt: impl Into<String>) -> Self {
         Self {
             prompt: prompt.into(),
+            prompt_supplied: true,
             runner: None,
             agent: None,
             thinking: None,
@@ -190,6 +192,7 @@ impl Request {
 
         Ok(Self {
             prompt: parsed.prompt.clone(),
+            prompt_supplied: parsed.prompt_supplied,
             runner,
             agent: parsed.alias.clone(),
             thinking: parsed.thinking,
@@ -250,7 +253,7 @@ impl Request {
             tokens.push("--output-mode".to_string());
             tokens.push(output_mode.as_cli_value().to_string());
         }
-        if !self.prompt_text().trim().is_empty() {
+        if self.prompt_supplied {
             tokens.push(self.prompt_text().to_string());
         }
         tokens

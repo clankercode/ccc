@@ -8,7 +8,7 @@ Small libraries for calling coding CLIs from normal programs.
 ./run_all_tests.sh
 ```
 
-This runs all 10 test suites (8 language-specific + 2 cross-language) and prints a color-coded checklist:
+This runs every implementation's unit/build checks plus the cross-language contract and mock-harness checks, then prints a color-coded checklist:
 
 ```
   PASS  python: runner + prompt_spec
@@ -19,10 +19,12 @@ This runs all 10 test suites (8 language-specific + 2 cross-language) and prints
   PASS  ruby: test suite
   PASS  perl: prove
   PASS  cpp: cmake build + gtest
-  PASS  contract: ccc CLI behavior (8 languages)
-  PASS  harness: mock binary behavior (8 langs × 9 cases)
+  ...
+  SKIP  vbscript: test suite (Windows only)
+  PASS  contract: ccc CLI behavior (legacy + @name matrix)
+  PASS  harness: mock binary behavior (16 langs × 9 cases)
 
-  Total: 10  Passed: 10  Failed: 0  Skipped: 0
+  Total: 22  Passed: 21  Failed: 0  Skipped: 1
 ```
 
 ## Running One Implementation
@@ -55,7 +57,7 @@ This builds the Rust binary and runs a Python compile check. Both Python and Rus
 
 | Language | Command |
 |----------|---------|
-| Python | `PYTHONPATH=python python3 -m unittest tests.test_runner tests.test_ccc_contract` |
+| Python | `PYTHONPATH=python python3 -m unittest tests.test_runner tests.test_parser_config tests.test_json_output tests.test_run_artifacts` |
 | Rust | `cd rust && cargo test` |
 | TypeScript | `node --test typescript/tests/runner.test.mjs` |
 | C | `cd c && make test` |
@@ -63,11 +65,11 @@ This builds the Rust binary and runs a Python compile check. Both Python and Rus
 | Ruby | `cd ruby && ruby -Ilib -Itest test/test_*.rb` |
 | Perl | `cd perl && prove -v t/` |
 | C++ | `cmake -B cpp/build -S cpp && cmake --build cpp/build --target ccc_tests && ./cpp/build/tests/ccc_tests` |
-| Cross-language | `PYTHONPATH=python python3 -m unittest tests.test_ccc_contract && PYTHONPATH=python python3 tests/test_harness.py all -v` |
+| Cross-language | `PYTHONPATH=. python3 tests/test_ccc_contract_impl.py <language> -v && PYTHONPATH=. python3 tests/test_harness.py <language> -v` |
 
 ## Implementation Status
 
-### Implemented (full runner + ccc CLI + cross-language tests)
+### Implemented (runner + `ccc` CLI + cross-language tests)
 
 - **Python** — `call_coding_clis` package, real-runner override env support
 - **Rust** — `call-coding-clis` crate, concurrent streaming, real-runner override env support
@@ -77,10 +79,11 @@ This builds the Rust binary and runs a Python compile check. Both Python and Rus
 - **Ruby** — `CallCodingClis` module with runner/stream, `ccc` CLI
 - **Perl** — `Call::Coding::Clis` with runner, `ccc` CLI
 - **C++** — C++17 with GoogleTest, cmake build, `ccc` CLI
+- **Zig, D, F#, PHP, PureScript, x86-64 ASM, OCaml, Crystal, Haskell, Elixir, Nim** — `ccc` implementations covered by targeted contract/harness checks
 
-### Planned (PLAN.md exists in each directory)
+### Planned / Follow-Up Tracked In `PLAN.md`
 
-PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir, OCaml (with formal verification)
+Implementation-specific follow-up work is tracked in each language's `PLAN.md`. VBScript remains planned.
 
 ## Target CLIs
 
@@ -89,6 +92,9 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - Codex
 - Kimi
 - Gemini CLI
+- Cursor Agent
+- RooCode
+- Crush
 - Qwen Code
 - similar terminal-first coding agents
 
@@ -104,7 +110,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 
 - every language library should also bundle a CLI named `ccc`
 - the `ccc` interface should have the same shape across languages
-- the interface is not fully designed yet, but `ccc "<Prompt>"` must work
+- `ccc "<Prompt>"` must work everywhere; Python and Rust carry the reference extended CLI surface
 - library and CLI design should stay aligned so `precurl` can use the library layer while humans can use the same runner shape directly
 - `precurl` uses the Rust library layer for delegated LLM analysis — see the [precurl SECURITY.md](../precurl/SECURITY.md) for threat model and prompt-injection mitigation details
 - Python and Rust also support free-order control tokens before the prompt, `--` to force literal prompt text, `--show-thinking` / `--no-show-thinking`, and `--yolo` / `-y`
@@ -151,10 +157,8 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 ## Planned `ccc` Syntax Growth (design notes only, not fully rolled out yet)
 
 - planned config support should eventually allow:
-  - custom alias definitions and abbreviations
-  - default provider selection
-  - default model selection
-  - bundled-runner defaults plus custom-name defaults
+  - broader multi-language rollout for the Python/Rust config surface
+  - multi-provider, multi-preset, and multi-alias routing policies
 - broader multi-language rollout is still pending for the extended control-token surface
 
 ## Python Package
@@ -175,16 +179,14 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - parser and config design for planned alias, thinking, runner, and provider/model selectors: `CCC_PARSER_CONFIG_DESIGN.md`
 - language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
 - cross-language test harness design: `TEST_HARNESS_PLAN.md`
-- expanded `ccc` token parsing for `@name`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
+- broader rollout of expanded `ccc` token parsing for `@name`, `+0..+4`, `:provider:model`, `:model`, and runner selectors beyond Python/Rust
 - future advanced tool allow/deny design note: [docs/clis/allow-deny-tool-plan.md](docs/clis/allow-deny-tool-plan.md)
 - shared model-thinking capability source of truth and refresh instructions: [docs/clis/model-capabilities.json](docs/clis/model-capabilities.json) and [docs/clis/updating-model-capabilities.md](docs/clis/updating-model-capabilities.md)
 
 ## Missing / Possible Future Features
 
-- expanded `ccc` token parsing for `@name`, `+0..+4`, `:provider:model`, `:model`, and runner selectors
-- config-backed presets, runner abbreviations, agent defaults, and provider/model resolution
+- broader rollout of Python/Rust config-backed presets, runner abbreviations, agent defaults, and provider/model resolution
 - richer stdin/cwd/env coverage and docs for every implementation
-- v2: parse structured JSON output from supported runners and render it consistently
 - v2: templated or user-customizable rendering for structured output
 - v2: HTTP/HTTPS delivery of run artifacts and final output logs, tracked in [TASKS.md](TASKS.md)
 

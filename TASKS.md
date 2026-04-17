@@ -23,6 +23,10 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
   - Allow a single logical route to fan out across multiple providers, presets, aliases, or equivalent backends.
   - Detect `429` rate-limit responses and other retryable provider errors, then fail over or rotate according to policy.
   - Track enough usage/capacity state to avoid hammering an exhausted route and to make round-robin selection stable.
+- [ ] Support failover aliases as an ordered sequence of aliases to try if the first one fails
+  - Keep the first alias as the primary route, then fall through to the next configured alias on failure.
+  - Reuse the same failure signals as the provider-routing work so the behavior stays consistent.
+  - Make the fallback order explicit in config/docs rather than inferring it from naming.
 - [ ] Capture real Kimi rate-limit and provider-error samples across every surface `ccc` reads
   - Collect representative `429` and nearby failure cases from plain stdout/stderr, `json`, and `stream-json` modes.
   - Save the observed payloads and transcripts in the same fixture style used for other real runner captures so parser and retry logic can target actual shapes.

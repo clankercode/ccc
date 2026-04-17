@@ -21,3 +21,7 @@ Shared feature changes that still need rollout to other implementations are note
 When changing the behavior of `ccc` in any way, including feature work and bug fixes, read [`ADDING_FEATURES.md`](ADDING_FEATURES.md) first.
 
 When adding config fields, update any generated config example/schema output and the related docs at the same time.
+
+Always prefer cross-impl tests rather than language-specific tests.
+Language-specific tests are for language specific behavior or quirks.
+When running cross-impl tests, run them only for the languages you're concerned with; running all of them is not advised nor necessary. 

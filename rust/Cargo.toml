@@ -3,12 +3,13 @@ name = "ccc"
 version = "0.1.2"
 edition = "2021"
 build = "build.rs"
-description = "Call coding CLIs (opencode, claude, codex, kimi, etc.) from Rust programs"
+description = "Unified Rust library and CLI for invoking coding-agent CLIs with shared parsing, planning, and transcript utilities"
 license = "Unlicense"
 repository = "https://github.com/clankercode/ccc"
+documentation = "https://docs.rs/ccc"
 readme = "README.md"
-keywords = ["cli", "opencode", "claude", "codex", "coding-agent"]
-categories = ["command-line-utilities", "development-tools"]
+keywords = ["cli", "codex", "claude", "opencode", "automation"]
+categories = ["command-line-utilities", "development-tools", "api-bindings"]
 
 [[bin]]
 name = "ccc"
@@ -20,3 +21,6 @@ path = "src/lib.rs"
 
 [dependencies]
 serde_json = "1"
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docsrs"]

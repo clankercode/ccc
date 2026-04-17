@@ -1,8 +1,13 @@
 # ccc
 
-`ccc` is a Rust library and command-line tool for calling coding-agent CLIs through one consistent interface.
+`ccc` is both:
 
-It supports OpenCode, Claude Code, Codex, Kimi, Cursor Agent, Gemini CLI, RooCode, and Crush. The CLI handles runner selection, model and thinking controls, structured output rendering, config-backed aliases, session persistence warnings, and per-run artifacts. The Rust library exposes the same subprocess primitives for applications that want to run coding CLIs directly.
+- a CLI for driving coding-agent tools through one consistent command surface
+- a Rust crate that exposes the same parsing, planning, runner, transcript, and config helpers
+
+It supports OpenCode, Claude Code, Codex, Kimi, Cursor Agent, Gemini CLI, RooCode, and Crush.
+
+The published package is named `ccc`. The library crate name is `call_coding_clis`.
 
 ## Install
 
@@ -12,34 +17,49 @@ Install the CLI from crates.io:
 cargo install ccc
 ```
 
-Use the library from Rust:
+Add the library to a Rust project:
 
 ```toml
 [dependencies]
 ccc = "0.1.2"
 ```
 
+Then import the library crate as:
+
 ```rust
 use call_coding_clis::{CommandSpec, Runner};
-
-let spec = CommandSpec::new(["opencode", "run", "Explain this module"]);
-let result = Runner::new().run(spec);
-
-println!("{}", result.stdout);
 ```
+
+## What The CLI Covers
+
+The `ccc` binary handles:
+
+- runner selection across supported coding CLIs
+- model, provider, thinking, and permission controls
+- raw, streaming, JSON, and formatted output modes
+- config-backed aliases and project-local `.ccc.toml`
+- per-run artifact directories and transcript files
+- runner-specific warnings around session persistence and compatibility
 
 ## CLI Quick Start
 
+Use OpenCode by default:
+
 ```bash
-ccc "fix the failing tests"          # OpenCode by default
-ccc cc "review my changes"          # Claude Code
-ccc c "write a regression test"      # Codex
-ccc k "explain this function"        # Kimi
-ccc cu "inspect this branch"         # Cursor Agent
-ccc g "summarize this file"          # Gemini CLI
+ccc "fix the failing tests"
 ```
 
-Common controls can appear before the prompt in any order:
+Pick an explicit runner:
+
+```bash
+ccc cc "review my changes"
+ccc c "write a regression test"
+ccc k "explain this function"
+ccc cu "inspect this branch"
+ccc g "summarize this file"
+```
+
+Controls can appear before the prompt in any order:
 
 ```bash
 ccc cc +3 "review this patch"
@@ -56,6 +76,68 @@ Help is available through any of these forms:
 ccc help
 ccc --help
 ccc -h
+```
+
+## Library Quick Start
+
+### Run a CLI command directly
+
+```rust,no_run
+use call_coding_clis::{CommandSpec, Runner};
+
+let spec = CommandSpec::new(["opencode", "run", "Explain this module"]);
+let result = Runner::new().run(spec);
+
+println!("{}", result.stdout);
+```
+
+### Build a request and let `Client` plan it
+
+```rust,no_run
+use call_coding_clis::{Client, Request, RunnerKind};
+
+let request = Request::new("review the latest changes")
+    .with_runner(RunnerKind::Claude);
+
+let plan = Client::new().plan(&request)?;
+
+assert!(!plan.command_spec().argv.is_empty());
+# Ok::<(), call_coding_clis::Error>(())
+```
+
+### Parse familiar `ccc`-style tokens into a typed request
+
+```rust
+use call_coding_clis::{parse_tokens_with_config, CccConfig, RunnerKind};
+
+let config = CccConfig::default();
+let parsed = parse_tokens_with_config(
+    ["c", ":openai:gpt-5.4-mini", "debug this"],
+    &config,
+) ?;
+
+assert_eq!(parsed.request.runner(), Some(RunnerKind::Codex));
+assert_eq!(parsed.request.model(), Some("gpt-5.4-mini"));
+# Ok::<(), call_coding_clis::Error>(())
+```
+
+### Stream output incrementally
+
+```rust,no_run
+use call_coding_clis::{CommandSpec, Runner};
+
+let spec = CommandSpec::new(["opencode", "run", "Explain this module"]);
+let runner = Runner::new();
+
+let completed = runner.stream(spec, |channel, chunk| {
+    if channel == "stdout" {
+        print!("{chunk}");
+    } else {
+        eprint!("{chunk}");
+    }
+});
+
+println!("exit code: {}", completed.exit_code);
 ```
 
 ## Runner Selectors
@@ -86,7 +168,7 @@ ccc -h
 
 Unhandled structured JSON is always preserved in run transcripts. In formatted modes, `--forward-unknown-json` or `CCC_FWD_UNKNOWN_JSON` controls whether unknown objects are also forwarded to stderr. The environment default is currently on.
 
-## Config
+## Config And Aliases
 
 `ccc` reads config from the normal user config locations plus the nearest project-local `.ccc.toml` searched upward from the current directory.
 
@@ -149,11 +231,17 @@ The CLI prints a parseable footer on stderr:
 
 Use `--no-output-log-path` to suppress the footer without disabling artifact writes.
 
-## Rust API
+## Public Rust API
 
-### CommandSpec
+The crate is split into a few main entry points:
 
-`CommandSpec` describes argv, stdin, working directory, and environment for one subprocess run.
+- `CommandSpec` and `Runner` for direct subprocess execution
+- `Request`, `Client`, `Plan`, and `Run` for the typed invoke API
+- `parse_tokens_with_config` and `sugar::parse_tokens` for `ccc`-style token parsing
+- `Transcript`, `Event`, `ToolCall`, and `ToolResult` for parsed structured output
+- config and help utilities such as `load_config`, `render_example_config`, and `print_help`
+
+### Direct execution with `CommandSpec`
 
 ```rust
 use call_coding_clis::CommandSpec;
@@ -164,12 +252,14 @@ let spec = CommandSpec::new(["claude", "-p", "review this"])
     .with_env("ANTHROPIC_API_KEY", "sk-...");
 ```
 
-### Runner
+### Execution with `Runner`
 
 `Runner` executes a `CommandSpec` either as a blocking run or as a stream.
 
 ```rust
-use call_coding_clis::Runner;
+use call_coding_clis::{CommandSpec, Runner};
+
+let spec = CommandSpec::new(["claude", "-p", "review this"]);
 
 let runner = Runner::new();
 let result = runner.run(spec);
@@ -191,7 +281,26 @@ let result = runner.stream(spec, |channel, chunk| {
 });
 ```
 
-### build_prompt_spec
+### Typed planning with `Request` and `Client`
+
+`Request` lets a Rust program express the same controls the CLI understands, while `Client` resolves that request into a runnable `Plan`.
+
+```rust
+use call_coding_clis::{Client, OutputMode, Request, RunnerKind};
+
+let request = Request::new("summarize the failing test")
+    .with_runner(RunnerKind::Codex)
+    .with_model("gpt-5.4-mini")
+    .with_output_mode(OutputMode::Formatted);
+
+let client = Client::new();
+let plan = client.plan(&request)?;
+
+assert_eq!(plan.runner(), RunnerKind::Codex);
+# Ok::<(), call_coding_clis::Error>(())
+```
+
+### `build_prompt_spec`
 
 `build_prompt_spec` builds the default OpenCode command for a prompt:
 

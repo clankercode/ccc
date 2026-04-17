@@ -1,5 +1,5 @@
 use call_coding_clis::{
-    parse_tokens_with_config, sugar, Client, CompletedRun, CccConfig, Event, OutputMode, Request,
+    parse_tokens_with_config, sugar, CccConfig, Client, CompletedRun, Event, OutputMode, Request,
     Run, Runner, RunnerKind, Transcript,
 };
 
@@ -63,7 +63,10 @@ fn library_api_tests_client_with_config_uses_injected_defaults() {
     let plan = client.plan(&request).expect("plan should resolve");
 
     assert_eq!(plan.runner(), RunnerKind::Codex);
-    assert_eq!(plan.command_spec().argv.first().map(|s| s.as_str()), Some("codex"));
+    assert_eq!(
+        plan.command_spec().argv.first().map(|s| s.as_str()),
+        Some("codex")
+    );
 }
 
 #[test]
@@ -83,12 +86,13 @@ fn library_api_tests_typed_transcript_and_run_surface_are_available() {
 
 #[test]
 fn library_api_tests_client_run_exposes_parsed_output_for_formatted_modes() {
-    let client = Client::new().with_runtime_runner(Runner::with_executor(Box::new(|spec| CompletedRun {
-        argv: spec.argv,
-        exit_code: 0,
-        stdout: "{\"response\":\"hello\"}\n".into(),
-        stderr: String::new(),
-    })));
+    let client =
+        Client::new().with_runtime_runner(Runner::with_executor(Box::new(|spec| CompletedRun {
+            argv: spec.argv,
+            exit_code: 0,
+            stdout: "{\"response\":\"hello\"}\n".into(),
+            stderr: String::new(),
+        })));
     let request = Request::new("hello")
         .with_runner(RunnerKind::OpenCode)
         .with_output_mode(OutputMode::Formatted);
@@ -101,12 +105,13 @@ fn library_api_tests_client_run_exposes_parsed_output_for_formatted_modes() {
 
 #[test]
 fn library_api_tests_client_run_returns_tool_failed_for_non_zero_exit() {
-    let client = Client::new().with_runtime_runner(Runner::with_executor(Box::new(|spec| CompletedRun {
-        argv: spec.argv,
-        exit_code: 7,
-        stdout: String::new(),
-        stderr: "runner failed".into(),
-    })));
+    let client =
+        Client::new().with_runtime_runner(Runner::with_executor(Box::new(|spec| CompletedRun {
+            argv: spec.argv,
+            exit_code: 7,
+            stdout: String::new(),
+            stderr: "runner failed".into(),
+        })));
     let request = Request::new("hello")
         .with_runner(RunnerKind::OpenCode)
         .with_output_mode(OutputMode::Text);

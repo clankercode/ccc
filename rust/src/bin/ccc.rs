@@ -4,8 +4,8 @@ use call_coding_clis::{
     parse_tokens_with_config, print_help, print_usage, print_version, render_alias_block,
     render_example_config, render_parsed, resolve_human_tty, resolve_output_plan,
     resolve_sanitize_osc, resolve_show_thinking, transcript_io_warning, write_alias_block,
-    AliasDef, Client, FormattedRenderer, OutputMode, RunArtifacts, Runner, RunnerKind,
-    StructuredStreamProcessor, TranscriptKind,
+    AliasDef, Client, Error as ClientError, FormattedRenderer, OutputMode, RunArtifacts,
+    RunnerKind, StructuredStreamProcessor, TranscriptKind,
 };
 use std::collections::BTreeMap;
 use std::env;
@@ -461,16 +461,45 @@ fn format_written_alias(name: &str, block: &str) -> String {
     format!("\n{heading}\n\n{indented_block}")
 }
 
-fn runner_kind_name(kind: RunnerKind) -> &'static str {
+fn real_runner_override_env_var(kind: RunnerKind) -> Option<&'static str> {
     match kind {
-        RunnerKind::OpenCode => "opencode",
-        RunnerKind::Claude => "claude",
-        RunnerKind::Codex => "codex",
-        RunnerKind::Kimi => "kimi",
-        RunnerKind::Cursor => "cursor",
-        RunnerKind::Gemini => "gemini",
-        RunnerKind::RooCode => "roocode",
-        RunnerKind::Crush => "crush",
+        RunnerKind::OpenCode => Some("CCC_REAL_OPENCODE"),
+        RunnerKind::Claude => Some("CCC_REAL_CLAUDE"),
+        RunnerKind::Kimi => Some("CCC_REAL_KIMI"),
+        RunnerKind::Cursor => Some("CCC_REAL_CURSOR"),
+        RunnerKind::Gemini => Some("CCC_REAL_GEMINI"),
+        RunnerKind::Codex | RunnerKind::RooCode | RunnerKind::Crush => None,
+    }
+}
+
+fn configure_real_runner_overrides(mut client: Client) -> Client {
+    for kind in [
+        RunnerKind::OpenCode,
+        RunnerKind::Claude,
+        RunnerKind::Kimi,
+        RunnerKind::Cursor,
+        RunnerKind::Gemini,
+    ] {
+        let Some(env_var) = real_runner_override_env_var(kind) else {
+            continue;
+        };
+        let Ok(override_binary) = env::var(env_var) else {
+            continue;
+        };
+        if override_binary.is_empty() {
+            continue;
+        }
+        client = client.with_binary_override(kind, override_binary);
+    }
+    client
+}
+
+fn print_client_error(error: ClientError) {
+    match error {
+        ClientError::InvalidRequest(message) | ClientError::Config(message) => {
+            eprintln!("{message}");
+        }
+        other => eprintln!("{other}"),
     }
 }
 
@@ -985,6 +1014,15 @@ fn write_output_text(artifacts: Option<&RunArtifacts>, text: &str) {
     }
 }
 
+fn completed_run_from_library_run(run: &call_coding_clis::Run) -> call_coding_clis::CompletedRun {
+    call_coding_clis::CompletedRun {
+        argv: run.plan().command_spec().argv.clone(),
+        exit_code: run.exit_code(),
+        stdout: run.stdout().to_string(),
+        stderr: run.stderr().to_string(),
+    }
+}
+
 fn env_bool_default_true(name: &str) -> bool {
     match env::var(name) {
         Ok(value) => {
@@ -1183,23 +1221,28 @@ fn collect_kimi_session_files(dir: &Path, session_id: &str, matches: &mut Vec<Pa
     }
 }
 
+#[cfg(test)]
 fn apply_real_runner_override(spec: &mut call_coding_clis::CommandSpec) {
     if spec.argv.is_empty() {
         return;
     }
-    let env_var = match spec.argv[0].as_str() {
-        "opencode" => Some("CCC_REAL_OPENCODE"),
-        "claude" => Some("CCC_REAL_CLAUDE"),
-        "kimi" => Some("CCC_REAL_KIMI"),
-        "cursor-agent" => Some("CCC_REAL_CURSOR"),
-        "gemini" => Some("CCC_REAL_GEMINI"),
+    let runner_kind = match spec.argv[0].as_str() {
+        "opencode" => Some(RunnerKind::OpenCode),
+        "claude" => Some(RunnerKind::Claude),
+        "kimi" => Some(RunnerKind::Kimi),
+        "cursor-agent" => Some(RunnerKind::Cursor),
+        "gemini" => Some(RunnerKind::Gemini),
         _ => None,
     };
-    if let Some(env_var) = env_var {
-        if let Ok(override_binary) = env::var(env_var) {
-            if !override_binary.is_empty() {
-                spec.argv[0] = override_binary;
-            }
+    let Some(kind) = runner_kind else {
+        return;
+    };
+    let Some(env_var) = real_runner_override_env_var(kind) else {
+        return;
+    };
+    if let Ok(override_binary) = env::var(env_var) {
+        if !override_binary.is_empty() {
+            spec.argv[0] = override_binary;
         }
     }
 }
@@ -1563,11 +1606,11 @@ fn main() -> ExitCode {
     if text_mode_with_visible_work {
         command_request = command_request.with_output_mode(OutputMode::StreamFormatted);
     }
-    let client = Client::new().with_config(config.clone());
+    let client = configure_real_runner_overrides(Client::new().with_config(config.clone()));
     let command_plan = match client.plan(&command_request) {
         Ok(plan) => plan,
         Err(error) => {
-            eprintln!("{error}");
+            print_client_error(error);
             return ExitCode::from(1);
         }
     };
@@ -1575,9 +1618,6 @@ fn main() -> ExitCode {
         eprintln!("{warning}");
     }
     let spec = command_plan.command_spec().clone();
-
-    let mut spec = spec;
-    apply_real_runner_override(&mut spec);
     let cleanup_spec = spec.clone();
     for warning in session_persistence_pre_run_warnings(
         parsed.save_session,
@@ -1587,7 +1627,6 @@ fn main() -> ExitCode {
         eprintln!("{warning}");
     }
 
-    let runner = Runner::new();
     let sanitize_osc = resolve_sanitize_osc(&parsed, Some(&config));
     let forward_unknown_json =
         parsed.forward_unknown_json || env_bool_default_true("CCC_FWD_UNKNOWN_JSON");
@@ -1618,11 +1657,17 @@ fn main() -> ExitCode {
 
     match output_plan.mode.as_str() {
         "json" => {
-            let result = runner.run(spec);
+            let result = match client.run_unchecked(&command_request) {
+                Ok(result) => result,
+                Err(error) => {
+                    print_client_error(error);
+                    return ExitCode::from(1);
+                }
+            };
             let parsed_output =
-                parse_json_output(&result.stdout, output_plan.schema.as_deref().unwrap_or(""));
-            let stdout = sanitize_raw_output(&result.stdout, &output_plan.runner_name);
-            let stderr = sanitize_raw_output(&result.stderr, &output_plan.runner_name);
+                parse_json_output(result.stdout(), output_plan.schema.as_deref().unwrap_or(""));
+            let stdout = sanitize_raw_output(result.stdout(), &output_plan.runner_name);
+            let stderr = sanitize_raw_output(result.stderr(), &output_plan.runner_name);
             if !stdout.is_empty() {
                 emit_stdout(artifacts.as_deref(), &stdout);
             }
@@ -1630,18 +1675,19 @@ fn main() -> ExitCode {
                 eprint!("{}", stderr);
             }
             write_output_text(artifacts.as_deref(), &parsed_output.final_text);
+            let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
                 &output_plan.runner_name,
                 &cleanup_spec,
-                &result,
+                &completed,
             );
             if footer_enabled {
                 if let Some(artifacts) = artifacts.as_deref() {
                     eprintln!("{}", artifacts.footer_line());
                 }
             }
-            std::process::exit(result.exit_code)
+            std::process::exit(result.exit_code())
         }
         _ if text_mode_with_visible_work => {
             let stream_runner_name = command_output_plan.runner_name.clone();
@@ -1651,7 +1697,7 @@ fn main() -> ExitCode {
             )));
             let callback_processor = Arc::clone(&processor);
             let artifacts_for_stream = artifacts.clone();
-            let result = runner.stream(spec, move |channel, chunk| {
+            let result = match client.stream_unchecked(&command_request, move |channel, chunk| {
                 if channel == "stderr" {
                     let filtered = filtered_human_stderr(chunk, &stream_runner_name);
                     if !filtered.is_empty() {
@@ -1672,7 +1718,13 @@ fn main() -> ExitCode {
                         }
                     }
                 }
-            });
+            }) {
+                Ok(result) => result,
+                Err(error) => {
+                    print_client_error(error);
+                    return ExitCode::from(1);
+                }
+            };
             let final_output_text = if let Ok(mut processor) = processor.lock() {
                 let trailing = processor.finish();
                 if !trailing.is_empty() {
@@ -1690,23 +1742,30 @@ fn main() -> ExitCode {
                 String::new()
             };
             write_output_text(artifacts.as_deref(), &final_output_text);
+            let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
                 &command_output_plan.runner_name,
                 &cleanup_spec,
-                &result,
+                &completed,
             );
             if footer_enabled {
                 if let Some(artifacts) = artifacts.as_deref() {
                     eprintln!("{}", artifacts.footer_line());
                 }
             }
-            std::process::exit(result.exit_code)
+            std::process::exit(result.exit_code())
         }
         "text" => {
-            let result = runner.run(spec);
-            let stdout = sanitize_raw_output(&result.stdout, &output_plan.runner_name);
-            let stderr = sanitize_raw_output(&result.stderr, &output_plan.runner_name);
+            let result = match client.run_unchecked(&command_request) {
+                Ok(result) => result,
+                Err(error) => {
+                    print_client_error(error);
+                    return ExitCode::from(1);
+                }
+            };
+            let stdout = sanitize_raw_output(result.stdout(), &output_plan.runner_name);
+            let stderr = sanitize_raw_output(result.stderr(), &output_plan.runner_name);
             if !stdout.is_empty() {
                 emit_stdout(artifacts.as_deref(), &stdout);
             }
@@ -1714,56 +1773,70 @@ fn main() -> ExitCode {
                 eprint!("{}", stderr);
             }
             write_output_text(artifacts.as_deref(), &stdout);
+            let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
                 &output_plan.runner_name,
                 &cleanup_spec,
-                &result,
+                &completed,
             );
             if footer_enabled {
                 if let Some(artifacts) = artifacts.as_deref() {
                     eprintln!("{}", artifacts.footer_line());
                 }
             }
-            std::process::exit(result.exit_code)
+            std::process::exit(result.exit_code())
         }
         "stream-text" | "stream-json" => {
             let artifacts_for_stream = artifacts.clone();
-            let result = runner.stream(spec, move |channel, chunk| {
+            let result = match client.stream_unchecked(&command_request, move |channel, chunk| {
                 if channel == "stdout" {
                     emit_stdout(artifacts_for_stream.as_deref(), chunk);
                 } else {
                     eprint!("{}", chunk);
                 }
-            });
+            }) {
+                Ok(result) => result,
+                Err(error) => {
+                    print_client_error(error);
+                    return ExitCode::from(1);
+                }
+            };
             let final_output_text = if output_plan.mode == "stream-json" {
-                parse_json_output(&result.stdout, output_plan.schema.as_deref().unwrap_or(""))
+                parse_json_output(result.stdout(), output_plan.schema.as_deref().unwrap_or(""))
                     .final_text
             } else {
-                sanitize_raw_output(&result.stdout, &output_plan.runner_name)
+                sanitize_raw_output(result.stdout(), &output_plan.runner_name)
             };
             write_output_text(artifacts.as_deref(), &final_output_text);
+            let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
                 &output_plan.runner_name,
                 &cleanup_spec,
-                &result,
+                &completed,
             );
             if footer_enabled {
                 if let Some(artifacts) = artifacts.as_deref() {
                     eprintln!("{}", artifacts.footer_line());
                 }
             }
-            std::process::exit(result.exit_code)
+            std::process::exit(result.exit_code())
         }
         "formatted" => {
-            let result = runner.run(spec);
-            let stderr = filtered_human_stderr(&result.stderr, &output_plan.runner_name);
+            let result = match client.run_unchecked(&command_request) {
+                Ok(result) => result,
+                Err(error) => {
+                    print_client_error(error);
+                    return ExitCode::from(1);
+                }
+            };
+            let stderr = filtered_human_stderr(result.stderr(), &output_plan.runner_name);
             if !stderr.is_empty() {
                 eprint!("{}", sanitize_human_output(&stderr, sanitize_osc));
             }
             let parsed_output =
-                parse_json_output(&result.stdout, output_plan.schema.as_deref().unwrap_or(""));
+                parse_json_output(result.stdout(), output_plan.schema.as_deref().unwrap_or(""));
             let output_text = parsed_output.final_text.clone();
             let rendered = render_parsed(&parsed_output, show_thinking, human_tty);
             if !rendered.is_empty() {
@@ -1777,18 +1850,19 @@ fn main() -> ExitCode {
                     eprintln!("{}", raw_line);
                 }
             }
+            let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
                 &output_plan.runner_name,
                 &cleanup_spec,
-                &result,
+                &completed,
             );
             if footer_enabled {
                 if let Some(artifacts) = artifacts.as_deref() {
                     eprintln!("{}", artifacts.footer_line());
                 }
             }
-            std::process::exit(result.exit_code)
+            std::process::exit(result.exit_code())
         }
         "stream-formatted" => {
             let stream_runner_name = output_plan.runner_name.clone();
@@ -1798,7 +1872,7 @@ fn main() -> ExitCode {
             )));
             let callback_processor = Arc::clone(&processor);
             let artifacts_for_stream = artifacts.clone();
-            let result = runner.stream(spec, move |channel, chunk| {
+            let result = match client.stream_unchecked(&command_request, move |channel, chunk| {
                 if channel == "stderr" {
                     let filtered = filtered_human_stderr(chunk, &stream_runner_name);
                     if !filtered.is_empty() {
@@ -1819,7 +1893,13 @@ fn main() -> ExitCode {
                         }
                     }
                 }
-            });
+            }) {
+                Ok(result) => result,
+                Err(error) => {
+                    print_client_error(error);
+                    return ExitCode::from(1);
+                }
+            };
             let final_output_text = if let Ok(mut processor) = processor.lock() {
                 let trailing = processor.finish();
                 if !trailing.is_empty() {
@@ -1837,18 +1917,19 @@ fn main() -> ExitCode {
                 String::new()
             };
             write_output_text(artifacts.as_deref(), &final_output_text);
+            let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
                 &output_plan.runner_name,
                 &cleanup_spec,
-                &result,
+                &completed,
             );
             if footer_enabled {
                 if let Some(artifacts) = artifacts.as_deref() {
                     eprintln!("{}", artifacts.footer_line());
                 }
             }
-            std::process::exit(result.exit_code)
+            std::process::exit(result.exit_code())
         }
         _ => {
             eprintln!("unsupported output mode");

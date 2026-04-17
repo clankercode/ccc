@@ -1,6 +1,7 @@
 use crate::exec::{CommandSpec, Runner};
 use crate::output::{parse_transcript_for_runner, schema_name_for_runner, Transcript};
 use crate::parser::{parse_args, resolve_command, resolve_output_mode, CccConfig};
+use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::fmt;
 use std::path::Path;
@@ -104,6 +105,7 @@ impl Run {
 
 pub struct Client {
     config: Option<CccConfig>,
+    binary_overrides: BTreeMap<RunnerKind, String>,
     runner: Runner,
 }
 
@@ -111,6 +113,7 @@ impl Client {
     pub fn new() -> Self {
         Self {
             config: None,
+            binary_overrides: BTreeMap::new(),
             runner: Runner::new(),
         }
     }
@@ -122,6 +125,15 @@ impl Client {
 
     pub fn with_runtime_runner(mut self, runner: Runner) -> Self {
         self.runner = runner;
+        self
+    }
+
+    pub fn with_binary_override(
+        mut self,
+        runner_kind: RunnerKind,
+        binary: impl Into<String>,
+    ) -> Self {
+        self.binary_overrides.insert(runner_kind, binary.into());
         self
     }
 
@@ -140,13 +152,19 @@ impl Client {
         let runner = runner_kind_from_argv(&argv)
             .or_else(|| request.runner_kind())
             .unwrap_or(RunnerKind::OpenCode);
+        let mut command_spec = CommandSpec {
+            argv,
+            stdin_text: None,
+            cwd: None,
+            env,
+        };
+        if let Some(binary_override) = self.binary_overrides.get(&runner) {
+            if let Some(program) = command_spec.argv.first_mut() {
+                *program = binary_override.clone();
+            }
+        }
         Ok(Plan {
-            command_spec: CommandSpec {
-                argv,
-                stdin_text: None,
-                cwd: None,
-                env,
-            },
+            command_spec,
             runner,
             output_mode,
             warnings,
@@ -154,7 +172,44 @@ impl Client {
     }
 
     pub fn run(&self, request: &Request) -> Result<Run, Error> {
+        let run = self.run_unchecked(request)?;
+        if run.exit_code != 0 {
+            return Err(Error::ToolFailed {
+                exit_code: run.exit_code,
+                stderr: run.stderr.clone(),
+            });
+        }
+        Ok(run)
+    }
+
+    pub fn run_unchecked(&self, request: &Request) -> Result<Run, Error> {
         let plan = self.plan(request)?;
+        Ok(self.run_preplanned(plan))
+    }
+
+    pub fn stream<F>(&self, request: &Request, on_event: F) -> Result<Run, Error>
+    where
+        F: FnMut(&str, &str) + Send + 'static,
+    {
+        let run = self.stream_unchecked(request, on_event)?;
+        if run.exit_code != 0 {
+            return Err(Error::ToolFailed {
+                exit_code: run.exit_code,
+                stderr: run.stderr.clone(),
+            });
+        }
+        Ok(run)
+    }
+
+    pub fn stream_unchecked<F>(&self, request: &Request, on_event: F) -> Result<Run, Error>
+    where
+        F: FnMut(&str, &str) + Send + 'static,
+    {
+        let plan = self.plan(request)?;
+        Ok(self.stream_preplanned(plan, on_event))
+    }
+
+    fn run_preplanned(&self, plan: Plan) -> Run {
         let completed = self.runner.run(plan.command_spec().clone());
         let parsed_output = if should_parse_output_mode(plan.output_mode()) {
             if schema_name_for_runner(plan.runner()).is_some() {
@@ -166,20 +221,37 @@ impl Client {
             None
         };
 
-        if completed.exit_code != 0 {
-            return Err(Error::ToolFailed {
-                exit_code: completed.exit_code,
-                stderr: completed.stderr,
-            });
-        }
-
-        Ok(Run {
+        Run {
             plan,
             exit_code: completed.exit_code,
             stdout: completed.stdout,
             stderr: completed.stderr,
             parsed_output,
-        })
+        }
+    }
+
+    fn stream_preplanned<F>(&self, plan: Plan, on_event: F) -> Run
+    where
+        F: FnMut(&str, &str) + Send + 'static,
+    {
+        let completed = self.runner.stream(plan.command_spec().clone(), on_event);
+        let parsed_output = if should_parse_output_mode(plan.output_mode()) {
+            if schema_name_for_runner(plan.runner()).is_some() {
+                parse_transcript_for_runner(&completed.stdout, plan.runner())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Run {
+            plan,
+            exit_code: completed.exit_code,
+            stdout: completed.stdout,
+            stderr: completed.stderr,
+            parsed_output,
+        }
     }
 }
 

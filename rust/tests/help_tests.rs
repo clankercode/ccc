@@ -89,11 +89,7 @@ fn test_version_prints_build_version_and_resolved_clients() {
         ),
     )
     .unwrap();
-    fs::set_permissions(
-        bin_dir.join("which"),
-        fs::Permissions::from_mode(0o755),
-    )
-    .unwrap();
+    fs::set_permissions(bin_dir.join("which"), fs::Permissions::from_mode(0o755)).unwrap();
 
     for flag in ["--version", "-v"] {
         let output = Command::new(ccc_bin())
@@ -102,7 +98,11 @@ fn test_version_prints_build_version_and_resolved_clients() {
             .output()
             .unwrap();
 
-        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         assert!(output.stderr.is_empty());
         let stdout = String::from_utf8_lossy(&output.stdout);
         let lines: Vec<_> = stdout.trim().lines().collect();

@@ -226,7 +226,12 @@ fn run_artifacts_warn_when_transcript_open_fails() {
         &state_root,
         TranscriptKind::Text,
         || "run-1".to_string(),
-        |_path| Err(io::Error::new(io::ErrorKind::PermissionDenied, "permission denied")),
+        |_path| {
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "permission denied",
+            ))
+        },
     )
     .expect("run artifacts should still create the run directory");
 
@@ -245,7 +250,12 @@ fn run_artifacts_reports_transcript_creation_warning() {
         &state_root,
         TranscriptKind::Text,
         || "run-1".to_string(),
-        |_path| Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied")),
+        |_path| {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "denied",
+            ))
+        },
     )
     .expect("run artifacts should still create the run directory");
 
@@ -266,9 +276,7 @@ fn run_artifacts_reports_transcript_write_failure() {
         &state_root,
         TranscriptKind::Text,
         || "run-1".to_string(),
-        |_path| {
-            OpenOptions::new().write(true).open("/dev/full")
-        },
+        |_path| OpenOptions::new().write(true).open("/dev/full"),
     )
     .expect("run artifacts should still create the run directory");
 

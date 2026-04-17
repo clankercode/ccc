@@ -1,17 +1,17 @@
 use super::model::{Event, Transcript};
 
 pub fn render_transcript(transcript: &Transcript, show_thinking: bool, tty: bool) -> String {
-    crate::json_output::render_parsed(&parsed_output_from_transcript(transcript), show_thinking, tty)
+    crate::json_output::render_parsed(
+        &parsed_output_from_transcript(transcript),
+        show_thinking,
+        tty,
+    )
 }
 
 fn parsed_output_from_transcript(transcript: &Transcript) -> crate::json_output::ParsedJsonOutput {
     crate::json_output::ParsedJsonOutput {
         schema_name: String::new(),
-        events: transcript
-            .events
-            .iter()
-            .map(event_to_json_event)
-            .collect(),
+        events: transcript.events.iter().map(event_to_json_event).collect(),
         final_text: transcript.final_text.clone(),
         session_id: transcript.session_id.clone().unwrap_or_default(),
         error: transcript.error.clone().unwrap_or_default(),

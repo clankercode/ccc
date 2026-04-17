@@ -1,6 +1,44 @@
 use call_coding_clis::*;
 
 #[test]
+fn test_sugar_parse_tokens_maps_common_cli_syntax() {
+    let parsed = sugar::parse_tokens(["cc", ".fmt", "+3", "review this patch"])
+        .expect("parse should succeed");
+
+    assert_eq!(parsed.request.runner(), Some(RunnerKind::Claude));
+    assert_eq!(parsed.request.output_mode(), Some(OutputMode::Formatted));
+    assert_eq!(parsed.request.prompt(), "review this patch");
+    assert!(parsed.warnings.is_empty());
+}
+
+#[test]
+fn test_sugar_parse_tokens_supports_provider_model_sugar() {
+    let parsed = sugar::parse_tokens(["c", ":openai:gpt-5.4-mini", "debug this"])
+        .expect("parse should succeed");
+
+    assert_eq!(parsed.request.runner(), Some(RunnerKind::Codex));
+    assert_eq!(parsed.request.provider(), Some("openai"));
+    assert_eq!(parsed.request.model(), Some("gpt-5.4-mini"));
+    assert!(parsed.warnings.is_empty());
+}
+
+#[test]
+fn test_sugar_parse_tokens_preserves_warnings_for_cleanup_session_compatibility() {
+    let parsed = sugar::parse_tokens(["cr", "--cleanup-session", "review this patch"])
+        .expect("parse should succeed");
+
+    assert!(!parsed.warnings.is_empty());
+    assert!(
+        parsed
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("cleanup")),
+        "expected a cleanup-session compatibility warning, got {:?}",
+        parsed.warnings
+    );
+}
+
+#[test]
 fn test_parse_prompt_only() {
     let args: Vec<String> = vec!["hello world".into()];
     let parsed = parse_args(&args);

@@ -689,6 +689,13 @@ pub fn resolve_command(
     Ok((argv, env_overrides, warnings))
 }
 
+pub(crate) fn resolve_command_warnings(
+    parsed: &ParsedArgs,
+    config: Option<&CccConfig>,
+) -> Result<Vec<String>, String> {
+    resolve_command(parsed, config).map(|(_, _, warnings)| warnings)
+}
+
 fn canonical_runner_name(effective_runner_name: &str, info: &RunnerInfo) -> String {
     match effective_runner_name {
         "oc" | "opencode" => "opencode".to_string(),

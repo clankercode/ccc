@@ -1,19 +1,46 @@
 use call_coding_clis::{
-    Client, CompletedRun, CccConfig, Event, OutputMode, Request, Run, Runner, RunnerKind,
-    Transcript,
+    parse_tokens_with_config, sugar, Client, CompletedRun, CccConfig, Event, OutputMode, Request,
+    Run, Runner, RunnerKind, Transcript,
 };
 
 #[test]
 fn library_api_tests_request_builder_sets_expected_fields() {
     let request = Request::new("review this patch")
         .with_runner(RunnerKind::Codex)
+        .with_provider("openai")
         .with_model("gpt-5.4-mini")
         .with_output_mode(OutputMode::StreamFormatted);
 
     assert_eq!(request.prompt(), "review this patch");
     assert_eq!(request.runner(), Some(RunnerKind::Codex));
+    assert_eq!(request.provider(), Some("openai"));
     assert_eq!(request.model(), Some("gpt-5.4-mini"));
     assert_eq!(request.output_mode(), Some(OutputMode::StreamFormatted));
+}
+
+#[test]
+fn library_api_tests_sugar_parse_tokens_supports_provider_model_sugar() {
+    let parsed = sugar::parse_tokens(["c", ":openai:gpt-5.4-mini", "debug this"])
+        .expect("parse should succeed");
+
+    assert_eq!(parsed.request.runner(), Some(RunnerKind::Codex));
+    assert_eq!(parsed.request.provider(), Some("openai"));
+    assert_eq!(parsed.request.model(), Some("gpt-5.4-mini"));
+}
+
+#[test]
+fn library_api_tests_parse_tokens_with_config_uses_explicit_defaults() {
+    let config = CccConfig {
+        default_runner: "codex".to_string(),
+        ..CccConfig::default()
+    };
+    let parsed = parse_tokens_with_config(["debug this"], &config).expect("parse should succeed");
+    let plan = Client::new()
+        .with_config(config)
+        .plan(&parsed.request)
+        .expect("plan should resolve");
+
+    assert_eq!(plan.runner(), RunnerKind::Codex);
 }
 
 #[test]

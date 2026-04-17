@@ -6,6 +6,7 @@ mod invoke;
 mod output;
 mod json_output;
 mod parser;
+pub mod sugar;
 
 pub use artifacts::{
     output_write_warning, resolve_state_root, transcript_io_warning, RunArtifacts, TranscriptKind,
@@ -21,6 +22,7 @@ pub use exec::{
 };
 pub use help::{print_help, print_usage, print_version};
 pub use invoke::{Client, Error, OutputMode, Plan, Request, Run, RunnerKind};
+pub use sugar::{parse_tokens_with_config, ParsedRequest};
 pub use output::{
     parse_transcript, parse_transcript_for_runner, render_transcript, schema_name_for_runner,
     Event, ToolCall, ToolResult, Transcript, Usage,

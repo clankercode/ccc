@@ -49,7 +49,7 @@ HELP_SLOT_LINE = (
 HELP_PRINT_CONFIG_SNIPPET = "--print-config"
 HELP_CONFIG_COMMAND_SNIPPET = "ccc config"
 HELP_CONFIG_EDIT_SNIPPET = "ccc config --edit"
-HELP_MIXED_HELP_SNIPPET = "--help / -h"
+HELP_MIXED_HELP_SNIPPET = "help / --help / -h"
 HELP_PRESET_PROMPT_LINE = "Presets can also define a default prompt"
 HELP_PROMPT_MODE_LINE = "prompt_mode lets alias prompts prepend or append text"
 HELP_EXHAUSTIVE_EXAMPLE_1 = (
@@ -714,8 +714,11 @@ class SingleImplCccContractTests(unittest.TestCase):
             self._write_opencode_stub(opencode_path)
 
             cases = [
+                ["help"],
                 ["@reviewer", "--help"],
+                ["@reviewer", "help"],
                 [PROMPT, "--help"],
+                [PROMPT, "help"],
                 ["--", "--help"],
             ]
 
@@ -729,6 +732,28 @@ class SingleImplCccContractTests(unittest.TestCase):
                         self.assert_help_mentions_standard_name_slot(
                             result, HELP_USAGE_LINE
                         )
+
+    def test_help_with_trailing_space_remains_prompt_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                with self.subTest(language=lang.name):
+                    result = lang.invoke_extra(
+                        ["help "], self._make_env(opencode_path, lang)
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(
+                        "[assistant] opencode run --format json --thinking help",
+                        result.stdout,
+                    )
+                    self.assertNotIn(HELP_USAGE_LINE, result.stdout)
 
     def test_help_surface_mentions_sanitize_osc_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

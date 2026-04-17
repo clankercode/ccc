@@ -136,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         print_usage()
         return 1
 
-    if any(token in {"--help", "-h"} for token in args):
+    if any(token in {"--help", "-h", "help"} for token in args):
         print_help()
         return 0
 

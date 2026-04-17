@@ -50,6 +50,7 @@ Usage:
   ccc config --edit [--user|--local]
   ccc add [-g] <alias>
   ccc --print-config
+  ccc help
   ccc --help
   ccc -h
   ccc @reviewer --help
@@ -77,7 +78,7 @@ Controls (free order before the prompt):
 
 Flags:
   --print-config                         Print the canonical example config.toml and exit
-  --help / -h                           Print help and exit, even when mixed with other args
+  help / --help / -h                    Print help and exit, even when mixed with other args
   --version / -v                        Print the ccc version and resolved client versions
   --show-thinking / --no-show-thinking  Request visible thinking output when the selected runner supports it
                                         (default: on; config key: show_thinking)

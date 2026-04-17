@@ -1438,7 +1438,10 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
 
-    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+    if args
+        .iter()
+        .any(|arg| arg == "--help" || arg == "-h" || arg == "help")
+    {
         print_help();
         return ExitCode::from(0);
     }

@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-15
 
+### Bare `help` now opens the shared help surface
+- Change: Python and Rust now treat a standalone argv token exactly equal to `help` the same as `--help` / `-h`, including when mixed with other args; prompt text such as `ccc "help "` still runs normally because the raw token is not exactly `help`
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`
+- Notes: updated `README.md`, `docs/llms.txt`, `docs/index.html`, and the Python/Rust help text
+
 ### Codex structured error events render as formatted errors
 - Change: Python and Rust now parse Codex `type:error` and `type:turn.failed` JSONL events, including nested JSON error strings, and render them as concise formatted error lines instead of treating them as unknown structured JSON
 - Required implementations: Python and Rust

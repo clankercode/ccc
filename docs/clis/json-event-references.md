@@ -148,6 +148,7 @@ Current `ccc` integration note:
 - Assistant output is carried by completed `agent_message` items.
 - Shell/tool work is carried by `command_execution` items with `command`, `aggregated_output`, `exit_code`, and `status`.
 - Usage counters are carried by `turn.completed.usage`, including observed `input_tokens`, `cached_input_tokens`, and `output_tokens`.
+- Failure output may arrive as `type:error` or `type:turn.failed`; observed Codex failures can nest a JSON error payload inside `message` or `error.message`, and Python/Rust decode that nested payload for formatted error rendering.
 
 ## How To Use These References
 

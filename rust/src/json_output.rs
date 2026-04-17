@@ -763,6 +763,21 @@ fn apply_codex_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) -> bo
             }
             true
         }
+        "error" => {
+            let text = obj
+                .get("message")
+                .or_else(|| obj.get("error"))
+                .map(codex_error_event_text)
+                .unwrap_or_default();
+            record_codex_error(result, text)
+        }
+        "turn.failed" => {
+            let text = obj
+                .get("error")
+                .map(codex_error_event_text)
+                .unwrap_or_default();
+            record_codex_error(result, text)
+        }
         "item.started" | "item.completed" => {
             let Some(item) = obj.get("item").and_then(|value| value.as_object()) else {
                 return false;
@@ -841,6 +856,90 @@ fn apply_codex_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) -> bo
             }
         }
         _ => false,
+    }
+}
+
+fn record_codex_error(result: &mut ParsedJsonOutput, text: String) -> bool {
+    if text.is_empty() {
+        return false;
+    }
+    if result.error == text {
+        return true;
+    }
+    result.error = text.clone();
+    result.events.push(JsonEvent {
+        event_type: "error".into(),
+        text,
+        thinking: String::new(),
+        tool_call: None,
+        tool_result: None,
+    });
+    true
+}
+
+fn codex_error_event_text(value: &serde_json::Value) -> String {
+    if let Some(obj) = value.as_object() {
+        if let Some(message) = obj.get("message") {
+            let nested = codex_error_event_text(message);
+            if !nested.is_empty() {
+                return nested;
+            }
+        }
+        return format_codex_error_payload(value);
+    }
+
+    let Some(text) = value.as_str().map(str::trim) else {
+        return String::new();
+    };
+    if text.is_empty() {
+        return String::new();
+    }
+    let Ok(decoded) = serde_json::from_str::<serde_json::Value>(text) else {
+        return text.to_string();
+    };
+    if decoded.as_object().is_some() {
+        let formatted = format_codex_error_payload(&decoded);
+        if !formatted.is_empty() {
+            return formatted;
+        }
+    }
+    text.to_string()
+}
+
+fn format_codex_error_payload(payload: &serde_json::Value) -> String {
+    let error = payload.get("error");
+    let error_obj = error.and_then(|value| value.as_object());
+    let message = error_obj
+        .and_then(|obj| obj.get("message"))
+        .or_else(|| payload.get("message"))
+        .or(error)
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    if message.is_empty() {
+        return String::new();
+    }
+
+    let status = payload.get("status").and_then(|value| value.as_i64());
+    let error_type = error_obj
+        .and_then(|obj| obj.get("type"))
+        .or_else(|| payload.get("type"))
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    let mut prefix = String::new();
+    if !error_type.is_empty() && error_type != "error" {
+        prefix.push_str(error_type);
+    }
+    if let Some(status) = status {
+        if prefix.is_empty() {
+            prefix = format!("HTTP {status}");
+        } else {
+            prefix = format!("{prefix} ({status})");
+        }
+    }
+    if prefix.is_empty() {
+        message.to_string()
+    } else {
+        format!("{prefix}: {message}")
     }
 }
 

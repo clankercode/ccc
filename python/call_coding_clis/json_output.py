@@ -509,8 +509,17 @@ def _apply_codex_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
                 str(key): int(value)
                 for key, value in usage.items()
                 if isinstance(value, int)
-            }
+        }
         return True
+
+    if msg_type == "error":
+        text = _codex_error_event_text(obj.get("message") or obj.get("error"))
+        return _record_codex_error(result, text, obj)
+
+    if msg_type == "turn.failed":
+        error = obj.get("error")
+        text = _codex_error_event_text(error)
+        return _record_codex_error(result, text, obj)
 
     if msg_type in {"item.started", "item.completed"}:
         item = obj.get("item", {})
@@ -558,6 +567,65 @@ def _apply_codex_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
             )
             return True
     return False
+
+
+def _record_codex_error(
+    result: ParsedJsonOutput, text: str, obj: dict[str, Any]
+) -> bool:
+    if not text:
+        return False
+    if result.error == text:
+        return True
+    result.error = text
+    result.events.append(JsonEvent(event_type="error", text=text, raw=obj))
+    return True
+
+
+def _codex_error_event_text(value: Any) -> str:
+    if isinstance(value, dict):
+        nested_message = value.get("message")
+        if nested_message is not None:
+            nested_text = _codex_error_event_text(nested_message)
+            if nested_text:
+                return nested_text
+        return _format_codex_error_payload(value)
+
+    if not isinstance(value, str):
+        return ""
+
+    text = value.strip()
+    if not text:
+        return ""
+    try:
+        decoded = json.loads(text)
+    except json.JSONDecodeError:
+        return text
+    if isinstance(decoded, dict):
+        formatted = _format_codex_error_payload(decoded)
+        if formatted:
+            return formatted
+    return text
+
+
+def _format_codex_error_payload(payload: dict[str, Any]) -> str:
+    error = payload.get("error")
+    error_obj = error if isinstance(error, dict) else {}
+    message = error_obj.get("message") or payload.get("message") or error
+    if not isinstance(message, str) or not message:
+        return ""
+
+    status = payload.get("status")
+    error_type = error_obj.get("type") or payload.get("type")
+    parts = []
+    if isinstance(error_type, str) and error_type and error_type != "error":
+        parts.append(error_type)
+    if isinstance(status, int):
+        if parts:
+            parts[-1] = f"{parts[-1]} ({status})"
+        else:
+            parts.append(f"HTTP {status}")
+    prefix = f"{parts[0]}: " if parts else ""
+    return f"{prefix}{message}"
 
 
 def _apply_gemini_stats(result: ParsedJsonOutput, stats: dict[str, Any]) -> None:

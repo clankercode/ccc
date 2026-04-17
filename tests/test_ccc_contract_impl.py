@@ -1,6 +1,8 @@
 import argparse
+import json
 import os
 import re
+import shlex
 import stat
 import subprocess
 import sys
@@ -2010,6 +2012,50 @@ class SingleImplCccContractTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertNotIn(unknown_line, result.stderr)
 
+    def test_codex_formatted_output_renders_structured_error_events(
+        self,
+    ) -> None:
+        expected_error = (
+            "[error] invalid_request_error (400): The 'gtp-5.4-mini' model is not "
+            "supported when using Codex with a ChatGPT account.\n"
+        )
+        raw_error_prefix = '{"type":"error","message":'
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            codex_path = bin_dir / "codex"
+            self._write_opencode_stub(opencode_path)
+            self._write_codex_structured_error_stub(codex_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in RUN_ARTIFACT_IMPLEMENTATIONS:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                env["XDG_STATE_HOME"] = str(tmp_path / f"xdg-state-{lang.name}")
+                env["CCC_FWD_UNKNOWN_JSON"] = "0"
+                with self.subTest(language=lang.name):
+                    result = lang.invoke_with_args(
+                        ["codex", "--save-session", ".fmt"],
+                        PROMPT,
+                        env,
+                        include_output_log_path=True,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    run_dir = self._footer_run_dir(result.stderr)
+                    self.assertTrue(run_dir.name.startswith("codex-"), run_dir)
+                    self.assertTrue((run_dir / "output.txt").exists(), run_dir)
+                    self.assertTrue((run_dir / "transcript.txt").exists(), run_dir)
+                    transcript = (run_dir / "transcript.txt").read_text(
+                        encoding="utf-8"
+                    )
+                    self.assertEqual(result.stdout, expected_error)
+                    self.assertEqual(transcript, expected_error)
+                    self.assertNotIn(raw_error_prefix, result.stderr)
+                    self.assertNotIn(raw_error_prefix, transcript)
+
     def test_footer_follows_cleanup_warning(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -2576,6 +2622,23 @@ class SingleImplCccContractTests(unittest.TestCase):
             "#!/bin/sh\n"
             'printf \'{"type":"mystery","payload":"keep-me"}\\n\'\n'
             'printf \'{"response":"opencode %s"}\\n\' "$*"\n'
+        )
+        path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    def _write_codex_structured_error_stub(self, path: Path) -> None:
+        nested = (
+            '{"type":"error","status":400,"error":{"type":"invalid_request_error",'
+            '"message":"The \'gtp-5.4-mini\' model is not supported when using Codex '
+            'with a ChatGPT account."}}'
+        )
+        error_event = json.dumps({"type": "error", "message": nested})
+        turn_failed_event = json.dumps(
+            {"type": "turn.failed", "error": {"message": nested}}
+        )
+        path.write_text(
+            "#!/bin/sh\n"
+            f"printf '%s\\n' {shlex.quote(error_event)}\n"
+            f"printf '%s\\n' {shlex.quote(turn_failed_event)}\n"
         )
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 

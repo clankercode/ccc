@@ -134,5 +134,8 @@ JSONL (`codex exec --json`).
 | `item.completed`, item type=`command_execution` | `item.id`, `aggregated_output`, `exit_code`, `status` | `tool_result` |
 | `item.completed`, item type=`agent_message` | `item.text` | `assistant` |
 | `turn.completed` | `usage` counters | (sets output field) |
+| `error`, `turn.failed` | nested JSON `message` / `error.message` payload, `status`, error type | `error` |
 
 Codex command execution items use normalized tool name `command_execution` and store the command preview in `ToolCall.arguments` as `{"command": "..."}` so formatted rendering can show the shell command consistently.
+
+Duplicate Codex failure events with the same decoded message are collapsed so a single upstream error is rendered once.

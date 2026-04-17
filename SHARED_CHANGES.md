@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-15
 
+### Codex structured error events render as formatted errors
+- Change: Python and Rust now parse Codex `type:error` and `type:turn.failed` JSONL events, including nested JSON error strings, and render them as concise formatted error lines instead of treating them as unknown structured JSON
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`
+- Notes: updated `docs/clis/codex.md`, `docs/clis/json-event-references.md`, and `JSON_PARSING_MAP.md`; duplicate `error` / `turn.failed` messages from the same Codex failure are collapsed to one rendered error
+
 ### Unknown structured JSON forwarding and artifact retention
 - Change: Python and Rust now always preserve unhandled structured JSON lines in formatted run transcripts, even when terminal forwarding is disabled; `CCC_FWD_UNKNOWN_JSON` also controls stderr forwarding and currently defaults to enabled
 - Required implementations: Python and Rust

@@ -234,9 +234,7 @@ fn default_stream_executor(spec: CommandSpec, callback: StreamCallback) -> Compl
     let stderr_buf = stderr_thread.join().unwrap_or_default();
 
     let status = child.wait().unwrap_or_else(|error| {
-        std::process::ExitStatus::from_raw(
-            failed_output(&spec, error).status.code().unwrap_or(1) as i32
-        )
+        exit_status_from_code(failed_output(&spec, error).status.code().unwrap_or(1))
     });
 
     CompletedRun {
@@ -272,10 +270,20 @@ fn failed_output(spec: &CommandSpec, error: io::Error) -> std::process::Output {
     )
     .into_bytes();
     std::process::Output {
-        status: std::process::ExitStatus::from_raw(1 << 8),
+        status: exit_status_from_code(1),
         stdout: Vec::new(),
         stderr,
     }
+}
+
+#[cfg(unix)]
+fn exit_status_from_code(code: i32) -> std::process::ExitStatus {
+    std::process::ExitStatus::from_raw(code << 8)
+}
+
+#[cfg(windows)]
+fn exit_status_from_code(code: i32) -> std::process::ExitStatus {
+    std::process::ExitStatus::from_raw(code as u32)
 }
 
 #[cfg(unix)]

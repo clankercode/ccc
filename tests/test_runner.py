@@ -211,7 +211,7 @@ class RunnerTests(unittest.TestCase):
 
     def test_version_report_lists_resolved_clients_and_summary(self) -> None:
         report = _format_version_report(
-            "0.1.1",
+            "0.1.2",
             [
                 RunnerStatus(
                     name="opencode",
@@ -232,7 +232,7 @@ class RunnerTests(unittest.TestCase):
 
         self.assertEqual(
             report,
-            "ccc version 0.1.1\n"
+            "ccc version 0.1.2\n"
             "Resolved clients:\n"
             "  [+] opencode   (opencode)  1.3.17\n"
             "  (and 1 unresolved)",

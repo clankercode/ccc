@@ -16,7 +16,7 @@ Use the library from Rust:
 
 ```toml
 [dependencies]
-ccc = "0.1.1"
+ccc = "0.1.2"
 ```
 
 ```rust

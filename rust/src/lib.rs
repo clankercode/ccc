@@ -12,13 +12,13 @@ mod json_output;
 mod parser;
 
 pub use artifacts::{
-    output_write_warning, resolve_state_root, transcript_io_warning, RunArtifacts,
-    TranscriptKind,
+    output_write_warning, resolve_state_root, transcript_io_warning, RunArtifacts, TranscriptKind,
 };
 pub use config::{
-    find_alias_write_path, find_config_command_path, find_config_command_paths, load_config,
-    normalize_alias_name, render_alias_block, render_example_config, upsert_alias_block,
-    write_alias_block,
+    find_alias_write_path, find_config_command_path, find_config_command_paths,
+    find_config_edit_path, find_local_config_write_path, find_project_config_path,
+    find_user_config_write_path, load_config, normalize_alias_name, render_alias_block,
+    render_example_config, upsert_alias_block, write_alias_block,
 };
 pub use help::{print_help, print_usage, print_version};
 pub use json_output::{

@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-15
 
+### Config editing and stricter alias wizard prompts
+- Change: Python and Rust now support `ccc config --edit [--user|--local]`, opening the selected config in `$EDITOR`; the alias wizard skips `prompt_mode` when prompt is unset and final save confirmation now rejects blank or invalid answers unless they are `y`, `n`, `yes`, or `no` case-insensitively
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`
+- Notes: updated `README.md`, `docs/llms.txt`, `docs/index.html`, and the Python/Rust help text; removed the completed backlog item from `TASKS.md`
+
 ### Build-time version source and `ccc --version`
 - Change: Python and Rust now read the repo-root `VERSION` file for the shared `ccc` version at build time, and `ccc -v` / `ccc --version` prints that build version plus the resolved supported client versions with a trailing unresolved-count summary
 - Required implementations: Python and Rust

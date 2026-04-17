@@ -4,6 +4,7 @@ from dataclasses import replace
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -29,6 +30,7 @@ try:
     )
     from .config import (
         find_alias_write_path,
+        find_config_edit_path,
         find_config_command_paths,
         load_config,
         normalize_alias_name,
@@ -57,6 +59,7 @@ except ImportError:
     )
     from config import (
         find_alias_write_path,
+        find_config_edit_path,
         find_config_command_paths,
         load_config,
         normalize_alias_name,
@@ -144,7 +147,12 @@ def main(argv: list[str] | None = None) -> int:
     if args and args[0] == "add":
         return _add_alias_command(args[1:])
 
-    if args == ["config"]:
+    if args and args[0] == "config":
+        if "--edit" in args:
+            return _config_edit_command(args[1:])
+        if args != ["config"]:
+            print("usage: ccc config [--edit] [--user|--local]", file=sys.stderr)
+            return 1
         config_paths = find_config_command_paths()
         if not config_paths:
             explicit = os.environ.get("CCC_CONFIG", "").strip()
@@ -444,6 +452,52 @@ def _add_alias_command(args: list[str]) -> int:
         return 1
 
 
+def _config_edit_command(args: list[str]) -> int:
+    target: str | None = None
+    edit_seen = False
+    for token in args:
+        if token == "--edit":
+            edit_seen = True
+        elif token == "--user":
+            if target is not None:
+                print("choose only one of --user or --local", file=sys.stderr)
+                return 1
+            target = "user"
+        elif token == "--local":
+            if target is not None:
+                print("choose only one of --user or --local", file=sys.stderr)
+                return 1
+            target = "local"
+        else:
+            print(f"unexpected config option: {token}", file=sys.stderr)
+            return 1
+    if not edit_seen:
+        print("usage: ccc config [--edit] [--user|--local]", file=sys.stderr)
+        return 1
+
+    editor = os.environ.get("EDITOR", "").strip()
+    if not editor:
+        print("$EDITOR is not set", file=sys.stderr)
+        return 1
+    config_path = find_config_edit_path(target)
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    if not config_path.exists():
+        config_path.touch()
+    try:
+        command = shlex.split(editor) + [str(config_path)]
+    except ValueError as exc:
+        print(f"invalid $EDITOR: {exc}", file=sys.stderr)
+        return 1
+    if not command:
+        print("$EDITOR is not set", file=sys.stderr)
+        return 1
+    try:
+        return subprocess.run(command, check=False).returncode
+    except OSError as exc:
+        print(f"failed to run editor {command[0]}: {exc}", file=sys.stderr)
+        return 1
+
+
 def _parse_add_alias_args(
     args: list[str],
 ) -> tuple[bool, str, AliasDef, set[str], bool, bool]:
@@ -622,6 +676,9 @@ def _prompt_alias_fields(alias: AliasDef, keep_current: bool) -> AliasDef:
                 result.output_mode = choice
             continue
         if field == "prompt_mode":
+            if not result.prompt:
+                result.prompt_mode = None
+                continue
             choice = _choose_optional_field(
                 label,
                 suffix,
@@ -648,7 +705,8 @@ def _confirm(prompt: str) -> bool:
             ("yes", "y", True, {"yes"}),
             ("no", "n", False, {"no"}),
         ],
-        default=2,
+        default=None,
+        reject_blank=True,
     )
 
 
@@ -705,6 +763,7 @@ def _choose(
     *,
     default: int | None,
     blank_value: object | None = None,
+    reject_blank: bool = False,
 ) -> object:
     markers = ", ".join(_choice_marker(key, label) for label, key, _, _ in choices)
     while True:
@@ -729,6 +788,13 @@ def _choose(
         if answer == "":
             if default is not None:
                 return choices[default - 1][2]
+            if reject_blank:
+                print(
+                    _menu_style("Please choose one of: ", "31", color)
+                    + ", ".join(str(index) for index in range(1, len(choices) + 1))
+                    + "."
+                )
+                continue
             return blank_value
         for index, (label, key, value, aliases) in enumerate(choices, 1):
             accepted = {str(index), label, key, *aliases}

@@ -30,6 +30,7 @@ Usage:
   ccc [controls...] "<Prompt>"
   ccc [controls...] -- "<Prompt starting with control-like tokens>"
   ccc config
+  ccc config --edit [--user|--local]
   ccc add [-g] <alias>
   ccc --print-config
   ccc --help
@@ -95,6 +96,9 @@ Examples:
 
 Config:
   ccc config                            — print every resolved config file path and contents
+  ccc config --edit                     — open the selected config in $EDITOR
+  ccc config --edit --user              — open XDG_CONFIG_HOME/ccc/config.toml or ~/.config/ccc/config.toml
+  ccc config --edit --local             — open the nearest .ccc.toml, or create one in CWD
   ccc add [-g] <alias>                  — prompt for alias settings and write them to config
   ccc add <alias> --runner cc --prompt "Review" --yes
                                         — write an alias non-interactively
@@ -446,7 +450,10 @@ pub fn print_help() {
 }
 
 pub fn print_version() {
-    println!("{}", format_version_report(&ccc_version(), &runner_checklist()));
+    println!(
+        "{}",
+        format_version_report(&ccc_version(), &runner_checklist())
+    );
 }
 
 pub fn print_usage() {

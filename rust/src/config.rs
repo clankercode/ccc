@@ -104,6 +104,27 @@ pub fn find_config_command_paths() -> Vec<PathBuf> {
     .collect()
 }
 
+pub fn find_project_config_path() -> Option<PathBuf> {
+    let current_dir = std::env::current_dir().ok()?;
+    find_project_config_path_from(&current_dir)
+}
+
+fn xdg_config_path() -> Option<PathBuf> {
+    std::env::var("XDG_CONFIG_HOME").ok().and_then(|xdg| {
+        if xdg.trim().is_empty() {
+            None
+        } else {
+            Some(PathBuf::from(xdg).join("ccc/config.toml"))
+        }
+    })
+}
+
+fn home_config_path() -> Option<PathBuf> {
+    std::env::var("HOME")
+        .ok()
+        .map(|home| PathBuf::from(home).join(".config/ccc/config.toml"))
+}
+
 pub fn find_alias_write_path(global_only: bool) -> PathBuf {
     if !global_only {
         if let Some(resolved) = find_config_command_path() {
@@ -135,6 +156,28 @@ pub fn find_alias_write_path(global_only: bool) -> PathBuf {
 
     xdg_path
         .unwrap_or_else(|| home_path.unwrap_or_else(|| PathBuf::from(".config/ccc/config.toml")))
+}
+
+pub fn find_user_config_write_path() -> PathBuf {
+    xdg_config_path()
+        .or_else(home_config_path)
+        .unwrap_or_else(|| PathBuf::from(".config/ccc/config.toml"))
+}
+
+pub fn find_local_config_write_path() -> PathBuf {
+    find_project_config_path().unwrap_or_else(|| {
+        std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join(".ccc.toml")
+    })
+}
+
+pub fn find_config_edit_path(target: Option<&str>) -> PathBuf {
+    match target {
+        Some("user") => find_user_config_write_path(),
+        Some("local") => find_local_config_write_path(),
+        _ => find_config_command_path().unwrap_or_else(find_user_config_write_path),
+    }
 }
 
 pub fn normalize_alias_name(name: &str) -> Result<String, String> {

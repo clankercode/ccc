@@ -1,10 +1,10 @@
 use call_coding_clis::{
-    find_alias_write_path, find_config_command_paths, load_config, normalize_alias_name,
-    output_write_warning, parse_args, parse_json_output, print_help, print_usage,
-    print_version, render_alias_block, render_example_config, render_parsed, resolve_command,
-    resolve_human_tty, resolve_output_plan, resolve_sanitize_osc, resolve_show_thinking,
-    transcript_io_warning, write_alias_block, AliasDef, FormattedRenderer, RunArtifacts, Runner,
-    StructuredStreamProcessor, TranscriptKind,
+    find_alias_write_path, find_config_command_paths, find_config_edit_path, load_config,
+    normalize_alias_name, output_write_warning, parse_args, parse_json_output, print_help,
+    print_usage, print_version, render_alias_block, render_example_config, render_parsed,
+    resolve_command, resolve_human_tty, resolve_output_plan, resolve_sanitize_osc,
+    resolve_show_thinking, transcript_io_warning, write_alias_block, AliasDef, FormattedRenderer,
+    RunArtifacts, Runner, StructuredStreamProcessor, TranscriptKind,
 };
 use std::collections::BTreeMap;
 use std::env;
@@ -259,6 +259,65 @@ fn run_add_alias_command(args: &[String]) -> ExitCode {
     ExitCode::from(0)
 }
 
+fn run_config_edit_command(args: &[String]) -> ExitCode {
+    let mut target: Option<&str> = None;
+    let mut edit_seen = false;
+    for token in args {
+        match token.as_str() {
+            "--edit" => edit_seen = true,
+            "--user" => {
+                if target.is_some() {
+                    eprintln!("choose only one of --user or --local");
+                    return ExitCode::from(1);
+                }
+                target = Some("user");
+            }
+            "--local" => {
+                if target.is_some() {
+                    eprintln!("choose only one of --user or --local");
+                    return ExitCode::from(1);
+                }
+                target = Some("local");
+            }
+            _ => {
+                eprintln!("unexpected config option: {token}");
+                return ExitCode::from(1);
+            }
+        }
+    }
+    if !edit_seen {
+        eprintln!("usage: ccc config [--edit] [--user|--local]");
+        return ExitCode::from(1);
+    }
+    let editor = match env::var("EDITOR") {
+        Ok(value) if !value.trim().is_empty() => value,
+        _ => {
+            eprintln!("$EDITOR is not set");
+            return ExitCode::from(1);
+        }
+    };
+    let config_path = find_config_edit_path(target);
+    if let Some(parent) = config_path.parent() {
+        if let Err(error) = fs::create_dir_all(parent) {
+            eprintln!("failed to create {}: {error}", parent.display());
+            return ExitCode::from(1);
+        }
+    }
+    if !config_path.exists() {
+        if let Err(error) = fs::File::create(&config_path) {
+            eprintln!("failed to create {}: {error}", config_path.display());
+            return ExitCode::from(1);
+        }
+    }
+    match Command::new(editor.trim()).arg(&config_path).status() {
+        Ok(status) => ExitCode::from(status.code().unwrap_or(1) as u8),
+        Err(error) => {
+            eprintln!("failed to run editor {}: {error}", editor.trim());
+            ExitCode::from(1)
+        }
+    }
+}
+
 fn is_add_alias_field(field: &str) -> bool {
     matches!(
         field,
@@ -406,6 +465,7 @@ fn choose(
     choices: &[WizardChoice<'_>],
     default: Option<usize>,
     blank_value: Option<&str>,
+    reject_blank: bool,
 ) -> Result<String, String> {
     let markers = choices
         .iter()
@@ -440,6 +500,17 @@ fn choose(
             if let Some(index) = default {
                 return Ok(choices[index - 1].value.to_string());
             }
+            if reject_blank {
+                let options = (1..=choices.len())
+                    .map(|index| index.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                println!(
+                    "{}{options}.",
+                    menu_style("Please choose one of: ", "31", color)
+                );
+                continue;
+            }
             return Ok(blank_value.unwrap_or("").to_string());
         }
         for (index, choice) in choices.iter().enumerate() {
@@ -472,6 +543,7 @@ fn choose_optional_field(
         choices,
         None,
         Some(KEEP_CURRENT_CHOICE),
+        false,
     )
 }
 
@@ -502,6 +574,7 @@ fn ask_existing_alias_action(name: &str, current_alias: &AliasDef) -> Result<&'s
         ],
         Some(1),
         None,
+        false,
     )?;
     match action.as_str() {
         "modify" => Ok("modify"),
@@ -688,6 +761,10 @@ fn prompt_alias_fields(alias: &AliasDef) -> Result<AliasDef, String> {
             continue;
         }
         if field == "prompt_mode" {
+            if result.prompt.as_deref().unwrap_or("").is_empty() {
+                result.prompt_mode = None;
+                continue;
+            }
             let choice = choose_optional_field(
                 label,
                 &suffix,
@@ -758,8 +835,9 @@ fn confirm(prompt: &str) -> Result<bool, String> {
                 aliases: &["no"],
             },
         ],
-        Some(2),
         None,
+        None,
+        true,
     )?;
     Ok(answer == "yes")
 }
@@ -1346,7 +1424,14 @@ fn main() -> ExitCode {
         return ExitCode::from(0);
     }
 
-    if args == ["config"] {
+    if args.first().map(String::as_str) == Some("config") {
+        if args.iter().any(|arg| arg == "--edit") {
+            return run_config_edit_command(&args[1..]);
+        }
+        if args != ["config"] {
+            eprintln!("usage: ccc config [--edit] [--user|--local]");
+            return ExitCode::from(1);
+        }
         let config_paths = find_config_command_paths();
         if config_paths.is_empty() {
             if let Ok(explicit) = env::var("CCC_CONFIG") {
@@ -1468,16 +1553,14 @@ fn main() -> ExitCode {
     } else {
         TranscriptKind::Text
     };
-    let artifacts = match RunArtifacts::create_for_runner(
-        output_plan.runner_name.as_str(),
-        transcript_kind,
-    ) {
-        Ok(artifacts) => Some(Arc::new(artifacts)),
-        Err(error) => {
-            eprintln!("warning: could not create artifact directory: {error}");
-            None
-        }
-    };
+    let artifacts =
+        match RunArtifacts::create_for_runner(output_plan.runner_name.as_str(), transcript_kind) {
+            Ok(artifacts) => Some(Arc::new(artifacts)),
+            Err(error) => {
+                eprintln!("warning: could not create artifact directory: {error}");
+                None
+            }
+        };
     if let Some(artifacts) = artifacts.as_deref() {
         if let Some(warning) = artifacts.transcript_warning() {
             eprintln!("{warning}");

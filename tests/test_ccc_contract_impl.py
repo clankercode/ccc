@@ -2,6 +2,7 @@ import argparse
 import os
 import re
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -45,6 +46,7 @@ HELP_SLOT_LINE = (
 )
 HELP_PRINT_CONFIG_SNIPPET = "--print-config"
 HELP_CONFIG_COMMAND_SNIPPET = "ccc config"
+HELP_CONFIG_EDIT_SNIPPET = "ccc config --edit"
 HELP_MIXED_HELP_SNIPPET = "--help / -h"
 HELP_PRESET_PROMPT_LINE = "Presets can also define a default prompt"
 HELP_PROMPT_MODE_LINE = "prompt_mode lets alias prompts prepend or append text"
@@ -75,6 +77,7 @@ PROMPT_PRESET_IMPLEMENTATIONS = {"Python", "Rust"}
 PRINT_CONFIG_IMPLEMENTATIONS = {"Python", "Rust"}
 CONFIG_COMMAND_IMPLEMENTATIONS = {"Python", "Rust"}
 ADD_ALIAS_IMPLEMENTATIONS = {"Python", "Rust"}
+CONFIG_EDIT_IMPLEMENTATIONS = {"Python", "Rust"}
 RUN_ARTIFACT_IMPLEMENTATIONS = OUTPUT_LOG_PATH_IMPLEMENTATIONS
 CCC_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 EXAMPLE_CONFIG_EXPECTED = (
@@ -992,6 +995,120 @@ class SingleImplCccContractTests(unittest.TestCase):
                             existing.unlink()
                     result = lang.invoke_extra(["config"], env)
                     self.assert_missing_config_command(result, env["CCC_CONFIG"])
+
+    def test_config_edit_opens_selected_config_path(self) -> None:
+        editor_body = (
+            "#!/usr/bin/env python3\n"
+            "import os, sys\n"
+            "with open(os.environ['CCC_EDITOR_LOG'], 'a', encoding='utf-8') as handle:\n"
+            "    handle.write(sys.argv[1] + '\\n')\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            editor_path = bin_dir / "editor"
+            self._write_opencode_stub(opencode_path)
+            editor_path.write_text(editor_body, encoding="utf-8")
+            editor_path.chmod(editor_path.stat().st_mode | stat.S_IXUSR)
+
+            for lang in self.selected_languages:
+                if lang.name not in CONFIG_EDIT_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, command="config-edit"):
+                    env = self._make_env(opencode_path, lang)
+                    env["HOME"] = str(tmp_path / f"home-{lang.name}")
+                    env["XDG_CONFIG_HOME"] = str(tmp_path / f"xdg-{lang.name}")
+                    env["EDITOR"] = str(editor_path)
+                    editor_log = tmp_path / f"editor-{lang.name}.log"
+                    env["CCC_EDITOR_LOG"] = str(editor_log)
+                    repo_path = tmp_path / f"repo-edit-{lang.name}"
+                    nested_cwd = repo_path / "nested"
+                    nested_cwd.mkdir(parents=True)
+                    local_path = repo_path / ".ccc.toml"
+                    local_path.write_text('[defaults]\nrunner = "k"\n', encoding="utf-8")
+                    user_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+
+                    default_result = lang.invoke_extra(
+                        ["config", "--edit"], env, cwd=nested_cwd
+                    )
+                    user_result = lang.invoke_extra(
+                        ["config", "--edit", "--user"], env, cwd=nested_cwd
+                    )
+                    local_result = lang.invoke_extra(
+                        ["config", "--edit", "--local"], env, cwd=nested_cwd
+                    )
+
+                    self.assertEqual(default_result.returncode, 0, default_result.stderr)
+                    self.assertEqual(user_result.returncode, 0, user_result.stderr)
+                    self.assertEqual(local_result.returncode, 0, local_result.stderr)
+                    self.assertEqual(
+                        editor_log.read_text(encoding="utf-8").splitlines(),
+                        [str(local_path), str(user_path), str(local_path)],
+                    )
+
+    def test_add_alias_wizard_skips_prompt_mode_when_prompt_is_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in ADD_ALIAS_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, command="add-skip-prompt-mode"):
+                    env = self._make_env(opencode_path, lang)
+                    command = lang.invoke_fn("__placeholder__")[:-1] + ["add", "noprompt"]
+                    result = subprocess.run(
+                        command,
+                        env=lang.prepared_env(env),
+                        cwd=ROOT,
+                        input="\n\n\n\n\n\n\n\n\ny\n",
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertNotIn("Prompt mode", result.stdout)
+                    self.assertEqual(
+                        config_path.read_text(encoding="utf-8"),
+                        "[aliases.noprompt]\n",
+                    )
+
+    def test_add_alias_wizard_reprompts_invalid_save_confirmation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in ADD_ALIAS_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, command="add-invalid-confirm"):
+                    env = self._make_env(opencode_path, lang)
+                    command = lang.invoke_fn("__placeholder__")[:-1] + ["add", "strict"]
+                    result = subprocess.run(
+                        command,
+                        env=lang.prepared_env(env),
+                        cwd=ROOT,
+                        input="\n\n\n\n\n\n\n\n\n\nmaybe\n\nYES\n",
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertGreaterEqual(result.stdout.count("Please choose one of:"), 2)
+                    self.assertEqual(
+                        config_path.read_text(encoding="utf-8"),
+                        "[aliases.strict]\n",
+                    )
 
     def test_add_alias_yes_writes_config_and_alias_is_usable(self) -> None:
         alias_block = (
@@ -2200,6 +2317,7 @@ class SingleImplCccContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(HELP_PRINT_CONFIG_SNIPPET, result.stdout)
         self.assertIn(HELP_CONFIG_COMMAND_SNIPPET, result.stdout)
+        self.assertIn(HELP_CONFIG_EDIT_SNIPPET, result.stdout)
         self.assertIn(HELP_MIXED_HELP_SNIPPET, result.stdout)
 
     def assert_help_mentions_sanitize_osc_flag(self, result) -> None:

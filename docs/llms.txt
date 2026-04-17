@@ -4,6 +4,7 @@
 
 ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Claude Code, Codex, Kimi, Cursor Agent, Gemini CLI, Crush) behind a single consistent interface. Each of the 20 language implementations bundles an identical `ccc` CLI binary and a reusable library with `CommandSpec`, `CompletedRun`, and `Runner` types.
 Python and Rust also expose `ccc --print-config`, which prints the canonical example config with the current supported keys, and `ccc config`, which prints every existing resolved config file path and contents.
+Python and Rust also expose `ccc config --edit [--user|--local]`, which opens the selected user or project-local config in `$EDITOR`.
 Python and Rust also expose `ccc add [-g] <alias>`, a line-prompt alias wizard that writes `[aliases.<name>]` entries to config; scriptable flags plus `--yes` can write aliases non-interactively.
 Python and Rust also write a per-run artifact directory under the platform state root, with a client-prefixed run folder such as `opencode-<run-id>`, `output.txt`, exactly one transcript file, and a stable stderr footer line that scripts can parse as `>> ccc:output-log >> /abs/path/to/run-dir`; `--output-log-path` enables the footer and `--no-output-log-path` suppresses it.
 Python and Rust also expose `ccc -v` / `ccc --version`, which prints the repo build version plus resolved client versions; the build version is sourced from the repo-root `VERSION` file at build time.
@@ -29,7 +30,8 @@ Slots are parsed in free order before the prompt, except that `-h` / `--help` wi
 - Config: in Python and Rust, project-local `.ccc.toml` files are searched upward from the current directory, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`
 - Generated config: `ccc --print-config` prints the canonical schema using `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 - Resolved config: `ccc config` prints all active config file paths and their raw contents in merge order; `CCC_CONFIG` wins alone when it points at an existing file
-- Alias wizard: `ccc add <alias>` writes the active write target; `-g` forces the effective global config instead of project-local config; blank/default answers omit alias keys; menu prompt color follows TTY detection and honors FORCE_COLOR/NO_COLOR
+- Config editing: `ccc config --edit` opens the selected config in `$EDITOR`; `--user` targets the XDG/home user config and `--local` targets the nearest `.ccc.toml`, creating one in the current directory if needed
+- Alias wizard: `ccc add <alias>` writes the active write target; `-g` forces the effective global config instead of project-local config; blank/default answers omit alias keys; menu prompt color follows TTY detection and honors FORCE_COLOR/NO_COLOR; the wizard skips `prompt_mode` when prompt is unset and final save confirmation only accepts `y`, `n`, `yes`, or `no`
 - `ccc` writes `transcript.txt` for text and human transcript paths, `transcript.jsonl` for JSON-oriented paths, keeps `text` requests upgraded into structured streaming on `transcript.txt`, and places the files under a client-prefixed run directory such as `opencode-<run-id>`
 
 Session persistence:
@@ -48,6 +50,7 @@ Examples:
 - ccc cu .fmt "Debug the parser"
 - ccc --print-config
 - ccc config
+- EDITOR=vim ccc config --edit --local
 - ccc add mm27 --runner cc --prompt "Review changes" --prompt-mode default --yes
 
 ## Languages

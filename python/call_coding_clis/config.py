@@ -126,6 +126,18 @@ def find_config_command_paths() -> list[Path]:
     return [candidate for candidate in _default_config_paths() if candidate.is_file()]
 
 
+def find_project_config_path() -> Path | None:
+    try:
+        cwd = Path.cwd()
+    except OSError:
+        return None
+    for directory in (cwd, *cwd.parents):
+        candidate = directory / PROJECT_CONFIG_FILE_NAME
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def _xdg_config_path() -> Path | None:
     xdg = os.environ.get("XDG_CONFIG_HOME", "").strip()
     if not xdg:
@@ -153,6 +165,30 @@ def find_alias_write_path(global_only: bool = False) -> Path:
     elif xdg_path is not None:
         return xdg_path
     return xdg_path if xdg_path is not None else home_path
+
+
+def find_user_config_write_path() -> Path:
+    xdg_path = _xdg_config_path()
+    home_path = _home_config_path()
+    if xdg_path is not None:
+        return xdg_path
+    return home_path
+
+
+def find_local_config_write_path() -> Path:
+    return find_project_config_path() or (Path.cwd() / PROJECT_CONFIG_FILE_NAME)
+
+
+def find_config_edit_path(target: str | None = None) -> Path:
+    if target == "user":
+        return find_user_config_write_path()
+    if target == "local":
+        return find_local_config_write_path()
+
+    resolved = find_config_command_path()
+    if resolved is not None:
+        return resolved
+    return find_user_config_write_path()
 
 
 def render_example_config() -> str:

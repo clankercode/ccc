@@ -127,6 +127,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
   - `-h` / `--help` wins anywhere in argv and prints help immediately
   - Python and Rust search project-local `.ccc.toml` files upward from the current directory and override the global config chain
   - `ccc config` prints every existing config file path and raw contents in merge order: `~/.config/ccc/config.toml`, `XDG_CONFIG_HOME/ccc/config.toml`, then the nearest project-local `.ccc.toml`; `CCC_CONFIG` still wins alone when it points at an existing file
+  - `ccc config --edit` opens the selected config in `$EDITOR`; add `--user` to edit the XDG/home user config or `--local` to edit the nearest `.ccc.toml` (creating one in the current directory if none exists)
   - `ccc add [-g] <alias>` starts a line-prompt wizard for writing `[aliases.<name>]` config; flags such as `--runner`, `--model`, `--prompt`, and `--prompt-mode` can prefill values, and `--yes` writes non-interactively
   - `formatted`, `stream-formatted`, and `ccc add` menu prompts honor `FORCE_COLOR` / `NO_COLOR` before falling back to TTY detection
   - `--print-config` to print the canonical example `config.toml`
@@ -141,6 +142,7 @@ PureScript, Zig, D, F#, Haskell, Nim, Crystal, PHP, VBScript, x86-64 ASM, Elixir
 - By default Python and Rust avoid saved sessions where the selected CLI supports it; OpenCode, Kimi, Cursor, Gemini, Crush, and RooCode warn that the runner may save a session unless `--save-session` or `--cleanup-session` is used
 - `ccc --print-config` is the source of truth for the current canonical config schema: `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 - `ccc config` is the source of truth for which config files currently resolve in the active shell
+- `ccc config --edit [--user|--local]` opens the selected config in `$EDITOR`; user config means `XDG_CONFIG_HOME/ccc/config.toml` when XDG is set, otherwise `~/.config/ccc/config.toml`, and local config means the nearest existing `.ccc.toml` or a new `.ccc.toml` in the current directory
 - `ccc add <alias>` writes the active write target: project-local config when present, otherwise the effective global config; when no config exists it creates a new global config under `XDG_CONFIG_HOME/ccc/config.toml` or `~/.config/ccc/config.toml`, and `-g` forces the effective global config instead of a project-local file
 - `ccc` writes `output.txt` plus exactly one transcript file in each run directory: `transcript.txt` for text and human transcript paths, `transcript.jsonl` for JSON-oriented paths; `text` requests that are upgraded into structured streaming still use `transcript.txt`
 - each run directory is client-prefixed, for example `opencode-<run-id>`

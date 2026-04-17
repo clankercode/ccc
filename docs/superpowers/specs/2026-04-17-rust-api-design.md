@@ -387,6 +387,35 @@ Update these once implementation starts:
 - docs for the sugar parser
 - docs for migration from low-level subprocess primitives to the typed API
 
+## docs.rs Optimization
+
+The new Rust API should be shipped with docs.rs as a first-class surface, not as an afterthought.
+
+Implementation should include:
+
+- strong crate-level docs on the library root with a short overview, one minimal example, and one slightly richer example
+- short focused docs on `Client`, `Request`, `Plan`, `Run`, and `Event`
+- examples that compile cleanly in doc tests where practical
+- explicit module docs so the intended layering is obvious on docs.rs
+- concise cross-links between the primary typed API and the compatibility `sugar` module
+- a visible statement that the typed API is the primary surface and the sugar parser is optional compatibility support
+
+Cargo metadata and docs polish should include:
+
+- `package.metadata.docs.rs` in `rust/Cargo.toml` if needed for feature selection or target settings
+- a docs.rs-friendly crate description and keyword set
+- a crate-level docs banner that points readers to the primary entry points instead of exposing internals first
+- hiding or de-emphasizing CLI-only internals from the default library docs where possible
+
+Public API docs should favor:
+
+- one-sentence summaries first
+- examples over long prose
+- explicit notes about runner compatibility or caveats when behavior differs by upstream CLI
+- stable terminology between code, README, and docs.rs
+
+If implementation introduces optional features, docs.rs should document which modules are always available and which are feature-gated.
+
 If the repo still lacks `CHANGELOG.md` at implementation time, add one and backfill release notes for `0.1.1` and `0.1.2` using the already compiled release summary.
 
 ## Open Decisions

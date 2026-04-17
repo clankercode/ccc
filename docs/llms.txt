@@ -22,6 +22,7 @@ Slots are parsed in free order before the prompt, except that `help`, `-h`, and 
 - --save-session: Explicitly allow the selected runner's normal session persistence. Implemented in Python and Rust for now.
 - --cleanup-session: Try post-run cleanup when the selected runner lacks a no-persist flag. Implemented in Python and Rust for now.
 - --output-log-path / --no-output-log-path: emit or suppress the final run-directory footer for scripts
+- --timeout-secs <N>: Kill the wrapped runner after N seconds; Python and Rust exit 124 and print `warning: timed out after N seconds; killed runner` to stderr
 - --output-mode: Choose `text`, `stream-text`, `json`, `stream-json`, `formatted`, or `stream-formatted`
   Dot-sugar aliases are available before the prompt: `.text` / `..text`, `.json` / `..json`, `.fmt` / `..fmt`.
   Human-formatted modes honor `FORCE_COLOR` and `NO_COLOR` before falling back to TTY detection.

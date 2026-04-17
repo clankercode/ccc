@@ -143,6 +143,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
   - `--cleanup-session` to try post-run cleanup when a runner lacks a no-persist flag
   - `--output-log-path` / `--no-output-log-path` to enable or suppress the final stderr footer that points at the run artifact directory
   - `--show-thinking` / `--no-show-thinking`
+  - `--timeout-secs <N>` kills the wrapped runner after `N` seconds, prints `warning: timed out after N seconds; killed runner` to stderr, and exits with status `124`
   - `--yolo` / `-y`
 - `--` forces the rest of argv to be treated as prompt text, even if it starts with control-like tokens
 - Python and Rust currently use `claude -p --no-session-persistence`, `codex exec --ephemeral`, `cursor-agent --print --trust`, `gemini --prompt`, and `crush run` for non-interactive invocation

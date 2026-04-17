@@ -2,15 +2,19 @@ use std::collections::BTreeMap;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct CommandSpec {
     pub argv: Vec<String>,
     pub stdin_text: Option<String>,
     pub cwd: Option<PathBuf>,
     pub env: BTreeMap<String, String>,
+    pub timeout_secs: Option<u64>,
 }
 
 impl CommandSpec {
@@ -24,6 +28,7 @@ impl CommandSpec {
             stdin_text: None,
             cwd: None,
             env: BTreeMap::new(),
+            timeout_secs: None,
         }
     }
 
@@ -41,14 +46,43 @@ impl CommandSpec {
         self.env.insert(key.into(), value.into());
         self
     }
+
+    pub fn with_timeout_secs(mut self, secs: u64) -> Self {
+        self.timeout_secs = Some(secs);
+        self
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct CompletedRun {
     pub argv: Vec<String>,
     pub exit_code: i32,
     pub stdout: String,
     pub stderr: String,
+    pub timed_out: bool,
+}
+
+impl CompletedRun {
+    pub fn new(
+        argv: Vec<String>,
+        exit_code: i32,
+        stdout: impl Into<String>,
+        stderr: impl Into<String>,
+    ) -> Self {
+        Self {
+            argv,
+            exit_code,
+            stdout: stdout.into(),
+            stderr: stderr.into(),
+            timed_out: false,
+        }
+    }
+
+    pub fn with_timed_out(mut self, timed_out: bool) -> Self {
+        self.timed_out = timed_out;
+        self
+    }
 }
 
 type StreamCallback = Arc<Mutex<dyn FnMut(&str, &str) + Send>>;
@@ -83,6 +117,9 @@ impl Runner {
     }
 
     pub fn run(&self, spec: CommandSpec) -> CompletedRun {
+        if spec.timeout_secs.is_some() {
+            return self.stream(spec, |_, _| {});
+        }
         (self.executor)(spec)
     }
 
@@ -118,11 +155,13 @@ fn default_run_executor(spec: CommandSpec) -> CompletedRun {
         exit_code: output.status.code().unwrap_or(1),
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        timed_out: false,
     }
 }
 
 fn default_stream_executor(spec: CommandSpec, callback: StreamCallback) -> CompletedRun {
     let argv = spec.argv.clone();
+    let timeout = spec.timeout_secs;
     let mut command = build_command(&spec);
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
@@ -143,6 +182,7 @@ fn default_stream_executor(spec: CommandSpec, callback: StreamCallback) -> Compl
                 exit_code: 1,
                 stdout: String::new(),
                 stderr: error_msg,
+                timed_out: false,
             };
         }
     };
@@ -202,18 +242,60 @@ fn default_stream_executor(spec: CommandSpec, callback: StreamCallback) -> Compl
         buf
     });
 
+    let timed_out_flag = Arc::new(AtomicBool::new(false));
+    let watchdog_stop = Arc::new(AtomicBool::new(false));
+    let child_handle = Arc::new(Mutex::new(child));
+    let watchdog_handle = timeout.map(|secs| {
+        let child_arc = Arc::clone(&child_handle);
+        let flag = Arc::clone(&timed_out_flag);
+        let stop = Arc::clone(&watchdog_stop);
+        thread::spawn(move || watchdog_run(secs, child_arc, flag, stop))
+    });
+
     let stdout_buf = stdout_thread.join().unwrap_or_default();
     let stderr_buf = stderr_thread.join().unwrap_or_default();
 
-    let status = child.wait().unwrap_or_else(|error| {
-        exit_status_from_code(failed_output(&spec, error).status.code().unwrap_or(1))
-    });
+    watchdog_stop.store(true, Ordering::SeqCst);
+    if let Some(handle) = watchdog_handle {
+        let _ = handle.join();
+    }
+
+    let status = {
+        let mut guard = child_handle.lock().unwrap();
+        guard.wait().unwrap_or_else(|error| {
+            exit_status_from_code(failed_output(&spec, error).status.code().unwrap_or(1))
+        })
+    };
 
     CompletedRun {
         argv,
         exit_code: status.code().unwrap_or(1),
         stdout: stdout_buf,
         stderr: stderr_buf,
+        timed_out: timed_out_flag.load(Ordering::SeqCst),
+    }
+}
+
+fn watchdog_run(
+    secs: u64,
+    child: Arc<Mutex<std::process::Child>>,
+    timed_out: Arc<AtomicBool>,
+    stop: Arc<AtomicBool>,
+) {
+    let deadline = Instant::now() + Duration::from_secs(secs);
+    while Instant::now() < deadline {
+        if stop.load(Ordering::SeqCst) {
+            return;
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    if stop.load(Ordering::SeqCst) {
+        return;
+    }
+    let mut guard = child.lock().unwrap();
+    if matches!(guard.try_wait(), Ok(None)) {
+        timed_out.store(true, Ordering::SeqCst);
+        let _ = guard.kill();
     }
 }
 

@@ -249,6 +249,48 @@ fn test_parse_cleanup_session_flag() {
 }
 
 #[test]
+fn test_parse_timeout_secs_flag_parses_positive_integer() {
+    let args: Vec<String> = vec!["--timeout-secs".into(), "30".into(), "hi".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.timeout_secs, Some(30));
+    assert_eq!(parsed.prompt, "hi");
+    assert!(resolve_command(&parsed, None).is_ok());
+}
+
+#[test]
+fn test_parse_timeout_secs_rejects_non_integer() {
+    let args: Vec<String> = vec!["--timeout-secs".into(), "abc".into(), "hi".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.timeout_secs, Some(0));
+    assert_eq!(
+        resolve_command(&parsed, None).unwrap_err(),
+        "--timeout-secs must be a positive integer"
+    );
+}
+
+#[test]
+fn test_parse_timeout_secs_rejects_zero() {
+    let args: Vec<String> = vec!["--timeout-secs".into(), "0".into(), "hi".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.timeout_secs, Some(0));
+    assert_eq!(
+        resolve_command(&parsed, None).unwrap_err(),
+        "--timeout-secs must be a positive integer"
+    );
+}
+
+#[test]
+fn test_parse_timeout_secs_rejects_missing_value() {
+    let args: Vec<String> = vec!["--timeout-secs".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.timeout_secs, Some(0));
+    assert_eq!(
+        resolve_command(&parsed, None).unwrap_err(),
+        "--timeout-secs must be a positive integer"
+    );
+}
+
+#[test]
 fn test_parse_provider_model() {
     let args: Vec<String> = vec![":anthropic:claude-4".into(), "hello".into()];
     let parsed = parse_args(&args);

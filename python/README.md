@@ -110,6 +110,8 @@ By default, `ccc` writes a run directory under the platform state root with `out
 
 Use `--no-output-log-path` to suppress that footer.
 
+Pass `--timeout-secs <N>` to kill the wrapped runner after `N` seconds. `ccc` prints `warning: timed out after N seconds; killed runner` to stderr and exits with status `124`.
+
 ## Environment
 
 | Variable | Purpose |

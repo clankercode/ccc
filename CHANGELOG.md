@@ -3,6 +3,10 @@
 ## Unreleased
 - No unreleased semantic changes.
 
+## 0.3.0 - 2026-04-18
+- Added `--timeout-secs <N>` in Python and Rust: `ccc` kills the wrapped runner after `N` seconds, prints `warning: timed out after N seconds; killed runner` to stderr, and exits with status `124`; invalid values (`0`, negatives, non-integers, missing value) are rejected at parse time.
+- Exposed the watchdog through the library API: Rust `CommandSpec::with_timeout_secs`, `Run::timed_out()`, and Python `CommandSpec(timeout_secs=...)` / `CompletedRun.timed_out` let library callers opt into the same cancel semantics.
+
 ## 0.2.0 - 2026-04-17
 - Added a typed Rust invocation API around `Client`, `Request`, `Plan`, `Run`, and typed transcript/output models, plus a compatibility sugar parser for `ccc`-style tokens.
 - Changed the Rust CLI to plan and execute through the new library path instead of wiring directly through parser internals, while keeping top-level `help`, `version`, `config`, `config --edit`, and `add` flows CLI-owned.

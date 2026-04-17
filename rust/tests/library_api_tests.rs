@@ -1,6 +1,6 @@
 use call_coding_clis::{
-    parse_tokens_with_config, sugar, CccConfig, Client, CompletedRun, Event, OutputMode, Request,
-    Run, Runner, RunnerKind, Transcript,
+    parse_tokens_with_config, sugar, CccConfig, Client, CommandSpec, CompletedRun, Event,
+    OutputMode, Request, Run, Runner, RunnerKind, Transcript,
 };
 
 #[test]
@@ -104,11 +104,8 @@ fn library_api_tests_typed_transcript_and_run_surface_are_available() {
 #[test]
 fn library_api_tests_client_run_exposes_parsed_output_for_formatted_modes() {
     let client =
-        Client::new().with_runtime_runner(Runner::with_executor(Box::new(|spec| CompletedRun {
-            argv: spec.argv,
-            exit_code: 0,
-            stdout: "{\"response\":\"hello\"}\n".into(),
-            stderr: String::new(),
+        Client::new().with_runtime_runner(Runner::with_executor(Box::new(|spec| {
+            CompletedRun::new(spec.argv, 0, "{\"response\":\"hello\"}\n", String::new())
         })));
     let request = Request::new("hello")
         .with_runner(RunnerKind::OpenCode)
@@ -120,14 +117,26 @@ fn library_api_tests_client_run_exposes_parsed_output_for_formatted_modes() {
     assert!(run.parsed_output().is_some());
 }
 
+#[cfg(unix)]
+#[test]
+fn library_api_tests_runner_run_with_timeout_kills_slow_child() {
+    let spec = CommandSpec::new(["/bin/sh", "-c", "sleep 5"]).with_timeout_secs(1);
+    let start = std::time::Instant::now();
+    let result = Runner::new().run(spec);
+    let elapsed = start.elapsed();
+
+    assert!(result.timed_out, "expected timed_out to be true");
+    assert!(
+        elapsed < std::time::Duration::from_secs(4),
+        "expected runner to exit under 4s, got {elapsed:?}"
+    );
+}
+
 #[test]
 fn library_api_tests_client_run_returns_tool_failed_for_non_zero_exit() {
     let client =
-        Client::new().with_runtime_runner(Runner::with_executor(Box::new(|spec| CompletedRun {
-            argv: spec.argv,
-            exit_code: 7,
-            stdout: String::new(),
-            stderr: "runner failed".into(),
+        Client::new().with_runtime_runner(Runner::with_executor(Box::new(|spec| {
+            CompletedRun::new(spec.argv, 7, String::new(), "runner failed")
         })));
     let request = Request::new("hello")
         .with_runner(RunnerKind::OpenCode)

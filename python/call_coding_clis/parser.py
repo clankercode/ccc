@@ -37,6 +37,7 @@ class ParsedArgs:
     cleanup_session: bool = False
     yolo: bool = False
     permission_mode: str | None = None
+    timeout_secs: int | None = None
     allow_tool: list[str] = field(default_factory=list)
     deny_tool: list[str] = field(default_factory=list)
     provider: str | None = None
@@ -279,6 +280,18 @@ def parse_args(argv: list[str]) -> ParsedArgs:
             parsed.save_session = True
         elif token == "--cleanup-session":
             parsed.cleanup_session = True
+        elif token == "--timeout-secs":
+            if index + 1 >= len(argv):
+                raise ValueError("--timeout-secs must be a positive integer")
+            raw = argv[index + 1]
+            try:
+                value = int(raw)
+            except ValueError as exc:
+                raise ValueError("--timeout-secs must be a positive integer") from exc
+            if value <= 0:
+                raise ValueError("--timeout-secs must be a positive integer")
+            parsed.timeout_secs = value
+            index += 1
         elif token.lower() in OUTPUT_MODE_SUGAR:
             parsed.output_mode = OUTPUT_MODE_SUGAR[token.lower()]
         elif token in {"--yolo", "-y"}:

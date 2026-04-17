@@ -14,6 +14,7 @@ class CommandSpec:
     stdin_text: str | None = None
     cwd: str | None = None
     env: dict[str, str] = field(default_factory=dict)
+    timeout_secs: int | None = None
 
 
 @dataclass(slots=True)
@@ -22,6 +23,7 @@ class CompletedRun:
     exit_code: int
     stdout: str
     stderr: str
+    timed_out: bool = False
 
 
 Executor = Callable[..., subprocess.CompletedProcess[str]]
@@ -41,6 +43,8 @@ class Runner:
         self._stream_executor = stream_executor or self._default_stream_executor
 
     def run(self, spec: CommandSpec) -> CompletedRun:
+        if spec.timeout_secs is not None:
+            return self.stream(spec, lambda _channel, _chunk: None)
         try:
             completed = self._executor(
                 spec.argv,
@@ -73,6 +77,7 @@ class Runner:
             exit_code=int(completed.returncode),
             stdout=str(completed.stdout),
             stderr=str(completed.stderr),
+            timed_out=bool(getattr(completed, "timed_out", False)),
         )
 
     def _default_stream_executor(
@@ -127,6 +132,17 @@ class Runner:
         stdout_thread.start()
         stderr_thread.start()
 
+        timed_out = threading.Event()
+        watchdog_stop = threading.Event()
+        watchdog_thread: threading.Thread | None = None
+        if spec.timeout_secs is not None:
+            watchdog_thread = threading.Thread(
+                target=_watchdog,
+                args=(process, spec.timeout_secs, timed_out, watchdog_stop),
+                daemon=True,
+            )
+            watchdog_thread.start()
+
         closed = 0
         while closed < 2:
             channel, chunk = event_queue.get()
@@ -140,13 +156,35 @@ class Runner:
             on_event(channel, chunk)
 
         process.wait()
+        watchdog_stop.set()
+        if watchdog_thread is not None:
+            watchdog_thread.join()
         stdout = "".join(stdout_chunks)
         stderr = "".join(stderr_chunks)
-        return subprocess.CompletedProcess(
+        completed = subprocess.CompletedProcess(
             spec.argv, process.returncode, stdout, stderr
         )
+        completed.timed_out = timed_out.is_set()  # type: ignore[attr-defined]
+        return completed
 
     def _merged_env(self, override: dict[str, str]) -> dict[str, str]:
         env = dict(os.environ)
         env.update(override)
         return env
+
+
+def _watchdog(
+    process: subprocess.Popen,
+    timeout_secs: int,
+    timed_out: threading.Event,
+    stop: threading.Event,
+) -> None:
+    if stop.wait(timeout_secs):
+        return
+    if process.poll() is not None:
+        return
+    timed_out.set()
+    try:
+        process.kill()
+    except OSError:
+        pass

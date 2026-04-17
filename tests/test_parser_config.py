@@ -225,6 +225,39 @@ class ParseArgsTests(unittest.TestCase):
         self.assertFalse(parsed.save_session)
         self.assertEqual(parsed.prompt, "hello")
 
+    def test_timeout_secs_flag_parses_positive_integer(self):
+        parsed = parse_args(["--timeout-secs", "30", "hello"])
+        self.assertEqual(parsed.timeout_secs, 30)
+        self.assertEqual(parsed.prompt, "hello")
+
+    def test_timeout_secs_rejects_non_integer(self):
+        with self.assertRaises(ValueError) as cm:
+            parse_args(["--timeout-secs", "abc", "hello"])
+        self.assertEqual(
+            str(cm.exception), "--timeout-secs must be a positive integer"
+        )
+
+    def test_timeout_secs_rejects_zero(self):
+        with self.assertRaises(ValueError) as cm:
+            parse_args(["--timeout-secs", "0", "hello"])
+        self.assertEqual(
+            str(cm.exception), "--timeout-secs must be a positive integer"
+        )
+
+    def test_timeout_secs_rejects_negative(self):
+        with self.assertRaises(ValueError) as cm:
+            parse_args(["--timeout-secs", "-5", "hello"])
+        self.assertEqual(
+            str(cm.exception), "--timeout-secs must be a positive integer"
+        )
+
+    def test_timeout_secs_rejects_missing_value(self):
+        with self.assertRaises(ValueError) as cm:
+            parse_args(["--timeout-secs"])
+        self.assertEqual(
+            str(cm.exception), "--timeout-secs must be a positive integer"
+        )
+
     def test_permission_mode_flag(self):
         parsed = parse_args(["--permission-mode", "auto", "hello"])
         self.assertEqual(parsed.permission_mode, "auto")

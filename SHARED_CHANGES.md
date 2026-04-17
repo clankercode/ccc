@@ -20,6 +20,15 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-04-18
+
+### `--timeout-secs <N>` kills the runner after N seconds
+- Change: Python and Rust now support `--timeout-secs <N>` to kill the wrapped runner after N seconds; the CLI exits `124`, prints `warning: timed out after N seconds; killed runner` to stderr, and still emits the run-artifact footer when enabled. `N` must be a positive integer; `0`, negatives, or non-integers are rejected at parse time
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/test_runner.py`, `rust/tests/library_api_tests.rs`, `rust/tests/parser_tests.rs`
+- Notes: the CLI, `CommandSpec`, and `Runner.run` now propagate `timeout_secs` through the stream path on POSIX, so both direct `run` and streaming callers honor the watchdog; updated `README.md`, `python/README.md`, `rust/README.md`, `docs/llms.txt`, `docs/index.html`, and the Python/Rust help text
+
 ## 2026-04-15
 
 ### Bare `help` now opens the shared help surface

@@ -179,7 +179,11 @@ def main(argv: list[str] | None = None) -> int:
             print(content, end="")
         return 0
 
-    parsed = parse_args(args)
+    try:
+        parsed = parse_args(args)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     if parsed.print_config:
         if args != ["--print-config"]:
             print("--print-config must be used on its own", file=sys.stderr)
@@ -206,7 +210,9 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 1
-    spec = CommandSpec(argv=argv_list, env=env_overrides)
+    spec = CommandSpec(
+        argv=argv_list, env=env_overrides, timeout_secs=parsed.timeout_secs
+    )
 
     _apply_real_runner_override(spec)
 
@@ -280,9 +286,7 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
-        if footer_line:
-            print(footer_line, file=sys.stderr)
-        return result.exit_code
+        return _finish_run(parsed.timeout_secs, result, footer_line)
 
     if output_plan.mode == "json":
         result = runner.run(spec)
@@ -297,9 +301,7 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
-        if footer_line:
-            print(footer_line, file=sys.stderr)
-        return result.exit_code
+        return _finish_run(parsed.timeout_secs, result, footer_line)
 
     if output_plan.mode == "text":
         result = runner.run(spec)
@@ -313,9 +315,7 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
-        if footer_line:
-            print(footer_line, file=sys.stderr)
-        return result.exit_code
+        return _finish_run(parsed.timeout_secs, result, footer_line)
 
     if output_plan.mode in {"stream-text", "stream-json"}:
         result = runner.stream(
@@ -334,9 +334,7 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
-        if footer_line:
-            print(footer_line, file=sys.stderr)
-        return result.exit_code
+        return _finish_run(parsed.timeout_secs, result, footer_line)
 
     if output_plan.mode == "formatted":
         result = runner.run(spec)
@@ -364,9 +362,7 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
-        if footer_line:
-            print(footer_line, file=sys.stderr)
-        return result.exit_code
+        return _finish_run(parsed.timeout_secs, result, footer_line)
 
     renderer = FormattedRenderer(
         show_thinking=show_thinking,
@@ -409,9 +405,7 @@ def main(argv: list[str] | None = None) -> int:
     _print_cleanup_warnings(
         parsed.cleanup_session, output_plan.runner_name, spec, result
     )
-    if footer_line:
-        print(footer_line, file=sys.stderr)
-    return result.exit_code
+    return _finish_run(parsed.timeout_secs, result, footer_line)
 
 
 def _add_alias_command(args: list[str]) -> int:
@@ -877,6 +871,23 @@ def _handle_raw_stream_chunk(
         _emit_stdout(chunk, artifact_writer=artifact_writer, newline=False)
     else:
         print(chunk, end="", file=sys.stderr)
+
+
+def _finish_run(
+    timeout_secs: int | None,
+    result,
+    footer_line: str | None,
+) -> int:
+    if getattr(result, "timed_out", False):
+        print(
+            f"warning: timed out after {timeout_secs} seconds; killed runner",
+            file=sys.stderr,
+        )
+    if footer_line:
+        print(footer_line, file=sys.stderr)
+    if getattr(result, "timed_out", False):
+        return 124
+    return result.exit_code
 
 
 def _finalize_run_artifacts(

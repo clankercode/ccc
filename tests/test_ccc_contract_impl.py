@@ -72,6 +72,10 @@ HELP_VERSION_SNIPPET = "--version / -v"
 HELP_SAVE_SESSION_SNIPPET = "--save-session"
 HELP_CLEANUP_SESSION_SNIPPET = "--cleanup-session"
 HELP_DELIMITER_SNIPPET = "Treat all remaining args as prompt text"
+HELP_TIMEOUT_SECS_SNIPPET = (
+    "--timeout-secs <N>                    Kill the runner after N seconds and exit 124"
+)
+TIMEOUT_SECS_IMPLEMENTATIONS = {"Python", "Rust"}
 SHOW_THINKING_IMPLEMENTATIONS = {"Python", "Rust"}
 YOLO_IMPLEMENTATIONS = {"Python", "Rust"}
 VERSION_IMPLEMENTATIONS = {"Python", "Rust"}
@@ -822,6 +826,78 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["--help"], self._make_env(opencode_path, lang)
                     )
                     self.assert_help_mentions_yolo_and_delimiter(result)
+
+    def test_help_surface_mentions_timeout_secs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in TIMEOUT_SECS_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(HELP_TIMEOUT_SECS_SNIPPET, result.stdout)
+
+    def test_timeout_secs_rejects_invalid_values(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            invalid_values = [["--timeout-secs", "abc"], ["--timeout-secs", "0"]]
+            for lang in self.selected_languages:
+                if lang.name not in TIMEOUT_SECS_IMPLEMENTATIONS:
+                    continue
+                for bad_args in invalid_values:
+                    with self.subTest(language=lang.name, args=bad_args):
+                        env = self._make_env(opencode_path, lang)
+                        result = lang.invoke_extra(
+                            bad_args + [PROMPT], env
+                        )
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn(
+                            "--timeout-secs must be a positive integer",
+                            result.stderr,
+                        )
+
+    def test_timeout_secs_kills_slow_runner(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            opencode_path.write_text("#!/bin/sh\nexec sleep 5\n")
+            opencode_path.chmod(
+                opencode_path.stat().st_mode
+                | stat.S_IXUSR
+                | stat.S_IXGRP
+                | stat.S_IXOTH
+            )
+
+            import time as _time
+
+            for lang in self.selected_languages:
+                if lang.name not in TIMEOUT_SECS_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name):
+                    env = self._make_env(opencode_path, lang)
+                    start = _time.monotonic()
+                    result = lang.invoke_extra(
+                        ["--timeout-secs", "1", PROMPT], env
+                    )
+                    elapsed = _time.monotonic() - start
+                    self.assertEqual(result.returncode, 124, result.stderr)
+                    self.assertIn("timed out after 1 seconds", result.stderr)
+                    self.assertLess(elapsed, 4.0)
 
     def test_help_surface_mentions_preset_prompt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

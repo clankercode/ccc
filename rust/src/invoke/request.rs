@@ -51,6 +51,7 @@ pub struct Request {
     provider: Option<String>,
     model: Option<String>,
     output_mode: Option<OutputMode>,
+    timeout_secs: Option<u64>,
 }
 
 impl Request {
@@ -69,6 +70,7 @@ impl Request {
             provider: None,
             model: None,
             output_mode: None,
+            timeout_secs: None,
         }
     }
 
@@ -125,6 +127,15 @@ impl Request {
     pub fn with_output_mode(mut self, output_mode: OutputMode) -> Self {
         self.output_mode = Some(output_mode);
         self
+    }
+
+    pub fn with_timeout_secs(mut self, secs: u64) -> Self {
+        self.timeout_secs = Some(secs);
+        self
+    }
+
+    pub fn timeout_secs(&self) -> Option<u64> {
+        self.timeout_secs
     }
 
     pub fn prompt(&self) -> &str {
@@ -204,6 +215,7 @@ impl Request {
             provider: parsed.provider.clone(),
             model: parsed.model.clone(),
             output_mode,
+            timeout_secs: parsed.timeout_secs,
         })
     }
 
@@ -252,6 +264,10 @@ impl Request {
         if let Some(output_mode) = self.output_mode_kind() {
             tokens.push("--output-mode".to_string());
             tokens.push(output_mode.as_cli_value().to_string());
+        }
+        if let Some(timeout) = self.timeout_secs {
+            tokens.push("--timeout-secs".to_string());
+            tokens.push(timeout.to_string());
         }
         if self.prompt_supplied {
             tokens.push(self.prompt_text().to_string());

@@ -1015,11 +1015,34 @@ fn write_output_text(artifacts: Option<&RunArtifacts>, text: &str) {
 }
 
 fn completed_run_from_library_run(run: &call_coding_clis::Run) -> call_coding_clis::CompletedRun {
-    call_coding_clis::CompletedRun {
-        argv: run.plan().command_spec().argv.clone(),
-        exit_code: run.exit_code(),
-        stdout: run.stdout().to_string(),
-        stderr: run.stderr().to_string(),
+    call_coding_clis::CompletedRun::new(
+        run.plan().command_spec().argv.clone(),
+        run.exit_code(),
+        run.stdout(),
+        run.stderr(),
+    )
+    .with_timed_out(run.timed_out())
+}
+
+fn finish_run(
+    timeout_secs: Option<u64>,
+    timed_out: bool,
+    footer_line: Option<&str>,
+    exit_code: i32,
+) -> i32 {
+    if timed_out {
+        eprintln!(
+            "warning: timed out after {} seconds; killed runner",
+            timeout_secs.unwrap_or(0)
+        );
+    }
+    if let Some(line) = footer_line {
+        eprintln!("{}", line);
+    }
+    if timed_out {
+        124
+    } else {
+        exit_code
     }
 }
 
@@ -1682,12 +1705,17 @@ fn main() -> ExitCode {
                 &cleanup_spec,
                 &completed,
             );
-            if footer_enabled {
-                if let Some(artifacts) = artifacts.as_deref() {
-                    eprintln!("{}", artifacts.footer_line());
-                }
-            }
-            std::process::exit(result.exit_code())
+            let footer_line = if footer_enabled {
+                artifacts.as_deref().map(|a| a.footer_line())
+            } else {
+                None
+            };
+            std::process::exit(finish_run(
+                parsed.timeout_secs,
+                result.timed_out(),
+                footer_line.as_deref(),
+                result.exit_code(),
+            ))
         }
         _ if text_mode_with_visible_work => {
             let stream_runner_name = command_output_plan.runner_name.clone();
@@ -1749,12 +1777,17 @@ fn main() -> ExitCode {
                 &cleanup_spec,
                 &completed,
             );
-            if footer_enabled {
-                if let Some(artifacts) = artifacts.as_deref() {
-                    eprintln!("{}", artifacts.footer_line());
-                }
-            }
-            std::process::exit(result.exit_code())
+            let footer_line = if footer_enabled {
+                artifacts.as_deref().map(|a| a.footer_line())
+            } else {
+                None
+            };
+            std::process::exit(finish_run(
+                parsed.timeout_secs,
+                result.timed_out(),
+                footer_line.as_deref(),
+                result.exit_code(),
+            ))
         }
         "text" => {
             let result = match client.run_unchecked(&command_request) {
@@ -1780,12 +1813,17 @@ fn main() -> ExitCode {
                 &cleanup_spec,
                 &completed,
             );
-            if footer_enabled {
-                if let Some(artifacts) = artifacts.as_deref() {
-                    eprintln!("{}", artifacts.footer_line());
-                }
-            }
-            std::process::exit(result.exit_code())
+            let footer_line = if footer_enabled {
+                artifacts.as_deref().map(|a| a.footer_line())
+            } else {
+                None
+            };
+            std::process::exit(finish_run(
+                parsed.timeout_secs,
+                result.timed_out(),
+                footer_line.as_deref(),
+                result.exit_code(),
+            ))
         }
         "stream-text" | "stream-json" => {
             let artifacts_for_stream = artifacts.clone();
@@ -1816,12 +1854,17 @@ fn main() -> ExitCode {
                 &cleanup_spec,
                 &completed,
             );
-            if footer_enabled {
-                if let Some(artifacts) = artifacts.as_deref() {
-                    eprintln!("{}", artifacts.footer_line());
-                }
-            }
-            std::process::exit(result.exit_code())
+            let footer_line = if footer_enabled {
+                artifacts.as_deref().map(|a| a.footer_line())
+            } else {
+                None
+            };
+            std::process::exit(finish_run(
+                parsed.timeout_secs,
+                result.timed_out(),
+                footer_line.as_deref(),
+                result.exit_code(),
+            ))
         }
         "formatted" => {
             let result = match client.run_unchecked(&command_request) {
@@ -1857,12 +1900,17 @@ fn main() -> ExitCode {
                 &cleanup_spec,
                 &completed,
             );
-            if footer_enabled {
-                if let Some(artifacts) = artifacts.as_deref() {
-                    eprintln!("{}", artifacts.footer_line());
-                }
-            }
-            std::process::exit(result.exit_code())
+            let footer_line = if footer_enabled {
+                artifacts.as_deref().map(|a| a.footer_line())
+            } else {
+                None
+            };
+            std::process::exit(finish_run(
+                parsed.timeout_secs,
+                result.timed_out(),
+                footer_line.as_deref(),
+                result.exit_code(),
+            ))
         }
         "stream-formatted" => {
             let stream_runner_name = output_plan.runner_name.clone();
@@ -1924,12 +1972,17 @@ fn main() -> ExitCode {
                 &cleanup_spec,
                 &completed,
             );
-            if footer_enabled {
-                if let Some(artifacts) = artifacts.as_deref() {
-                    eprintln!("{}", artifacts.footer_line());
-                }
-            }
-            std::process::exit(result.exit_code())
+            let footer_line = if footer_enabled {
+                artifacts.as_deref().map(|a| a.footer_line())
+            } else {
+                None
+            };
+            std::process::exit(finish_run(
+                parsed.timeout_secs,
+                result.timed_out(),
+                footer_line.as_deref(),
+                result.exit_code(),
+            ))
         }
         _ => {
             eprintln!("unsupported output mode");

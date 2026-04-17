@@ -1,6 +1,6 @@
 [package]
 name = "ccc"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 build = "build.rs"
 description = "Unified Rust library and CLI for invoking coding-agent CLIs with shared parsing, planning, and transcript utilities"

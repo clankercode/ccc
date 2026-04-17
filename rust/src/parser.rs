@@ -54,6 +54,7 @@ pub struct ParsedArgs {
     pub alias: Option<String>,
     pub prompt: String,
     pub prompt_supplied: bool,
+    pub timeout_secs: Option<u64>,
 }
 
 #[derive(Clone, Debug)]
@@ -440,6 +441,17 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
             parsed.save_session = true;
         } else if token == "--cleanup-session" {
             parsed.cleanup_session = true;
+        } else if token == "--timeout-secs" {
+            if index + 1 >= argv.len() {
+                parsed.timeout_secs = Some(0);
+            } else {
+                let raw = &argv[index + 1];
+                parsed.timeout_secs = match raw.parse::<u64>() {
+                    Ok(value) if value > 0 => Some(value),
+                    _ => Some(0),
+                };
+                index += 1;
+            }
         } else if let Some(mode) = parse_output_mode_sugar(token) {
             parsed.output_mode = Some(mode);
         } else if token == "--yolo" || token == "-y" {
@@ -485,6 +497,9 @@ pub fn resolve_command(
             .ok_or_else(|| "no runner found".to_string())?;
     if parsed.save_session && parsed.cleanup_session {
         return Err("--save-session and --cleanup-session are mutually exclusive".to_string());
+    }
+    if parsed.timeout_secs == Some(0) {
+        return Err("--timeout-secs must be a positive integer".to_string());
     }
 
     let mut argv: Vec<String> = vec![effective_runner.binary.clone()];

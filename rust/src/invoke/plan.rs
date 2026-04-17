@@ -72,6 +72,7 @@ pub struct Run {
     stdout: String,
     stderr: String,
     parsed_output: Option<Transcript>,
+    timed_out: bool,
 }
 
 impl Run {
@@ -93,6 +94,10 @@ impl Run {
 
     pub fn parsed_output(&self) -> Option<&Transcript> {
         self.parsed_output.as_ref()
+    }
+
+    pub fn timed_out(&self) -> bool {
+        self.timed_out
     }
 
     pub fn final_text(&self) -> &str {
@@ -157,6 +162,7 @@ impl Client {
             stdin_text: None,
             cwd: None,
             env,
+            timeout_secs: parsed.timeout_secs,
         };
         if let Some(provider) = request.provider() {
             command_spec
@@ -232,6 +238,7 @@ impl Client {
             stdout: completed.stdout,
             stderr: completed.stderr,
             parsed_output,
+            timed_out: completed.timed_out,
         }
     }
 
@@ -256,6 +263,7 @@ impl Client {
             stdout: completed.stdout,
             stderr: completed.stderr,
             parsed_output,
+            timed_out: completed.timed_out,
         }
     }
 }

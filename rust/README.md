@@ -231,6 +231,8 @@ The CLI prints a parseable footer on stderr:
 
 Use `--no-output-log-path` to suppress the footer without disabling artifact writes.
 
+Pass `--timeout-secs <N>` to kill the wrapped runner after `N` seconds. `ccc` prints `warning: timed out after N seconds; killed runner` to stderr and exits with status `124`. `CommandSpec::with_timeout_secs` exposes the same watchdog to library callers, and `Run::timed_out()` reports whether it fired.
+
 ## Public Rust API
 
 The crate is split into a few main entry points:

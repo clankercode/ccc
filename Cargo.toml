@@ -1,9 +1,10 @@
 [package]
 name = "call-coding-clis"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "Unlicense"
 description = "Minimal subprocess wrappers for coding CLIs"
+repository = "https://github.com/clankercode/ccc"
 
 [lib]
 name = "call_coding_clis"

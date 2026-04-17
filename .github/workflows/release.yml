@@ -1,0 +1,48 @@
+name: release
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  rust-binaries:
+    name: Rust binary (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build ccc
+        run: cargo build --manifest-path rust/Cargo.toml --release
+
+      - name: Package ccc
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          triple="$(rustc -vV | awk '/host:/ {print $2}')"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cp rust/target/release/ccc.exe "dist/ccc-${triple}.exe"
+            7z a -tzip "dist/ccc-${triple}.zip" "dist/ccc-${triple}.exe"
+            rm "dist/ccc-${triple}.exe"
+          else
+            tar -C rust/target/release -czf "dist/ccc-${triple}.tar.gz" ccc
+          fi
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber

@@ -11,6 +11,21 @@ fn fixture(path: &str) -> String {
 }
 
 #[test]
+fn typed_transcript_preserves_final_text_and_unknown_json() {
+    let transcript = Transcript {
+        events: vec![Event::Text("hello".into())],
+        final_text: "hello".into(),
+        session_id: Some("abc".into()),
+        usage: Default::default(),
+        error: None,
+        unknown_json_lines: vec!["{\"mystery\":true}".into()],
+    };
+
+    assert_eq!(transcript.final_text, "hello");
+    assert_eq!(transcript.unknown_json_lines.len(), 1);
+}
+
+#[test]
 fn test_opencode_simple_response() {
     let raw = "{\"response\":\"hello world\"}\n";
     let parsed = parse_opencode_json(raw);

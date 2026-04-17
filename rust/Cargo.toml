@@ -1,6 +1,6 @@
 [package]
 name = "ccc"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 build = "build.rs"
 description = "Unified Rust library and CLI for invoking coding-agent CLIs with shared parsing, planning, and transcript utilities"
@@ -9,7 +9,7 @@ repository = "https://github.com/clankercode/ccc"
 documentation = "https://docs.rs/ccc"
 readme = "README.md"
 keywords = ["cli", "codex", "claude", "opencode", "automation"]
-categories = ["command-line-utilities", "development-tools", "api-bindings"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "ccc"

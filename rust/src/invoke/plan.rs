@@ -158,6 +158,11 @@ impl Client {
             cwd: None,
             env,
         };
+        if let Some(provider) = request.provider() {
+            command_spec
+                .env
+                .insert("CCC_PROVIDER".to_string(), provider.to_string());
+        }
         if let Some(binary_override) = self.binary_overrides.get(&runner) {
             if let Some(program) = command_spec.argv.first_mut() {
                 *program = binary_override.clone();

@@ -1,9 +1,12 @@
 # Changelog
 
 ## Unreleased
+- No unreleased semantic changes.
+
+## 0.2.0 - 2026-04-17
 - Added a typed Rust invocation API around `Client`, `Request`, `Plan`, `Run`, and typed transcript/output models, plus a compatibility sugar parser for `ccc`-style tokens.
 - Changed the Rust CLI to plan and execute through the new library path instead of wiring directly through parser internals, while keeping top-level `help`, `version`, `config`, `config --edit`, and `add` flows CLI-owned.
-- Improved the Rust crate's docs.rs direction and implementation planning for the new library surface.
+- Improved the published Rust crate surface with stronger docs.rs metadata, crate-level API documentation, and clearer library examples for both typed requests and direct runner execution.
 
 ## 0.1.2 - 2026-04-17
 - Fixed the Windows release build so `ccc` 0.1.2 could ship working Windows release artifacts.

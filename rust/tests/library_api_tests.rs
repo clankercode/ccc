@@ -54,6 +54,23 @@ fn library_api_tests_client_plan_resolves_to_non_empty_command_spec() {
 }
 
 #[test]
+fn library_api_tests_client_plan_preserves_provider_only_request() {
+    let client = Client::new();
+    let request = Request::new("explain this module")
+        .with_runner(RunnerKind::OpenCode)
+        .with_provider("openai");
+    let plan = client.plan(&request).expect("plan should resolve");
+
+    assert_eq!(
+        plan.command_spec()
+            .env
+            .get("CCC_PROVIDER")
+            .map(|s| s.as_str()),
+        Some("openai")
+    );
+}
+
+#[test]
 fn library_api_tests_client_with_config_uses_injected_defaults() {
     let client = Client::new().with_config(CccConfig {
         default_runner: "codex".to_string(),

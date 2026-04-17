@@ -21,7 +21,7 @@ Add the library to a Rust project:
 
 ```toml
 [dependencies]
-ccc = "0.1.2"
+ccc = "0.2.0"
 ```
 
 Then import the library crate as:
@@ -114,7 +114,7 @@ let config = CccConfig::default();
 let parsed = parse_tokens_with_config(
     ["c", ":openai:gpt-5.4-mini", "debug this"],
     &config,
-) ?;
+)?;
 
 assert_eq!(parsed.request.runner(), Some(RunnerKind::Codex));
 assert_eq!(parsed.request.model(), Some("gpt-5.4-mini"));

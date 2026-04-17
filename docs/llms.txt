@@ -25,6 +25,7 @@ Slots are parsed in free order before the prompt, except that `-h` / `--help` wi
 - --output-mode: Choose `text`, `stream-text`, `json`, `stream-json`, `formatted`, or `stream-formatted`
   Dot-sugar aliases are available before the prompt: `.text` / `..text`, `.json` / `..json`, `.fmt` / `..fmt`.
   Human-formatted modes honor `FORCE_COLOR` and `NO_COLOR` before falling back to TTY detection.
+  Formatted run transcripts always retain unhandled structured JSON lines; `CCC_FWD_UNKNOWN_JSON` controls stderr forwarding and currently defaults on.
 - :provider:model: Override provider and model
 - @name: Use a named preset from the loaded config layers; when no preset exists, runner names such as `@k` select that runner before ordinary agent fallback; in Python and Rust, presets can also provide a default prompt when the user leaves prompt text blank, and alias `prompt_mode = "prepend"|"append"` can wrap explicitly supplied prompt text with alias prompt text
 - Config: in Python and Rust, project-local `.ccc.toml` files are searched upward from the current directory, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`

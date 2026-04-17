@@ -949,11 +949,35 @@ fn emit_stdout_line(artifacts: Option<&RunArtifacts>, text: &str) {
     }
 }
 
+fn record_transcript_line(artifacts: Option<&RunArtifacts>, text: &str) {
+    if let Some(artifacts) = artifacts {
+        let mut chunk = String::with_capacity(text.len() + 1);
+        chunk.push_str(text);
+        chunk.push('\n');
+        if let Err(error) = artifacts.record_stdout(&chunk) {
+            eprintln!(
+                "{}",
+                transcript_io_warning("write", artifacts.transcript_path(), &error)
+            );
+        }
+    }
+}
+
 fn write_output_text(artifacts: Option<&RunArtifacts>, text: &str) {
     if let Some(artifacts) = artifacts {
         if let Err(error) = artifacts.write_output_text(text) {
             eprintln!("{}", output_write_warning(&error));
         }
+    }
+}
+
+fn env_bool_default_true(name: &str) -> bool {
+    match env::var(name) {
+        Ok(value) => {
+            let normalized = value.trim().to_ascii_lowercase();
+            !matches!(normalized.as_str(), "0" | "false" | "no" | "n" | "off")
+        }
+        Err(_) => true,
     }
 }
 
@@ -1541,7 +1565,8 @@ fn main() -> ExitCode {
 
     let runner = Runner::new();
     let sanitize_osc = resolve_sanitize_osc(&parsed, Some(&config));
-    let forward_unknown_json = parsed.forward_unknown_json;
+    let forward_unknown_json =
+        parsed.forward_unknown_json || env_bool_default_true("CCC_FWD_UNKNOWN_JSON");
     let human_tty = resolve_human_tty(
         std::io::stdout().is_terminal(),
         env::var("FORCE_COLOR").ok().as_deref(),
@@ -1616,6 +1641,12 @@ fn main() -> ExitCode {
                         let rendered = sanitize_human_output(&rendered, sanitize_osc);
                         emit_stdout_line(artifacts_for_stream.as_deref(), &rendered);
                     }
+                    for raw_line in processor.take_unknown_json_lines() {
+                        record_transcript_line(artifacts_for_stream.as_deref(), &raw_line);
+                        if forward_unknown_json {
+                            eprintln!("{}", raw_line);
+                        }
+                    }
                 }
             });
             let final_output_text = if let Ok(mut processor) = processor.lock() {
@@ -1623,6 +1654,12 @@ fn main() -> ExitCode {
                 if !trailing.is_empty() {
                     let trailing = sanitize_human_output(&trailing, sanitize_osc);
                     emit_stdout_line(artifacts.as_deref(), &trailing);
+                }
+                for raw_line in processor.take_unknown_json_lines() {
+                    record_transcript_line(artifacts.as_deref(), &raw_line);
+                    if forward_unknown_json {
+                        eprintln!("{}", raw_line);
+                    }
                 }
                 processor.output().final_text.clone()
             } else {
@@ -1710,8 +1747,9 @@ fn main() -> ExitCode {
                 emit_stdout_line(artifacts.as_deref(), &rendered);
             }
             write_output_text(artifacts.as_deref(), &output_text);
-            if forward_unknown_json {
-                for raw_line in parsed_output.unknown_json_lines {
+            for raw_line in parsed_output.unknown_json_lines {
+                record_transcript_line(artifacts.as_deref(), &raw_line);
+                if forward_unknown_json {
                     eprintln!("{}", raw_line);
                 }
             }
@@ -1750,8 +1788,9 @@ fn main() -> ExitCode {
                         let rendered = sanitize_human_output(&rendered, sanitize_osc);
                         emit_stdout_line(artifacts_for_stream.as_deref(), &rendered);
                     }
-                    if forward_unknown_json {
-                        for raw_line in processor.take_unknown_json_lines() {
+                    for raw_line in processor.take_unknown_json_lines() {
+                        record_transcript_line(artifacts_for_stream.as_deref(), &raw_line);
+                        if forward_unknown_json {
                             eprintln!("{}", raw_line);
                         }
                     }
@@ -1763,8 +1802,9 @@ fn main() -> ExitCode {
                     let trailing = sanitize_human_output(&trailing, sanitize_osc);
                     emit_stdout_line(artifacts.as_deref(), &trailing);
                 }
-                if forward_unknown_json {
-                    for raw_line in processor.take_unknown_json_lines() {
+                for raw_line in processor.take_unknown_json_lines() {
+                    record_transcript_line(artifacts.as_deref(), &raw_line);
+                    if forward_unknown_json {
                         eprintln!("{}", raw_line);
                     }
                 }

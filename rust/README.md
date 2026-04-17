@@ -304,6 +304,7 @@ Use `--no-output-log-path` to suppress the footer.
 | `CCC_REAL_GEMINI`     | Override gemini binary path (for testing)    |
 | `CCC_PROVIDER`        | Set provider for current run                  |
 | `CCC_CONFIG`          | Explicit config file path                     |
+| `CCC_FWD_UNKNOWN_JSON` | Forward unhandled structured JSON lines to stderr in formatted modes; defaults on for now |
 | `FORCE_COLOR`         | Force colored output                          |
 | `NO_COLOR`            | Disable colored output                       |
 

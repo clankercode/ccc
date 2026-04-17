@@ -236,7 +236,9 @@ def main(argv: list[str] | None = None) -> int:
 
     runner = Runner()
     sanitize_osc = resolve_sanitize_osc(parsed, config)
-    forward_unknown_json = parsed.forward_unknown_json
+    forward_unknown_json = parsed.forward_unknown_json or _env_bool_default_true(
+        "CCC_FWD_UNKNOWN_JSON"
+    )
     human_tty = resolve_human_tty(
         sys.stdout.isatty(),
         os.environ.get("FORCE_COLOR"),
@@ -253,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
                 channel,
                 chunk,
                 processor,
-                False,
+                forward_unknown_json,
                 stderr_filter,
                 sanitize_osc,
                 artifact_writer,
@@ -352,8 +354,9 @@ def main(argv: list[str] | None = None) -> int:
                 _sanitize_human_output(rendered, sanitize_osc),
                 artifact_writer=artifact_writer,
             )
-        if forward_unknown_json:
-            for raw_line in parsed_output.unknown_json_lines:
+        for raw_line in parsed_output.unknown_json_lines:
+            _record_transcript_line(raw_line, artifact_writer)
+            if forward_unknown_json:
                 print(raw_line, file=sys.stderr)
         footer_line = _finalize_run_artifacts(
             artifact_writer, parsed_output.final_text
@@ -396,8 +399,9 @@ def main(argv: list[str] | None = None) -> int:
             end="",
             file=sys.stderr,
         )
-    if forward_unknown_json:
-        for raw_line in processor.take_unknown_json_lines():
+    for raw_line in processor.take_unknown_json_lines():
+        _record_transcript_line(raw_line, artifact_writer)
+        if forward_unknown_json:
             print(raw_line, file=sys.stderr)
     footer_line = _finalize_run_artifacts(
         artifact_writer, processor.output.final_text
@@ -849,6 +853,21 @@ def _emit_stdout(
             )
 
 
+def _record_transcript_line(
+    text: str,
+    artifact_writer: artifacts.RunArtifactWriter | None,
+) -> None:
+    if artifact_writer is None:
+        return
+    try:
+        artifact_writer.write_transcript(text + "\n")
+    except OSError as exc:
+        print(
+            f"warning: could not write {artifact_writer.transcript_name}: {exc}",
+            file=sys.stderr,
+        )
+
+
 def _handle_raw_stream_chunk(
     channel: str,
     chunk: str,
@@ -897,9 +916,17 @@ def _handle_structured_chunk(
     if rendered:
         emitted = _sanitize_human_output(rendered, sanitize_osc)
         _emit_stdout(emitted, artifact_writer=artifact_writer)
-    if forward_unknown_json:
-        for raw_line in processor.take_unknown_json_lines():
+    for raw_line in processor.take_unknown_json_lines():
+        _record_transcript_line(raw_line, artifact_writer)
+        if forward_unknown_json:
             print(raw_line, file=sys.stderr)
+
+
+def _env_bool_default_true(name: str) -> bool:
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return True
+    return value.strip().lower() not in {"0", "false", "no", "n", "off"}
 
 
 _KIMI_RESUME_RE = re.compile(

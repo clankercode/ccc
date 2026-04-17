@@ -120,5 +120,6 @@ Use `--no-output-log-path` to suppress that footer.
 | `CCC_REAL_CURSOR` | Override Cursor Agent binary path |
 | `CCC_REAL_GEMINI` | Override Gemini binary path |
 | `CCC_CONFIG` | Explicit config file path |
+| `CCC_FWD_UNKNOWN_JSON` | Forward unhandled structured JSON lines to stderr in formatted modes; defaults on for now |
 | `FORCE_COLOR` | Force colored human output |
 | `NO_COLOR` | Disable colored human output |

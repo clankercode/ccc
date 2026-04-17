@@ -15,6 +15,10 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
 - [ ] Decide whether structured output rendering needs templating or user customization
   - This is the `v2` rendering direction currently noted in `README.md`.
   - Keep the scope narrow unless there is a concrete user-facing need.
+- [ ] Eventually default `CCC_FWD_UNKNOWN_JSON` back to false
+  - The environment-controlled default is temporarily true so parser gaps stay visible during structured-output hardening.
+  - Keep run artifacts recording unknown JSON regardless of the forwarding default.
+  - Deferred indefinitely until structured output coverage is boring enough that hidden terminal forwarding is acceptable.
 - [ ] Add multi-provider / multi-preset / multi-alias routing based on capacity, usage, and round-robin policy
   - Allow a single logical route to fan out across multiple providers, presets, aliases, or equivalent backends.
   - Detect `429` rate-limit responses and other retryable provider errors, then fail over or rotate according to policy.

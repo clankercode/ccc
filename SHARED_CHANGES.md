@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-04-15
 
+### Unknown structured JSON forwarding and artifact retention
+- Change: Python and Rust now always preserve unhandled structured JSON lines in formatted run transcripts, even when terminal forwarding is disabled; `CCC_FWD_UNKNOWN_JSON` also controls stderr forwarding and currently defaults to enabled
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`
+- Notes: updated `README.md`, `python/README.md`, `rust/README.md`, `docs/llms.txt`, Python/Rust help text, and `TASKS.md`; the later default-off reversal is tracked in `TASKS.md`
+
 ### Config editing and stricter alias wizard prompts
 - Change: Python and Rust now support `ccc config --edit [--user|--local]`, opening the selected config in `$EDITOR`; the alias wizard skips `prompt_mode` when prompt is unset and final save confirmation now rejects blank or invalid answers unless they are `y`, `n`, `yes`, or `no` case-insensitively
 - Required implementations: Python and Rust

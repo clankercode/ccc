@@ -1926,6 +1926,90 @@ class SingleImplCccContractTests(unittest.TestCase):
                             result.stdout,
                         )
 
+    def test_formatted_artifacts_record_unknown_json_when_forwarding_is_off(
+        self,
+    ) -> None:
+        cases = [
+            ("formatted", ["--save-session", ".fmt"]),
+            ("stream-formatted", ["--save-session", "..fmt"]),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_structured_unknown_json_stub(opencode_path)
+            unknown_line = '{"type":"mystery","payload":"keep-me"}'
+
+            for lang in self.selected_languages:
+                if lang.name not in RUN_ARTIFACT_IMPLEMENTATIONS:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                env["XDG_STATE_HOME"] = str(tmp_path / f"xdg-state-{lang.name}")
+                env["CCC_FWD_UNKNOWN_JSON"] = "0"
+                for mode_name, extra_args in cases:
+                    with self.subTest(language=lang.name, mode=mode_name):
+                        result = lang.invoke_with_args(
+                            extra_args,
+                            PROMPT,
+                            env,
+                            include_output_log_path=True,
+                        )
+                        run_dir = self._assert_footer_artifacts(
+                            result,
+                            "transcript.txt",
+                            expected_prefix="opencode-",
+                        )
+                        self.assertNotIn(unknown_line, result.stderr)
+                        self.assertIn(
+                            unknown_line,
+                            (run_dir / "transcript.txt").read_text(
+                                encoding="utf-8"
+                            ),
+                        )
+
+    def test_unknown_json_forwarding_defaults_on_and_env_can_disable_it(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_structured_unknown_json_stub(opencode_path)
+            unknown_line = '{"type":"mystery","payload":"keep-me"}'
+
+            for lang in self.selected_languages:
+                if lang.name not in RUN_ARTIFACT_IMPLEMENTATIONS:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                env["XDG_STATE_HOME"] = str(tmp_path / f"xdg-state-{lang.name}")
+                with self.subTest(language=lang.name, env="default"):
+                    result = lang.invoke_with_args(
+                        ["--save-session", ".fmt"],
+                        PROMPT,
+                        env,
+                        include_output_log_path=True,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(unknown_line, result.stderr)
+
+                env_disabled = dict(env)
+                env_disabled["XDG_STATE_HOME"] = str(
+                    tmp_path / f"xdg-state-disabled-{lang.name}"
+                )
+                env_disabled["CCC_FWD_UNKNOWN_JSON"] = "0"
+                with self.subTest(language=lang.name, env="disabled"):
+                    result = lang.invoke_with_args(
+                        ["--save-session", ".fmt"],
+                        PROMPT,
+                        env_disabled,
+                        include_output_log_path=True,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertNotIn(unknown_line, result.stderr)
+
     def test_footer_follows_cleanup_warning(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -2485,6 +2569,14 @@ class SingleImplCccContractTests(unittest.TestCase):
         else:
             body = f'#!/bin/sh\nprintf \'{{"response":"{runner_name} %s"}}\\n\' "$*"\n'
         path.write_text(body)
+        path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    def _write_structured_unknown_json_stub(self, path: Path) -> None:
+        path.write_text(
+            "#!/bin/sh\n"
+            'printf \'{"type":"mystery","payload":"keep-me"}\\n\'\n'
+            'printf \'{"response":"opencode %s"}\\n\' "$*"\n'
+        )
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def _write_codex_stub(self, path: Path) -> None:

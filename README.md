@@ -136,6 +136,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
   - `ccc config --edit` opens the selected config in `$EDITOR`; add `--user` to edit the XDG/home user config or `--local` to edit the nearest `.ccc.toml` (creating one in the current directory if none exists)
   - `ccc add [-g] <alias>` starts a line-prompt wizard for writing `[aliases.<name>]` config; flags such as `--runner`, `--model`, `--prompt`, and `--prompt-mode` can prefill values, and `--yes` writes non-interactively
   - `formatted`, `stream-formatted`, and `ccc add` menu prompts honor `FORCE_COLOR` / `NO_COLOR` before falling back to TTY detection
+  - formatted modes always keep unhandled structured JSON lines in the run transcript; `CCC_FWD_UNKNOWN_JSON` controls whether they are also forwarded to stderr and currently defaults on
   - `--print-config` to print the canonical example `config.toml`
   - `--permission-mode safe|auto|yolo|plan`
   - `--save-session` to explicitly allow normal runner session persistence

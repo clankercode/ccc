@@ -208,7 +208,8 @@ PROVIDER_MODEL_RE = re.compile(r"^:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)$")
 MODEL_RE = re.compile(r"^:([a-zA-Z0-9._-]+)$")
 ALIAS_RE = re.compile(r"^@([a-zA-Z0-9_-]+)$")
 OUTPUT_MODE_RE = re.compile(
-    r"^(text|stream-text|json|stream-json|formatted|stream-formatted)$",
+    r"^(text|stream-text|json|stream-json|formatted|stream-formatted|"
+    r"pass-text|stream-pass-text|pass-json|stream-pass-json|pt|stream-pt|pj|stream-pj)$",
     re.IGNORECASE,
 )
 
@@ -219,6 +220,10 @@ OUTPUT_MODE_SUGAR = {
     "..json": "stream-json",
     ".fmt": "formatted",
     "..fmt": "stream-formatted",
+    ".pt": "pass-text",
+    "..pt": "stream-pass-text",
+    ".pj": "pass-json",
+    "..pj": "stream-pass-json",
 }
 
 THINKING_TOKEN_TO_LEVEL = {
@@ -389,9 +394,24 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
             "stream-json",
             "formatted",
             "stream-formatted",
+            "pass-text",
+            "stream-pass-text",
+            "pass-json",
+            "stream-pass-json",
         }
     if key in {"k", "kimi"}:
-        return {"text", "stream-text", "stream-json", "formatted", "stream-formatted"}
+        return {
+            "text",
+            "stream-text",
+            "json",
+            "stream-json",
+            "formatted",
+            "stream-formatted",
+            "pass-text",
+            "stream-pass-text",
+            "pass-json",
+            "stream-pass-json",
+        }
     if key in {"oc", "opencode"}:
         return {
             "text",
@@ -400,6 +420,10 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
             "stream-json",
             "formatted",
             "stream-formatted",
+            "pass-text",
+            "stream-pass-text",
+            "pass-json",
+            "stream-pass-json",
         }
     if key in {"c", "cx", "codex"}:
         return {
@@ -409,6 +433,10 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
             "stream-json",
             "formatted",
             "stream-formatted",
+            "pass-text",
+            "stream-pass-text",
+            "pass-json",
+            "stream-pass-json",
         }
     if key in {"cu", "cursor"}:
         return {
@@ -418,6 +446,10 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
             "stream-json",
             "formatted",
             "stream-formatted",
+            "pass-text",
+            "stream-pass-text",
+            "pass-json",
+            "stream-pass-json",
         }
     if key in {"g", "gemini"}:
         return {
@@ -427,8 +459,12 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
             "stream-json",
             "formatted",
             "stream-formatted",
+            "pass-text",
+            "stream-pass-text",
+            "pass-json",
+            "stream-pass-json",
         }
-    return {"text", "stream-text"}
+    return {"text", "stream-text", "pass-text", "stream-pass-text", "pass-json", "stream-pass-json"}
 
 
 def resolve_output_mode(parsed: ParsedArgs, config: CccConfig | None = None) -> str:
@@ -452,12 +488,12 @@ def _resolve_output_mode_with_source(
         source = "configured"
     if mode == "":
         raise ValueError(
-            "output mode requires one of: text, stream-text, json, stream-json, formatted, stream-formatted"
+            "output mode requires one of: text, stream-text, json, stream-json, formatted, stream-formatted, pass-text, stream-pass-text, pass-json, stream-pass-json"
         )
     mode = mode.lower()
     if not OUTPUT_MODE_RE.match(mode):
         raise ValueError(
-            "output mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted"
+            "output mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted, pass-text, stream-pass-text, pass-json, stream-pass-json"
         )
     return mode, source
 
@@ -525,11 +561,97 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
         mode = fallback
 
     key = effective_runner_name.lower()
-    if mode in {"text", "stream-text"}:
+    if mode in {"text", "stream-text", "pass-text", "stream-pass-text"}:
         return OutputPlan(
             runner_name=effective_runner_name,
             mode=mode,
             stream=mode.startswith("stream-"),
+            formatted=False,
+            schema=None,
+            argv_flags=[],
+            warnings=warnings,
+        )
+    if mode in {"pass-json", "stream-pass-json"}:
+        is_stream = mode.startswith("stream-")
+        if key in {"cc", "claude"}:
+            flags = (
+                ["--output-format", "json"]
+                if mode == "pass-json"
+                else ["--verbose", "--output-format", "stream-json"]
+            )
+            return OutputPlan(
+                runner_name=effective_runner_name,
+                mode=mode,
+                stream=is_stream,
+                formatted=False,
+                schema=None,
+                argv_flags=flags,
+                warnings=warnings,
+            )
+        if key in {"k", "kimi"}:
+            return OutputPlan(
+                runner_name=effective_runner_name,
+                mode=mode,
+                stream=is_stream,
+                formatted=False,
+                schema=None,
+                argv_flags=["--print", "--output-format", "stream-json"],
+                warnings=warnings,
+            )
+        if key in {"oc", "opencode"}:
+            return OutputPlan(
+                runner_name=effective_runner_name,
+                mode=mode,
+                stream=is_stream,
+                formatted=False,
+                schema=None,
+                argv_flags=["--format", "json"],
+                warnings=warnings,
+            )
+        if key in {"c", "cx", "codex"}:
+            return OutputPlan(
+                runner_name=effective_runner_name,
+                mode=mode,
+                stream=is_stream,
+                formatted=False,
+                schema=None,
+                argv_flags=["--json"],
+                warnings=warnings,
+            )
+        if key in {"cu", "cursor"}:
+            flags = (
+                ["--output-format", "json"]
+                if mode == "pass-json"
+                else ["--output-format", "stream-json"]
+            )
+            return OutputPlan(
+                runner_name=effective_runner_name,
+                mode=mode,
+                stream=is_stream,
+                formatted=False,
+                schema=None,
+                argv_flags=flags,
+                warnings=warnings,
+            )
+        if key in {"g", "gemini"}:
+            flags = (
+                ["--output-format", "json"]
+                if mode == "pass-json"
+                else ["--output-format", "stream-json"]
+            )
+            return OutputPlan(
+                runner_name=effective_runner_name,
+                mode=mode,
+                stream=is_stream,
+                formatted=False,
+                schema=None,
+                argv_flags=flags,
+                warnings=warnings,
+            )
+        return OutputPlan(
+            runner_name=effective_runner_name,
+            mode=mode,
+            stream=is_stream,
             formatted=False,
             schema=None,
             argv_flags=[],

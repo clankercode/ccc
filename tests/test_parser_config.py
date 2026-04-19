@@ -153,6 +153,10 @@ class ParseArgsTests(unittest.TestCase):
             "..json": "stream-json",
             ".fmt": "formatted",
             "..fmt": "stream-formatted",
+            ".pt": "pass-text",
+            "..pt": "stream-pass-text",
+            ".pj": "pass-json",
+            "..pj": "stream-pass-json",
         }
         for token, expected in cases.items():
             with self.subTest(token=token):
@@ -1161,6 +1165,38 @@ class ResolveCommandTests(unittest.TestCase):
         self.assertTrue(plan.stream)
         self.assertTrue(plan.formatted)
         self.assertEqual(plan.schema, "opencode")
+        self.assertEqual(plan.argv_flags, ["--format", "json"])
+
+    def test_opencode_pass_text_output_plan(self):
+        parsed = ParsedArgs(runner="oc", output_mode="pass-text", prompt="hello")
+        plan = resolve_output_plan(parsed)
+        self.assertFalse(plan.stream)
+        self.assertFalse(plan.formatted)
+        self.assertIsNone(plan.schema)
+        self.assertEqual(plan.argv_flags, [])
+
+    def test_opencode_stream_pass_text_output_plan(self):
+        parsed = ParsedArgs(runner="oc", output_mode="stream-pass-text", prompt="hello")
+        plan = resolve_output_plan(parsed)
+        self.assertTrue(plan.stream)
+        self.assertFalse(plan.formatted)
+        self.assertIsNone(plan.schema)
+        self.assertEqual(plan.argv_flags, [])
+
+    def test_opencode_pass_json_output_plan(self):
+        parsed = ParsedArgs(runner="oc", output_mode="pass-json", prompt="hello")
+        plan = resolve_output_plan(parsed)
+        self.assertFalse(plan.stream)
+        self.assertFalse(plan.formatted)
+        self.assertIsNone(plan.schema)
+        self.assertEqual(plan.argv_flags, ["--format", "json"])
+
+    def test_opencode_stream_pass_json_output_plan(self):
+        parsed = ParsedArgs(runner="oc", output_mode="stream-pass-json", prompt="hello")
+        plan = resolve_output_plan(parsed)
+        self.assertTrue(plan.stream)
+        self.assertFalse(plan.formatted)
+        self.assertIsNone(plan.schema)
         self.assertEqual(plan.argv_flags, ["--format", "json"])
 
     def test_codex_output_plans(self):

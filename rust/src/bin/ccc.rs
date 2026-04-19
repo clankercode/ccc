@@ -22,6 +22,10 @@ const ADD_OUTPUT_MODES: &[&str] = &[
     "stream-json",
     "formatted",
     "stream-formatted",
+    "pass-text",
+    "stream-pass-text",
+    "pass-json",
+    "stream-pass-json",
 ];
 const ADD_PROMPT_MODES: &[&str] = &["default", "prepend", "append"];
 const KEEP_CURRENT_CHOICE: &str = "__keep_current__";
@@ -85,7 +89,7 @@ fn set_add_alias_field(alias: &mut AliasDef, field: &str, value: &str) -> Result
         "output_mode" => {
             if !ADD_OUTPUT_MODES.contains(&value) {
                 return Err(
-                    "output_mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted"
+                    "output_mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted, pass-text, pt, stream-pass-text, stream-pt, pass-json, pj, stream-pass-json, stream-pj"
                         .to_string(),
                 );
             }
@@ -1964,6 +1968,114 @@ fn main() -> ExitCode {
             } else {
                 String::new()
             };
+            write_output_text(artifacts.as_deref(), &final_output_text);
+            let completed = completed_run_from_library_run(&result);
+            print_cleanup_warnings(
+                parsed.cleanup_session,
+                &output_plan.runner_name,
+                &cleanup_spec,
+                &completed,
+            );
+            let footer_line = if footer_enabled {
+                artifacts.as_deref().map(|a| a.footer_line())
+            } else {
+                None
+            };
+            std::process::exit(finish_run(
+                parsed.timeout_secs,
+                result.timed_out(),
+                footer_line.as_deref(),
+                result.exit_code(),
+            ))
+        }
+        "pass-text" => {
+            let result = match client.run_unchecked(&command_request) {
+                Ok(result) => result,
+                Err(error) => {
+                    print_client_error(error);
+                    return ExitCode::from(1);
+                }
+            };
+            let stdout = sanitize_raw_output(result.stdout(), &output_plan.runner_name);
+            let stderr = sanitize_raw_output(result.stderr(), &output_plan.runner_name);
+            if !stdout.is_empty() {
+                emit_stdout(artifacts.as_deref(), &stdout);
+            }
+            if !stderr.is_empty() {
+                eprint!("{}", stderr);
+            }
+            write_output_text(artifacts.as_deref(), &stdout);
+            let completed = completed_run_from_library_run(&result);
+            print_cleanup_warnings(
+                parsed.cleanup_session,
+                &output_plan.runner_name,
+                &cleanup_spec,
+                &completed,
+            );
+            let footer_line = if footer_enabled {
+                artifacts.as_deref().map(|a| a.footer_line())
+            } else {
+                None
+            };
+            std::process::exit(finish_run(
+                parsed.timeout_secs,
+                result.timed_out(),
+                footer_line.as_deref(),
+                result.exit_code(),
+            ))
+        }
+        "pass-json" => {
+            let result = match client.run_unchecked(&command_request) {
+                Ok(result) => result,
+                Err(error) => {
+                    print_client_error(error);
+                    return ExitCode::from(1);
+                }
+            };
+            let stdout = sanitize_raw_output(result.stdout(), &output_plan.runner_name);
+            let stderr = sanitize_raw_output(result.stderr(), &output_plan.runner_name);
+            if !stdout.is_empty() {
+                emit_stdout(artifacts.as_deref(), &stdout);
+            }
+            if !stderr.is_empty() {
+                eprint!("{}", stderr);
+            }
+            write_output_text(artifacts.as_deref(), &stdout);
+            let completed = completed_run_from_library_run(&result);
+            print_cleanup_warnings(
+                parsed.cleanup_session,
+                &output_plan.runner_name,
+                &cleanup_spec,
+                &completed,
+            );
+            let footer_line = if footer_enabled {
+                artifacts.as_deref().map(|a| a.footer_line())
+            } else {
+                None
+            };
+            std::process::exit(finish_run(
+                parsed.timeout_secs,
+                result.timed_out(),
+                footer_line.as_deref(),
+                result.exit_code(),
+            ))
+        }
+        "stream-pass-text" | "stream-pass-json" => {
+            let artifacts_for_stream = artifacts.clone();
+            let result = match client.stream_unchecked(&command_request, move |channel, chunk| {
+                if channel == "stdout" {
+                    emit_stdout(artifacts_for_stream.as_deref(), chunk);
+                } else {
+                    eprint!("{}", chunk);
+                }
+            }) {
+                Ok(result) => result,
+                Err(error) => {
+                    print_client_error(error);
+                    return ExitCode::from(1);
+                }
+            };
+            let final_output_text = sanitize_raw_output(result.stdout(), &output_plan.runner_name);
             write_output_text(artifacts.as_deref(), &final_output_text);
             let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(

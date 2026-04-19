@@ -215,6 +215,10 @@ fn test_parse_output_mode_sugar() {
         ("..json", "stream-json"),
         (".fmt", "formatted"),
         ("..fmt", "stream-formatted"),
+        (".pt", "pass-text"),
+        ("..pt", "stream-pass-text"),
+        (".pj", "pass-json"),
+        ("..pj", "stream-pass-json"),
     ];
     for (token, expected) in cases {
         let args: Vec<String> = vec![token.into(), "hello".into()];

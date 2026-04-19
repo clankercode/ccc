@@ -11,6 +11,10 @@ const OUTPUT_MODES: &[&str] = &[
     "stream-json",
     "formatted",
     "stream-formatted",
+    "pass-text",
+    "stream-pass-text",
+    "pass-json",
+    "stream-pass-json",
 ];
 const KIMI_OUTPUT_MODES: &[&str] = &[
     "text",
@@ -18,6 +22,10 @@ const KIMI_OUTPUT_MODES: &[&str] = &[
     "stream-json",
     "formatted",
     "stream-formatted",
+    "pass-text",
+    "stream-pass-text",
+    "pass-json",
+    "stream-pass-json",
 ];
 const TEXT_OUTPUT_MODES: &[&str] = &["text", "stream-text"];
 
@@ -398,6 +406,10 @@ fn parse_output_mode_sugar(s: &str) -> Option<String> {
         "..json" => Some("stream-json".to_string()),
         ".fmt" => Some("formatted".to_string()),
         "..fmt" => Some("stream-formatted".to_string()),
+        ".pt" => Some("pass-text".to_string()),
+        "..pt" => Some("stream-pass-text".to_string()),
+        ".pj" => Some("pass-json".to_string()),
+        "..pj" => Some("stream-pass-json".to_string()),
         _ => None,
     }
 }
@@ -867,6 +879,10 @@ fn supported_output_modes(runner_name: &str) -> &'static [&'static str] {
             "stream-json",
             "formatted",
             "stream-formatted",
+            "pass-text",
+            "stream-pass-text",
+            "pass-json",
+            "stream-pass-json",
         ],
         _ => TEXT_OUTPUT_MODES,
     }
@@ -907,13 +923,13 @@ fn resolve_output_mode_with_source(
     });
     if mode.is_empty() {
         return Err(
-            "output mode requires one of: text, stream-text, json, stream-json, formatted, stream-formatted",
+            "output mode requires one of: text, stream-text, json, stream-json, formatted, stream-formatted, pass-text, pt, stream-pass-text, stream-pt, pass-json, pj, stream-pass-json, stream-pj",
         );
     }
     match parse_output_mode(&mode) {
         Some(mode) => Ok((mode, source)),
         None => Err(
-            "output mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted",
+            "output mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted, pass-text, pt, stream-pass-text, stream-pt, pass-json, pj, stream-pass-json, stream-pj",
         ),
     }
 }
@@ -977,15 +993,91 @@ pub fn resolve_output_plan(
         });
     }
 
+    if matches!(
+        mode.as_str(),
+        "pass-text" | "stream-pass-text" | "pass-json" | "stream-pass-json"
+    ) {
+        let argv_flags = if mode == "pass-json" {
+            if matches!(runner_name.as_str(), "cc" | "claude") {
+                vec!["--output-format".into(), "json".into()]
+            } else if matches!(runner_name.as_str(), "cu" | "cursor") {
+                vec!["--output-format".into(), "json".into()]
+            } else if matches!(runner_name.as_str(), "g" | "gemini") {
+                vec!["--output-format".into(), "json".into()]
+            } else if matches!(runner_name.as_str(), "c" | "cx" | "codex") {
+                vec!["--json".into()]
+            } else if matches!(runner_name.as_str(), "k" | "kimi") {
+                vec![
+                    "--print".into(),
+                    "--output-format".into(),
+                    "stream-json".into(),
+                ]
+            } else if matches!(runner_name.as_str(), "oc" | "opencode") {
+                vec!["--format".into(), "json".into()]
+            } else {
+                vec![]
+            }
+        } else if mode == "stream-pass-json" {
+            if matches!(runner_name.as_str(), "cc" | "claude") {
+                vec![
+                    "--verbose".into(),
+                    "--output-format".into(),
+                    "stream-json".into(),
+                ]
+            } else if matches!(runner_name.as_str(), "cu" | "cursor") {
+                vec!["--output-format".into(), "stream-json".into()]
+            } else if matches!(runner_name.as_str(), "g" | "gemini") {
+                vec!["--output-format".into(), "stream-json".into()]
+            } else if matches!(runner_name.as_str(), "c" | "cx" | "codex") {
+                vec!["--json".into()]
+            } else if matches!(runner_name.as_str(), "k" | "kimi") {
+                vec![
+                    "--print".into(),
+                    "--output-format".into(),
+                    "stream-json".into(),
+                ]
+            } else if matches!(runner_name.as_str(), "oc" | "opencode") {
+                vec!["--format".into(), "json".into()]
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+        return Ok(OutputPlan {
+            runner_name,
+            mode: mode.clone(),
+            stream: mode.starts_with("stream-"),
+            formatted: false,
+            schema: None,
+            argv_flags,
+            warnings,
+        });
+    }
+
     if matches!(runner_name.as_str(), "cc" | "claude") {
         let mut argv_flags = if mode == "json" {
             vec!["--output-format".into(), "json".into()]
-        } else {
+        } else if mode == "formatted" {
             vec![
                 "--verbose".into(),
                 "--output-format".into(),
                 "stream-json".into(),
             ]
+        } else if mode == "stream-formatted" {
+            vec![
+                "--verbose".into(),
+                "--output-format".into(),
+                "stream-json".into(),
+            ]
+        } else if mode == "stream-json" {
+            vec![
+                "--verbose".into(),
+                "--output-format".into(),
+                "stream-json".into(),
+            ]
+        } else {
+            vec![]
         };
         if mode == "stream-formatted" {
             argv_flags.push("--include-partial-messages".into());

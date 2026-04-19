@@ -50,7 +50,7 @@ Controls (free order before the prompt):
                 prompt_mode lets alias prompts prepend or append text; prepend/append require an explicit prompt argument
   .mode / ..mode
                 Output-mode sugar with a shared dot identity:
-                  .text / ..text, .json / ..json, .fmt / ..fmt
+                  .text / ..text, .json / ..json, .fmt / ..fmt, .pt / ..pt, .pj / ..pj
   --permission-mode <safe|auto|yolo|plan>
                 Request a higher-level permission profile when the selected runner supports it
   --yolo / -y   Request the runner's lowest-friction auto-approval mode when supported
@@ -70,7 +70,7 @@ Flags:
                                         (config key: defaults.sanitize_osc)
   --output-log-path / --no-output-log-path
                                         Print the parseable run-artifact footer line on stderr
-  --output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>
+  --output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted|pass-text|pt|stream-pass-text|stream-pt|pass-json|pj|stream-pass-json|stream-pj>
                                         Select raw, streamed, or formatted output handling
                                         (config key: defaults.output_mode)
   --forward-unknown-json                In formatted modes, forward unhandled JSON objects to stderr

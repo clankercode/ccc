@@ -44,10 +44,10 @@ fn test_help_mentions_name_slot() {
     ));
     assert!(stdout.contains("--sanitize-osc / --no-sanitize-osc"));
     assert!(stdout.contains(
-        "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>"
+        "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted|pass-text|pt|stream-pass-text|stream-pt|pass-json|pj|stream-pass-json|stream-pj>"
     ));
     assert!(stdout.contains("--forward-unknown-json"));
-    assert!(stdout.contains(".text / ..text, .json / ..json, .fmt / ..fmt"));
+    assert!(stdout.contains(".text / ..text, .json / ..json, .fmt / ..fmt, .pt / ..pt, .pj / ..pj"));
     assert!(stdout.contains("--permission-mode <safe|auto|yolo|plan>"));
     assert!(stdout.contains("--yolo / -y"));
     assert!(stdout.contains("--version / -v"));

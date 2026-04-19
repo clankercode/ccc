@@ -88,7 +88,7 @@ Flags:
   --output-log-path / --no-output-log-path
                                         Emit or suppress the parseable run footer on stderr
                                         (default: on; No TOML config key)
-  --output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>
+  --output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted|pass-text|pt|stream-pass-text|stream-pt|pass-json|pj|stream-pass-json|stream-pj>
                                         Select raw, streamed, or formatted output handling
                                         (config key: defaults.output_mode)
   --forward-unknown-json                In formatted modes, forward unhandled JSON objects to stderr

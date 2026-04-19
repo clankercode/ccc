@@ -62,7 +62,7 @@ HELP_HOME_CONFIG_LINE = "~/.config/ccc/config.toml"
 HELP_SHOW_THINKING_SNIPPET = "--show-thinking"
 HELP_SANITIZE_OSC_SNIPPET = "--sanitize-osc / --no-sanitize-osc"
 HELP_OUTPUT_MODE_SNIPPET = (
-    "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted>"
+    "--output-mode / -o <text|stream-text|json|stream-json|formatted|stream-formatted|pass-text|pt|stream-pass-text|stream-pt|pass-json|pj|stream-pass-json|stream-pj>"
 )
 HELP_OUTPUT_SUGAR_SNIPPET = ".text / ..text, .json / ..json, .fmt / ..fmt"
 HELP_COLOR_ENV_SNIPPET = "FORCE_COLOR / NO_COLOR"
@@ -1743,6 +1743,238 @@ class SingleImplCccContractTests(unittest.TestCase):
                     continue
                 env = self._make_env(opencode_path, lang)
                 with self.subTest(language=lang.name, capability="output-mode"):
+                    for extra_args, expected_stdout in cases[lang.name]:
+                        with self.subTest(language=lang.name, args=extra_args):
+                            result = lang.invoke_with_args(extra_args, PROMPT, env)
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            self.assertEqual(result.stdout, expected_stdout)
+                            self.assertEqual(
+                                result.stderr,
+                                self._expected_persistence_warning_for_args(extra_args),
+                            )
+
+    def test_pass_output_mode_sugar_maps_to_runner_specific_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            claude_path = bin_dir / "claude"
+            kimi_path = bin_dir / "kimi"
+            opencode_path = bin_dir / "opencode"
+            cursor_path = bin_dir / "cursor-agent"
+            codex_path = bin_dir / "codex"
+            gemini_path = bin_dir / "gemini"
+            self._write_argv_echo_stub(claude_path, "claude")
+            self._write_argv_echo_stub(kimi_path, "kimi")
+            self._write_argv_echo_stub(opencode_path, "opencode")
+            self._write_argv_echo_stub(cursor_path, "cursor-agent")
+            self._write_argv_echo_stub(codex_path, "codex")
+            self._write_argv_echo_stub(gemini_path, "gemini")
+
+            cases = {
+                "Python": [
+                    (
+                        ["cc", ".pt"],
+                        "claude -p --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
+                    ),
+                    (
+                        ["cc", "..pt"],
+                        "claude -p --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
+                    ),
+                    (
+                        ["cc", ".pj"],
+                        "claude -p --output-format json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
+                    ),
+                    (
+                        ["cc", "..pj"],
+                        "claude -p --verbose --output-format stream-json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", ".pt"],
+                        "kimi --thinking --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", "..pt"],
+                        "kimi --thinking --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", ".pj"],
+                        "kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", "..pj"],
+                        "kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["oc", ".pt"],
+                        "opencode run --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["oc", "..pt"],
+                        "opencode run --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["oc", ".pj"],
+                        "opencode run --format json --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["oc", "..pj"],
+                        "opencode run --format json --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["c", ".pt"],
+                        "codex exec --ephemeral Fix the failing tests\n",
+                    ),
+                    (
+                        ["c", "..pt"],
+                        "codex exec --ephemeral Fix the failing tests\n",
+                    ),
+                    (
+                        ["c", ".pj"],
+                        "codex exec --json --ephemeral Fix the failing tests\n",
+                    ),
+                    (
+                        ["c", "..pj"],
+                        "codex exec --json --ephemeral Fix the failing tests\n",
+                    ),
+                    (
+                        ["cu", ".pt"],
+                        "cursor-agent --print --trust Fix the failing tests\n",
+                    ),
+                    (
+                        ["cu", "..pt"],
+                        "cursor-agent --print --trust Fix the failing tests\n",
+                    ),
+                    (
+                        ["cu", ".pj"],
+                        "cursor-agent --print --trust --output-format json Fix the failing tests\n",
+                    ),
+                    (
+                        ["cu", "..pj"],
+                        "cursor-agent --print --trust --output-format stream-json Fix the failing tests\n",
+                    ),
+                    (
+                        ["g", ".pt"],
+                        "gemini --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["g", "..pt"],
+                        "gemini --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["g", ".pj"],
+                        "gemini --output-format json --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["g", "..pj"],
+                        "gemini --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
+                ],
+                "Rust": [
+                    (
+                        ["cc", ".pt"],
+                        "claude -p --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
+                    ),
+                    (
+                        ["cc", "..pt"],
+                        "claude -p --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
+                    ),
+                    (
+                        ["cc", ".pj"],
+                        "claude -p --output-format json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
+                    ),
+                    (
+                        ["cc", "..pj"],
+                        "claude -p --verbose --output-format stream-json --thinking enabled --effort low --no-session-persistence Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", ".pt"],
+                        "kimi --thinking --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", "..pt"],
+                        "kimi --thinking --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", ".pj"],
+                        "kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["k", "..pj"],
+                        "kimi --print --output-format stream-json --thinking --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["oc", ".pt"],
+                        "opencode run --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["oc", "..pt"],
+                        "opencode run --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["oc", ".pj"],
+                        "opencode run --format json --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["oc", "..pj"],
+                        "opencode run --format json --thinking Fix the failing tests\n",
+                    ),
+                    (
+                        ["c", ".pt"],
+                        "codex exec --ephemeral Fix the failing tests\n",
+                    ),
+                    (
+                        ["c", "..pt"],
+                        "codex exec --ephemeral Fix the failing tests\n",
+                    ),
+                    (
+                        ["c", ".pj"],
+                        "codex exec --json --ephemeral Fix the failing tests\n",
+                    ),
+                    (
+                        ["c", "..pj"],
+                        "codex exec --json --ephemeral Fix the failing tests\n",
+                    ),
+                    (
+                        ["cu", ".pt"],
+                        "cursor-agent --print --trust Fix the failing tests\n",
+                    ),
+                    (
+                        ["cu", "..pt"],
+                        "cursor-agent --print --trust Fix the failing tests\n",
+                    ),
+                    (
+                        ["cu", ".pj"],
+                        "cursor-agent --print --trust --output-format json Fix the failing tests\n",
+                    ),
+                    (
+                        ["cu", "..pj"],
+                        "cursor-agent --print --trust --output-format stream-json Fix the failing tests\n",
+                    ),
+                    (
+                        ["g", ".pt"],
+                        "gemini --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["g", "..pt"],
+                        "gemini --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["g", ".pj"],
+                        "gemini --output-format json --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["g", "..pj"],
+                        "gemini --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
+                ],
+            }
+
+            for lang in self.selected_languages:
+                if lang.name not in cases:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                with self.subTest(language=lang.name, capability="pass-output-mode"):
                     for extra_args, expected_stdout in cases[lang.name]:
                         with self.subTest(language=lang.name, args=extra_args):
                             result = lang.invoke_with_args(extra_args, PROMPT, env)

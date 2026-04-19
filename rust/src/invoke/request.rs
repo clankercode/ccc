@@ -34,6 +34,10 @@ pub enum OutputMode {
     StreamJson,
     Formatted,
     StreamFormatted,
+    PassText,
+    StreamPassText,
+    PassJson,
+    StreamPassJson,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -190,12 +194,12 @@ impl Request {
         let output_mode = match parsed.output_mode.as_deref() {
             Some("") => {
                 return Err(
-                    "output mode requires one of: text, stream-text, json, stream-json, formatted, stream-formatted"
+                    "output mode requires one of: text, stream-text, json, stream-json, formatted, stream-formatted, pass-text, pt, stream-pass-text, stream-pt, pass-json, pj, stream-pass-json, stream-pj"
                         .to_string(),
                 )
             }
             Some(value) => Some(OutputMode::from_cli_value(value).ok_or_else(|| {
-                "output mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted"
+                "output mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted, pass-text, pt, stream-pass-text, stream-pt, pass-json, pj, stream-pass-json, stream-pj"
                     .to_string()
             })?),
             None => None,
@@ -300,17 +304,25 @@ impl OutputMode {
             OutputMode::StreamJson => "stream-json",
             OutputMode::Formatted => "formatted",
             OutputMode::StreamFormatted => "stream-formatted",
+            OutputMode::PassText => "pass-text",
+            OutputMode::StreamPassText => "stream-pass-text",
+            OutputMode::PassJson => "pass-json",
+            OutputMode::StreamPassJson => "stream-pass-json",
         }
     }
 
     pub(crate) fn from_cli_value(value: &str) -> Option<Self> {
         match value {
-            "text" => Some(OutputMode::Text),
-            "stream-text" => Some(OutputMode::StreamText),
-            "json" => Some(OutputMode::Json),
-            "stream-json" => Some(OutputMode::StreamJson),
+            "text" | "pt" => Some(OutputMode::Text),
+            "stream-text" | "stream-pt" => Some(OutputMode::StreamText),
+            "json" | "pj" => Some(OutputMode::Json),
+            "stream-json" | "stream-pj" => Some(OutputMode::StreamJson),
             "formatted" => Some(OutputMode::Formatted),
             "stream-formatted" => Some(OutputMode::StreamFormatted),
+            "pass-text" => Some(OutputMode::PassText),
+            "stream-pass-text" => Some(OutputMode::StreamPassText),
+            "pass-json" => Some(OutputMode::PassJson),
+            "stream-pass-json" => Some(OutputMode::StreamPassJson),
             _ => None,
         }
     }

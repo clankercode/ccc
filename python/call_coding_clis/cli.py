@@ -100,6 +100,10 @@ OUTPUT_MODE_CHOICES = [
     "stream-json",
     "formatted",
     "stream-formatted",
+    "pass-text",
+    "stream-pass-text",
+    "pass-json",
+    "stream-pass-json",
 ]
 PROMPT_MODE_CHOICES = ["default", "prepend", "append"]
 
@@ -288,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return _finish_run(parsed.timeout_secs, result, footer_line)
 
-    if output_plan.mode == "json":
+    if output_plan.mode in {"json", "pass-json"}:
         result = runner.run(spec)
         stdout = _sanitize_raw_output(result.stdout, output_plan.runner_name)
         stderr = _sanitize_raw_output(result.stderr, output_plan.runner_name)
@@ -296,14 +300,17 @@ def main(argv: list[str] | None = None) -> int:
             _emit_stdout(stdout, artifact_writer=artifact_writer, newline=False)
         if stderr:
             print(stderr, end="", file=sys.stderr)
-        parsed_output = parse_json_output(result.stdout, output_plan.schema or "")
-        footer_line = _finalize_run_artifacts(artifact_writer, parsed_output.final_text)
+        if output_plan.mode == "json":
+            parsed_output = parse_json_output(result.stdout, output_plan.schema or "")
+            footer_line = _finalize_run_artifacts(artifact_writer, parsed_output.final_text)
+        else:
+            footer_line = _finalize_run_artifacts(artifact_writer, stdout)
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
         return _finish_run(parsed.timeout_secs, result, footer_line)
 
-    if output_plan.mode == "text":
+    if output_plan.mode in {"text", "pass-text"}:
         result = runner.run(spec)
         stdout = _sanitize_raw_output(result.stdout, output_plan.runner_name)
         stderr = _sanitize_raw_output(result.stderr, output_plan.runner_name)
@@ -317,14 +324,14 @@ def main(argv: list[str] | None = None) -> int:
         )
         return _finish_run(parsed.timeout_secs, result, footer_line)
 
-    if output_plan.mode in {"stream-text", "stream-json"}:
+    if output_plan.mode in {"stream-text", "stream-json", "stream-pass-text", "stream-pass-json"}:
         result = runner.stream(
             spec,
             lambda channel, chunk: _handle_raw_stream_chunk(
                 channel, chunk, artifact_writer
             ),
         )
-        if output_plan.mode == "stream-json":
+        if output_plan.mode in {"stream-json", "stream-pass-json"}:
             output_text = parse_json_output(
                 result.stdout, output_plan.schema or ""
             ).final_text
@@ -561,9 +568,13 @@ def _set_alias_field(alias: AliasDef, field: str, value: str) -> None:
             "stream-json",
             "formatted",
             "stream-formatted",
+            "pass-text",
+            "stream-pass-text",
+            "pass-json",
+            "stream-pass-json",
         }:
             raise ValueError(
-                "output_mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted"
+                "output_mode must be one of: text, stream-text, json, stream-json, formatted, stream-formatted, pass-text, stream-pass-text, pass-json, stream-pass-json"
             )
         alias.output_mode = value
     elif field == "prompt_mode":

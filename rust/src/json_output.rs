@@ -216,7 +216,7 @@ fn apply_opencode_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
     }
 }
 
-fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
+fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) -> bool {
     let msg_type = obj
         .get("type")
         .and_then(|value| value.as_str())
@@ -233,6 +233,7 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                     .and_then(|value| value.as_str())
                     .unwrap_or("")
                     .to_string();
+                return true;
             } else if subtype == "api_retry" {
                 result.events.push(JsonEvent {
                     event_type: "system_retry".into(),
@@ -241,7 +242,27 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                     tool_call: None,
                     tool_result: None,
                 });
+                return true;
+            } else if matches!(
+                subtype,
+                "hook_started"
+                    | "hook_progress"
+                    | "hook_response"
+                    | "status"
+                    | "compact_boundary"
+                    | "post_turn_summary"
+                    | "local_command_output"
+                    | "files_persisted"
+                    | "task_notification"
+                    | "task_started"
+                    | "task_progress"
+                    | "session_state_changed"
+                    | "elicitation_complete"
+                    | "bridge_state"
+            ) {
+                return true;
             }
+            false
         }
         "assistant" => {
             if let Some(message) = obj.get("message").and_then(|value| value.as_object()) {
@@ -272,6 +293,7 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                         .collect();
                 }
             }
+            true
         }
         "user" => {
             if let Some(message) = obj.get("message").and_then(|value| value.as_object()) {
@@ -305,6 +327,7 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                     }
                 }
             }
+            true
         }
         "stream_event" => {
             if let Some(event) = obj.get("event").and_then(|value| value.as_object()) {
@@ -352,6 +375,7 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                                 tool_call: None,
                                 tool_result: None,
                             }),
+                            "signature_delta" | "citations_delta" | "connector_text_delta" => {}
                             _ => {}
                         }
                     }
@@ -393,9 +417,11 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                                 tool_result: None,
                             });
                         }
+                        // text, server_tool_use, connector_text, advisor_tool_result: silent
                     }
                 }
             }
+            true
         }
         "tool_use" => {
             let tool_input = obj
@@ -417,6 +443,7 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                 }),
                 tool_result: None,
             });
+            true
         }
         "tool_result" => {
             result.events.push(JsonEvent {
@@ -441,6 +468,7 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                         .unwrap_or(false),
                 }),
             });
+            true
         }
         "result" => {
             let subtype = obj
@@ -474,7 +502,15 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                     tool_call: None,
                     tool_result: None,
                 });
-            } else if subtype == "error" {
+                true
+            } else if matches!(
+                subtype,
+                "error"
+                    | "error_during_execution"
+                    | "error_max_turns"
+                    | "error_max_budget_usd"
+                    | "error_max_structured_output_retries"
+            ) {
                 result.error = obj
                     .get("error")
                     .and_then(|value| value.as_str())
@@ -487,9 +523,19 @@ fn apply_claude_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
                     tool_call: None,
                     tool_result: None,
                 });
+                true
+            } else {
+                false
             }
         }
-        _ => {}
+        "rate_limit_event"
+        | "tool_progress"
+        | "tool_use_summary"
+        | "auth_status"
+        | "streamlined_text"
+        | "streamlined_tool_use_summary"
+        | "prompt_suggestion" => true,
+        _ => false,
     }
 }
 
@@ -1069,10 +1115,7 @@ pub fn parse_claude_code_json(raw: &str) -> ParsedJsonOutput {
     let mut result = new_output("claude-code");
     for line in raw.lines() {
         if let Some(obj) = parse_json_line(line) {
-            let before = parser_state(&result);
-            apply_claude_obj(&mut result, &obj);
-            let after = parser_state(&result);
-            if before == after {
+            if !apply_claude_obj(&mut result, &obj) {
                 result.unknown_json_lines.push(line.trim().to_string());
             }
         }
@@ -1516,10 +1559,7 @@ impl StructuredStreamProcessor {
                 apply_opencode_obj(&mut self.output, obj);
                 false
             }
-            "claude-code" => {
-                apply_claude_obj(&mut self.output, obj);
-                false
-            }
+            "claude-code" => apply_claude_obj(&mut self.output, obj),
             "kimi" => {
                 apply_kimi_obj(&mut self.output, obj);
                 false

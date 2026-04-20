@@ -635,31 +635,7 @@ fn test_fixture_claude_stream_unknown_events() {
     let rendered = render_parsed(&parsed, true, false);
     assert!(rendered.contains("[thinking] The user wants a staged tool-using response."));
     assert!(rendered.contains("[assistant] Computing the first multiplication."));
-    assert!(parsed.unknown_json_lines.len() >= 6);
-    assert!(parsed
-        .unknown_json_lines
-        .iter()
-        .any(|line| line.contains("\"type\":\"message_start\"")));
-    assert!(parsed
-        .unknown_json_lines
-        .iter()
-        .any(|line| line.contains("\"type\":\"signature_delta\"")));
-    assert!(parsed
-        .unknown_json_lines
-        .iter()
-        .any(|line| line.contains("\"type\":\"content_block_stop\"")));
-    assert!(parsed
-        .unknown_json_lines
-        .iter()
-        .any(|line| line.contains("\"type\":\"message_delta\"")));
-    assert!(parsed
-        .unknown_json_lines
-        .iter()
-        .any(|line| line.contains("\"type\":\"message_stop\"")));
-    assert!(parsed
-        .unknown_json_lines
-        .iter()
-        .any(|line| line.contains("\"type\":\"rate_limit_event\"")));
+    assert!(parsed.unknown_json_lines.is_empty());
 }
 
 #[test]
@@ -686,6 +662,83 @@ fn test_claude_code_streaming_thinking() {
 }
 
 #[test]
+fn test_claude_new_system_subtypes_are_handled() {
+    let subtypes = [
+        "hook_progress",
+        "compact_boundary",
+        "post_turn_summary",
+        "local_command_output",
+        "files_persisted",
+        "task_notification",
+        "task_started",
+        "task_progress",
+        "session_state_changed",
+        "elicitation_complete",
+        "bridge_state",
+    ];
+    let raw: String = subtypes
+        .iter()
+        .map(|s| format!("{{\"type\":\"system\",\"subtype\":\"{s}\"}}\n"))
+        .collect();
+    let parsed = parse_claude_code_json(&raw);
+    assert!(parsed.unknown_json_lines.is_empty());
+    assert_eq!(render_parsed(&parsed, true, false), "");
+}
+
+#[test]
+fn test_claude_new_top_level_types_are_handled() {
+    let raw = concat!(
+        "{\"type\":\"tool_progress\"}\n",
+        "{\"type\":\"tool_use_summary\"}\n",
+        "{\"type\":\"auth_status\"}\n",
+        "{\"type\":\"streamlined_text\"}\n",
+        "{\"type\":\"streamlined_tool_use_summary\"}\n",
+        "{\"type\":\"prompt_suggestion\"}\n",
+    );
+    let parsed = parse_claude_code_json(raw);
+    assert!(parsed.unknown_json_lines.is_empty());
+}
+
+#[test]
+fn test_claude_user_without_tool_results_is_handled() {
+    let raw = "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"hi\"}]}}\n";
+    let parsed = parse_claude_code_json(raw);
+    assert!(parsed.unknown_json_lines.is_empty());
+}
+
+#[test]
+fn test_claude_stream_event_new_block_and_delta_types_are_handled() {
+    let raw = concat!(
+        "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"server_tool_use\"}}}\n",
+        "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"connector_text\"}}}\n",
+        "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"advisor_tool_result\"}}}\n",
+        "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"citations_delta\"}}}\n",
+        "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"connector_text_delta\"}}}\n",
+    );
+    let parsed = parse_claude_code_json(raw);
+    assert!(parsed.unknown_json_lines.is_empty());
+}
+
+#[test]
+fn test_claude_result_error_subtypes_produce_error_events() {
+    for subtype in [
+        "error_during_execution",
+        "error_max_turns",
+        "error_max_budget_usd",
+        "error_max_structured_output_retries",
+    ] {
+        let raw = format!("{{\"type\":\"result\",\"subtype\":\"{subtype}\",\"error\":\"boom\"}}\n");
+        let parsed = parse_claude_code_json(&raw);
+        assert!(parsed.unknown_json_lines.is_empty(), "subtype {subtype} landed in unknown_json_lines");
+        assert!(
+            parsed.events.iter().any(|e| e.event_type == "error"),
+            "subtype {subtype} did not produce an error event"
+        );
+        assert_eq!(parsed.error, "boom", "subtype {subtype} did not set error field");
+    }
+}
+
+#[test]
 fn test_unknown_json_is_captured_but_not_rendered_by_default() {
     let raw = concat!(
         "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"sess-1\"}\n",
@@ -693,6 +746,5 @@ fn test_unknown_json_is_captured_but_not_rendered_by_default() {
     );
     let parsed = parse_claude_code_json(raw);
     assert_eq!(render_parsed(&parsed, true, false), "");
-    assert_eq!(parsed.unknown_json_lines.len(), 1);
-    assert!(parsed.unknown_json_lines[0].contains("\"type\":\"rate_limit_event\""));
+    assert!(parsed.unknown_json_lines.is_empty());
 }

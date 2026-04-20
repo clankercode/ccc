@@ -1,3 +1,4 @@
+import json
 import unittest
 from pathlib import Path
 
@@ -443,8 +444,7 @@ class RenderParsedTests(unittest.TestCase):
     def test_unknown_json_is_captured_but_not_rendered_by_default(self):
         result = parse_claude_code_json(CLAUDE_UNKNOWN_EVENT)
         self.assertEqual(render_parsed(result, show_thinking=True), "")
-        self.assertEqual(len(result.unknown_json_lines), 1)
-        self.assertIn('"type":"rate_limit_event"', result.unknown_json_lines[0])
+        self.assertEqual(result.unknown_json_lines, [])
 
     def test_resolve_human_tty_defaults_to_terminal_state(self):
         self.assertTrue(resolve_human_tty(True))
@@ -475,33 +475,72 @@ class RenderParsedTests(unittest.TestCase):
             "[thinking] The user wants a staged tool-using response.", rendered
         )
         self.assertIn("[assistant] Computing the first multiplication.", rendered)
-        self.assertGreaterEqual(len(result.unknown_json_lines), 6)
-        self.assertTrue(
-            any('"type":"message_start"' in line for line in result.unknown_json_lines)
+        self.assertEqual(result.unknown_json_lines, [])
+
+    def test_claude_new_system_subtypes_are_handled(self):
+        subtypes = [
+            "hook_progress",
+            "compact_boundary",
+            "post_turn_summary",
+            "local_command_output",
+            "files_persisted",
+            "task_notification",
+            "task_started",
+            "task_progress",
+            "session_state_changed",
+            "elicitation_complete",
+            "bridge_state",
+        ]
+        raw = "".join(
+            json.dumps({"type": "system", "subtype": s}) + "\n" for s in subtypes
         )
-        self.assertTrue(
-            any(
-                '"type":"signature_delta"' in line for line in result.unknown_json_lines
-            )
-        )
-        self.assertTrue(
-            any(
-                '"type":"content_block_stop"' in line
-                for line in result.unknown_json_lines
-            )
-        )
-        self.assertTrue(
-            any('"type":"message_delta"' in line for line in result.unknown_json_lines)
-        )
-        self.assertTrue(
-            any('"type":"message_stop"' in line for line in result.unknown_json_lines)
-        )
-        self.assertTrue(
-            any(
-                '"type":"rate_limit_event"' in line
-                for line in result.unknown_json_lines
-            )
-        )
+        result = parse_claude_code_json(raw)
+        self.assertEqual(result.unknown_json_lines, [])
+        self.assertEqual(render_parsed(result, show_thinking=True), "")
+
+    def test_claude_new_top_level_types_are_handled(self):
+        types = [
+            "tool_progress",
+            "tool_use_summary",
+            "auth_status",
+            "streamlined_text",
+            "streamlined_tool_use_summary",
+            "prompt_suggestion",
+        ]
+        raw = "".join(json.dumps({"type": t}) + "\n" for t in types)
+        result = parse_claude_code_json(raw)
+        self.assertEqual(result.unknown_json_lines, [])
+
+    def test_claude_user_without_tool_results_is_handled(self):
+        raw = '{"type":"user","message":{"content":[{"type":"text","text":"hi"}]}}\n'
+        result = parse_claude_code_json(raw)
+        self.assertEqual(result.unknown_json_lines, [])
+
+    def test_claude_stream_event_new_block_and_delta_types_are_handled(self):
+        lines = [
+            {"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "server_tool_use"}}},
+            {"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "connector_text"}}},
+            {"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "advisor_tool_result"}}},
+            {"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "citations_delta"}}},
+            {"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "connector_text_delta"}}},
+        ]
+        raw = "".join(json.dumps(l) + "\n" for l in lines)
+        result = parse_claude_code_json(raw)
+        self.assertEqual(result.unknown_json_lines, [])
+
+    def test_claude_result_error_subtypes_produce_error_events(self):
+        for subtype in [
+            "error_during_execution",
+            "error_max_turns",
+            "error_max_budget_usd",
+            "error_max_structured_output_retries",
+        ]:
+            with self.subTest(subtype=subtype):
+                raw = json.dumps({"type": "result", "subtype": subtype, "error": "boom"}) + "\n"
+                result = parse_claude_code_json(raw)
+                self.assertEqual(result.unknown_json_lines, [])
+                self.assertTrue(any(e.event_type == "error" for e in result.events))
+                self.assertEqual(result.error, "boom")
 
     def test_fixture_kimi_tool_bash(self):
         raw = (FIXTURES / "kimi" / "tool_bash" / "stdout.ndjson").read_text()

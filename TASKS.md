@@ -34,3 +34,4 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
 - [ ] Add HTTP/HTTPS delivery for final-message sinks
   - Keep the first pass focused on local file and stdio destinations for scripts.
   - Reuse the final-output sink abstraction so remote delivery can land later without changing the CLI surface again.
+- [] do something with tests/fixtures/unhandled-claude-json.txt

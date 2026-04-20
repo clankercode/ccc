@@ -167,7 +167,24 @@ def _apply_claude_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
             result.session_id = str(obj.get("session_id", ""))
         elif subtype == "api_retry":
             result.events.append(JsonEvent(event_type="system_retry", raw=obj))
-        return subtype in {"init", "api_retry"}
+        return subtype in {
+            "init",
+            "api_retry",
+            "hook_started",
+            "hook_progress",
+            "hook_response",
+            "status",
+            "compact_boundary",
+            "post_turn_summary",
+            "local_command_output",
+            "files_persisted",
+            "task_notification",
+            "task_started",
+            "task_progress",
+            "session_state_changed",
+            "elicitation_complete",
+            "bridge_state",
+        }
 
     if msg_type == "assistant":
         message = obj.get("message", {})
@@ -209,14 +226,7 @@ def _apply_claude_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
                                 raw=obj,
                             )
                         )
-        return (
-            any(
-                isinstance(block, dict) and block.get("type") == "tool_result"
-                for block in content
-            )
-            if isinstance(content, list)
-            else False
-        )
+        return True
 
     if msg_type == "stream_event":
         event = obj.get("event", {})
@@ -255,6 +265,8 @@ def _apply_claude_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
                     )
                 )
                 return True
+            elif delta_type in {"signature_delta", "citations_delta", "connector_text_delta"}:
+                return True
         elif event_type == "content_block_start":
             content_block = event.get("content_block", {})
             if not isinstance(content_block, dict):
@@ -276,6 +288,15 @@ def _apply_claude_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
                     )
                 )
                 return True
+            elif block_type in {"text", "server_tool_use", "connector_text", "advisor_tool_result"}:
+                return True
+        elif event_type in {
+            "message_start",
+            "message_delta",
+            "message_stop",
+            "content_block_stop",
+        }:
+            return True
         return False
 
     if msg_type == "tool_use":
@@ -322,12 +343,28 @@ def _apply_claude_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
                 JsonEvent(event_type="result", text=result.final_text, raw=obj)
             )
             return True
-        elif subtype == "error":
+        elif subtype in {
+            "error",
+            "error_during_execution",
+            "error_max_turns",
+            "error_max_budget_usd",
+            "error_max_structured_output_retries",
+        }:
             result.error = str(obj.get("error", ""))
             result.events.append(
                 JsonEvent(event_type="error", text=result.error, raw=obj)
             )
             return True
+    if msg_type in {
+        "rate_limit_event",
+        "tool_progress",
+        "tool_use_summary",
+        "auth_status",
+        "streamlined_text",
+        "streamlined_tool_use_summary",
+        "prompt_suggestion",
+    }:
+        return True
     return False
 
 

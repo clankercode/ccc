@@ -114,6 +114,32 @@ fn apply_opencode_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) {
             tool_call: None,
             tool_result: None,
         });
+    } else if obj.get("type").and_then(|value| value.as_str()) == Some("reasoning") {
+        if let Some(session_id) = obj.get("sessionID").and_then(|value| value.as_str()) {
+            if !session_id.is_empty() {
+                result.session_id = session_id.to_string();
+            }
+        }
+        if let Some(part) = obj.get("part").and_then(|value| value.as_object()) {
+            if result.session_id.is_empty() {
+                if let Some(part_session_id) = part.get("sessionID").and_then(|value| value.as_str()) {
+                    if !part_session_id.is_empty() {
+                        result.session_id = part_session_id.to_string();
+                    }
+                }
+            }
+            if let Some(text) = part.get("text").and_then(|value| value.as_str()) {
+                if !text.is_empty() {
+                    result.events.push(JsonEvent {
+                        event_type: "thinking".into(),
+                        text: String::new(),
+                        thinking: text.to_string(),
+                        tool_call: None,
+                        tool_result: None,
+                    });
+                }
+            }
+        }
     } else if obj.get("type").and_then(|value| value.as_str()) == Some("step_start") {
         result.session_id = obj
             .get("sessionID")
@@ -1100,10 +1126,11 @@ pub fn parse_opencode_json(raw: &str) -> ParsedJsonOutput {
     let mut result = new_output("opencode");
     for line in raw.lines() {
         if let Some(obj) = parse_json_line(line) {
+            let is_reasoning = obj.get("type").and_then(|value| value.as_str()) == Some("reasoning");
             let before = parser_state(&result);
             apply_opencode_obj(&mut result, &obj);
             let after = parser_state(&result);
-            if before == after {
+            if before == after && !is_reasoning {
                 result.unknown_json_lines.push(line.trim().to_string());
             }
         }

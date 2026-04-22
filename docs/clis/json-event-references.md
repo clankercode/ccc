@@ -100,8 +100,11 @@ Current `ccc` integration note:
 
 - Real smoke verification currently observes at least:
   - `step_start`
+  - `reasoning`
   - `text`
   - `step_finish`
+- OpenCode `reasoning` events carry `part.text`; Python and Rust normalize that payload to `thinking` so visible-thinking output can render it through the shared transcript path.
+- Real smoke verification also captures `sessionID` on `reasoning`, which lets `ccc` seed the run/session id even when reasoning arrives before the first `step_start`.
 - Real smoke verification also confirms that `opencode run --format json` emits those events incrementally, so `ccc` uses that same upstream transport for both buffered `formatted` and live `stream-formatted`.
 - Real smoke verification also observed OSC terminal-title control sequences in buffered raw output, so Python and Rust now strip those sequences on the `ccc` side for OpenCode buffered raw modes.
 

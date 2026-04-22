@@ -95,6 +95,29 @@ fn test_opencode_tool_use_and_result_response() {
 }
 
 #[test]
+fn test_opencode_reasoning_event_is_treated_as_thinking() {
+    let raw = concat!(
+        "{\"type\":\"reasoning\",\"timestamp\":1,\"sessionID\":\"ses_3\",\"part\":{\"id\":\"prt_1\",\"messageID\":\"msg_1\",\"sessionID\":\"ses_3\",\"type\":\"reasoning\",\"text\":\"Let me think about this.\",\"time\":{\"start\":1},\"metadata\":{}}}\n",
+        "{\"type\":\"text\",\"timestamp\":2,\"sessionID\":\"ses_3\",\"part\":{\"type\":\"text\",\"text\":\"Final answer\"}}\n"
+    );
+    let parsed = parse_opencode_json(raw);
+    let thinking_events: Vec<_> = parsed
+        .events
+        .iter()
+        .filter(|event| event.event_type == "thinking")
+        .collect();
+    assert_eq!(parsed.session_id, "ses_3");
+    assert_eq!(parsed.final_text, "Final answer");
+    assert_eq!(thinking_events.len(), 1);
+    assert_eq!(thinking_events[0].thinking, "Let me think about this.");
+    assert!(parsed.unknown_json_lines.is_empty());
+    let rendered = render_parsed(&parsed, true, false);
+    assert!(rendered.contains("[thinking] Let me think about this."));
+    assert!(rendered.contains("[assistant] Final answer"));
+    assert!(!render_parsed(&parsed, false, false).contains("[thinking] Let me think about this."));
+}
+
+#[test]
 fn test_claude_code_simple_response() {
     let raw = concat!(
         "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"sess-123\"}\n",

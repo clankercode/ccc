@@ -34,6 +34,11 @@ OPENCODE_TOOL_STREAM = (
     '{"type":"text","timestamp":3,"sessionID":"ses_2","part":{"type":"text","text":"Done reading."}}\n'
 )
 
+OPENCODE_REASONING_STREAM = (
+    '{"type":"reasoning","timestamp":1,"sessionID":"ses_3","part":{"id":"prt_1","messageID":"msg_1","sessionID":"ses_3","type":"reasoning","text":"Let me think about this.","time":{"start":1},"metadata":{}}}\n'
+    '{"type":"text","timestamp":2,"sessionID":"ses_3","part":{"type":"text","text":"Final answer"}}\n'
+)
+
 CLAUDE_CODE_STDOUT = (
     '{"type":"system","subtype":"init","session_id":"sess-1","tools":[],"model":"mock","permission_mode":"default"}\n'
     '{"type":"assistant","message":{"id":"msg_1","type":"message","role":"assistant","model":"mock",'
@@ -147,6 +152,19 @@ class ParseOpenCodeJsonTests(unittest.TestCase):
         self.assertEqual(tool_use_events[0].tool_call.name, "read")
         self.assertEqual(tool_result_events[0].tool_result.tool_call_id, "call_1")
         self.assertEqual(result.final_text, "Done reading.")
+
+    def test_reasoning_event_is_treated_as_thinking(self):
+        result = parse_opencode_json(OPENCODE_REASONING_STREAM)
+        thinking_events = [e for e in result.events if e.event_type == "thinking"]
+        self.assertEqual(result.session_id, "ses_3")
+        self.assertEqual(result.final_text, "Final answer")
+        self.assertEqual(len(thinking_events), 1)
+        self.assertEqual(thinking_events[0].thinking, "Let me think about this.")
+        self.assertEqual(result.unknown_json_lines, [])
+        rendered = render_parsed(result, show_thinking=True)
+        self.assertIn("[thinking] Let me think about this.", rendered)
+        self.assertIn("[assistant] Final answer", rendered)
+        self.assertNotIn("[thinking] Let me think about this.", render_parsed(result, show_thinking=False))
 
 
 class ParseClaudeCodeJsonTests(unittest.TestCase):

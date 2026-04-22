@@ -20,6 +20,15 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-04-22
+
+### OpenCode reasoning events now render as thinking
+- Change: Python and Rust now normalize OpenCode `type:"reasoning"` events into the shared `thinking` event path, capture `sessionID` from the reasoning payload even when it arrives before `step_start`, and keep `unknown_json_lines` clean for the new wire shape
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_json_output.py`, `rust/tests/json_output_tests.rs`
+- Notes: updated [docs/clis/json-event-references.md](docs/clis/json-event-references.md), [JSON_PARSING_MAP.md](JSON_PARSING_MAP.md), and [docs/clis/opencode.md](docs/clis/opencode.md)
+
 ## 2026-04-18
 
 ### `--timeout-secs <N>` kills the runner after N seconds

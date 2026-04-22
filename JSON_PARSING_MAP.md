@@ -48,6 +48,7 @@ JSON event stream (`--format json`), with legacy one-shot `response` and `error`
 | `response` | yes | `text` |
 | `error` | yes | `error` |
 | `step_start` | `sessionID` | (sets `session_id`) |
+| `reasoning` | `sessionID`, `part.text` | `thinking` |
 | `text` | `part.text` | `text` |
 | `tool_use` | tool name, call id, input, output | `tool_use`, `tool_result` |
 | `step_finish` | token usage, cost | (sets output fields) |

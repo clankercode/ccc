@@ -85,6 +85,22 @@ def _apply_opencode_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
         result.events.append(JsonEvent(event_type="error", text=result.error, raw=obj))
         return True
     event_type = str(obj.get("type", ""))
+    if event_type == "reasoning":
+        session_id = obj.get("sessionID")
+        if isinstance(session_id, str) and session_id:
+            result.session_id = session_id
+        part = obj.get("part", {})
+        if isinstance(part, dict):
+            if not result.session_id:
+                part_session_id = part.get("sessionID")
+                if isinstance(part_session_id, str) and part_session_id:
+                    result.session_id = part_session_id
+            text = str(part.get("text", ""))
+            if text:
+                result.events.append(
+                    JsonEvent(event_type="thinking", thinking=text, raw=obj)
+                )
+        return True
     if event_type == "step_start":
         result.session_id = str(obj.get("sessionID", result.session_id))
         return True

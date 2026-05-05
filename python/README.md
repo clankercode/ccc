@@ -67,6 +67,8 @@ ccc -- "use --yolo literally in the prompt"
 
 Supported runner selectors include `oc`/`opencode`, `cc`/`claude`, `c`/`cx`/`codex`, `k`/`kimi`, `cu`/`cursor`, `g`/`gemini`, `rc`/`roocode`, and `cr`/`crush`.
 
+`ccc --help` lists aliases loaded from the current config chain and includes agent tips for checking `ccc config`, choosing `@alias` presets, and using `--` before literal prompt text that starts with control-like tokens.
+
 ## Config
 
 Python loads config in merge order:

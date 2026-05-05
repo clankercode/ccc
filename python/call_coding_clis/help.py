@@ -15,6 +15,11 @@ try:
 except ImportError:
     from parser import RUNNER_REGISTRY
 
+try:
+    from .config import load_config
+except ImportError:
+    from config import load_config
+
 
 CANONICAL_RUNNERS = [
     ("opencode", "oc"),
@@ -26,6 +31,19 @@ CANONICAL_RUNNERS = [
     ("cursor", "cu"),
     ("gemini", "g"),
 ]
+ALIAS_SUMMARY_FIELDS = (
+    "runner",
+    "provider",
+    "model",
+    "thinking",
+    "show_thinking",
+    "sanitize_osc",
+    "output_mode",
+    "agent",
+    "prompt",
+    "prompt_mode",
+)
+BARE_ALIAS_VALUE_RE = re.compile(r"^[A-Za-z0-9._:/+-]+$")
 
 ROOT = Path(__file__).resolve().parents[2]
 VERSION_FILE = ROOT / "VERSION"
@@ -127,6 +145,11 @@ Config:
   .ccc.toml (searched upward from CWD)  — project-local presets and defaults
   XDG_CONFIG_HOME/ccc/config.toml       — global defaults when XDG is set
   ~/.config/ccc/config.toml             — legacy global fallback
+
+Agent tips:
+  Run `ccc config` before relying on aliases or defaults; `ccc --help` lists the aliases visible from the current directory.
+  Use `ccc @alias "task"` when an alias matches the job, then add explicit runner/model/thinking controls only when they matter.
+  Use `--` before prompt text that starts with control-like tokens such as `+1`, `@agent`, or `:model`.
 """
 
 
@@ -305,6 +328,38 @@ def runner_checklist() -> str:
     return "\n".join(lines)
 
 
+def _format_alias_value(value: object) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    text = str(value).replace("\r", " ").replace("\n", " ")
+    if BARE_ALIAS_VALUE_RE.match(text):
+        return text
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _format_alias_summary(alias: object) -> str:
+    fields: list[str] = []
+    for key in ALIAS_SUMMARY_FIELDS:
+        value = getattr(alias, key)
+        if value is not None:
+            fields.append(f"{key}={_format_alias_value(value)}")
+    return " ".join(fields) if fields else "(empty)"
+
+
+def alias_checklist() -> str:
+    config = load_config()
+    lines = ["Configured aliases:"]
+    if not config.aliases:
+        lines.append("  (none)")
+        return "\n".join(lines)
+
+    for name in sorted(config.aliases):
+        lines.append(f"  @{name:<11} {_format_alias_summary(config.aliases[name])}")
+    return "\n".join(lines)
+
+
 def _format_version_report(version: str, statuses: list[RunnerStatus]) -> str:
     lines = [f"ccc version {version}", "Resolved clients:"]
     resolved = 0
@@ -324,7 +379,7 @@ def print_version() -> None:
 
 
 def print_help() -> None:
-    print(HELP_TEXT + "\n" + runner_checklist())
+    print(HELP_TEXT + "\n" + alias_checklist() + "\n\n" + runner_checklist())
 
 
 def print_usage() -> None:

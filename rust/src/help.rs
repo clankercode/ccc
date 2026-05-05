@@ -1,3 +1,5 @@
+use crate::config::load_config;
+use crate::parser::AliasDef;
 use crate::RUNNER_REGISTRY;
 use serde_json::Value;
 use std::fs;
@@ -109,6 +111,11 @@ Config:
   .ccc.toml (searched upward from CWD)  — project-local presets and defaults
   XDG_CONFIG_HOME/ccc/config.toml       — global defaults when XDG is set
   ~/.config/ccc/config.toml             — legacy global fallback
+
+Agent tips:
+  Run `ccc config` before relying on aliases or defaults; `ccc --help` lists the aliases visible from the current directory.
+  Use `ccc @alias "task"` when an alias matches the job, then add explicit runner/model/thinking controls only when they matter.
+  Use `--` before prompt text that starts with control-like tokens such as `+1`, `@agent`, or `:model`.
 "#;
 
 fn get_version(binary: &str) -> String {
@@ -427,6 +434,75 @@ fn format_runner_checklist() -> String {
     out
 }
 
+fn format_alias_value(value: &str) -> String {
+    let text = value.replace(['\r', '\n'], " ");
+    if text
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | ':' | '/' | '+' | '-'))
+    {
+        return text;
+    }
+    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+fn format_alias_summary(alias: &AliasDef) -> String {
+    let mut fields = Vec::new();
+    if let Some(value) = &alias.runner {
+        fields.push(format!("runner={}", format_alias_value(value)));
+    }
+    if let Some(value) = &alias.provider {
+        fields.push(format!("provider={}", format_alias_value(value)));
+    }
+    if let Some(value) = &alias.model {
+        fields.push(format!("model={}", format_alias_value(value)));
+    }
+    if let Some(value) = alias.thinking {
+        fields.push(format!("thinking={value}"));
+    }
+    if let Some(value) = alias.show_thinking {
+        fields.push(format!(
+            "show_thinking={}",
+            if value { "true" } else { "false" }
+        ));
+    }
+    if let Some(value) = alias.sanitize_osc {
+        fields.push(format!(
+            "sanitize_osc={}",
+            if value { "true" } else { "false" }
+        ));
+    }
+    if let Some(value) = &alias.output_mode {
+        fields.push(format!("output_mode={}", format_alias_value(value)));
+    }
+    if let Some(value) = &alias.agent {
+        fields.push(format!("agent={}", format_alias_value(value)));
+    }
+    if let Some(value) = &alias.prompt {
+        fields.push(format!("prompt={}", format_alias_value(value)));
+    }
+    if let Some(value) = &alias.prompt_mode {
+        fields.push(format!("prompt_mode={}", format_alias_value(value)));
+    }
+    if fields.is_empty() {
+        "(empty)".to_string()
+    } else {
+        fields.join(" ")
+    }
+}
+
+fn format_alias_checklist() -> String {
+    let config = load_config(None);
+    let mut out = String::from("Configured aliases:\n");
+    if config.aliases.is_empty() {
+        out.push_str("  (none)\n");
+        return out;
+    }
+    for (name, alias) in config.aliases {
+        out.push_str(&format!("  @{name:<11} {}\n", format_alias_summary(&alias)));
+    }
+    out
+}
+
 fn format_version_report(version: &str, statuses: &[RunnerStatus]) -> String {
     let mut out = format!("ccc version {version}\nResolved clients:\n");
     let mut resolved = 0usize;
@@ -449,6 +525,9 @@ fn format_version_report(version: &str, statuses: &[RunnerStatus]) -> String {
 
 pub fn print_help() {
     print!("{}", HELP_TEXT);
+    println!();
+    println!("{}", format_alias_checklist().trim_end());
+    println!();
     print!("{}", format_runner_checklist());
 }
 

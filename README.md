@@ -131,6 +131,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
   - `:provider:model` and `:model`
   - `@name` for preset lookup; if no preset exists, runner names such as `@k` select that runner before ordinary agent fallback; presets can also define a default prompt, and alias `prompt_mode = "prepend"|"append"` can compose alias prompt text around an explicitly supplied prompt
   - `help`, `-h`, and `--help` win anywhere in argv and print help immediately
+  - `ccc --help` lists configured aliases visible from the current directory and includes short agent tips for checking config, choosing aliases, and using `--` for literal prompt text
   - Python and Rust search project-local `.ccc.toml` files upward from the current directory and override the global config chain
   - `ccc config` prints every existing config file path and raw contents in merge order: `~/.config/ccc/config.toml`, `XDG_CONFIG_HOME/ccc/config.toml`, then the nearest project-local `.ccc.toml`; `CCC_CONFIG` still wins alone when it points at an existing file
   - `ccc config --edit` opens the selected config in `$EDITOR`; add `--user` to edit the XDG/home user config or `--local` to edit the nearest `.ccc.toml` (creating one in the current directory if none exists)

@@ -713,6 +713,8 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("Presets can also define a default prompt", HELP_TEXT)
         self.assertIn("Treat all remaining args as prompt text", HELP_TEXT)
         self.assertIn("show_thinking", HELP_TEXT)
+        self.assertIn("Agent tips:", HELP_TEXT)
+        self.assertIn("Run `ccc config`", HELP_TEXT)
 
 
 if __name__ == "__main__":

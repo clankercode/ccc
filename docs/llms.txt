@@ -8,6 +8,7 @@ Python and Rust also expose `ccc config --edit [--user|--local]`, which opens th
 Python and Rust also expose `ccc add [-g] <alias>`, a line-prompt alias wizard that writes `[aliases.<name>]` entries to config; scriptable flags plus `--yes` can write aliases non-interactively.
 Python and Rust also write a per-run artifact directory under the platform state root, with a client-prefixed run folder such as `opencode-<run-id>`, `output.txt`, exactly one transcript file, and a stable stderr footer line that scripts can parse as `>> ccc:output-log >> /abs/path/to/run-dir`; `--output-log-path` enables the footer and `--no-output-log-path` suppresses it.
 Python and Rust also expose `ccc -v` / `ccc --version`, which prints the repo build version plus resolved client versions; the build version is sourced from the repo-root `VERSION` file at build time.
+Python and Rust `ccc --help` also lists configured aliases visible from the current directory and includes short agent tips for checking config, selecting aliases, and using `--` for literal prompt text.
 
 ## Usage
 
@@ -29,6 +30,7 @@ Slots are parsed in free order before the prompt, except that `help`, `-h`, and 
   Formatted run transcripts always retain unhandled structured JSON lines; `CCC_FWD_UNKNOWN_JSON` controls stderr forwarding and currently defaults on.
 - :provider:model: Override provider and model
 - @name: Use a named preset from the loaded config layers; when no preset exists, runner names such as `@k` select that runner before ordinary agent fallback; in Python and Rust, presets can also provide a default prompt when the user leaves prompt text blank, and alias `prompt_mode = "prepend"|"append"` can wrap explicitly supplied prompt text with alias prompt text
+- Help: `ccc --help` lists the configured aliases visible from the current directory before the runner checklist and includes agent-specific usage tips
 - Config: in Python and Rust, project-local `.ccc.toml` files are searched upward from the current directory, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`
 - Generated config: `ccc --print-config` prints the canonical schema using `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 - Resolved config: `ccc config` prints all active config file paths and their raw contents in merge order; `CCC_CONFIG` wins alone when it points at an existing file

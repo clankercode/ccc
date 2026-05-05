@@ -58,9 +58,49 @@ fn test_help_mentions_name_slot() {
     assert!(stdout.contains("XDG_CONFIG_HOME/ccc/config.toml"));
     assert!(stdout.contains("~/.config/ccc/config.toml"));
     assert!(stdout.contains("show_thinking"));
+    assert!(stdout.contains("Agent tips:"));
+    assert!(stdout.contains("Run `ccc config`"));
+    assert!(stdout.contains("Configured aliases:"));
     assert!(stdout.contains(
         "opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g)"
     ));
+}
+
+#[test]
+fn test_help_lists_configured_aliases() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-help-aliases-{unique}"));
+    let home_root = base_dir.join("home");
+    let xdg_root = base_dir.join("xdg");
+    let config_path = xdg_root.join("ccc/config.toml");
+    fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+    fs::write(
+        &config_path,
+        "[aliases.review]\n\
+runner = \"cc\"\n\
+model = \"claude-4\"\n\
+prompt = \"Review changes\"\n\
+\n\
+[aliases.commit]\n\
+prompt = \"Commit all changes\"\n",
+    )
+    .unwrap();
+
+    let output = Command::new(ccc_bin())
+        .arg("--help")
+        .env("HOME", &home_root)
+        .env("XDG_CONFIG_HOME", &xdg_root)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Configured aliases:"));
+    assert!(stdout.contains("  @commit      prompt=\"Commit all changes\""));
+    assert!(stdout.contains("  @review      runner=cc model=claude-4 prompt=\"Review changes\""));
 }
 
 #[test]

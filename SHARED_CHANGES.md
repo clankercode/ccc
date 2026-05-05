@@ -20,6 +20,15 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-05-05
+
+### Help lists configured aliases and agent tips
+- Change: Python and Rust `ccc --help` now includes short agent-facing usage tips and a `Configured aliases:` section built from the aliases visible in the current config chain
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/test_runner.py`, `rust/tests/help_tests.rs`
+- Notes: updated `README.md`, `python/README.md`, `rust/README.md`, `docs/llms.txt`, `docs/index.html`, and the Python/Rust help text
+
 ## 2026-04-22
 
 ### OpenCode reasoning events now render as thinking

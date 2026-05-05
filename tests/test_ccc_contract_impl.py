@@ -75,6 +75,8 @@ HELP_DELIMITER_SNIPPET = "Treat all remaining args as prompt text"
 HELP_TIMEOUT_SECS_SNIPPET = (
     "--timeout-secs <N>                    Kill the runner after N seconds and exit 124"
 )
+HELP_AGENT_TIPS_SNIPPET = "Agent tips:"
+HELP_CONFIGURED_ALIASES_SNIPPET = "Configured aliases:"
 TIMEOUT_SECS_IMPLEMENTATIONS = {"Python", "Rust"}
 SHOW_THINKING_IMPLEMENTATIONS = {"Python", "Rust"}
 YOLO_IMPLEMENTATIONS = {"Python", "Rust"}
@@ -708,6 +710,59 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["--help"], self._make_env(opencode_path, lang)
                     )
                     self.assert_help_mentions_print_config(result)
+
+    def test_help_surface_mentions_agent_tips(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(HELP_AGENT_TIPS_SNIPPET, result.stdout)
+                    self.assertIn("Run `ccc config`", result.stdout)
+                    self.assertIn("Use `--` before prompt text", result.stdout)
+
+    def test_help_surface_lists_configured_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                config_path.write_text(
+                    "[aliases.review]\n"
+                    'runner = "cc"\n'
+                    'model = "claude-4"\n'
+                    'prompt = "Review changes"\n'
+                    "\n"
+                    "[aliases.commit]\n"
+                    'prompt = "Commit all changes"\n',
+                    encoding="utf-8",
+                )
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(["--help"], env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(HELP_CONFIGURED_ALIASES_SNIPPET, result.stdout)
+                    self.assertIn('  @commit      prompt="Commit all changes"', result.stdout)
+                    self.assertIn(
+                        '  @review      runner=cc model=claude-4 prompt="Review changes"',
+                        result.stdout,
+                    )
 
     def test_help_wins_when_mixed_with_other_args(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

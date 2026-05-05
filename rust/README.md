@@ -78,6 +78,8 @@ ccc --help
 ccc -h
 ```
 
+The help output lists aliases loaded from the current config chain and includes agent tips for checking `ccc config`, choosing `@alias` presets, and using `--` before literal prompt text that starts with control-like tokens.
+
 ## Library Quick Start
 
 ### Run a CLI command directly

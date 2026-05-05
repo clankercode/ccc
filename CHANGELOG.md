@@ -3,6 +3,10 @@
 ## Unreleased
 - No unreleased semantic changes.
 
+## 0.3.1 - 2026-05-05
+- Added a `Configured aliases:` section to Python and Rust `ccc --help`, showing aliases visible from the current config chain before the runner checklist.
+- Added short agent-facing help tips for checking `ccc config`, choosing `@alias` presets, and using `--` before literal prompt text that starts with control-like tokens.
+
 ## 0.3.0 - 2026-04-18
 - Added `--timeout-secs <N>` in Python and Rust: `ccc` kills the wrapped runner after `N` seconds, prints `warning: timed out after N seconds; killed runner` to stderr, and exits with status `124`; invalid values (`0`, negatives, non-integers, missing value) are rejected at parse time.
 - Exposed the watchdog through the library API: Rust `CommandSpec::with_timeout_secs`, `Run::timed_out()`, and Python `CommandSpec(timeout_secs=...)` / `CompletedRun.timed_out` let library callers opt into the same cancel semantics.

@@ -22,7 +22,7 @@ For the targeted implementation check:
 from call_coding_clis import CommandSpec, Runner
 
 spec = CommandSpec(
-    argv=["opencode", "run", "Explain this code"],
+    argv=["opencode", "--pure", "run", "Explain this code"],
     cwd="/path/to/project",
 )
 
@@ -35,7 +35,7 @@ Streaming uses a callback that receives `stdout` or `stderr` plus the chunk text
 ```python
 from call_coding_clis import CommandSpec, Runner
 
-spec = CommandSpec(argv=["opencode", "run", "Build a CLI"])
+spec = CommandSpec(argv=["opencode", "--pure", "run", "Build a CLI"])
 
 def on_chunk(channel: str, chunk: str) -> None:
     print(f"{channel}: {chunk}", end="")

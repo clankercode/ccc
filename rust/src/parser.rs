@@ -140,7 +140,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let mut m = BTreeMap::new();
     let opencode = RunnerInfo {
         binary: "opencode".into(),
-        extra_args: vec!["run".into()],
+        extra_args: vec!["--pure".into(), "run".into()],
         no_persist_flags: vec![],
         thinking_flags: BTreeMap::new(),
         show_thinking_flags: {

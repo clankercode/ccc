@@ -142,7 +142,7 @@ pub fn build_prompt_spec(prompt: &str) -> Result<CommandSpec, &'static str> {
     if normalized_prompt.is_empty() {
         return Err("prompt must not be empty");
     }
-    Ok(CommandSpec::new(["opencode", "run", normalized_prompt]))
+    Ok(CommandSpec::new(["opencode", "--pure", "run", normalized_prompt]))
 }
 
 fn default_run_executor(spec: CommandSpec) -> CompletedRun {

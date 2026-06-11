@@ -1722,7 +1722,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["oc", ".json"],
-                        "opencode run --format json --thinking Fix the failing tests\n",
+                        "opencode --pure run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["c", ".json"],
@@ -1764,7 +1764,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["oc", ".json"],
-                        "opencode run --format json --thinking Fix the failing tests\n",
+                        "opencode --pure run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["c", ".json"],
@@ -1862,19 +1862,19 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["oc", ".pt"],
-                        "opencode run --thinking Fix the failing tests\n",
+                        "opencode --pure run --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", "..pt"],
-                        "opencode run --thinking Fix the failing tests\n",
+                        "opencode --pure run --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", ".pj"],
-                        "opencode run --format json --thinking Fix the failing tests\n",
+                        "opencode --pure run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", "..pj"],
-                        "opencode run --format json --thinking Fix the failing tests\n",
+                        "opencode --pure run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["c", ".pt"],
@@ -1960,19 +1960,19 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["oc", ".pt"],
-                        "opencode run --thinking Fix the failing tests\n",
+                        "opencode --pure run --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", "..pt"],
-                        "opencode run --thinking Fix the failing tests\n",
+                        "opencode --pure run --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", ".pj"],
-                        "opencode run --format json --thinking Fix the failing tests\n",
+                        "opencode --pure run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", "..pj"],
-                        "opencode run --format json --thinking Fix the failing tests\n",
+                        "opencode --pure run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["c", ".pt"],
@@ -2080,11 +2080,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["oc", ".fmt"],
-                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                        "[assistant] opencode --pure run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", "..fmt"],
-                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                        "[assistant] opencode --pure run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["c", ".fmt"],
@@ -2130,11 +2130,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["oc", ".fmt"],
-                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                        "[assistant] opencode --pure run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", "..fmt"],
-                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
+                        "[assistant] opencode --pure run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["c", ".fmt"],
@@ -2189,7 +2189,7 @@ class SingleImplCccContractTests(unittest.TestCase):
             self._write_structured_argv_echo_stub(opencode_path, "opencode", "opencode")
 
             expected_stdout = (
-                "\x1b[96m💬\x1b[0m opencode run --format json --thinking Fix the failing tests\n"
+                "\x1b[96m💬\x1b[0m opencode --pure run --format json --thinking Fix the failing tests\n"
             )
 
             for lang in self.selected_languages:
@@ -2928,6 +2928,7 @@ class SingleImplCccContractTests(unittest.TestCase):
     def _write_opencode_stub(self, path: Path) -> None:
         path.write_text(
             "#!/bin/sh\n"
+            'if [ "$1" = "--pure" ]; then shift; fi\n'
             'if [ "$1" != "run" ]; then\n'
             "  exit 9\n"
             "fi\n"
@@ -2944,6 +2945,7 @@ class SingleImplCccContractTests(unittest.TestCase):
     def _write_opencode_cleanup_stub(self, path: Path) -> None:
         path.write_text(
             "#!/bin/sh\n"
+            'if [ "$1" = "--pure" ]; then shift; fi\n'
             'if [ "$1" = "session" ] && [ "${2:-}" = "delete" ]; then\n'
             '  printf "cleanup failed\\n" >&2\n'
             "  exit 17\n"
@@ -3047,6 +3049,7 @@ class SingleImplCccContractTests(unittest.TestCase):
     def _write_opencode_yolo_stub(self, path: Path) -> None:
         path.write_text(
             "#!/bin/sh\n"
+            'if [ "$1" = "--pure" ]; then shift; fi\n'
             'if [ "$1" != "run" ]; then\n'
             "  exit 9\n"
             "fi\n"
@@ -3066,6 +3069,7 @@ class SingleImplCccContractTests(unittest.TestCase):
     def _write_agent_opencode_stub(self, path: Path) -> None:
         path.write_text(
             "#!/bin/sh\n"
+            'if [ "$1" = "--pure" ]; then shift; fi\n'
             'if [ "$1" != "run" ]; then\n'
             "  exit 9\n"
             "fi\n"

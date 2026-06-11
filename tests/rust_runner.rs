@@ -104,7 +104,7 @@ fn command_spec_preserves_cwd_stdin_and_env() {
 fn ccc_builds_prompt_command_spec() {
     let spec = build_prompt_spec("Fix the failing tests").expect("prompt should be valid");
 
-    assert_eq!(spec.argv, vec!["opencode", "run", "Fix the failing tests"]);
+    assert_eq!(spec.argv, vec!["opencode", "--pure", "run", "Fix the failing tests"]);
 }
 
 #[test]

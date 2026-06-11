@@ -112,7 +112,7 @@ def build_prompt_spec(prompt: str) -> CommandSpec:
     normalized_prompt = prompt.strip()
     if not normalized_prompt:
         raise ValueError("prompt must not be empty")
-    return CommandSpec(argv=["opencode", "run", normalized_prompt])
+    return CommandSpec(argv=["opencode", "--pure", "run", normalized_prompt])
 
 
 def _apply_real_runner_override(spec: CommandSpec) -> None:

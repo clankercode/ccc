@@ -20,6 +20,15 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-06-12
+
+### OpenCode --pure flag
+- Change: Python and Rust `ccc` now passes `--pure` to opencode to skip plugin auto-updates
+- Required implementations: Python and Rust
+- Additional rollout: rolled out to Python and Rust
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/test_parser_config.py`, `tests/test_runner.py`, `rust/tests/parser_tests.rs`, `tests/rust_runner.rs`
+- Notes: `--pure` is a global opencode flag that goes before the `run` subcommand
+
 ## 2026-05-05
 
 ### Help lists configured aliases and agent tips

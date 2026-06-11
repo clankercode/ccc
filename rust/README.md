@@ -21,7 +21,7 @@ Add the library to a Rust project:
 
 ```toml
 [dependencies]
-ccc = "0.3.1"
+ccc = "0.3.2"
 ```
 
 Then import the library crate as:
@@ -87,7 +87,7 @@ The help output lists aliases loaded from the current config chain and includes 
 ```rust,no_run
 use call_coding_clis::{CommandSpec, Runner};
 
-let spec = CommandSpec::new(["opencode", "run", "Explain this module"]);
+let spec = CommandSpec::new(["opencode", "--pure", "run", "Explain this module"]);
 let result = Runner::new().run(spec);
 
 println!("{}", result.stdout);
@@ -128,7 +128,7 @@ assert_eq!(parsed.request.model(), Some("gpt-5.4-mini"));
 ```rust,no_run
 use call_coding_clis::{CommandSpec, Runner};
 
-let spec = CommandSpec::new(["opencode", "run", "Explain this module"]);
+let spec = CommandSpec::new(["opencode", "--pure", "run", "Explain this module"]);
 let runner = Runner::new();
 
 let completed = runner.stream(spec, |channel, chunk| {

@@ -781,9 +781,10 @@ fn test_resolve_show_thinking_for_opencode() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
-        argv[..3],
+        argv[..4],
         [
             "opencode".to_string(),
+            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string()
         ]
@@ -912,7 +913,7 @@ fn test_resolve_default_show_thinking_enables_opencode_thinking() {
         ..Default::default()
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
-    assert_eq!(argv[..3], ["opencode", "run", "--thinking"]);
+    assert_eq!(argv[..4], ["opencode", "--pure", "run", "--thinking"]);
     assert!(warnings.is_empty());
 }
 
@@ -946,7 +947,7 @@ fn test_resolve_no_show_thinking_overrides_default_for_opencode() {
         ..Default::default()
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
-    assert_eq!(argv[..2], ["opencode", "run"]);
+    assert_eq!(argv[..3], ["opencode", "--pure", "run"]);
     assert!(!argv.contains(&"--thinking".to_string()));
     assert!(warnings.is_empty());
 }
@@ -1234,7 +1235,7 @@ fn test_resolve_alias_prompt_fills_missing_prompt() {
     let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
     assert_eq!(
         argv,
-        vec!["opencode", "run", "--thinking", "Commit all changes"]
+        vec!["opencode", "--pure", "run", "--thinking", "Commit all changes"]
     );
     assert!(warnings.is_empty());
 }
@@ -1265,6 +1266,7 @@ fn test_resolve_explicit_prompt_overrides_alias_prompt() {
         argv,
         vec![
             "opencode".to_string(),
+            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "Write the commit summary".to_string()
@@ -1301,6 +1303,7 @@ fn test_resolve_alias_prompt_mode_prepend_uses_newline_separator() {
         argv,
         vec![
             "opencode".to_string(),
+            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "Commit all changes\nInclude the failing tests".to_string()
@@ -1337,6 +1340,7 @@ fn test_resolve_alias_prompt_mode_append_uses_newline_separator() {
         argv,
         vec![
             "opencode".to_string(),
+            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "Include the failing tests\nCommit all changes".to_string()
@@ -1402,6 +1406,7 @@ fn test_resolve_alias_prompt_mode_allows_explicit_empty_prompt() {
         argv,
         vec![
             "opencode".to_string(),
+            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "Commit all changes".to_string()
@@ -1516,6 +1521,7 @@ fn test_explicit_runner_keeps_runner_like_alias_as_agent() {
         argv,
         vec![
             "opencode".to_string(),
+            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "--agent".to_string(),
@@ -1544,8 +1550,8 @@ fn test_configured_alias_named_like_runner_selector_wins() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
     assert_eq!(
-        argv[..5],
-        ["opencode", "run", "--thinking", "--agent", "specialist"]
+        argv[..6],
+        ["opencode", "--pure", "run", "--thinking", "--agent", "specialist"]
     );
     assert!(warnings.is_empty());
 }
@@ -1663,6 +1669,7 @@ fn test_resolve_yolo_for_opencode_uses_env_override() {
         argv,
         vec![
             "opencode".to_string(),
+            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "hello".to_string()
@@ -1745,6 +1752,7 @@ fn test_resolve_permission_mode_safe_for_opencode_uses_ask_override() {
         argv,
         [
             "opencode".to_string(),
+            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "hello".to_string()

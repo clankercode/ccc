@@ -507,7 +507,7 @@ class ResolveCommandTests(unittest.TestCase):
     def test_show_thinking_for_opencode(self):
         parsed = ParsedArgs(show_thinking=True, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
-        self.assertEqual(argv[:3], ["opencode", "run", "--thinking"])
+        self.assertEqual(argv[:4], ["opencode", "--pure", "run", "--thinking"])
 
     def test_show_thinking_for_claude(self):
         parsed = ParsedArgs(runner="cc", show_thinking=True, prompt="hello")
@@ -526,7 +526,7 @@ class ResolveCommandTests(unittest.TestCase):
     def test_default_show_thinking_enables_opencode_thinking(self):
         parsed = ParsedArgs(prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
-        self.assertEqual(argv[:3], ["opencode", "run", "--thinking"])
+        self.assertEqual(argv[:4], ["opencode", "--pure", "run", "--thinking"])
 
     def test_default_thinking_effort_is_low_for_claude(self):
         parsed = ParsedArgs(runner="cc", prompt="hello")
@@ -539,7 +539,7 @@ class ResolveCommandTests(unittest.TestCase):
     def test_no_show_thinking_overrides_default_for_opencode(self):
         parsed = ParsedArgs(show_thinking=False, prompt="hello")
         argv, env, _warnings = resolve_command(parsed)
-        self.assertEqual(argv[:2], ["opencode", "run"])
+        self.assertEqual(argv[:3], ["opencode", "--pure", "run"])
         self.assertNotIn("--thinking", argv)
 
     def test_show_thinking_does_not_override_explicit_thinking(self):
@@ -649,14 +649,14 @@ class ResolveCommandTests(unittest.TestCase):
         config = CccConfig(aliases={"commit": AliasDef(prompt="Commit all changes")})
         parsed = ParsedArgs(alias="commit", prompt="   ")
         argv, env, warnings = resolve_command(parsed, config)
-        self.assertEqual(argv, ["opencode", "run", "--thinking", "Commit all changes"])
+        self.assertEqual(argv, ["opencode", "--pure", "run", "--thinking", "Commit all changes"])
         self.assertEqual(warnings, [])
 
     def test_explicit_prompt_overrides_alias_prompt(self):
         config = CccConfig(aliases={"commit": AliasDef(prompt="Commit all changes")})
         parsed = ParsedArgs(alias="commit", prompt="Write the commit summary")
         argv, env, warnings = resolve_command(parsed, config)
-        self.assertEqual(argv, ["opencode", "run", "--thinking", "Write the commit summary"])
+        self.assertEqual(argv, ["opencode", "--pure", "run", "--thinking", "Write the commit summary"])
         self.assertEqual(warnings, [])
 
     def test_alias_prompt_mode_prepend_uses_newline_separator(self):
@@ -678,6 +678,7 @@ class ResolveCommandTests(unittest.TestCase):
             argv,
             [
                 "opencode",
+                "--pure",
                 "run",
                 "--thinking",
                 "Commit all changes\nInclude the failing tests",
@@ -704,6 +705,7 @@ class ResolveCommandTests(unittest.TestCase):
             argv,
             [
                 "opencode",
+                "--pure",
                 "run",
                 "--thinking",
                 "Include the failing tests\nCommit all changes",
@@ -738,7 +740,7 @@ class ResolveCommandTests(unittest.TestCase):
         )
         parsed = ParsedArgs(alias="commit", prompt="", prompt_supplied=True)
         argv, env, warnings = resolve_command(parsed, config)
-        self.assertEqual(argv, ["opencode", "run", "--thinking", "Commit all changes"])
+        self.assertEqual(argv, ["opencode", "--pure", "run", "--thinking", "Commit all changes"])
         self.assertEqual(warnings, [])
 
     def test_alias_prompt_mode_requires_non_empty_alias_prompt(self):
@@ -796,7 +798,7 @@ class ResolveCommandTests(unittest.TestCase):
     def test_alias_falls_back_to_agent_for_opencode(self):
         parsed = ParsedArgs(alias="reviewer", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
-        self.assertEqual(argv[:5], ["opencode", "run", "--thinking", "--agent", "reviewer"])
+        self.assertEqual(argv[:6], ["opencode", "--pure", "run", "--thinking", "--agent", "reviewer"])
         self.assertEqual(env, {"OPENCODE_DISABLE_TERMINAL_TITLE": "true"})
         self.assertEqual(warnings, [])
 
@@ -841,7 +843,7 @@ class ResolveCommandTests(unittest.TestCase):
         argv, _env, warnings = resolve_command(parsed)
         self.assertEqual(
             argv,
-            ["opencode", "run", "--thinking", "--agent", "k", "hello"],
+            ["opencode", "--pure", "run", "--thinking", "--agent", "k", "hello"],
         )
         self.assertEqual(warnings, [])
 
@@ -851,7 +853,7 @@ class ResolveCommandTests(unittest.TestCase):
         )
         parsed = ParsedArgs(alias="k", prompt="hello")
         argv, _env, warnings = resolve_command(parsed, config)
-        self.assertEqual(argv[:5], ["opencode", "run", "--thinking", "--agent", "specialist"])
+        self.assertEqual(argv[:6], ["opencode", "--pure", "run", "--thinking", "--agent", "specialist"])
         self.assertEqual(warnings, [])
 
     def test_alias_falls_back_to_agent_with_warning_when_runner_lacks_support(self):
@@ -868,7 +870,7 @@ class ResolveCommandTests(unittest.TestCase):
         config = CccConfig(aliases={"work": AliasDef(agent="reviewer")})
         parsed = ParsedArgs(alias="work", prompt="hello")
         argv, env, warnings = resolve_command(parsed, config)
-        self.assertEqual(argv[:5], ["opencode", "run", "--thinking", "--agent", "reviewer"])
+        self.assertEqual(argv[:6], ["opencode", "--pure", "run", "--thinking", "--agent", "reviewer"])
         self.assertEqual(warnings, [])
 
     def test_yolo_for_claude(self):
@@ -916,7 +918,7 @@ class ResolveCommandTests(unittest.TestCase):
     def test_yolo_for_opencode_uses_env_override(self):
         parsed = ParsedArgs(runner="oc", yolo=True, prompt="hello")
         argv, env, warnings = resolve_command(parsed)
-        self.assertEqual(argv, ["opencode", "run", "--thinking", "hello"])
+        self.assertEqual(argv, ["opencode", "--pure", "run", "--thinking", "hello"])
         self.assertEqual(env["OPENCODE_CONFIG_CONTENT"], '{"permission":"allow"}')
         self.assertEqual(warnings, [])
 
@@ -959,7 +961,7 @@ class ResolveCommandTests(unittest.TestCase):
     def test_permission_mode_safe_for_opencode_uses_ask_override(self):
         parsed = ParsedArgs(runner="oc", permission_mode="safe", prompt="hello")
         argv, env, warnings = resolve_command(parsed)
-        self.assertEqual(argv, ["opencode", "run", "--thinking", "hello"])
+        self.assertEqual(argv, ["opencode", "--pure", "run", "--thinking", "hello"])
         self.assertEqual(env["OPENCODE_CONFIG_CONTENT"], '{"permission":"ask"}')
         self.assertEqual(warnings, [])
 

@@ -3,6 +3,9 @@
 ## Unreleased
 - No unreleased semantic changes.
 
+## 0.3.2 - 2026-06-12
+- Added `--pure` flag when launching opencode to skip plugin auto-updates.
+
 ## 0.3.1 - 2026-05-05
 - Added a `Configured aliases:` section to Python and Rust `ccc --help`, showing aliases visible from the current config chain before the runner checklist.
 - Added short agent-facing help tips for checking `ccc config`, choosing `@alias` presets, and using `--` before literal prompt text that starts with control-like tokens.

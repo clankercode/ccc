@@ -43,7 +43,7 @@
 //! ```no_run
 //! use call_coding_clis::{CommandSpec, Runner};
 //!
-//! let spec = CommandSpec::new(["opencode", "run", "Explain this module"]);
+//! let spec = CommandSpec::new(["opencode", "--pure", "run", "Explain this module"]);
 //! let result = Runner::new().run(spec);
 //!
 //! println!("stdout: {}", result.stdout);
@@ -85,7 +85,7 @@
 //! ```no_run
 //! use call_coding_clis::{CommandSpec, Runner};
 //!
-//! let spec = CommandSpec::new(["opencode", "run", "Describe the next step"]);
+//! let spec = CommandSpec::new(["opencode", "--pure", "run", "Describe the next step"]);
 //! let runner = Runner::new();
 //!
 //! let completed = runner.stream(spec, |channel, chunk| {

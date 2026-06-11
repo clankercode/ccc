@@ -35,3 +35,4 @@ Living backlog of unfinished work. Completed items should move to `SHARED_CHANGE
   - Keep the first pass focused on local file and stdio destinations for scripts.
   - Reuse the final-output sink abstraction so remote delivery can land later without changing the CLI surface again.
 - [] do something with tests/fixtures/unhandled-claude-json.txt
+- [x] Use `--pure` flag when launching opencode to skip plugin auto-updates

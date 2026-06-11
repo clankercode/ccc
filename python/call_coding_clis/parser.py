@@ -81,7 +81,7 @@ def _register_defaults() -> None:
         return
     RUNNER_REGISTRY["opencode"] = RunnerInfo(
         binary="opencode",
-        extra_args=["run"],
+        extra_args=["--pure", "run"],
         no_persist_flags=[],
         thinking_flags={},
         show_thinking_flags={True: ["--thinking"]},

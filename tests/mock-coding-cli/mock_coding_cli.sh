@@ -525,6 +525,18 @@ case "$stdin_data" in
 esac
 
 # --- argv parsing ---
+# Shift global flags before subcommand
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --pure)
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
 if [ "$1" = "run" ] || [ "$1" = "exec" ]; then
     shift
 fi
@@ -532,7 +544,7 @@ fi
 prompt=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        -p|--print|--trust|--verbose|--include-partial-messages|--no-thinking|--yolo|--plan|--full-auto|--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox|--no-session-persistence|--ephemeral|--save-session|--cleanup-session|--json)
+        -p|--print|--trust|--verbose|--include-partial-messages|--no-thinking|--yolo|--plan|--full-auto|--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox|--no-session-persistence|--ephemeral|--save-session|--cleanup-session|--json|--pure)
             shift
             ;;
         --thinking)

@@ -3,6 +3,9 @@
 ## Unreleased
 - No unreleased semantic changes.
 
+## 0.3.4 - 2026-06-12
+- Fixed opencode model format: now passes `provider/model` to opencode (e.g. `minimax/MiniMax-M3`) as required by its `--model` flag.
+
 ## 0.3.3 - 2026-06-12
 - Fixed opencode `--model` flag: aliases with configured models (e.g. `@mm`, `@glm51`) now correctly pass `--model` to opencode instead of silently dropping it.
 

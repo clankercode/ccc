@@ -584,7 +584,15 @@ pub fn resolve_command(
     if let Some(ref model) = effective_model {
         if !effective_runner.model_flag.is_empty() {
             argv.push(effective_runner.model_flag.clone());
-            argv.push(model.clone());
+            if matches!(effective_runner_name.as_str(), "oc" | "opencode") {
+                if let Some(ref provider) = effective_provider {
+                    argv.push(format!("{}/{}", provider, model));
+                } else {
+                    argv.push(model.clone());
+                }
+            } else {
+                argv.push(model.clone());
+            }
         }
     }
 

@@ -809,7 +809,10 @@ def resolve_command(
         env_overrides["OPENCODE_DISABLE_TERMINAL_TITLE"] = "true"
 
     if effective_model and info.model_flag:
-        argv.extend([info.model_flag, effective_model])
+        if effective_runner_name in {"oc", "opencode"} and effective_provider:
+            argv.extend([info.model_flag, f"{effective_provider}/{effective_model}"])
+        else:
+            argv.extend([info.model_flag, effective_model])
 
     effective_agent = requested_agent
     if effective_agent is None and alias_def and alias_def.agent:

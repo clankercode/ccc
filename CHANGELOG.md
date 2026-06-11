@@ -3,6 +3,9 @@
 ## Unreleased
 - No unreleased semantic changes.
 
+## 0.3.3 - 2026-06-12
+- Fixed opencode `--model` flag: aliases with configured models (e.g. `@mm`, `@glm51`) now correctly pass `--model` to opencode instead of silently dropping it.
+
 ## 0.3.2 - 2026-06-12
 - Added `--pure` flag when launching opencode to skip plugin auto-updates.
 

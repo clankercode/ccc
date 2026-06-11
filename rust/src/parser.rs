@@ -150,7 +150,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         },
         yolo_flags: vec![],
         provider_flag: String::new(),
-        model_flag: String::new(),
+        model_flag: "--model".into(),
         agent_flag: "--agent".into(),
         prompt_flag: String::new(),
     };

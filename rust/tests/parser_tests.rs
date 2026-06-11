@@ -1070,6 +1070,42 @@ fn test_resolve_model_flag() {
 }
 
 #[test]
+fn test_resolve_model_flag_for_opencode() {
+    let parsed = ParsedArgs {
+        runner: Some("oc".into()),
+        model: Some("glm-5.1".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    assert!(argv.contains(&"--model".to_string()));
+    assert!(argv.contains(&"glm-5.1".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_alias_model_for_opencode() {
+    let mut config = CccConfig::default();
+    config.aliases.insert(
+        "m".into(),
+        AliasDef {
+            runner: Some("oc".into()),
+            model: Some("MiniMax-M3".into()),
+            ..Default::default()
+        },
+    );
+    let parsed = ParsedArgs {
+        alias: Some("m".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert!(argv.contains(&"--model".to_string()));
+    assert!(argv.contains(&"MiniMax-M3".to_string()));
+    assert!(warnings.is_empty());
+}
+
+#[test]
 fn test_resolve_provider_sets_env() {
     let parsed = ParsedArgs {
         provider: Some("anthropic".into()),

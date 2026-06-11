@@ -578,6 +578,19 @@ class ResolveCommandTests(unittest.TestCase):
         self.assertIn("--model", argv)
         self.assertIn("claude-4", argv)
 
+    def test_model_flag_for_opencode(self):
+        parsed = ParsedArgs(runner="oc", model="glm-5.1", prompt="hello")
+        argv, env, _warnings = resolve_command(parsed)
+        self.assertIn("--model", argv)
+        self.assertIn("glm-5.1", argv)
+
+    def test_alias_model_for_opencode(self):
+        config = CccConfig(aliases={"m": AliasDef(runner="oc", model="MiniMax-M3")})
+        parsed = ParsedArgs(alias="m", prompt="hello")
+        argv, env, _warnings = resolve_command(parsed, config)
+        self.assertIn("--model", argv)
+        self.assertIn("MiniMax-M3", argv)
+
     def test_provider_sets_env(self):
         parsed = ParsedArgs(provider="anthropic", prompt="hello")
         argv, env, _warnings = resolve_command(parsed)

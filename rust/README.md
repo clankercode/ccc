@@ -21,7 +21,7 @@ Add the library to a Rust project:
 
 ```toml
 [dependencies]
-ccc = "0.3.2"
+ccc = "0.3.3"
 ```
 
 Then import the library crate as:

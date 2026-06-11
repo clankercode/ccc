@@ -29,6 +29,13 @@ Entry format:
 - Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/test_parser_config.py`, `tests/test_runner.py`, `rust/tests/parser_tests.rs`, `tests/rust_runner.rs`
 - Notes: `--pure` is a global opencode flag that goes before the `run` subcommand
 
+### OpenCode --model flag
+- Change: Python and Rust `ccc` now passes `--model` to opencode so aliases with configured models actually use them
+- Required implementations: Python and Rust
+- Additional rollout: rolled out to Python and Rust; Ruby, Go, C, OCaml still have `model_flag=""` (deferred)
+- Shared tests updated: `tests/test_parser_config.py`, `rust/tests/parser_tests.rs`
+- Notes: opencode uses `-m`/`--model` on the `run` subcommand; previously `model_flag=""` silently dropped the model
+
 ## 2026-05-05
 
 ### Help lists configured aliases and agent tips

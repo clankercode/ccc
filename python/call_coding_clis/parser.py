@@ -87,7 +87,7 @@ def _register_defaults() -> None:
         show_thinking_flags={True: ["--thinking"]},
         yolo_flags=[],
         provider_flag="",
-        model_flag="",
+        model_flag="--model",
         agent_flag="--agent",
         prompt_flag="",
     )

@@ -262,6 +262,33 @@ class ParseArgsTests(unittest.TestCase):
             str(cm.exception), "--timeout-secs must be a positive integer"
         )
 
+    def test_runner_arg_appends_before_prompt(self):
+        parsed = parse_args(
+            [
+                "k",
+                "--runner-arg",
+                "--max-steps-per-turn",
+                "--runner-arg",
+                "9999",
+                "hello",
+            ]
+        )
+        argv, _env, warnings = resolve_command(parsed, None)
+        prompt_index = argv.index("--prompt")
+        self.assertEqual(argv[prompt_index - 2 : prompt_index], ["--max-steps-per-turn", "9999"])
+        self.assertEqual(argv[prompt_index + 1], "hello")
+        self.assertEqual(warnings, [])
+
+    def test_runner_arg_rejects_missing_value(self):
+        with self.assertRaises(ValueError) as cm:
+            parse_args(["k", "--runner-arg"])
+        self.assertEqual(str(cm.exception), "--runner-arg requires a non-empty value")
+
+    def test_runner_arg_rejects_empty_value(self):
+        with self.assertRaises(ValueError) as cm:
+            parse_args(["k", "--runner-arg", ""])
+        self.assertEqual(str(cm.exception), "--runner-arg requires a non-empty value")
+
     def test_permission_mode_flag(self):
         parsed = parse_args(["--permission-mode", "auto", "hello"])
         self.assertEqual(parsed.permission_mode, "auto")

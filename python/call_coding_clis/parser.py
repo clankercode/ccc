@@ -38,6 +38,7 @@ class ParsedArgs:
     yolo: bool = False
     permission_mode: str | None = None
     timeout_secs: int | None = None
+    runner_args: list[str] = field(default_factory=list)
     allow_tool: list[str] = field(default_factory=list)
     deny_tool: list[str] = field(default_factory=list)
     provider: str | None = None
@@ -296,6 +297,11 @@ def parse_args(argv: list[str]) -> ParsedArgs:
             if value <= 0:
                 raise ValueError("--timeout-secs must be a positive integer")
             parsed.timeout_secs = value
+            index += 1
+        elif token == "--runner-arg":
+            if index + 1 >= len(argv) or not argv[index + 1]:
+                raise ValueError("--runner-arg requires a non-empty value")
+            parsed.runner_args.append(argv[index + 1])
             index += 1
         elif token.lower() in OUTPUT_MODE_SUGAR:
             parsed.output_mode = OUTPUT_MODE_SUGAR[token.lower()]
@@ -889,6 +895,7 @@ def resolve_command(
 
     if not parsed.save_session:
         argv.extend(info.no_persist_flags)
+    argv.extend(parsed.runner_args)
 
     prompt = _resolve_prompt(parsed, alias_def)
     if not prompt:

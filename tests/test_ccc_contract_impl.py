@@ -75,6 +75,7 @@ HELP_DELIMITER_SNIPPET = "Treat all remaining args as prompt text"
 HELP_TIMEOUT_SECS_SNIPPET = (
     "--timeout-secs <N>                    Kill the runner after N seconds and exit 124"
 )
+HELP_RUNNER_ARG_SNIPPET = "--runner-arg <ARG>                    Append one raw argument"
 HELP_AGENT_TIPS_SNIPPET = "Agent tips:"
 HELP_CONFIGURED_ALIASES_SNIPPET = "Configured aliases:"
 TIMEOUT_SECS_IMPLEMENTATIONS = {"Python", "Rust"}
@@ -899,6 +900,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     )
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertIn(HELP_TIMEOUT_SECS_SNIPPET, result.stdout)
+                    self.assertIn(HELP_RUNNER_ARG_SNIPPET, result.stdout)
 
     def test_timeout_secs_rejects_invalid_values(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

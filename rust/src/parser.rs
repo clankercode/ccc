@@ -63,6 +63,7 @@ pub struct ParsedArgs {
     pub prompt: String,
     pub prompt_supplied: bool,
     pub timeout_secs: Option<u64>,
+    pub runner_args: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -464,6 +465,13 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
                 };
                 index += 1;
             }
+        } else if token == "--runner-arg" {
+            if index + 1 >= argv.len() {
+                parsed.runner_args.push(String::new());
+            } else {
+                parsed.runner_args.push(argv[index + 1].clone());
+                index += 1;
+            }
         } else if let Some(mode) = parse_output_mode_sugar(token) {
             parsed.output_mode = Some(mode);
         } else if token == "--yolo" || token == "-y" {
@@ -512,6 +520,9 @@ pub fn resolve_command(
     }
     if parsed.timeout_secs == Some(0) {
         return Err("--timeout-secs must be a positive integer".to_string());
+    }
+    if parsed.runner_args.iter().any(|arg| arg.is_empty()) {
+        return Err("--runner-arg requires a non-empty value".to_string());
     }
 
     let mut argv: Vec<String> = vec![effective_runner.binary.clone()];
@@ -712,6 +723,7 @@ pub fn resolve_command(
     if !parsed.save_session {
         argv.extend(effective_runner.no_persist_flags.iter().cloned());
     }
+    argv.extend(parsed.runner_args.iter().cloned());
 
     let prompt = resolve_prompt(parsed, alias_def)?;
     if effective_runner.prompt_flag.is_empty() {

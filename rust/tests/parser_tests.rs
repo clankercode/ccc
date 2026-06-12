@@ -295,6 +295,35 @@ fn test_parse_timeout_secs_rejects_missing_value() {
 }
 
 #[test]
+fn test_parse_runner_arg_appends_before_prompt() {
+    let args: Vec<String> = vec![
+        "k".into(),
+        "--runner-arg".into(),
+        "--max-steps-per-turn".into(),
+        "--runner-arg".into(),
+        "9999".into(),
+        "hello".into(),
+    ];
+    let parsed = parse_args(&args);
+    let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
+    let prompt_index = argv.iter().position(|arg| arg == "--prompt").unwrap();
+    assert_eq!(argv[prompt_index - 2], "--max-steps-per-turn");
+    assert_eq!(argv[prompt_index - 1], "9999");
+    assert_eq!(argv[prompt_index + 1], "hello");
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_parse_runner_arg_rejects_missing_value() {
+    let args: Vec<String> = vec!["k".into(), "--runner-arg".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(
+        resolve_command(&parsed, None).unwrap_err(),
+        "--runner-arg requires a non-empty value"
+    );
+}
+
+#[test]
 fn test_parse_provider_model() {
     let args: Vec<String> = vec![":anthropic:claude-4".into(), "hello".into()];
     let parsed = parse_args(&args);

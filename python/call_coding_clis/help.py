@@ -111,6 +111,7 @@ Flags:
                                         (config key: defaults.output_mode)
   --forward-unknown-json                In formatted modes, forward unhandled JSON objects to stderr
   --timeout-secs <N>                    Kill the runner after N seconds and exit 124
+  --runner-arg <ARG>                    Append one raw argument to the resolved runner command before the prompt
   Environment:
     CCC_FWD_UNKNOWN_JSON                Also controls unknown-JSON forwarding; defaults on for now
     FORCE_COLOR / NO_COLOR              Override TTY detection for formatted human output

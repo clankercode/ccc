@@ -54,6 +54,22 @@ fn library_api_tests_client_plan_resolves_to_non_empty_command_spec() {
 }
 
 #[test]
+fn library_api_tests_client_plan_preserves_runner_args_before_prompt() {
+    let client = Client::new();
+    let request = Request::new("hello")
+        .with_runner(RunnerKind::Kimi)
+        .with_runner_arg("--max-steps-per-turn")
+        .with_runner_arg("9999");
+    let plan = client.plan(&request).expect("plan should resolve");
+    let argv = &plan.command_spec().argv;
+    let prompt_index = argv.iter().position(|arg| arg == "--prompt").unwrap();
+
+    assert_eq!(argv[prompt_index - 2], "--max-steps-per-turn");
+    assert_eq!(argv[prompt_index - 1], "9999");
+    assert_eq!(argv[prompt_index + 1], "hello");
+}
+
+#[test]
 fn library_api_tests_client_plan_preserves_provider_only_request() {
     let client = Client::new();
     let request = Request::new("explain this module")

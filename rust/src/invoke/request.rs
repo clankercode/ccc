@@ -56,6 +56,7 @@ pub struct Request {
     model: Option<String>,
     output_mode: Option<OutputMode>,
     timeout_secs: Option<u64>,
+    runner_args: Vec<String>,
 }
 
 impl Request {
@@ -75,6 +76,7 @@ impl Request {
             model: None,
             output_mode: None,
             timeout_secs: None,
+            runner_args: Vec::new(),
         }
     }
 
@@ -138,6 +140,11 @@ impl Request {
         self
     }
 
+    pub fn with_runner_arg(mut self, arg: impl Into<String>) -> Self {
+        self.runner_args.push(arg.into());
+        self
+    }
+
     pub fn timeout_secs(&self) -> Option<u64> {
         self.timeout_secs
     }
@@ -160,6 +167,10 @@ impl Request {
 
     pub fn output_mode(&self) -> Option<OutputMode> {
         self.output_mode
+    }
+
+    pub fn runner_args(&self) -> &[String] {
+        &self.runner_args
     }
 
     pub(crate) fn prompt_text(&self) -> &str {
@@ -220,6 +231,7 @@ impl Request {
             model: parsed.model.clone(),
             output_mode,
             timeout_secs: parsed.timeout_secs,
+            runner_args: parsed.runner_args.clone(),
         })
     }
 
@@ -272,6 +284,10 @@ impl Request {
         if let Some(timeout) = self.timeout_secs {
             tokens.push("--timeout-secs".to_string());
             tokens.push(timeout.to_string());
+        }
+        for arg in &self.runner_args {
+            tokens.push("--runner-arg".to_string());
+            tokens.push(arg.clone());
         }
         if self.prompt_supplied {
             tokens.push(self.prompt_text().to_string());

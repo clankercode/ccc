@@ -124,6 +124,7 @@ def _apply_real_runner_override(spec: CommandSpec) -> None:
         "kimi": "CCC_REAL_KIMI",
         "cursor-agent": "CCC_REAL_CURSOR",
         "gemini": "CCC_REAL_GEMINI",
+        "pi": "CCC_REAL_PI",
     }
     env_var = env_var_by_binary.get(spec.argv[0])
     if not env_var:
@@ -1039,6 +1040,8 @@ def _canonical_session_runner_name(runner_name: str) -> str:
         return "cursor"
     if key in {"g", "gemini"}:
         return "gemini"
+    if key in {"p", "pi"}:
+        return "pi"
     return key
 
 

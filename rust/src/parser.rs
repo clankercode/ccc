@@ -303,6 +303,30 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         agent_flag: String::new(),
         prompt_flag: "--prompt".into(),
     };
+    let pi = RunnerInfo {
+        binary: "pi".into(),
+        extra_args: vec!["-p".into()],
+        no_persist_flags: vec!["--no-session".into()],
+        thinking_flags: {
+            let mut tf = BTreeMap::new();
+            tf.insert(0, vec!["--thinking".into(), "off".into()]);
+            tf.insert(1, vec!["--thinking".into(), "low".into()]);
+            tf.insert(2, vec!["--thinking".into(), "medium".into()]);
+            tf.insert(3, vec!["--thinking".into(), "high".into()]);
+            tf.insert(4, vec!["--thinking".into(), "xhigh".into()]);
+            tf
+        },
+        show_thinking_flags: {
+            let mut tf = BTreeMap::new();
+            tf.insert(true, vec!["--thinking".into(), "low".into()]);
+            tf
+        },
+        yolo_flags: vec![],
+        provider_flag: "--provider".into(),
+        model_flag: "--model".into(),
+        agent_flag: String::new(),
+        prompt_flag: String::new(),
+    };
 
     let claude_clone = claude.clone();
     let kimi_clone = kimi.clone();
@@ -313,6 +337,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let crush_clone = crush.clone();
     let cursor_clone = cursor.clone();
     let gemini_clone = gemini.clone();
+    let pi_clone = pi.clone();
 
     m.insert("opencode".into(), opencode);
     m.insert("claude".into(), claude);
@@ -322,6 +347,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     m.insert("crush".into(), crush);
     m.insert("cursor".into(), cursor);
     m.insert("gemini".into(), gemini);
+    m.insert("pi".into(), pi);
 
     m.insert("oc".into(), opencode_clone);
     m.insert("cc".into(), claude_clone.clone());
@@ -332,13 +358,14 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     m.insert("cr".into(), crush_clone);
     m.insert("cu".into(), cursor_clone);
     m.insert("g".into(), gemini_clone);
+    m.insert("p".into(), pi_clone);
 
     RwLock::new(m)
 });
 
 static RUNNER_SELECTOR_STRS: &[&str] = &[
-    "oc", "cc", "c", "cx", "k", "rc", "cr", "cu", "g", "codex", "claude", "opencode", "kimi",
-    "roocode", "crush", "cursor", "gemini",
+    "oc", "cc", "c", "cx", "k", "rc", "cr", "cu", "g", "p", "pi", "codex", "claude", "opencode",
+    "kimi", "roocode", "crush", "cursor", "gemini",
 ];
 
 fn is_runner_selector(s: &str) -> bool {
@@ -753,6 +780,7 @@ fn canonical_runner_name(effective_runner_name: &str, info: &RunnerInfo) -> Stri
         "rc" | "roocode" => "roocode".to_string(),
         "cu" | "cursor" => "cursor".to_string(),
         "g" | "gemini" => "gemini".to_string(),
+        "p" | "pi" => "pi".to_string(),
         _ => info.binary.clone(),
     }
 }
@@ -892,7 +920,7 @@ fn supported_output_modes(runner_name: &str) -> &'static [&'static str] {
             OUTPUT_MODES
         }
         "k" | "kimi" => KIMI_OUTPUT_MODES,
-        "g" | "gemini" => &[
+        "g" | "gemini" | "p" | "pi" => &[
             "text",
             "stream-text",
             "json",
@@ -1183,6 +1211,18 @@ pub fn resolve_output_plan(
             formatted: mode.contains("formatted"),
             schema: Some("gemini".into()),
             argv_flags,
+            warnings,
+        });
+    }
+
+    if matches!(runner_name.as_str(), "p" | "pi") {
+        return Ok(OutputPlan {
+            runner_name,
+            mode: mode.clone(),
+            stream: mode.starts_with("stream-"),
+            formatted: mode.contains("formatted"),
+            schema: Some("pi".into()),
+            argv_flags: vec!["--mode".into(), "json".into()],
             warnings,
         });
     }

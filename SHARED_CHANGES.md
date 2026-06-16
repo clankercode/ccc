@@ -20,6 +20,16 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-06-16
+
+### Pi runner support
+- Change: Added `pi` (earendil-works pi-coding-agent) as a supported runner in Python and Rust. Runner selectors `p` and `pi` map to the pi binary. Non-interactive mode uses `pi -p --no-session`. JSON streaming uses `pi -p --mode json`. Thinking levels map to `--thinking off|low|medium|high|xhigh`. Provider/model selection via `--provider`/`--model`.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `tests/test_json_output.py`, `tests/test_ccc_contract_impl.py`, `rust/tests/parser_tests.rs`, `rust/src/json_output.rs`
+- Docs updated: `docs/clis/pi.md`, `FEATURES.md`, `README.md`
+- Notes: Pi does not have explicit yolo or permission mode flags. `CCC_REAL_PI` env var supported for testing.
+
 ## 2026-06-12
 
 ### OpenCode --pure flag

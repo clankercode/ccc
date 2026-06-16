@@ -8,6 +8,7 @@ pub enum RunnerKind {
     Gemini,
     RooCode,
     Crush,
+    Pi,
 }
 
 impl RunnerKind {
@@ -21,6 +22,7 @@ impl RunnerKind {
             "g" | "gemini" => Some(RunnerKind::Gemini),
             "rc" | "roocode" => Some(RunnerKind::RooCode),
             "cr" | "crush" => Some(RunnerKind::Crush),
+            "p" | "pi" => Some(RunnerKind::Pi),
             _ => None,
         }
     }
@@ -307,6 +309,7 @@ impl RunnerKind {
             RunnerKind::Gemini => "g",
             RunnerKind::RooCode => "rc",
             RunnerKind::Crush => "cr",
+            RunnerKind::Pi => "p",
         }
     }
 }

@@ -183,6 +183,24 @@ def _register_defaults() -> None:
         agent_flag="",
         prompt_flag="--prompt",
     )
+    RUNNER_REGISTRY["pi"] = RunnerInfo(
+        binary="pi",
+        extra_args=["-p"],
+        no_persist_flags=["--no-session"],
+        thinking_flags={
+            0: ["--thinking", "off"],
+            1: ["--thinking", "low"],
+            2: ["--thinking", "medium"],
+            3: ["--thinking", "high"],
+            4: ["--thinking", "xhigh"],
+        },
+        show_thinking_flags={True: ["--thinking", "low"]},
+        yolo_flags=[],
+        provider_flag="--provider",
+        model_flag="--model",
+        agent_flag="",
+        prompt_flag="",
+    )
 
     RUNNER_REGISTRY["oc"] = RUNNER_REGISTRY["opencode"]
     RUNNER_REGISTRY["cc"] = RUNNER_REGISTRY["claude"]
@@ -193,12 +211,13 @@ def _register_defaults() -> None:
     RUNNER_REGISTRY["cr"] = RUNNER_REGISTRY["crush"]
     RUNNER_REGISTRY["cu"] = RUNNER_REGISTRY["cursor"]
     RUNNER_REGISTRY["g"] = RUNNER_REGISTRY["gemini"]
+    RUNNER_REGISTRY["p"] = RUNNER_REGISTRY["pi"]
 
 
 _register_defaults()
 
 RUNNER_SELECTOR_RE = re.compile(
-    r"^(?:oc|cc|c|cx|k|rc|cr|cu|g|codex|claude|opencode|kimi|roocode|crush|cursor|gemini)$",
+    r"^(?:oc|cc|c|cx|k|rc|cr|cu|g|p|pi|codex|claude|opencode|kimi|roocode|crush|cursor|gemini)$",
     re.IGNORECASE,
 )
 THINKING_RE = re.compile(
@@ -470,6 +489,19 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
             "pass-json",
             "stream-pass-json",
         }
+    if key in {"p", "pi"}:
+        return {
+            "text",
+            "stream-text",
+            "json",
+            "stream-json",
+            "formatted",
+            "stream-formatted",
+            "pass-text",
+            "stream-pass-text",
+            "pass-json",
+            "stream-pass-json",
+        }
     return {"text", "stream-text", "pass-text", "stream-pass-text", "pass-json", "stream-pass-json"}
 
 
@@ -654,6 +686,16 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
                 argv_flags=flags,
                 warnings=warnings,
             )
+        if key in {"p", "pi"}:
+            return OutputPlan(
+                runner_name=effective_runner_name,
+                mode=mode,
+                stream=is_stream,
+                formatted=False,
+                schema=None,
+                argv_flags=["--mode", "json"],
+                warnings=warnings,
+            )
         return OutputPlan(
             runner_name=effective_runner_name,
             mode=mode,
@@ -738,6 +780,16 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
             formatted="formatted" in mode,
             schema="gemini",
             argv_flags=flags,
+            warnings=warnings,
+        )
+    if key in {"p", "pi"}:
+        return OutputPlan(
+            runner_name=effective_runner_name,
+            mode=mode,
+            stream=mode.startswith("stream-"),
+            formatted="formatted" in mode,
+            schema="pi",
+            argv_flags=["--mode", "json"],
             warnings=warnings,
         )
     return OutputPlan(
@@ -926,6 +978,8 @@ def _canonical_runner_name(effective_runner_name: str, info: RunnerInfo) -> str:
         return "cursor"
     if name in {"g", "gemini"}:
         return "gemini"
+    if name in {"p", "pi"}:
+        return "pi"
     return info.binary
 
 

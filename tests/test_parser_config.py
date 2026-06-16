@@ -75,10 +75,15 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(parsed.runner, "opencode")
         self.assertEqual(parsed.prompt, "hello")
 
-    def test_unregistered_pi_is_prompt_text(self):
+    def test_pi_runner_selector(self):
         parsed = parse_args(["pi", "hello"])
-        self.assertIsNone(parsed.runner)
-        self.assertEqual(parsed.prompt, "pi hello")
+        self.assertEqual(parsed.runner, "pi")
+        self.assertEqual(parsed.prompt, "hello")
+
+    def test_p_runner_selector(self):
+        parsed = parse_args(["p", "hello"])
+        self.assertEqual(parsed.runner, "p")
+        self.assertEqual(parsed.prompt, "hello")
 
     def test_runner_selector_cursor_and_cu(self):
         for selector in ("cursor", "cu"):

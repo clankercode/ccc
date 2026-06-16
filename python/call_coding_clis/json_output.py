@@ -791,6 +791,129 @@ def parse_gemini_json(raw_stdout: str) -> ParsedJsonOutput:
     return result
 
 
+def _apply_pi_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
+    result.raw_lines.append(obj)
+    msg_type = str(obj.get("type", ""))
+
+    if msg_type == "session":
+        session_id = obj.get("id")
+        if isinstance(session_id, str) and session_id:
+            result.session_id = session_id
+        return True
+
+    if msg_type in {"agent_start", "agent_end", "turn_start"}:
+        return True
+
+    if msg_type == "turn_end":
+        message = obj.get("message", {})
+        if isinstance(message, dict):
+            usage = message.get("usage", {})
+            if isinstance(usage, dict):
+                usage_map: dict[str, int] = {}
+                for key in ("input", "output", "cacheRead", "cacheWrite", "totalTokens"):
+                    value = usage.get(key)
+                    if isinstance(value, int):
+                        usage_map[key] = value
+                if usage_map:
+                    result.usage = usage_map
+                cost = usage.get("cost", {})
+                if isinstance(cost, dict):
+                    total = cost.get("total")
+                    if isinstance(total, (int, float)):
+                        result.cost_usd = float(total)
+        return True
+
+    if msg_type == "message_start":
+        return True
+
+    if msg_type == "message_end":
+        return True
+
+    if msg_type == "message_update":
+        event = obj.get("assistantMessageEvent", {})
+        if not isinstance(event, dict):
+            return True
+        event_subtype = str(event.get("type", ""))
+
+        if event_subtype == "text_end":
+            content = str(event.get("content", ""))
+            if content:
+                result.final_text = content
+                result.events.append(JsonEvent(event_type="text", text=content, raw=obj))
+            return True
+
+        if event_subtype == "thinking_end":
+            content = str(event.get("content", ""))
+            if content:
+                result.events.append(JsonEvent(event_type="thinking", thinking=content, raw=obj))
+            return True
+
+        if event_subtype == "toolcall_end":
+            tool_call = event.get("toolCall", {})
+            if isinstance(tool_call, dict):
+                call_id = str(tool_call.get("id", ""))
+                tool_name = str(tool_call.get("name", ""))
+                arguments = tool_call.get("arguments", {})
+                result.events.append(
+                    JsonEvent(
+                        event_type="tool_use",
+                        tool_call=ToolCall(
+                            id=call_id,
+                            name=tool_name,
+                            arguments=json.dumps(arguments) if isinstance(arguments, dict) else str(arguments),
+                        ),
+                        raw=obj,
+                    )
+                )
+            return True
+
+        # Delta events and other subtypes are streaming updates, not final
+        if event_subtype in {"thinking_start", "thinking_delta", "text_start", "text_delta", "toolcall_start", "toolcall_delta"}:
+            return True
+
+        return True
+
+    if msg_type == "tool_execution_end":
+        tool_call_id = str(obj.get("toolCallId", ""))
+        tool_result = obj.get("result", {})
+        is_error = bool(obj.get("isError", False))
+        content = ""
+        if isinstance(tool_result, dict):
+            content_items = tool_result.get("content", [])
+            if isinstance(content_items, list):
+                parts = []
+                for item in content_items:
+                    if isinstance(item, dict) and item.get("type") == "text":
+                        parts.append(str(item.get("text", "")))
+                content = "\n".join(parts)
+        result.events.append(
+            JsonEvent(
+                event_type="tool_result",
+                tool_result=ToolResult(
+                    tool_call_id=tool_call_id,
+                    content=content,
+                    is_error=is_error,
+                ),
+                raw=obj,
+            )
+        )
+        return True
+
+    if msg_type in {"tool_execution_start", "tool_execution_update"}:
+        return True
+
+    return False
+
+
+def parse_pi_json(raw_stdout: str) -> ParsedJsonOutput:
+    result = _new_output("pi")
+    for line in raw_stdout.splitlines():
+        obj, raw_line = _parse_json_line(line)
+        if obj is not None and not _apply_pi_obj(result, obj):
+            result.unknown_json_lines.append(raw_line)
+    return result
+
+
 PARSERS = {
     "opencode": parse_opencode_json,
     "claude-code": parse_claude_code_json,
@@ -798,6 +921,7 @@ PARSERS = {
     "cursor-agent": parse_cursor_agent_json,
     "codex": parse_codex_json,
     "gemini": parse_gemini_json,
+    "pi": parse_pi_json,
 }
 
 
@@ -1024,6 +1148,7 @@ class StructuredStreamProcessor:
             "cursor-agent": _apply_cursor_agent_obj,
             "codex": _apply_codex_obj,
             "gemini": _apply_gemini_obj,
+            "pi": _apply_pi_obj,
         }.get(schema)
         self._buffer = ""
         self._unknown_lines: list[str] = []

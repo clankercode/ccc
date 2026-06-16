@@ -1204,6 +1204,152 @@ pub fn parse_gemini_json(raw: &str) -> ParsedJsonOutput {
     result
 }
 
+fn apply_pi_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) -> bool {
+    let msg_type = obj.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+    match msg_type {
+        "session" => {
+            if let Some(id) = obj.get("id").and_then(|v| v.as_str()) {
+                if !id.is_empty() {
+                    result.session_id = id.to_string();
+                }
+            }
+            true
+        }
+        "agent_start" | "agent_end" | "turn_start" | "message_start" | "message_end" => true,
+        "turn_end" => {
+            if let Some(message) = obj.get("message").and_then(|v| v.as_object()) {
+                if let Some(usage) = message.get("usage").and_then(|v| v.as_object()) {
+                    let mut usage_map = BTreeMap::new();
+                    for key in &["input", "output", "cacheRead", "cacheWrite", "totalTokens"] {
+                        if let Some(val) = usage.get(*key).and_then(|v| v.as_i64()) {
+                            usage_map.insert(key.to_string(), val as i64);
+                        }
+                    }
+                    if !usage_map.is_empty() {
+                        result.usage = usage_map;
+                    }
+                    if let Some(cost) = usage.get("cost").and_then(|v| v.as_object()) {
+                        if let Some(total) = cost.get("total").and_then(|v| v.as_f64()) {
+                            result.cost_usd = total;
+                        }
+                    }
+                }
+            }
+            true
+        }
+        "message_update" => {
+            if let Some(event) = obj.get("assistantMessageEvent").and_then(|v| v.as_object()) {
+                let event_subtype = event.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                match event_subtype {
+                    "text_end" => {
+                        if let Some(content) = event.get("content").and_then(|v| v.as_str()) {
+                            if !content.is_empty() {
+                                result.final_text = content.to_string();
+                                result.events.push(JsonEvent {
+                                    event_type: "text".into(),
+                                    text: content.to_string(),
+                                    thinking: String::new(),
+                                    tool_call: None,
+                                    tool_result: None,
+                                });
+                            }
+                        }
+                        true
+                    }
+                    "thinking_end" => {
+                        if let Some(content) = event.get("content").and_then(|v| v.as_str()) {
+                            if !content.is_empty() {
+                                result.events.push(JsonEvent {
+                                    event_type: "thinking".into(),
+                                    text: String::new(),
+                                    thinking: content.to_string(),
+                                    tool_call: None,
+                                    tool_result: None,
+                                });
+                            }
+                        }
+                        true
+                    }
+                    "toolcall_end" => {
+                        if let Some(tool_call_obj) = event.get("toolCall").and_then(|v| v.as_object()) {
+                            let call_id = tool_call_obj.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                            let tool_name = tool_call_obj.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                            let arguments = tool_call_obj.get("arguments").map(|v| {
+                                if v.is_object() {
+                                    serde_json::to_string(v).unwrap_or_default()
+                                } else {
+                                    v.as_str().unwrap_or("").to_string()
+                                }
+                            }).unwrap_or_default();
+                            result.events.push(JsonEvent {
+                                event_type: "tool_use".into(),
+                                text: String::new(),
+                                thinking: String::new(),
+                                tool_call: Some(ToolCall {
+                                    id: call_id,
+                                    name: tool_name,
+                                    arguments,
+                                }),
+                                tool_result: None,
+                            });
+                        }
+                        true
+                    }
+                    _ => true,
+                }
+            } else {
+                true
+            }
+        }
+        "tool_execution_end" => {
+            let tool_call_id = obj.get("toolCallId").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let is_error = obj.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
+            let mut content = String::new();
+            if let Some(tool_result) = obj.get("result").and_then(|v| v.as_object()) {
+                if let Some(content_items) = tool_result.get("content").and_then(|v| v.as_array()) {
+                    let parts: Vec<String> = content_items.iter()
+                        .filter_map(|item| {
+                            if item.get("type").and_then(|v| v.as_str()) == Some("text") {
+                                item.get("text").and_then(|v| v.as_str()).map(|s| s.to_string())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    content = parts.join("\n");
+                }
+            }
+            result.events.push(JsonEvent {
+                event_type: "tool_result".into(),
+                text: String::new(),
+                thinking: String::new(),
+                tool_call: None,
+                tool_result: Some(ToolResult {
+                    tool_call_id,
+                    content,
+                    is_error,
+                }),
+            });
+            true
+        }
+        "tool_execution_start" | "tool_execution_update" => true,
+        _ => true,
+    }
+}
+
+pub fn parse_pi_json(raw: &str) -> ParsedJsonOutput {
+    let mut result = new_output("pi");
+    for line in raw.lines() {
+        if let Some(obj) = parse_json_line(line) {
+            if !apply_pi_obj(&mut result, &obj) {
+                result.unknown_json_lines.push(line.trim().to_string());
+            }
+        }
+    }
+    result
+}
+
 pub fn parse_json_output(raw: &str, schema: &str) -> ParsedJsonOutput {
     match schema {
         "opencode" => parse_opencode_json(raw),
@@ -1212,6 +1358,7 @@ pub fn parse_json_output(raw: &str, schema: &str) -> ParsedJsonOutput {
         "cursor-agent" => parse_cursor_agent_json(raw),
         "codex" => parse_codex_json(raw),
         "gemini" => parse_gemini_json(raw),
+        "pi" => parse_pi_json(raw),
         _ => ParsedJsonOutput {
             schema_name: schema.into(),
             events: Vec::new(),
@@ -1597,6 +1744,7 @@ impl StructuredStreamProcessor {
             }
             "codex" => apply_codex_obj(&mut self.output, obj),
             "gemini" => apply_gemini_obj(&mut self.output, obj),
+            "pi" => apply_pi_obj(&mut self.output, obj),
             _ => false,
         }
     }

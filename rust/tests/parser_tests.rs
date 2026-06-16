@@ -116,11 +116,19 @@ fn test_parse_runner_selector_cr_remains_crush() {
 }
 
 #[test]
-fn test_parse_unregistered_pi_as_prompt_text() {
+fn test_parse_pi_runner_selector() {
     let args: Vec<String> = vec!["pi".into(), "fix bug".into()];
     let parsed = parse_args(&args);
-    assert!(parsed.runner.is_none());
-    assert_eq!(parsed.prompt, "pi fix bug");
+    assert_eq!(parsed.runner.as_deref(), Some("pi"));
+    assert_eq!(parsed.prompt, "fix bug");
+}
+
+#[test]
+fn test_parse_p_runner_selector() {
+    let args: Vec<String> = vec!["p".into(), "fix bug".into()];
+    let parsed = parse_args(&args);
+    assert_eq!(parsed.runner.as_deref(), Some("p"));
+    assert_eq!(parsed.prompt, "fix bug");
 }
 
 #[test]

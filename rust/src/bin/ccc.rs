@@ -472,6 +472,7 @@ fn real_runner_override_env_var(kind: RunnerKind) -> Option<&'static str> {
         RunnerKind::Kimi => Some("CCC_REAL_KIMI"),
         RunnerKind::Cursor => Some("CCC_REAL_CURSOR"),
         RunnerKind::Gemini => Some("CCC_REAL_GEMINI"),
+        RunnerKind::Pi => Some("CCC_REAL_PI"),
         RunnerKind::Codex | RunnerKind::RooCode | RunnerKind::Crush => None,
     }
 }
@@ -483,7 +484,8 @@ fn configure_real_runner_overrides(mut client: Client) -> Client {
         RunnerKind::Kimi,
         RunnerKind::Cursor,
         RunnerKind::Gemini,
-    ] {
+        RunnerKind::Pi,
+    ] { 
         let Some(env_var) = real_runner_override_env_var(kind) else {
             continue;
         };
@@ -1259,6 +1261,7 @@ fn apply_real_runner_override(spec: &mut call_coding_clis::CommandSpec) {
         "kimi" => Some(RunnerKind::Kimi),
         "cursor-agent" => Some(RunnerKind::Cursor),
         "gemini" => Some(RunnerKind::Gemini),
+        "pi" => Some(RunnerKind::Pi),
         _ => None,
     };
     let Some(kind) = runner_kind else {

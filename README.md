@@ -96,6 +96,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
 - RooCode
 - Crush
 - Qwen Code
+- Pi
 - similar terminal-first coding agents
 
 ## Current Scope
@@ -126,7 +127,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
 ## Current Python/Rust Extended `ccc` Syntax
 
 - Python and Rust currently accept control tokens in any order before the prompt:
-  - runner selectors such as `c`, `cx`, `cc`, `oc`, `k`, `cu`, `g`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `cursor`, `gemini`, `roocode`, and `crush`
+  - runner selectors such as `c`, `cx`, `cc`, `oc`, `k`, `cu`, `g`, `p`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `cursor`, `gemini`, `roocode`, `crush`, and `pi`
   - `+0..+4` thinking levels
   - `:provider:model` and `:model`
   - `@name` for preset lookup; if no preset exists, runner names such as `@k` select that runner before ordinary agent fallback; presets can also define a default prompt, and alias `prompt_mode = "prepend"|"append"` can compose alias prompt text around an explicitly supplied prompt
@@ -147,7 +148,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
   - `--timeout-secs <N>` kills the wrapped runner after `N` seconds, prints `warning: timed out after N seconds; killed runner` to stderr, and exits with status `124`
   - `--yolo` / `-y`
 - `--` forces the rest of argv to be treated as prompt text, even if it starts with control-like tokens
-- Python and Rust currently use `claude -p --no-session-persistence`, `codex exec --ephemeral`, `cursor-agent --print --trust`, `gemini --prompt`, and `crush run` for non-interactive invocation
+- Python and Rust currently use `claude -p --no-session-persistence`, `codex exec --ephemeral`, `cursor-agent --print --trust`, `gemini --prompt`, `pi -p --no-session`, and `crush run` for non-interactive invocation
 - By default Python and Rust avoid saved sessions where the selected CLI supports it; OpenCode, Kimi, Cursor, Gemini, Crush, and RooCode warn that the runner may save a session unless `--save-session` or `--cleanup-session` is used
 - `ccc --print-config` is the source of truth for the current canonical config schema: `[defaults]`, `[abbreviations]`, and `[aliases.<name>]`
 - `ccc config` is the source of truth for which config files currently resolve in the active shell

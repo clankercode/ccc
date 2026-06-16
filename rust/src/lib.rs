@@ -145,8 +145,9 @@ pub use help::{print_help, print_usage, print_version};
 pub use invoke::{Client, Error, OutputMode, Plan, Request, Run, RunnerKind};
 pub use json_output::{
     parse_claude_code_json, parse_codex_json, parse_cursor_agent_json, parse_gemini_json,
-    parse_json_output, parse_kimi_json, parse_opencode_json, render_parsed, resolve_human_tty,
-    FormattedRenderer, JsonEvent, ParsedJsonOutput, StructuredStreamProcessor, TextContent,
+    parse_json_output, parse_kimi_json, parse_opencode_json, parse_pi_json, render_parsed,
+    resolve_human_tty, FormattedRenderer, JsonEvent, ParsedJsonOutput, StructuredStreamProcessor,
+    TextContent,
     ThinkingContent, ToolCall as JsonToolCall, ToolResult as JsonToolResult,
 };
 pub use output::{

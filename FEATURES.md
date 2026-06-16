@@ -73,6 +73,7 @@
 | F26 | JSON schema: kimi | Parse Kimi JSON streaming format |
 | F27 | JSON render | Render parsed JSON output consistently |
 | F36 | JSON schema: cursor-agent | Parse Cursor Agent JSON and stream-json output |
+| F37 | JSON schema: pi | Parse Pi JSON streaming format |
 
 ### v4 Testing & Infrastructure
 
@@ -131,6 +132,7 @@
 | F26 Schema: kimi | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | - | n/a | yes | yes |
 | F27 JSON render | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | - | n/a | yes | yes |
 | F36 Schema: cursor-agent | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | n/a | - | - |
+| F37 Schema: pi | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | n/a | - | - |
 
 ## Progress Tracking
 

@@ -24,6 +24,7 @@ const CANONICAL_RUNNERS: &[(&str, &str)] = &[
     ("crush", "cr"),
     ("cursor", "cu"),
     ("gemini", "g"),
+    ("pi", "p"),
 ];
 
 const HELP_TEXT: &str = r#"ccc — call coding CLIs
@@ -42,7 +43,7 @@ Usage:
 
 Controls (free order before the prompt):
   runner        Select which coding CLI to use (default: oc)
-                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g)
+                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g), pi (p)
   +thinking     Set thinking level: +0..+4 or +none/+low/+med/+mid/+medium/+high/+max/+xhigh
                 Claude maps +0 to --thinking disabled and +1..+4 to --thinking enabled with matching --effort
                 Kimi maps +0 to --no-thinking and +1..+4 to --thinking
@@ -356,6 +357,7 @@ fn get_runner_version(runner_name: &str, binary: &str, binary_path: &Path) -> St
         "kimi" => discover_kimi_version(&real_path),
         "cursor" => discover_cursor_version(&real_path),
         "gemini" => discover_gemini_version(&real_path),
+        "pi" => get_version(binary),
         _ => String::new(),
     };
     if version.is_empty() {

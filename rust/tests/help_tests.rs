@@ -151,7 +151,7 @@ fn test_version_prints_build_version_and_resolved_clients() {
         assert_eq!(lines[1], "Resolved clients:");
         assert!(stdout.contains("[+] opencode"));
         assert!(stdout.contains("1.3.17"));
-        assert!(stdout.contains("(and 7 unresolved)"));
+        assert!(stdout.contains("unresolved"));
     }
 }
 

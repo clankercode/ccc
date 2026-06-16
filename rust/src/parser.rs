@@ -1062,6 +1062,8 @@ pub fn resolve_output_plan(
                 ]
             } else if matches!(runner_name.as_str(), "oc" | "opencode") {
                 vec!["--format".into(), "json".into()]
+            } else if matches!(runner_name.as_str(), "p" | "pi") {
+                vec!["--mode".into(), "json".into()]
             } else {
                 vec![]
             }
@@ -1086,6 +1088,8 @@ pub fn resolve_output_plan(
                 ]
             } else if matches!(runner_name.as_str(), "oc" | "opencode") {
                 vec!["--format".into(), "json".into()]
+            } else if matches!(runner_name.as_str(), "p" | "pi") {
+                vec!["--mode".into(), "json".into()]
             } else {
                 vec![]
             }

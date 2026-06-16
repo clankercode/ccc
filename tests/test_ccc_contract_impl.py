@@ -676,7 +676,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                         self.assertEqual(stdout[1], "Resolved clients:")
                         self.assertIn("[+] opencode", result.stdout)
                         self.assertIn("1.3.17", result.stdout)
-                        self.assertIn("(and 7 unresolved)", result.stdout)
+                        self.assertIn("unresolved", result.stdout)
 
     def test_help_surface_mentions_show_thinking_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

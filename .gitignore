@@ -59,6 +59,7 @@ elixir/deps/
 .subagent-logs/
 .headless-*
 .worktrees/
+.pi/
 haskell/ccc
 *.dump
 tmp/

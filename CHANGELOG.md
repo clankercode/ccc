@@ -3,6 +3,10 @@
 ## Unreleased
 - No unreleased semantic changes.
 
+## 0.3.5 - 2026-06-16
+- Added `pi` (earendil-works pi-coding-agent) as a supported runner. Runner selectors `p` and `pi` map to the pi binary. Non-interactive mode uses `pi -p --no-session`, JSON streaming uses `pi -p --mode json`, thinking levels map to `--thinking off|low|medium|high|xhigh`, and provider/model selection via `--provider`/`--model`.
+- Added `--arg` flag for passing extra arguments directly to the underlying runner binary.
+
 ## 0.3.4 - 2026-06-12
 - Fixed opencode model format: now passes `provider/model` to opencode (e.g. `minimax/MiniMax-M3`) as required by its `--model` flag.
 

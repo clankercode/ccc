@@ -14,6 +14,7 @@ from call_coding_clis.json_output import (
     parse_cursor_agent_json,
     parse_gemini_json,
     parse_kimi_json,
+    parse_pi_json,
     ParsedJsonOutput,
     JsonEvent,
     ToolCall,
@@ -315,6 +316,169 @@ class ParseGeminiJsonTests(unittest.TestCase):
                 chunks.append(rendered)
         self.assertEqual(chunks, ["[assistant] pong"])
         self.assertEqual(processor.take_unknown_json_lines(), [])
+
+
+PI_SIMPLE = (
+    '{"type":"session","version":3,"id":"pi-ses-1","timestamp":"2026-06-16T00:00:00Z","cwd":"/tmp"}\n'
+    '{"type":"agent_start"}\n'
+    '{"type":"turn_start"}\n'
+    '{"type":"message_start","message":{"role":"user","content":[{"type":"text","text":"say hello"}],"timestamp":1000}}\n'
+    '{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"say hello"}],"timestamp":1000}}\n'
+    '{"type":"message_update","assistantMessageEvent":{"type":"thinking_start","contentIndex":0,"partial":{"role":"assistant","content":[{"type":"thinking","thinking":"User"}]}},"message":{}}\n'
+    '{"type":"message_update","assistantMessageEvent":{"type":"thinking_end","contentIndex":0,"content":"User wants hello","partial":{"role":"assistant","content":[{"type":"thinking","thinking":"User wants hello"},{"type":"text","text":""}]}},"message":{}}\n'
+    '{"type":"message_update","assistantMessageEvent":{"type":"text_start","contentIndex":1,"partial":{"role":"assistant","content":[{"type":"thinking","thinking":"User wants hello"},{"type":"text","text":"Hel"}]}},"message":{}}\n'
+    '{"type":"message_update","assistantMessageEvent":{"type":"text_end","contentIndex":1,"content":"Hello!","partial":{"role":"assistant","content":[{"type":"thinking","thinking":"User wants hello"},{"type":"text","text":"Hello!"}]}},"message":{}}\n'
+    '{"type":"message_end","message":{"role":"assistant","content":[{"type":"thinking","thinking":"User wants hello"},{"type":"text","text":"Hello!"}],"usage":{"input":50,"output":10,"cacheRead":100,"cacheWrite":0,"totalTokens":160,"cost":{"input":0.005,"output":0.001,"cacheRead":0.0001,"cacheWrite":0,"total":0.0061}}}}\n'
+    '{"type":"turn_end","message":{"role":"assistant","content":[{"type":"thinking","thinking":"User wants hello"},{"type":"text","text":"Hello!"}],"usage":{"input":50,"output":10,"cacheRead":100,"cacheWrite":0,"totalTokens":160,"cost":{"input":0.005,"output":0.001,"cacheRead":0.0001,"cacheWrite":0,"total":0.0061}}},"toolResults":[]}\n'
+    '{"type":"agent_end","messages":[],"willRetry":false}\n'
+)
+
+PI_TOOL_CALL = (
+    '{"type":"session","version":3,"id":"pi-ses-2","cwd":"/tmp"}\n'
+    '{"type":"agent_start"}\n'
+    '{"type":"turn_start"}\n'
+    '{"type":"message_update","assistantMessageEvent":{"type":"thinking_end","contentIndex":0,"content":"Need to list files","partial":{}},"message":{}}\n'
+    '{"type":"message_update","assistantMessageEvent":{"type":"toolcall_start","contentIndex":1,"partial":{"role":"assistant","content":[{"type":"toolCall","id":"call_abc","name":"bash","arguments":{},"partialArgs":""}]}},"message":{}}\n'
+    '{"type":"message_update","assistantMessageEvent":{"type":"toolcall_end","contentIndex":1,"toolCall":{"type":"toolCall","id":"call_abc","name":"bash","arguments":{"command":"ls"}},"partial":{}},"message":{}}\n'
+    '{"type":"tool_execution_start","toolCallId":"call_abc","toolName":"bash","args":{"command":"ls"}}\n'
+    '{"type":"tool_execution_end","toolCallId":"call_abc","toolName":"bash","result":{"content":[{"type":"text","text":"file1.txt\\nfile2.txt"}]},"isError":false}\n'
+    '{"type":"message_update","assistantMessageEvent":{"type":"text_end","contentIndex":1,"content":"Here are the files","partial":{}},"message":{}}\n'
+    '{"type":"turn_end","message":{"role":"assistant","content":[{"type":"text","text":"Here are the files"}],"usage":{"input":100,"output":20,"cacheRead":0,"cacheWrite":0,"totalTokens":120,"cost":{"total":0.01}}}}\n'
+    '{"type":"agent_end","messages":[],"willRetry":false}\n'
+)
+
+PI_ERROR_TOOL = (
+    '{"type":"session","version":3,"id":"pi-ses-3","cwd":"/tmp"}\n'
+    '{"type":"turn_start"}\n'
+    '{"type":"message_update","assistantMessageEvent":{"type":"toolcall_end","contentIndex":0,"toolCall":{"type":"toolCall","id":"call_err","name":"bash","arguments":{"command":"bad"}},"partial":{}},"message":{}}\n'
+    '{"type":"tool_execution_end","toolCallId":"call_err","toolName":"bash","result":{"content":[{"type":"text","text":"command not found"}]},"isError":true}\n'
+    '{"type":"turn_end","message":{"role":"assistant","content":[],"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":{"total":0}}}}\n'
+    '{"type":"agent_end","messages":[]}\n'
+)
+
+PI_MULTI_TOOL = (
+    '{"type":"session","version":3,"id":"pi-ses-4","cwd":"/tmp"}\n'
+    '{"type":"turn_start"}\n'
+    '{"type":"tool_execution_end","toolCallId":"call_1","toolName":"bash","result":{"content":[{"type":"text","text":"result1"}]},"isError":false}\n'
+    '{"type":"tool_execution_end","toolCallId":"call_2","toolName":"read","result":{"content":[{"type":"text","text":"result2"}]},"isError":false}\n'
+    '{"type":"tool_execution_end","toolCallId":"call_3","toolName":"bash","result":{"content":[{"type":"text","text":"err"}]},"isError":true}\n'
+    '{"type":"turn_end","message":{"role":"assistant","content":[],"usage":{"input":0,"output":0}}}\n'
+    '{"type":"agent_end","messages":[]}\n'
+)
+
+PI_EMPTY_THINKING = (
+    '{"type":"session","version":3,"id":"pi-ses-5","cwd":"/tmp"}\n'
+    '{"type":"turn_start"}\n'
+    '{"type":"message_update","assistantMessageEvent":{"type":"thinking_end","contentIndex":0,"content":"","partial":{}},"message":{}}\n'
+    '{"type":"message_update","assistantMessageEvent":{"type":"text_end","contentIndex":1,"content":"ok","partial":{}},"message":{}}\n'
+    '{"type":"turn_end","message":{"role":"assistant","content":[],"usage":{"input":0,"output":0}}}\n'
+    '{"type":"agent_end","messages":[]}\n'
+)
+
+
+class ParsePiJsonTests(unittest.TestCase):
+    def test_simple_response(self):
+        result = parse_pi_json(PI_SIMPLE)
+        self.assertEqual(result.schema_name, "pi")
+        self.assertEqual(result.session_id, "pi-ses-1")
+        self.assertEqual(result.final_text, "Hello!")
+        self.assertEqual(len(result.events), 2)  # thinking + text
+        self.assertEqual(result.events[0].event_type, "thinking")
+        self.assertEqual(result.events[0].thinking, "User wants hello")
+        self.assertEqual(result.events[1].event_type, "text")
+        self.assertEqual(result.events[1].text, "Hello!")
+        self.assertEqual(result.unknown_json_lines, [])
+
+    def test_usage_from_turn_end(self):
+        result = parse_pi_json(PI_SIMPLE)
+        self.assertEqual(result.usage["input"], 50)
+        self.assertEqual(result.usage["output"], 10)
+        self.assertEqual(result.usage["cacheRead"], 100)
+        self.assertEqual(result.usage["totalTokens"], 160)
+        self.assertAlmostEqual(result.cost_usd, 0.0061)
+
+    def test_tool_call_and_result(self):
+        result = parse_pi_json(PI_TOOL_CALL)
+        tool_use_events = [e for e in result.events if e.event_type == "tool_use"]
+        tool_result_events = [e for e in result.events if e.event_type == "tool_result"]
+        self.assertEqual(len(tool_use_events), 1)
+        self.assertEqual(len(tool_result_events), 1)
+        self.assertEqual(tool_use_events[0].tool_call.name, "bash")
+        self.assertEqual(tool_use_events[0].tool_call.id, "call_abc")
+        self.assertIn("ls", tool_use_events[0].tool_call.arguments)
+        self.assertEqual(tool_result_events[0].tool_result.tool_call_id, "call_abc")
+        self.assertEqual(tool_result_events[0].tool_result.content, "file1.txt\nfile2.txt")
+        self.assertFalse(tool_result_events[0].tool_result.is_error)
+        self.assertEqual(result.final_text, "Here are the files")
+
+    def test_error_tool_result(self):
+        result = parse_pi_json(PI_ERROR_TOOL)
+        tr_events = [e for e in result.events if e.event_type == "tool_result"]
+        self.assertEqual(len(tr_events), 1)
+        self.assertTrue(tr_events[0].tool_result.is_error)
+        self.assertEqual(tr_events[0].tool_result.content, "command not found")
+
+    def test_multiple_tool_results(self):
+        result = parse_pi_json(PI_MULTI_TOOL)
+        tr_events = [e for e in result.events if e.event_type == "tool_result"]
+        self.assertEqual(len(tr_events), 3)
+        self.assertFalse(tr_events[0].tool_result.is_error)
+        self.assertFalse(tr_events[1].tool_result.is_error)
+        self.assertTrue(tr_events[2].tool_result.is_error)
+
+    def test_empty_thinking_not_emitted(self):
+        result = parse_pi_json(PI_EMPTY_THINKING)
+        thinking_events = [e for e in result.events if e.event_type == "thinking"]
+        self.assertEqual(len(thinking_events), 0)  # empty thinking should be skipped
+        self.assertEqual(result.final_text, "ok")
+
+    def test_render_pi_simple(self):
+        result = parse_pi_json(PI_SIMPLE)
+        rendered = render_parsed(result)
+        self.assertIn("[thinking] User wants hello", rendered)
+        self.assertIn("[assistant] Hello!", rendered)
+
+    def test_render_pi_no_thinking(self):
+        result = parse_pi_json(PI_SIMPLE)
+        rendered = render_parsed(result, show_thinking=False)
+        self.assertNotIn("[thinking]", rendered)
+        self.assertIn("[assistant] Hello!", rendered)
+
+    def test_render_pi_tool_use(self):
+        result = parse_pi_json(PI_TOOL_CALL)
+        rendered = render_parsed(result)
+        self.assertIn("[tool:start] bash: ls", rendered)
+        self.assertIn("[tool:result] bash (ok)", rendered)
+        self.assertIn("file1.txt", rendered)
+        self.assertIn("[assistant] Here are the files", rendered)
+
+    def test_render_pi_error_tool(self):
+        result = parse_pi_json(PI_ERROR_TOOL)
+        rendered = render_parsed(result)
+        self.assertIn("[tool:result] bash (error)", rendered)
+        self.assertIn("command not found", rendered)
+
+    def test_stream_processor_pi(self):
+        processor = StructuredStreamProcessor("pi", FormattedRenderer(show_thinking=True))
+        rendered = processor.feed(PI_SIMPLE)
+        self.assertIn("[thinking] User wants hello", rendered)
+        self.assertIn("[assistant] Hello!", rendered)
+        self.assertEqual(processor.output.session_id, "pi-ses-1")
+        self.assertEqual(processor.output.final_text, "Hello!")
+        self.assertEqual(processor.take_unknown_json_lines(), [])
+
+    def test_stream_processor_pi_tool(self):
+        processor = StructuredStreamProcessor("pi", FormattedRenderer())
+        rendered = processor.feed(PI_TOOL_CALL)
+        self.assertIn("[tool:start] bash: ls", rendered)
+        self.assertIn("[tool:result] bash (ok)", rendered)
+        self.assertIn("[assistant] Here are the files", rendered)
+        self.assertEqual(processor.take_unknown_json_lines(), [])
+
+    def test_parse_via_schema_dispatch(self):
+        result = parse_json_output(PI_SIMPLE, "pi")
+        self.assertEqual(result.schema_name, "pi")
+        self.assertEqual(result.final_text, "Hello!")
 
 
 class RenderParsedTests(unittest.TestCase):

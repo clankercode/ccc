@@ -20,6 +20,16 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-06-27
+
+### Pi alias provider flag and runner classification
+- Change: Python and Rust now emit Pi's `--provider <name>` flag whenever an effective provider is configured for the Pi runner, including config aliases such as `@pi-mimo25p`. Rust `Client` planning also classifies `pi` command specs as `RunnerKind::Pi`, so `CCC_REAL_PI` and library binary overrides apply to alias-expanded Pi runs.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `tests/test_ccc_contract_impl.py`, `rust/tests/parser_tests.rs`, `rust/tests/library_api_tests.rs`
+- Docs updated: `docs/clis/pi.md`, `CHANGELOG.md`
+- Notes: OpenCode keeps its existing provider/model behavior because it has no separate provider flag and expects `provider/model` through `--model`.
+
 ## 2026-06-16
 
 ### Pi runner support

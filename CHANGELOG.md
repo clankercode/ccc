@@ -3,6 +3,10 @@
 ## Unreleased
 - No unreleased semantic changes.
 
+## 0.4.0 - 2026-06-27
+- Fixed Pi alias execution in Python and Rust so configured providers are passed with Pi's `--provider` flag instead of only as `CCC_PROVIDER`; this prevents provider/model aliases such as `@pi-mimo25p` from falling through to the wrong Pi provider candidate.
+- Fixed Rust `Client` planning so commands resolved to the `pi` binary are classified as `RunnerKind::Pi`, allowing `CCC_REAL_PI` and library binary overrides to apply correctly.
+
 ## 0.3.5 - 2026-06-16
 - Added `pi` (earendil-works pi-coding-agent) as a supported runner. Runner selectors `p` and `pi` map to the pi binary. Non-interactive mode uses `pi -p --no-session`, JSON streaming uses `pi -p --mode json`, thinking levels map to `--thinking off|low|medium|high|xhigh`, and provider/model selection via `--provider`/`--model`.
 - Added `--arg` flag for passing extra arguments directly to the underlying runner binary.

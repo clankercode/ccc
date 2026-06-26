@@ -1,5 +1,5 @@
 use call_coding_clis::{
-    parse_tokens_with_config, sugar, CccConfig, Client, CommandSpec, CompletedRun, Event,
+    parse_tokens_with_config, sugar, AliasDef, CccConfig, Client, CommandSpec, CompletedRun, Event,
     OutputMode, Request, Run, Runner, RunnerKind, Transcript,
 };
 
@@ -99,6 +99,59 @@ fn library_api_tests_client_with_config_uses_injected_defaults() {
     assert_eq!(
         plan.command_spec().argv.first().map(|s| s.as_str()),
         Some("codex")
+    );
+}
+
+#[test]
+fn library_api_tests_client_plan_recognizes_pi_alias_runner() {
+    let mut config = CccConfig::default();
+    config.aliases.insert(
+        "pi-mimo25p".to_string(),
+        AliasDef {
+            runner: Some("pi".to_string()),
+            provider: Some("xiaomi-token-plan-sgp".to_string()),
+            model: Some("mimo-v2.5-pro".to_string()),
+            thinking: Some(3),
+            output_mode: Some("stream-text".to_string()),
+            ..AliasDef::default()
+        },
+    );
+    let parsed = parse_tokens_with_config(["@pi-mimo25p", "reply HI123"], &config)
+        .expect("parse should succeed");
+    let plan = Client::new()
+        .with_config(config)
+        .plan(&parsed.request)
+        .expect("plan should resolve");
+
+    assert_eq!(plan.runner(), RunnerKind::Pi);
+    assert_eq!(
+        plan.command_spec().argv,
+        vec![
+            "pi",
+            "-p",
+            "--thinking",
+            "high",
+            "--provider",
+            "xiaomi-token-plan-sgp",
+            "--model",
+            "mimo-v2.5-pro",
+            "--no-session",
+            "reply HI123",
+        ]
+    );
+}
+
+#[test]
+fn library_api_tests_client_plan_applies_pi_binary_override() {
+    let plan = Client::new()
+        .with_binary_override(RunnerKind::Pi, "/tmp/mock-pi")
+        .plan(&Request::new("hello").with_runner(RunnerKind::Pi))
+        .expect("plan should resolve");
+
+    assert_eq!(plan.runner(), RunnerKind::Pi);
+    assert_eq!(
+        plan.command_spec().argv.first().map(|s| s.as_str()),
+        Some("/tmp/mock-pi")
     );
 }
 

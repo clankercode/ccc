@@ -628,6 +628,36 @@ class ResolveCommandTests(unittest.TestCase):
         argv, env, _warnings = resolve_command(parsed)
         self.assertEqual(env.get("CCC_PROVIDER"), "anthropic")
 
+    def test_pi_provider_uses_provider_flag(self):
+        config = CccConfig(
+            aliases={
+                "mimo": AliasDef(
+                    runner="pi",
+                    provider="xiaomi-token-plan-sgp",
+                    model="mimo-v2.5-pro",
+                    thinking=3,
+                )
+            }
+        )
+        parsed = ParsedArgs(alias="mimo", prompt="hello")
+        argv, env, _warnings = resolve_command(parsed, config)
+        self.assertEqual(
+            argv,
+            [
+                "pi",
+                "-p",
+                "--thinking",
+                "high",
+                "--provider",
+                "xiaomi-token-plan-sgp",
+                "--model",
+                "mimo-v2.5-pro",
+                "--no-session",
+                "hello",
+            ],
+        )
+        self.assertEqual(env.get("CCC_PROVIDER"), "xiaomi-token-plan-sgp")
+
     def test_opencode_sets_terminal_title_env(self):
         parsed = ParsedArgs(runner="oc", prompt="hello")
         argv, env, _warnings = resolve_command(parsed)

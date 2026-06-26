@@ -619,6 +619,13 @@ pub fn resolve_command(
         );
     }
 
+    if let Some(ref provider) = effective_provider {
+        if !effective_runner.provider_flag.is_empty() {
+            argv.push(effective_runner.provider_flag.clone());
+            argv.push(provider.clone());
+        }
+    }
+
     if let Some(ref model) = effective_model {
         if !effective_runner.model_flag.is_empty() {
             argv.push(effective_runner.model_flag.clone());

@@ -866,6 +866,9 @@ def resolve_command(
     if effective_runner_name in {"oc", "opencode"}:
         env_overrides["OPENCODE_DISABLE_TERMINAL_TITLE"] = "true"
 
+    if effective_provider and info.provider_flag:
+        argv.extend([info.provider_flag, effective_provider])
+
     if effective_model and info.model_flag:
         if effective_runner_name in {"oc", "opencode"} and effective_provider:
             argv.extend([info.model_flag, f"{effective_provider}/{effective_model}"])

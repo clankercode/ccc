@@ -1158,6 +1158,47 @@ fn test_resolve_provider_sets_env() {
 }
 
 #[test]
+fn test_resolve_pi_provider_uses_provider_flag() {
+    let mut config = CccConfig::default();
+    config.aliases.insert(
+        "mimo".into(),
+        AliasDef {
+            runner: Some("pi".into()),
+            provider: Some("xiaomi-token-plan-sgp".into()),
+            model: Some("mimo-v2.5-pro".into()),
+            thinking: Some(3),
+            ..Default::default()
+        },
+    );
+    let parsed = ParsedArgs {
+        alias: Some("mimo".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, env, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(
+        argv,
+        vec![
+            "pi",
+            "-p",
+            "--thinking",
+            "high",
+            "--provider",
+            "xiaomi-token-plan-sgp",
+            "--model",
+            "mimo-v2.5-pro",
+            "--no-session",
+            "hello",
+        ]
+    );
+    assert_eq!(
+        env.get("CCC_PROVIDER").map(|s| s.as_str()),
+        Some("xiaomi-token-plan-sgp")
+    );
+    assert!(warnings.is_empty());
+}
+
+#[test]
 fn test_resolve_opencode_sets_terminal_title_env() {
     let parsed = ParsedArgs {
         runner: Some("oc".into()),

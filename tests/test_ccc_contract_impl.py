@@ -447,6 +447,42 @@ class SingleImplCccContractTests(unittest.TestCase):
                     )
                     self.assertEqual(result.stderr, "")
 
+    def test_pi_alias_passes_provider_model_flags_and_uses_pi_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            pi_path = bin_dir / "pi-mock"
+            self._write_opencode_stub(opencode_path)
+            self._write_runner_stub(pi_path, "pi")
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                with self.subTest(language=lang.name, alias="@pi-mimo25p"):
+                    env = self._make_env(opencode_path, lang)
+                    config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                    config_path.write_text(
+                        '[aliases.pi-mimo25p]\n'
+                        'runner = "pi"\n'
+                        'provider = "xiaomi-token-plan-sgp"\n'
+                        'model = "mimo-v2.5-pro"\n'
+                        "thinking = 3\n"
+                        'output_mode = "stream-text"\n',
+                        encoding="utf-8",
+                    )
+                    env["CCC_REAL_PI"] = str(pi_path)
+                    result = lang.invoke_extra(
+                        ["--no-output-log-path", "@pi-mimo25p", "reply HI123"], env
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(
+                        result.stdout,
+                        "pi -p --thinking high --provider xiaomi-token-plan-sgp --model mimo-v2.5-pro --no-session reply HI123\n",
+                    )
+                    self.assertEqual(result.stderr, "")
+
     def test_name_without_preset_falls_back_to_agent(self) -> None:
         self._run_with_agent_stub_extra_args_assertion(
             ["@reviewer", PROMPT], self.assert_uses_agent_fallback

@@ -76,4 +76,4 @@ pi --list-models
 - Python and Rust map `json`, `stream-json`, `formatted`, and `stream-formatted` to `pi -p --mode json`
 - the pi JSON parser extracts session ID, text content, thinking content, tool calls, tool results, and usage data
 - pi supports thinking levels via `--thinking <level>` (off, minimal, low, medium, high, xhigh)
-- pi supports provider selection via `--provider <name>` and model selection via `--model <pattern>`
+- pi supports provider selection via `--provider <name>` and model selection via `--model <pattern>`; Python and Rust emit both flags for aliases that configure both fields

@@ -68,3 +68,4 @@ tmp/
 nim/tests/test_cli
 nim/tests/test_config
 nim/tests/test_help
+reviews/

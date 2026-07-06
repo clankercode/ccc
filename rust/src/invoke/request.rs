@@ -52,6 +52,7 @@ pub struct Request {
     show_thinking: Option<bool>,
     sanitize_osc: Option<bool>,
     permission_mode: Option<String>,
+    fast: Option<bool>,
     save_session: bool,
     cleanup_session: bool,
     provider: Option<String>,
@@ -72,6 +73,7 @@ impl Request {
             show_thinking: None,
             sanitize_osc: None,
             permission_mode: None,
+            fast: None,
             save_session: false,
             cleanup_session: false,
             provider: None,
@@ -114,6 +116,11 @@ impl Request {
 
     pub fn with_permission_mode(mut self, mode: impl Into<String>) -> Self {
         self.permission_mode = Some(mode.into());
+        self
+    }
+
+    pub fn with_fast(mut self, enabled: bool) -> Self {
+        self.fast = Some(enabled);
         self
     }
 
@@ -227,6 +234,7 @@ impl Request {
             show_thinking: parsed.show_thinking,
             sanitize_osc: parsed.sanitize_osc,
             permission_mode: parsed.permission_mode.clone(),
+            fast: parsed.fast,
             save_session: parsed.save_session,
             cleanup_session: parsed.cleanup_session,
             provider: parsed.provider.clone(),
@@ -262,6 +270,13 @@ impl Request {
         if let Some(permission_mode) = self.permission_mode.as_deref() {
             tokens.push("--permission-mode".to_string());
             tokens.push(permission_mode.to_string());
+        }
+        if let Some(fast) = self.fast {
+            tokens.push(if fast {
+                "--fast".to_string()
+            } else {
+                "--no-fast".to_string()
+            });
         }
         if self.save_session {
             tokens.push("--save-session".to_string());

@@ -114,7 +114,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
 - `ccc "<Prompt>"` must work everywhere; Python and Rust carry the reference extended CLI surface
 - library and CLI design should stay aligned so `precurl` can use the library layer while humans can use the same runner shape directly
 - `precurl` uses the Rust library layer for delegated LLM analysis — see the [precurl SECURITY.md](../precurl/SECURITY.md) for threat model and prompt-injection mitigation details
-- Python and Rust also support free-order control tokens before the prompt, `--` to force literal prompt text, `--show-thinking` / `--no-show-thinking`, and `--yolo` / `-y`
+- Python and Rust also support free-order control tokens before the prompt, `--` to force literal prompt text, `--show-thinking` / `--no-show-thinking`, `--yolo` / `-y`, and `--fast` / `--no-fast`
 - `-v` / `--version` prints the shared build version plus resolved client versions
 
 ## First-Pass `ccc` Contract
@@ -147,6 +147,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
   - `--show-thinking` / `--no-show-thinking`
   - `--timeout-secs <N>` kills the wrapped runner after `N` seconds, prints `warning: timed out after N seconds; killed runner` to stderr, and exits with status `124`
   - `--yolo` / `-y`
+  - `--fast` / `--no-fast` toggles the runner's fast mode when supported (codex maps to `--enable fast_mode` / `--disable fast_mode`); runners without a fast mode warn and ignore the flag
 - `--` forces the rest of argv to be treated as prompt text, even if it starts with control-like tokens
 - Python and Rust currently use `claude -p --no-session-persistence`, `codex exec --ephemeral`, `cursor-agent --print --trust`, `gemini --prompt`, `pi -p --no-session`, and `crush run` for non-interactive invocation
 - By default Python and Rust avoid saved sessions where the selected CLI supports it; OpenCode, Kimi, Cursor, Gemini, Crush, and RooCode warn that the runner may save a session unless `--save-session` or `--cleanup-session` is used

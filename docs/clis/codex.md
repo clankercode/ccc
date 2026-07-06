@@ -30,6 +30,7 @@ Useful flags from local help:
 - `--json`
 - `--ephemeral`
 - `-c key=value` config overrides
+- `--enable <feature>` / `--disable <feature>` toggle a feature flag (equivalent to `-c features.<name>=true|false`); e.g. `fast_mode`
 
 ## Permission controls
 
@@ -65,6 +66,8 @@ codex exec --help | rg "sandbox|full-auto|dangerously"
 - `ccc` uses `codex exec`
 - Python and Rust add `--ephemeral` by default so `ccc` runs do not persist Codex session files
 - `ccc --save-session c ...` omits `--ephemeral` and restores normal Codex session saving
+- Codex has no literal `--fast` CLI flag, but exposes a native `fast_mode` feature flag (also a live TUI toggle); `ccc --fast c ...` maps to `codex exec --enable fast_mode` and `ccc --no-fast c ...` maps to `--disable fast_mode`. `fast_mode` is enabled by default in current Codex, so `--no-fast` is the meaningful override
+- runners without a fast mode warn `runner "<name>" does not support fast mode; ignoring --fast/--no-fast` and drop the flag
 - Python and Rust map `json`, `stream-json`, `formatted`, and `stream-formatted` to `codex exec --json`
 - the Codex JSONL parser extracts `thread.started.thread_id`, completed assistant messages, command execution start/result events, `turn.completed.usage`, and structured failure events from `error` / `turn.failed`
 - Codex sometimes wraps an upstream error object as a JSON string inside `message` or `error.message`; Python and Rust decode that nested payload and render a concise formatted error such as `invalid_request_error (400): ...`

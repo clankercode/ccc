@@ -57,6 +57,9 @@ Controls (free order before the prompt):
   --permission-mode <safe|auto|yolo|plan>
                 Request a higher-level permission profile when the selected runner supports it
   --yolo / -y   Request the runner's lowest-friction auto-approval mode when supported
+  --fast / --no-fast
+                Toggle the runner's fast mode when supported (codex: --enable/--disable fast_mode);
+                unsupported runners warn and ignore it
   --save-session
                 Allow the selected runner to save this run in its normal session history
   --cleanup-session
@@ -98,6 +101,7 @@ Examples:
   ccc @reviewer k +4 "Debug the parser"
   ccc @reviewer "Audit the API boundary"
   ccc codex "Write a unit test"
+  ccc c --fast "Write a unit test"
   ccc -y -- +1 @agent :model
   ccc --print-config
 

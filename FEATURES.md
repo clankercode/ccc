@@ -62,6 +62,7 @@
 | F33 | Order-independent controls | Pre-prompt control tokens may appear in any order; `--` forces literal prompt text |
 | F34 | Permission mode | `--permission-mode <safe|auto|yolo|plan>` maps to runner-specific permission profiles where supported |
 | F35 | Session persistence controls | `--save-session` explicitly allows saved sessions, while default runner mappings avoid persistence where supported and warn otherwise; `--cleanup-session` tries safe post-run cleanup |
+| F38 | Fast mode | `--fast` / `--no-fast` toggles the runner's fast mode where supported (codex maps to `--enable fast_mode` / `--disable fast_mode`); unsupported runners warn and ignore it |
 
 ### v3 JSON Output Features
 

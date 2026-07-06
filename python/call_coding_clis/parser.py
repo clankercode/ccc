@@ -17,6 +17,7 @@ class RunnerInfo:
     thinking_flags: dict[int, list[str]] = field(default_factory=dict)
     show_thinking_flags: dict[bool, list[str]] = field(default_factory=dict)
     yolo_flags: list[str] = field(default_factory=list)
+    fast_flags: dict[bool, list[str]] = field(default_factory=dict)
     provider_flag: str = ""
     model_flag: str = ""
     agent_flag: str = ""
@@ -36,6 +37,7 @@ class ParsedArgs:
     save_session: bool = False
     cleanup_session: bool = False
     yolo: bool = False
+    fast: bool | None = None
     permission_mode: str | None = None
     timeout_secs: int | None = None
     runner_args: list[str] = field(default_factory=list)
@@ -135,6 +137,10 @@ def _register_defaults() -> None:
         thinking_flags={},
         show_thinking_flags={},
         yolo_flags=["--dangerously-bypass-approvals-and-sandbox"],
+        fast_flags={
+            True: ["--enable", "fast_mode"],
+            False: ["--disable", "fast_mode"],
+        },
         provider_flag="",
         model_flag="--model",
         prompt_flag="",
@@ -324,6 +330,8 @@ def parse_args(argv: list[str]) -> ParsedArgs:
             index += 1
         elif token.lower() in OUTPUT_MODE_SUGAR:
             parsed.output_mode = OUTPUT_MODE_SUGAR[token.lower()]
+        elif token in {"--fast", "--no-fast"}:
+            parsed.fast = token == "--fast"
         elif token in {"--yolo", "-y"}:
             parsed.yolo = True
             parsed.permission_mode = "yolo"
@@ -946,6 +954,16 @@ def resolve_command(
         else:
             warnings.append(
                 f'warning: runner "{effective_runner_name}" does not support permission mode "plan"; ignoring it'
+            )
+
+    if parsed.fast is not None:
+        if parsed.fast in info.fast_flags:
+            argv.extend(info.fast_flags[parsed.fast])
+        else:
+            display = _canonical_runner_name(effective_runner_name, info)
+            flag = "--fast" if parsed.fast else "--no-fast"
+            warnings.append(
+                f'warning: runner "{display}" does not support fast mode; ignoring {flag}'
             )
 
     if not parsed.save_session:

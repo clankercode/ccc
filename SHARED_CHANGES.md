@@ -20,6 +20,16 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-07-06
+
+### Fast mode flag (`--fast` / `--no-fast`)
+- Change: Python and Rust add a `--fast` / `--no-fast` control token. For the codex runner it injects `codex exec --enable fast_mode` / `--disable fast_mode` (codex has no literal `--fast` flag; `fast_mode` is its native feature flag, default-on). Runners without a fast mode emit `warning: runner "<name>" does not support fast mode; ignoring --fast|--no-fast` and drop the flag. Data-driven via a new `RunnerInfo.fast_flags` map; Rust also threads `fast` through the `Request` round-trip (`from_parsed_args` / `to_cli_tokens`, new `Request::with_fast`).
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py` (`test_fast_maps_to_runner_specific_flags`, help-surface `--fast / --no-fast` assertion)
+- Docs updated: `docs/clis/codex.md`, `README.md`, `FEATURES.md`, help text (`python/call_coding_clis/help.py`, `rust/src/help.rs`)
+- Notes: verified the real `codex exec --enable fast_mode` argv shape end-to-end against `codex-cli 0.142.5`.
+
 ## 2026-06-27
 
 ### Pi alias provider flag and runner classification

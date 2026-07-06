@@ -68,6 +68,7 @@ HELP_OUTPUT_SUGAR_SNIPPET = ".text / ..text, .json / ..json, .fmt / ..fmt"
 HELP_COLOR_ENV_SNIPPET = "FORCE_COLOR / NO_COLOR"
 HELP_PERMISSION_MODE_SNIPPET = "--permission-mode <safe|auto|yolo|plan>"
 HELP_YOLO_SNIPPET = "--yolo / -y"
+HELP_FAST_SNIPPET = "--fast / --no-fast"
 HELP_VERSION_SNIPPET = "--version / -v"
 HELP_SAVE_SESSION_SNIPPET = "--save-session"
 HELP_CLEANUP_SESSION_SNIPPET = "--cleanup-session"
@@ -2788,6 +2789,58 @@ class SingleImplCccContractTests(unittest.TestCase):
                             self.assertEqual(result.stdout, expected_stdout)
                             self.assertIn(result.stderr, {expected_stderr, expected_stderr + "\n"})
 
+    def test_fast_maps_to_runner_specific_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            codex_path = bin_dir / "codex"
+            gemini_path = bin_dir / "gemini"
+            opencode_path = bin_dir / "opencode"
+            self._write_argv_echo_stub(codex_path, "codex")
+            self._write_argv_echo_stub(gemini_path, "gemini")
+            self._write_opencode_stub(opencode_path)
+
+            cases = [
+                (
+                    ["c", "--fast"],
+                    "codex exec --enable fast_mode --ephemeral Fix the failing tests\n",
+                    "",
+                ),
+                (
+                    ["c", "--no-fast"],
+                    "codex exec --disable fast_mode --ephemeral Fix the failing tests\n",
+                    "",
+                ),
+                (
+                    ["g", "--fast"],
+                    "gemini --prompt Fix the failing tests\n",
+                    'warning: runner "gemini" does not support fast mode; ignoring --fast\n'
+                    + GEMINI_PERSISTENCE_WARNING,
+                ),
+                (
+                    ["g", "--no-fast"],
+                    "gemini --prompt Fix the failing tests\n",
+                    'warning: runner "gemini" does not support fast mode; ignoring --no-fast\n'
+                    + GEMINI_PERSISTENCE_WARNING,
+                ),
+            ]
+
+            for lang in self.selected_languages:
+                if lang.name not in YOLO_IMPLEMENTATIONS:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                with self.subTest(language=lang.name, capability="fast"):
+                    for extra_args, expected_stdout, expected_stderr in cases:
+                        with self.subTest(language=lang.name, args=extra_args):
+                            result = lang.invoke_with_args(extra_args, PROMPT, env)
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            self.assertEqual(result.stdout, expected_stdout)
+                            self.assertIn(
+                                result.stderr,
+                                {expected_stderr, expected_stderr + "\n"},
+                            )
+
     def assert_equal_output(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, EXPECTED)
@@ -2896,6 +2949,7 @@ class SingleImplCccContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(HELP_PERMISSION_MODE_SNIPPET, result.stdout)
         self.assertIn(HELP_YOLO_SNIPPET, result.stdout)
+        self.assertIn(HELP_FAST_SNIPPET, result.stdout)
         self.assertIn(HELP_SAVE_SESSION_SNIPPET, result.stdout)
         self.assertIn(HELP_CLEANUP_SESSION_SNIPPET, result.stdout)
         self.assertIn(HELP_DELIMITER_SNIPPET, result.stdout)

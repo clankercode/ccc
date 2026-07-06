@@ -37,6 +37,7 @@ pub struct RunnerInfo {
     pub thinking_flags: BTreeMap<i32, Vec<String>>,
     pub show_thinking_flags: BTreeMap<bool, Vec<String>>,
     pub yolo_flags: Vec<String>,
+    pub fast_flags: BTreeMap<bool, Vec<String>>,
     pub provider_flag: String,
     pub model_flag: String,
     pub agent_flag: String,
@@ -56,6 +57,7 @@ pub struct ParsedArgs {
     pub save_session: bool,
     pub cleanup_session: bool,
     pub yolo: bool,
+    pub fast: Option<bool>,
     pub permission_mode: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
@@ -141,6 +143,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let mut m = BTreeMap::new();
     let opencode = RunnerInfo {
         binary: "opencode".into(),
+        fast_flags: BTreeMap::new(),
         extra_args: vec!["--pure".into(), "run".into()],
         no_persist_flags: vec![],
         thinking_flags: BTreeMap::new(),
@@ -157,6 +160,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let claude = RunnerInfo {
         binary: "claude".into(),
+        fast_flags: BTreeMap::new(),
         extra_args: vec!["-p".into()],
         no_persist_flags: vec!["--no-session-persistence".into()],
         thinking_flags: {
@@ -221,6 +225,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let kimi = RunnerInfo {
         binary: "kimi".into(),
+        fast_flags: BTreeMap::new(),
         extra_args: vec![],
         no_persist_flags: vec![],
         thinking_flags: {
@@ -245,6 +250,12 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let codex = RunnerInfo {
         binary: "codex".into(),
+        fast_flags: {
+            let mut ff = BTreeMap::new();
+            ff.insert(true, vec!["--enable".into(), "fast_mode".into()]);
+            ff.insert(false, vec!["--disable".into(), "fast_mode".into()]);
+            ff
+        },
         extra_args: vec!["exec".into()],
         no_persist_flags: vec!["--ephemeral".into()],
         thinking_flags: BTreeMap::new(),
@@ -257,6 +268,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let roocode = RunnerInfo {
         binary: "roocode".into(),
+        fast_flags: BTreeMap::new(),
         extra_args: vec![],
         no_persist_flags: vec![],
         thinking_flags: BTreeMap::new(),
@@ -269,6 +281,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let crush = RunnerInfo {
         binary: "crush".into(),
+        fast_flags: BTreeMap::new(),
         extra_args: vec!["run".into()],
         no_persist_flags: vec![],
         thinking_flags: BTreeMap::new(),
@@ -281,6 +294,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let cursor = RunnerInfo {
         binary: "cursor-agent".into(),
+        fast_flags: BTreeMap::new(),
         extra_args: vec!["--print".into(), "--trust".into()],
         no_persist_flags: vec![],
         thinking_flags: BTreeMap::new(),
@@ -293,6 +307,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let gemini = RunnerInfo {
         binary: "gemini".into(),
+        fast_flags: BTreeMap::new(),
         extra_args: vec![],
         no_persist_flags: vec![],
         thinking_flags: BTreeMap::new(),
@@ -305,6 +320,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let pi = RunnerInfo {
         binary: "pi".into(),
+        fast_flags: BTreeMap::new(),
         extra_args: vec!["-p".into()],
         no_persist_flags: vec!["--no-session".into()],
         thinking_flags: {
@@ -501,6 +517,8 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
             }
         } else if let Some(mode) = parse_output_mode_sugar(token) {
             parsed.output_mode = Some(mode);
+        } else if token == "--fast" || token == "--no-fast" {
+            parsed.fast = Some(token == "--fast");
         } else if token == "--yolo" || token == "-y" {
             parsed.yolo = true;
             parsed.permission_mode = Some("yolo".to_string());
@@ -750,6 +768,18 @@ pub fn resolve_command(
             warnings.push(format!(
                 "warning: runner \"{}\" does not support permission mode \"plan\"; ignoring it",
                 effective_runner_name
+            ));
+        }
+    }
+
+    if let Some(fast) = parsed.fast {
+        if let Some(flags) = effective_runner.fast_flags.get(&fast) {
+            argv.extend(flags.iter().cloned());
+        } else {
+            let display = canonical_runner_name(&effective_runner_name, effective_runner);
+            let flag = if fast { "--fast" } else { "--no-fast" };
+            warnings.push(format!(
+                "warning: runner \"{display}\" does not support fast mode; ignoring {flag}"
             ));
         }
     }

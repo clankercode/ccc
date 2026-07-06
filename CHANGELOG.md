@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- No unreleased semantic changes.
+
+## 0.4.1 - 2026-07-06
 - Added `--fast` / `--no-fast` in Python and Rust: toggles the runner's fast mode where supported. The codex runner maps `--fast` to `codex exec --enable fast_mode` and `--no-fast` to `--disable fast_mode` (codex has no literal `--fast` flag; `fast_mode` is its native feature flag). Runners without a fast mode warn and ignore the flag.
 
 ## 0.4.0 - 2026-06-27

@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+## 0.4.2 - 2026-07-11
 - Added post-run version update detection in Python and Rust: after a coding-CLI run, `ccc` may warn on stderr when a newer version is available (crates.io + GitHub releases, cached under `~/.cache/ccc/update-check.json`). New `[update]` config keys `check`, `auto_update`, and `interval_hours`, plus env overrides `CCC_UPDATE_CHECK`, `CCC_AUTO_UPDATE`, `CCC_UPDATE_CACHE`, and `CCC_UPDATE_INTERVAL_HOURS`. Optional `auto_update` starts a background `cargo install ccc --force` for cargo-installed binaries.
 - Extended the thinking ladder to `+0..+5` in Python and Rust and added support for all OpenAI gpt-5.6 reasoning-effort tiers (`none`/`low`/`medium`/`high`/`xhigh`/`max`, excluding the `ultra` run mode). `+xhigh` now maps to level 4 and `+max` to level 5 (previously both were level 4); `+5` is a new token. The codex runner maps each level to `codex exec -c model_reasoning_effort=<value>` and defaults to `medium` via a new per-runner default; runners with fewer tiers clamp `+5` down to their top tier (e.g. claude `+5` → `max`, pi `+5` → `xhigh`). Behavior change: codex now always emits a reasoning-effort override (previously none), defaulting to `medium`.
 

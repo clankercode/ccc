@@ -1,16 +1,245 @@
 name: release
 
+# On version tag push (vX.Y.Z):
+#   1. run the release test gate
+#   2. create/refresh the GitHub Release from CHANGELOG.md
+#   3. build and upload native ccc binaries (Linux / macOS / Windows)
+#
+# Nothing is published unless tests pass.
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing version tag to (re)test and publish (e.g. v0.4.2)"
+        required: true
+        type: string
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  resolve:
+    name: Resolve tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Resolve tag and version
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-].*)?$ ]]; then
+            echo "Refusing non-semver tag: $tag" >&2
+            exit 1
+          fi
+          version="${tag#v}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=$tag version=$version"
+
+  test:
+    name: Test gate
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Verify VERSION matches tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.resolve.outputs.version }}"
+          # Strip prerelease/build metadata for VERSION file comparison (file is x.y.z).
+          core="${version%%-*}"
+          core="${core%%+*}"
+          file_version="$(tr -d '[:space:]' < VERSION)"
+          if [[ "$file_version" != "$core" && "$file_version" != "$version" ]]; then
+            echo "VERSION file ($file_version) does not match tag version ($version)" >&2
+            exit 1
+          fi
+          cargo_version="$(awk -F'"' '/^version = / {print $2; exit}' rust/Cargo.toml)"
+          if [[ "$cargo_version" != "$core" && "$cargo_version" != "$version" ]]; then
+            echo "rust/Cargo.toml version ($cargo_version) does not match tag version ($version)" >&2
+            exit 1
+          fi
+          echo "VERSION=$file_version Cargo.toml=$cargo_version tag=$version"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          cache-dependency-path: go/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install system packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            g++ \
+            gcc \
+            make \
+            perl \
+            php-cli \
+            ruby \
+            ninja-build
+
+      - name: Isolate color env for tests
+        shell: bash
+        run: |
+          echo "NO_COLOR=1" >> "$GITHUB_ENV"
+          echo "FORCE_COLOR=" >> "$GITHUB_ENV"
+
+      - name: Python unit + contract + harness
+        shell: bash
+        run: ./test_impl.sh python
+
+      - name: Rust unit + contract + harness
+        shell: bash
+        run: ./test_impl.sh rust
+
+      - name: TypeScript tests
+        shell: bash
+        run: ./test_impl.sh typescript
+
+      - name: C tests
+        shell: bash
+        run: ./test_impl.sh c
+
+      - name: Go tests
+        shell: bash
+        run: ./test_impl.sh go
+
+      - name: Ruby tests
+        shell: bash
+        run: ./test_impl.sh ruby
+
+      - name: Perl tests
+        shell: bash
+        run: ./test_impl.sh perl
+
+      - name: C++ tests
+        shell: bash
+        run: ./test_impl.sh cpp
+
+      - name: PHP tests
+        shell: bash
+        run: ./test_impl.sh php
+
+      - name: x86-64 ASM tests
+        shell: bash
+        run: ./test_impl.sh asm
+
+  prepare:
+    name: Create GitHub Release
+    needs: [resolve, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
+
+      - name: Extract changelog notes
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.resolve.outputs.version }}"
+          tag="${{ needs.resolve.outputs.tag }}"
+          notes_file="$RUNNER_TEMP/release-notes.md"
+          {
+            echo "## ccc ${version}"
+            echo
+            if [[ -f CHANGELOG.md ]]; then
+              awk -v ver="$version" '
+                BEGIN { printing = 0 }
+                $0 ~ ("^##[[:space:]]+" ver "([[:space:]]|$)") { printing = 1; next }
+                printing && $0 ~ /^##[[:space:]]+/ { exit }
+                printing { print }
+              ' CHANGELOG.md | sed -e 's/[[:space:]]*$//' | awk '
+                BEGIN { nonempty = 0 }
+                NF { nonempty = 1 }
+                { lines[NR] = $0 }
+                END {
+                  if (!nonempty) exit 0
+                  start = 1
+                  while (start <= NR && lines[start] ~ /^[[:space:]]*$/) start++
+                  end = NR
+                  while (end >= start && lines[end] ~ /^[[:space:]]*$/) end--
+                  for (i = start; i <= end; i++) print lines[i]
+                }
+              '
+            fi
+            echo
+            echo "Install:"
+            echo
+            echo '```bash'
+            echo "cargo install ccc"
+            echo '```'
+            echo
+            echo "Or download a prebuilt binary from the assets below."
+            echo
+            echo "See also [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${tag}/CHANGELOG.md)."
+          } > "$notes_file"
+          echo "notes_file=$notes_file" >> "$GITHUB_OUTPUT"
+          echo "----- release notes -----"
+          cat "$notes_file"
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ needs.resolve.outputs.tag }}"
+          version="${{ needs.resolve.outputs.version }}"
+          notes_file="${{ steps.notes.outputs.notes_file }}"
+          title="ccc ${version}"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; refreshing notes"
+            gh release edit "$tag" --title "$title" --notes-file "$notes_file"
+          else
+            echo "Creating release $tag"
+            gh release create "$tag" \
+              --title "$title" \
+              --notes-file "$notes_file" \
+              --verify-tag
+          fi
+
   rust-binaries:
-    name: Rust binary (${{ matrix.os }})
+    name: Build binary (${{ matrix.os }})
+    needs: [resolve, prepare]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -21,8 +250,13 @@ jobs:
           - windows-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout tag
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Build ccc
         run: cargo build --manifest-path rust/Cargo.toml --release
@@ -40,9 +274,12 @@ jobs:
           else
             tar -C rust/target/release -czf "dist/ccc-${triple}.tar.gz" ccc
           fi
+          ls -la dist
 
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
-        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber
+        run: |
+          set -euo pipefail
+          gh release upload "${{ needs.resolve.outputs.tag }}" dist/* --clobber

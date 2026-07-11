@@ -36,6 +36,7 @@ pub struct RunnerInfo {
     pub no_persist_flags: Vec<String>,
     pub thinking_flags: BTreeMap<i32, Vec<String>>,
     pub show_thinking_flags: BTreeMap<bool, Vec<String>>,
+    pub default_thinking: Option<i32>,
     pub yolo_flags: Vec<String>,
     pub fast_flags: BTreeMap<bool, Vec<String>>,
     pub provider_flag: String,
@@ -143,6 +144,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let mut m = BTreeMap::new();
     let opencode = RunnerInfo {
         binary: "opencode".into(),
+        default_thinking: None,
         fast_flags: BTreeMap::new(),
         extra_args: vec!["--pure".into(), "run".into()],
         no_persist_flags: vec![],
@@ -160,6 +162,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let claude = RunnerInfo {
         binary: "claude".into(),
+        default_thinking: None,
         fast_flags: BTreeMap::new(),
         extra_args: vec!["-p".into()],
         no_persist_flags: vec!["--no-session-persistence".into()],
@@ -225,6 +228,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let kimi = RunnerInfo {
         binary: "kimi".into(),
+        default_thinking: None,
         fast_flags: BTreeMap::new(),
         extra_args: vec![],
         no_persist_flags: vec![],
@@ -250,6 +254,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let codex = RunnerInfo {
         binary: "codex".into(),
+        default_thinking: Some(2),
         fast_flags: {
             let mut ff = BTreeMap::new();
             ff.insert(true, vec!["--enable".into(), "fast_mode".into()]);
@@ -258,7 +263,16 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         },
         extra_args: vec!["exec".into()],
         no_persist_flags: vec!["--ephemeral".into()],
-        thinking_flags: BTreeMap::new(),
+        thinking_flags: {
+            let mut tf = BTreeMap::new();
+            tf.insert(0, vec!["-c".into(), "model_reasoning_effort=none".into()]);
+            tf.insert(1, vec!["-c".into(), "model_reasoning_effort=low".into()]);
+            tf.insert(2, vec!["-c".into(), "model_reasoning_effort=medium".into()]);
+            tf.insert(3, vec!["-c".into(), "model_reasoning_effort=high".into()]);
+            tf.insert(4, vec!["-c".into(), "model_reasoning_effort=xhigh".into()]);
+            tf.insert(5, vec!["-c".into(), "model_reasoning_effort=max".into()]);
+            tf
+        },
         show_thinking_flags: BTreeMap::new(),
         yolo_flags: vec!["--dangerously-bypass-approvals-and-sandbox".into()],
         provider_flag: String::new(),
@@ -268,6 +282,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let roocode = RunnerInfo {
         binary: "roocode".into(),
+        default_thinking: None,
         fast_flags: BTreeMap::new(),
         extra_args: vec![],
         no_persist_flags: vec![],
@@ -281,6 +296,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let crush = RunnerInfo {
         binary: "crush".into(),
+        default_thinking: None,
         fast_flags: BTreeMap::new(),
         extra_args: vec!["run".into()],
         no_persist_flags: vec![],
@@ -294,6 +310,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let cursor = RunnerInfo {
         binary: "cursor-agent".into(),
+        default_thinking: None,
         fast_flags: BTreeMap::new(),
         extra_args: vec!["--print".into(), "--trust".into()],
         no_persist_flags: vec![],
@@ -307,6 +324,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let gemini = RunnerInfo {
         binary: "gemini".into(),
+        default_thinking: None,
         fast_flags: BTreeMap::new(),
         extra_args: vec![],
         no_persist_flags: vec![],
@@ -320,6 +338,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let pi = RunnerInfo {
         binary: "pi".into(),
+        default_thinking: None,
         fast_flags: BTreeMap::new(),
         extra_args: vec!["-p".into()],
         no_persist_flags: vec!["--no-session".into()],
@@ -425,7 +444,8 @@ fn parse_thinking(s: &str) -> Option<i32> {
         "1" | "low" => Some(1),
         "2" | "med" | "mid" | "medium" => Some(2),
         "3" | "high" => Some(3),
-        "4" | "max" | "xhigh" => Some(4),
+        "4" | "xhigh" => Some(4),
+        "5" | "max" => Some(5),
         _ => None,
     }
 }
@@ -612,13 +632,24 @@ pub fn resolve_command(
     let effective_thinking = parsed
         .thinking
         .or_else(|| alias_def.and_then(|a| a.thinking))
+        .or(effective_runner.default_thinking)
         .or(config.default_thinking);
 
     let mut thinking_flags_applied = false;
     if let Some(level) = effective_thinking {
-        if let Some(flags) = effective_runner.thinking_flags.get(&level) {
-            argv.extend(flags.iter().cloned());
-            thinking_flags_applied = true;
+        if !effective_runner.thinking_flags.is_empty() {
+            let mut lookup = level;
+            if !effective_runner.thinking_flags.contains_key(&lookup) {
+                if let Some(&top) = effective_runner.thinking_flags.keys().max() {
+                    if lookup > top {
+                        lookup = top;
+                    }
+                }
+            }
+            if let Some(flags) = effective_runner.thinking_flags.get(&lookup) {
+                argv.extend(flags.iter().cloned());
+                thinking_flags_applied = true;
+            }
         }
     }
 

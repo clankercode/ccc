@@ -45,9 +45,12 @@ Usage:
 Controls (free order before the prompt):
   runner        Select which coding CLI to use (default: oc)
                 opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g), pi (p), grok (gb)
-  +thinking     Set thinking level: +0..+4 or +none/+low/+med/+mid/+medium/+high/+max/+xhigh
-                Claude maps +0 to --thinking disabled and +1..+4 to --thinking enabled with matching --effort
-                Kimi maps +0 to --no-thinking and +1..+4 to --thinking
+  +thinking     Set thinking level: +0..+5 or +none/+low/+med/+mid/+medium/+high/+xhigh/+max
+                Levels map 0 none, 1 low, 2 medium, 3 high, 4 xhigh, 5 max
+                Claude maps +0 to --thinking disabled and +1..+5 to --thinking enabled with matching --effort
+                Kimi maps +0 to --no-thinking and +1..+5 to --thinking
+                Codex maps each level to -c model_reasoning_effort (none/low/medium/high/xhigh/max) for gpt-5.6-style models
+                Runners with fewer tiers clamp +5 down to their top tier
   :provider:model  Override provider and model
   @name         Use a named preset from config; if no preset exists, runner names select runners before agent fallback
                 Presets can also define a default prompt when the user leaves prompt text blank

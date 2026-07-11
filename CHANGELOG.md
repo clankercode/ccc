@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- No unreleased semantic changes.
+- Extended the thinking ladder to `+0..+5` in Python and Rust and added support for all OpenAI gpt-5.6 reasoning-effort tiers (`none`/`low`/`medium`/`high`/`xhigh`/`max`, excluding the `ultra` run mode). `+xhigh` now maps to level 4 and `+max` to level 5 (previously both were level 4); `+5` is a new token. The codex runner maps each level to `codex exec -c model_reasoning_effort=<value>` and defaults to `medium` via a new per-runner default; runners with fewer tiers clamp `+5` down to their top tier (e.g. claude `+5` → `max`, pi `+5` → `xhigh`). Behavior change: codex now always emits a reasoning-effort override (previously none), defaulting to `medium`.
 
 ## 0.4.1 - 2026-07-06
 - Added `--fast` / `--no-fast` in Python and Rust: toggles the runner's fast mode where supported. The codex runner maps `--fast` to `codex exec --enable fast_mode` and `--no-fast` to `--disable fast_mode` (codex has no literal `--fast` flag; `fast_mode` is its native feature flag). Runners without a fast mode warn and ignore the flag.

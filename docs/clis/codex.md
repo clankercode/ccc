@@ -48,6 +48,24 @@ What this means for `ccc`:
 - a safer intermediate mode could map to `--full-auto`
 - sandbox choice could plausibly be exposed later as a cross-runner concept, but only Codex currently makes that especially explicit in CLI flags
 
+## Reasoning effort
+
+Codex takes its reasoning effort from the `model_reasoning_effort` config key, set via `-c model_reasoning_effort=<value>`. `ccc` maps its thinking ladder onto this key:
+
+| `ccc` level | token | codex effort |
+| --- | --- | --- |
+| `+0` | `+none` | `none` |
+| `+1` | `+low` | `low` |
+| `+2` | `+medium` | `medium` |
+| `+3` | `+high` | `high` |
+| `+4` | `+xhigh` | `xhigh` |
+| `+5` | `+max` | `max` |
+
+- These are the six effort tiers exposed by OpenAI's gpt-5.6 family (`gpt-5.6-sol`/`gpt-5.6`, `gpt-5.6-terra`, `gpt-5.6-luna`). gpt-5.6's `ultra` is a parallel-agent *run mode*, not an effort tier, so `ccc` does not map to it.
+- Unlike other runners, codex has its own default effort: when no level is given (via token, alias, or global default), `ccc` emits `-c model_reasoning_effort=medium`, matching codex's native default. Set an explicit level to override.
+- The effort override applies to any codex model. Effort values a given model does not support (for example `max` on a pre-5.6 model) are rejected by codex/the API, not by `ccc`.
+- Verified against `codex-cli 0.144.1`: `-c model_reasoning_effort=<value>` sets the banner's `reasoning effort` field end-to-end.
+
 ## Quick checks
 
 ```sh

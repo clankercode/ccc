@@ -126,8 +126,9 @@ class ParseArgsTests(unittest.TestCase):
             "+3": 3,
             "+high": 3,
             "+4": 4,
-            "+max": 4,
             "+xhigh": 4,
+            "+5": 5,
+            "+max": 5,
         }
         for token, expected in cases.items():
             with self.subTest(token=token):
@@ -373,9 +374,9 @@ class ParseArgsTests(unittest.TestCase):
             resolve_command(parsed)
 
     def test_thinking_out_of_range_not_matched(self):
-        parsed = parse_args(["+5", "hello"])
+        parsed = parse_args(["+6", "hello"])
         self.assertIsNone(parsed.thinking)
-        self.assertEqual(parsed.prompt, "+5 hello")
+        self.assertEqual(parsed.prompt, "+6 hello")
 
     def test_tokens_after_prompt_become_part_of_prompt(self):
         parsed = parse_args(["cc", "hello", "+2"])
@@ -418,6 +419,45 @@ class ResolveCommandTests(unittest.TestCase):
         self.assertEqual(argv[:2], ["codex", "exec"])
         self.assertIn("--ephemeral", argv)
         self.assertEqual(warnings, [])
+
+    def test_codex_effort_ladder_maps_each_level(self):
+        expected = {
+            0: "none",
+            1: "low",
+            2: "medium",
+            3: "high",
+            4: "xhigh",
+            5: "max",
+        }
+        for level, effort in expected.items():
+            with self.subTest(level=level):
+                parsed = ParsedArgs(runner="c", thinking=level, prompt="hello")
+                argv, _env, _warnings = resolve_command(parsed)
+                self.assertIn("-c", argv)
+                self.assertIn(f"model_reasoning_effort={effort}", argv)
+
+    def test_codex_defaults_to_medium_effort(self):
+        parsed = ParsedArgs(runner="c", prompt="hello")
+        argv, _env, _warnings = resolve_command(parsed)
+        self.assertIn("model_reasoning_effort=medium", argv)
+
+    def test_thinking_five_maps_to_max_effort_for_codex(self):
+        parsed = parse_args(["c", "+max", "hello"])
+        self.assertEqual(parsed.thinking, 5)
+        argv, _env, _warnings = resolve_command(parsed)
+        self.assertIn("model_reasoning_effort=max", argv)
+
+    def test_thinking_five_clamps_for_runners_without_a_top_tier(self):
+        # Claude tops out at level 4 (max); pi tops out at xhigh.
+        claude = parse_args(["cc", "+5", "hello"])
+        argv, _env, _warnings = resolve_command(claude)
+        self.assertEqual(
+            argv[:6],
+            ["claude", "-p", "--thinking", "enabled", "--effort", "max"],
+        )
+        pi = parse_args(["p", "+5", "hello"])
+        argv, _env, _warnings = resolve_command(pi)
+        self.assertEqual(argv[:4], ["pi", "-p", "--thinking", "xhigh"])
 
     def test_cursor_runner_via_cu(self):
         parsed = ParsedArgs(runner="cu", prompt="hello")
@@ -465,7 +505,16 @@ class ResolveCommandTests(unittest.TestCase):
         argv, env, warnings = resolve_command(parsed)
         self.assertEqual(
             argv,
-            ["codex", "exec", "--model", "gpt-5.4-mini", "--ephemeral", "hello"],
+            [
+                "codex",
+                "exec",
+                "-c",
+                "model_reasoning_effort=medium",
+                "--model",
+                "gpt-5.4-mini",
+                "--ephemeral",
+                "hello",
+            ],
         )
         self.assertEqual(warnings, [])
 
@@ -475,7 +524,10 @@ class ResolveCommandTests(unittest.TestCase):
                 ParsedArgs(runner="cc", save_session=True, prompt="hello"),
                 ["claude", "-p", "--thinking", "enabled", "--effort", "low", "hello"],
             ),
-            (ParsedArgs(runner="c", save_session=True, prompt="hello"), ["codex", "exec", "hello"]),
+            (
+                ParsedArgs(runner="c", save_session=True, prompt="hello"),
+                ["codex", "exec", "-c", "model_reasoning_effort=medium", "hello"],
+            ),
         ]
         for parsed, expected in cases:
             with self.subTest(runner=parsed.runner):
@@ -1050,8 +1102,16 @@ class ResolveCommandTests(unittest.TestCase):
         parsed = ParsedArgs(runner="c", yolo=True, prompt="hello")
         argv, _env, warnings = resolve_command(parsed)
         self.assertEqual(
-            argv[:3],
-            ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox"],
+            argv,
+            [
+                "codex",
+                "exec",
+                "-c",
+                "model_reasoning_effort=medium",
+                "--dangerously-bypass-approvals-and-sandbox",
+                "--ephemeral",
+                "hello",
+            ],
         )
         self.assertEqual(warnings, [])
 
@@ -1205,7 +1265,18 @@ class ResolveCommandTests(unittest.TestCase):
     def test_permission_mode_auto_for_codex(self):
         parsed = ParsedArgs(runner="c", permission_mode="auto", prompt="hello")
         argv, _env, warnings = resolve_command(parsed)
-        self.assertEqual(argv[:3], ["codex", "exec", "--full-auto"])
+        self.assertEqual(
+            argv,
+            [
+                "codex",
+                "exec",
+                "-c",
+                "model_reasoning_effort=medium",
+                "--full-auto",
+                "--ephemeral",
+                "hello",
+            ],
+        )
         self.assertEqual(warnings, [])
 
     def test_permission_mode_plan_for_claude(self):

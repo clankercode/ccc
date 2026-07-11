@@ -65,7 +65,7 @@ Prefer the cheapest representative model that exercises the route. Only move to 
 
 ## Field Notes
 
-- `thinking_mode = "ladder"` means the model family exposes a real multi-tier ladder that can honestly map to `+0..+4`.
+- `thinking_mode = "ladder"` means the model family exposes a real multi-tier ladder that can honestly map to `+0..+5` (levels 0–4 = none/low/medium/high/xhigh, level 5 = max). Families that top out earlier list only the levels they support.
 - `thinking_mode = "binary"` means `ccc` may preserve the numeric surface, but upstream only supports on/off internally.
 - `visible_thinking` records whether the runner can request visible reasoning output, not whether every model definitely emits it.
 - Prefer family-level entries over one-off model IDs when the behavior is uniform within the family.

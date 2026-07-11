@@ -95,7 +95,7 @@ For every implementation that claims `ccc` support:
 The following are planned but not yet stable contract:
 
 - `@alias`
-- `+0..+4`
+- `+0..+5`
 - `:provider:model`
 - `:model`
 - runner selector shortcuts

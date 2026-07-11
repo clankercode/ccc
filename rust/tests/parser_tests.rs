@@ -174,8 +174,9 @@ fn test_parse_named_thinking_levels() {
         ("+mid", 2),
         ("+medium", 2),
         ("+high", 3),
-        ("+max", 4),
         ("+xhigh", 4),
+        ("+5", 5),
+        ("+max", 5),
     ];
     for (token, expected) in cases {
         let args: Vec<String> = vec![token.into(), "hello".into()];
@@ -585,7 +586,13 @@ fn test_resolve_save_session_preserves_old_claude_and_codex_argv() {
                 prompt: "hello".into(),
                 ..Default::default()
             },
-            vec!["codex", "exec", "hello"],
+            vec![
+                "codex",
+                "exec",
+                "-c",
+                "model_reasoning_effort=medium",
+                "hello",
+            ],
         ),
     ];
     for (parsed, expected) in cases {
@@ -855,6 +862,8 @@ fn test_resolve_codex_runner_with_model_uses_exec() {
         vec![
             "codex",
             "exec",
+            "-c",
+            "model_reasoning_effort=medium",
             "--model",
             "gpt-5.4-mini",
             "--ephemeral",
@@ -862,6 +871,63 @@ fn test_resolve_codex_runner_with_model_uses_exec() {
         ]
     );
     assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_codex_effort_ladder_maps_each_level() {
+    let expected = [
+        (0, "none"),
+        (1, "low"),
+        (2, "medium"),
+        (3, "high"),
+        (4, "xhigh"),
+        (5, "max"),
+    ];
+    for (level, effort) in expected {
+        let parsed = ParsedArgs {
+            runner: Some("c".into()),
+            thinking: Some(level),
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let (argv, _, _) = resolve_command(&parsed, None).unwrap();
+        assert!(argv.contains(&"-c".to_string()));
+        assert!(argv.contains(&format!("model_reasoning_effort={effort}")));
+    }
+}
+
+#[test]
+fn test_resolve_codex_defaults_to_medium_effort() {
+    let parsed = ParsedArgs {
+        runner: Some("c".into()),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, _) = resolve_command(&parsed, None).unwrap();
+    assert!(argv.contains(&"model_reasoning_effort=medium".to_string()));
+}
+
+#[test]
+fn test_resolve_thinking_five_clamps_for_lower_tier_runners() {
+    let claude = ParsedArgs {
+        runner: Some("cc".into()),
+        thinking: Some(5),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, _) = resolve_command(&claude, None).unwrap();
+    assert_eq!(
+        argv[..6],
+        ["claude", "-p", "--thinking", "enabled", "--effort", "max"]
+    );
+    let pi = ParsedArgs {
+        runner: Some("p".into()),
+        thinking: Some(5),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, _) = resolve_command(&pi, None).unwrap();
+    assert_eq!(argv[..4], ["pi", "-p", "--thinking", "xhigh"]);
 }
 
 #[test]
@@ -1835,10 +1901,12 @@ fn test_resolve_yolo_for_codex() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
-        argv[..3],
+        argv[..5],
         [
             "codex".to_string(),
             "exec".to_string(),
+            "-c".to_string(),
+            "model_reasoning_effort=medium".to_string(),
             "--dangerously-bypass-approvals-and-sandbox".to_string()
         ]
     );
@@ -2144,10 +2212,12 @@ fn test_resolve_permission_mode_auto_for_codex() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
-        argv[..3],
+        argv[..5],
         [
             "codex".to_string(),
             "exec".to_string(),
+            "-c".to_string(),
+            "model_reasoning_effort=medium".to_string(),
             "--full-auto".to_string()
         ]
     );

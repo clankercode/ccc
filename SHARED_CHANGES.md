@@ -30,6 +30,17 @@ Entry format:
 - Docs updated: `docs/clis/grok.md`, `docs/clis/README.md`, `docs/clis/output-mode-compatibility.md`, `docs/clis/json-event-references.md`, `JSON_PARSING_MAP.md`, `README.md`, `python/README.md`, `rust/README.md`, `docs/llms.txt`, `docs/index.html`, `FEATURES.md`, help text
 - Notes: verified local `grok 0.2.93`; bare positional prompts start the TUI so `-p` is required; upstream streaming format is `streaming-json`, not `stream-json`; live smoke confirmed modes end-to-end and corrected `+0` from unsupported `none` to `minimal`.
 
+## 2026-07-11
+
+### gpt-5.6 reasoning effort + `+5`/`max` thinking tier
+- Change: The thinking ladder now spans `+0..+5`. Tokens remap so `+xhigh` → level 4 and `+max` → level 5 (previously both were 4); `+5` is a new valid token. Codex (`c`/`cx`) now maps each level to `-c model_reasoning_effort=<none|low|medium|high|xhigh|max>`, matching OpenAI's gpt-5.6 family effort tiers (`gpt-5.6-sol`/`gpt-5.6`, `-terra`, `-luna`). gpt-5.6's `ultra` is a parallel-agent run mode, not an effort tier, so it is intentionally not mapped. A new optional per-runner `default_thinking` (`RunnerInfo.default_thinking` / `Option<i32>`) lets codex default to `medium` (level 2) instead of the global default, preserving codex's native default; this fallback sits between alias thinking and the global `default_thinking`. Runners with fewer tiers clamp a requested level above their top key down to it (e.g. claude `+5` → `max`, pi `+5` → `xhigh`); levels 0–4 on existing runners are unchanged.
+- Behavior change: codex previously sent no reasoning-effort flag (using its own default); it now always emits `-c model_reasoning_effort=...`, defaulting to `medium`. Explicit `+N`, alias `thinking`, and global `default_thinking` still override.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py` (new `test_codex_effort_ladder_maps_to_model_reasoning_effort`; codex expectations across json/pass-through/permission/yolo/fast now include the medium default), `tests/test_parser_config.py`, `rust/tests/parser_tests.rs`
+- Docs updated: `docs/clis/codex.md`, `docs/clis/model-capabilities.json`, `README.md`, `FEATURES.md`, help text (`python/call_coding_clis/help.py`, `rust/src/help.rs`)
+- Notes: verified the real `codex exec -c model_reasoning_effort=<value>` argv/banner end-to-end against `codex-cli 0.144.1`; effort tiers sourced from OpenAI gpt-5.6/gpt-5.5 model docs.
+
 ## 2026-07-06
 
 ### Fast mode flag (`--fast` / `--no-fast`)

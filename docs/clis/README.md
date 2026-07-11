@@ -86,9 +86,10 @@ Current structured coverage summary:
 
 | Provider | Family | Runner | Thinking mode | Visible thinking | Notes |
 |---|---|---|---|---|---|
-| Anthropic | `claude-4` | `cc` | ladder | yes | maps cleanly to `+0..+4` |
-| OpenAI-style | `gpt-5` | `c` | ladder | unknown | top label is `xhigh` |
-| Moonshot | `kimi-k2` | `k` | binary | yes | `+1..+4` collapse to `--thinking` |
+| Anthropic | `claude-4` | `cc` | ladder | yes | 5 tiers; `+5` clamps to `max` |
+| OpenAI-style | `gpt-5` | `c` | ladder | unknown | top label is `xhigh` (level 4) |
+| OpenAI | `gpt-5.6` | `c` | ladder | unknown | 6 tiers via `-c model_reasoning_effort`; `+4` xhigh, `+5` max; default medium; `ultra` is a run mode, not an effort |
+| Moonshot | `kimi-k2` | `k` | binary | yes | `+1..+5` collapse to `--thinking` |
 | OpenCode | unverified | `oc` | unknown | yes | visible-thinking support known, tier mapping not yet verified |
 
 If you update thinking-capability notes, follow [updating-model-capabilities.md](updating-model-capabilities.md) and update the JSON first.

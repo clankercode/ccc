@@ -128,7 +128,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
 
 - Python and Rust currently accept control tokens in any order before the prompt:
   - runner selectors such as `c`, `cx`, `cc`, `oc`, `k`, `cu`, `g`, `p`, `gb`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `cursor`, `gemini`, `pi`, `grok`, `roocode`, and `crush`
-  - `+0..+4` thinking levels
+  - `+0..+5` thinking levels (`0` none, `1` low, `2` medium, `3` high, `4` xhigh, `5` max); `+max` maps to `5` and `+xhigh` to `4`. Codex maps each level to `-c model_reasoning_effort=<none|low|medium|high|xhigh|max>` for gpt-5.6-style models and defaults to `medium`; runners with fewer tiers clamp `+5` down to their top tier
   - `:provider:model` and `:model`
   - `@name` for preset lookup; if no preset exists, runner names such as `@k` select that runner before ordinary agent fallback; presets can also define a default prompt, and alias `prompt_mode = "prepend"|"append"` can compose alias prompt text around an explicitly supplied prompt
   - `help`, `-h`, and `--help` win anywhere in argv and print help immediately
@@ -184,7 +184,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
 - parser and config design for planned alias, thinking, runner, and provider/model selectors: `CCC_PARSER_CONFIG_DESIGN.md`
 - language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
 - cross-language test harness design: `TEST_HARNESS_PLAN.md`
-- broader rollout of expanded `ccc` token parsing for `@name`, `+0..+4`, `:provider:model`, `:model`, and runner selectors beyond Python/Rust
+- broader rollout of expanded `ccc` token parsing for `@name`, `+0..+5`, `:provider:model`, `:model`, and runner selectors beyond Python/Rust
 - future advanced tool allow/deny design note: [docs/clis/allow-deny-tool-plan.md](docs/clis/allow-deny-tool-plan.md)
 - shared model-thinking capability source of truth and refresh instructions: [docs/clis/model-capabilities.json](docs/clis/model-capabilities.json) and [docs/clis/updating-model-capabilities.md](docs/clis/updating-model-capabilities.md)
 

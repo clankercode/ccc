@@ -1478,7 +1478,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", "--permission-mode", "auto"],
-                        "codex exec --full-auto --ephemeral Fix the failing tests\n",
+                        "codex exec -c model_reasoning_effort=medium --full-auto --ephemeral Fix the failing tests\n",
                         "",
                     ),
                     (
@@ -1568,7 +1568,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", "--permission-mode", "auto"],
-                        "codex exec --full-auto --ephemeral Fix the failing tests\n",
+                        "codex exec -c model_reasoning_effort=medium --full-auto --ephemeral Fix the failing tests\n",
                         "",
                     ),
                     (
@@ -1992,11 +1992,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", ".pt"],
-                        "codex exec --ephemeral Fix the failing tests\n",
+                        "codex exec -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["c", "..pt"],
-                        "codex exec --ephemeral Fix the failing tests\n",
+                        "codex exec -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["c", ".pj"],
@@ -2090,11 +2090,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", ".pt"],
-                        "codex exec --ephemeral Fix the failing tests\n",
+                        "codex exec -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["c", "..pt"],
-                        "codex exec --ephemeral Fix the failing tests\n",
+                        "codex exec -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["c", ".pj"],
@@ -2202,11 +2202,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", ".fmt"],
-                        "[assistant] codex exec --json --ephemeral Fix the failing tests\n",
+                        "[assistant] codex exec --json -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["codex", "..fmt"],
-                        "[assistant] codex exec --json --ephemeral Fix the failing tests\n",
+                        "[assistant] codex exec --json -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["cu", ".fmt"],
@@ -2252,11 +2252,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", ".fmt"],
-                        "[assistant] codex exec --json --ephemeral Fix the failing tests\n",
+                        "[assistant] codex exec --json -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["codex", "..fmt"],
-                        "[assistant] codex exec --json --ephemeral Fix the failing tests\n",
+                        "[assistant] codex exec --json -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["cu", ".fmt"],
@@ -2782,7 +2782,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", "--yolo"],
-                        "codex exec --dangerously-bypass-approvals-and-sandbox --ephemeral Fix the failing tests\n",
+                        "codex exec -c model_reasoning_effort=medium --dangerously-bypass-approvals-and-sandbox --ephemeral Fix the failing tests\n",
                         "",
                     ),
                     (
@@ -2825,7 +2825,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", "--yolo"],
-                        "codex exec --dangerously-bypass-approvals-and-sandbox --ephemeral Fix the failing tests\n",
+                        "codex exec -c model_reasoning_effort=medium --dangerously-bypass-approvals-and-sandbox --ephemeral Fix the failing tests\n",
                         "",
                     ),
                     (
@@ -2891,12 +2891,12 @@ class SingleImplCccContractTests(unittest.TestCase):
             cases = [
                 (
                     ["c", "--fast"],
-                    "codex exec --enable fast_mode --ephemeral Fix the failing tests\n",
+                    "codex exec -c model_reasoning_effort=medium --enable fast_mode --ephemeral Fix the failing tests\n",
                     "",
                 ),
                 (
                     ["c", "--no-fast"],
-                    "codex exec --disable fast_mode --ephemeral Fix the failing tests\n",
+                    "codex exec -c model_reasoning_effort=medium --disable fast_mode --ephemeral Fix the failing tests\n",
                     "",
                 ),
                 (
@@ -2927,6 +2927,40 @@ class SingleImplCccContractTests(unittest.TestCase):
                                 result.stderr,
                                 {expected_stderr, expected_stderr + "\n"},
                             )
+
+    def test_codex_effort_ladder_maps_to_model_reasoning_effort(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            codex_path = bin_dir / "codex"
+            opencode_path = bin_dir / "opencode"
+            self._write_argv_echo_stub(codex_path, "codex")
+            self._write_opencode_stub(opencode_path)
+
+            cases = [
+                (["c", "+0"], "codex exec -c model_reasoning_effort=none --ephemeral Fix the failing tests\n"),
+                (["c", "+1"], "codex exec -c model_reasoning_effort=low --ephemeral Fix the failing tests\n"),
+                (["c", "+2"], "codex exec -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n"),
+                (["c", "+3"], "codex exec -c model_reasoning_effort=high --ephemeral Fix the failing tests\n"),
+                (["c", "+4"], "codex exec -c model_reasoning_effort=xhigh --ephemeral Fix the failing tests\n"),
+                (["c", "+5"], "codex exec -c model_reasoning_effort=max --ephemeral Fix the failing tests\n"),
+                (["c", "+xhigh"], "codex exec -c model_reasoning_effort=xhigh --ephemeral Fix the failing tests\n"),
+                (["c", "+max"], "codex exec -c model_reasoning_effort=max --ephemeral Fix the failing tests\n"),
+                # No explicit level: codex falls back to its own medium default.
+                (["c"], "codex exec -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n"),
+            ]
+
+            for lang in self.selected_languages:
+                if lang.name not in YOLO_IMPLEMENTATIONS:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                with self.subTest(language=lang.name, capability="codex-effort"):
+                    for extra_args, expected_stdout in cases:
+                        with self.subTest(language=lang.name, args=extra_args):
+                            result = lang.invoke_with_args(extra_args, PROMPT, env)
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            self.assertEqual(result.stdout, expected_stdout)
 
     def assert_equal_output(self, result) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -3222,6 +3256,10 @@ class SingleImplCccContractTests(unittest.TestCase):
             "  exit 9\n"
             "fi\n"
             "shift\n"
+            'while [ "$1" = "-c" ]; do\n'
+            "  shift\n"
+            "  shift\n"
+            "done\n"
             'if [ "$1" = "--ephemeral" ]; then\n'
             "  shift\n"
             "fi\n"

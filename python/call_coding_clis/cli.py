@@ -90,8 +90,8 @@ THINKING_ALIASES = {
     "med": 2,
     "mid": 2,
     "high": 3,
-    "max": 4,
     "xhigh": 4,
+    "max": 5,
 }
 OUTPUT_MODE_CHOICES = [
     "text",
@@ -597,10 +597,10 @@ def _parse_add_thinking(value: str) -> int:
         parsed = int(value)
     except ValueError as exc:
         raise ValueError(
-            "thinking must be 0, 1, 2, 3, 4, none, low, medium, high, max, or xhigh"
+            "thinking must be 0, 1, 2, 3, 4, 5, none, low, medium, high, xhigh, or max"
         ) from exc
-    if parsed not in {0, 1, 2, 3, 4}:
-        raise ValueError("thinking must be 0, 1, 2, 3, or 4")
+    if parsed not in {0, 1, 2, 3, 4, 5}:
+        raise ValueError("thinking must be 0, 1, 2, 3, 4, or 5")
     return parsed
 
 
@@ -633,7 +633,7 @@ def _prompt_alias_fields(alias: AliasDef, keep_current: bool) -> AliasDef:
         ("runner", "Runner"),
         ("provider", "Provider"),
         ("model", "Model"),
-        ("thinking", "Thinking 0-4"),
+        ("thinking", "Thinking 0-5"),
         ("show_thinking", "Show thinking true/false"),
         ("sanitize_osc", "Sanitize OSC true/false"),
         ("output_mode", "Output mode"),
@@ -654,7 +654,8 @@ def _prompt_alias_fields(alias: AliasDef, keep_current: bool) -> AliasDef:
                     ("low", "l", 1, {"low"}),
                     ("medium", "m", 2, {"medium", "med", "mid"}),
                     ("high", "h", 3, {"high"}),
-                    ("xhigh", "x", 4, {"xhigh", "max"}),
+                    ("xhigh", "x", 4, {"xhigh"}),
+                    ("max", "M", 5, {"max"}),
                 ],
             )
             if choice is not _KEEP_CURRENT:

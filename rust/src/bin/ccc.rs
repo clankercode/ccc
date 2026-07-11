@@ -66,12 +66,13 @@ fn parse_add_thinking(value: &str) -> Result<i32, String> {
         "low" => Ok(1),
         "med" | "mid" | "medium" => Ok(2),
         "high" => Ok(3),
-        "max" | "xhigh" => Ok(4),
+        "xhigh" => Ok(4),
+        "max" => Ok(5),
         _ => match value.parse::<i32>() {
-            Ok(parsed @ 0..=4) => Ok(parsed),
-            Ok(_) => Err("thinking must be 0, 1, 2, 3, or 4".to_string()),
+            Ok(parsed @ 0..=5) => Ok(parsed),
+            Ok(_) => Err("thinking must be 0, 1, 2, 3, 4, or 5".to_string()),
             Err(_) => Err(
-                "thinking must be 0, 1, 2, 3, 4, none, low, medium, high, max, or xhigh"
+                "thinking must be 0, 1, 2, 3, 4, 5, none, low, medium, high, xhigh, or max"
                     .to_string(),
             ),
         },
@@ -642,7 +643,7 @@ fn prompt_alias_fields(alias: &AliasDef) -> Result<AliasDef, String> {
         ("model", "Model", alias.model.clone()),
         (
             "thinking",
-            "Thinking 0-4",
+            "Thinking 0-5",
             alias.thinking.map(|value| value.to_string()),
         ),
         (
@@ -703,7 +704,13 @@ fn prompt_alias_fields(alias: &AliasDef) -> Result<AliasDef, String> {
                         label: "xhigh",
                         key: "x",
                         value: "xhigh",
-                        aliases: &["xhigh", "max"],
+                        aliases: &["xhigh"],
+                    },
+                    WizardChoice {
+                        label: "max",
+                        key: "M",
+                        value: "max",
+                        aliases: &["max"],
                     },
                 ],
             )?;

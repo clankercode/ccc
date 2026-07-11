@@ -16,6 +16,7 @@ class RunnerInfo:
     no_persist_flags: list[str] = field(default_factory=list)
     thinking_flags: dict[int, list[str]] = field(default_factory=dict)
     show_thinking_flags: dict[bool, list[str]] = field(default_factory=dict)
+    default_thinking: int | None = None
     yolo_flags: list[str] = field(default_factory=list)
     fast_flags: dict[bool, list[str]] = field(default_factory=dict)
     provider_flag: str = ""
@@ -134,8 +135,16 @@ def _register_defaults() -> None:
         binary="codex",
         extra_args=["exec"],
         no_persist_flags=["--ephemeral"],
-        thinking_flags={},
+        thinking_flags={
+            0: ["-c", "model_reasoning_effort=none"],
+            1: ["-c", "model_reasoning_effort=low"],
+            2: ["-c", "model_reasoning_effort=medium"],
+            3: ["-c", "model_reasoning_effort=high"],
+            4: ["-c", "model_reasoning_effort=xhigh"],
+            5: ["-c", "model_reasoning_effort=max"],
+        },
         show_thinking_flags={},
+        default_thinking=2,
         yolo_flags=["--dangerously-bypass-approvals-and-sandbox"],
         fast_flags={
             True: ["--enable", "fast_mode"],
@@ -246,7 +255,7 @@ RUNNER_SELECTOR_RE = re.compile(
     re.IGNORECASE,
 )
 THINKING_RE = re.compile(
-    r"^\+(0|1|2|3|4|none|low|med|mid|medium|high|max|xhigh)$",
+    r"^\+(0|1|2|3|4|5|none|low|med|mid|medium|high|xhigh|max)$",
     re.IGNORECASE,
 )
 PROVIDER_MODEL_RE = re.compile(r"^:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)$")
@@ -283,8 +292,9 @@ THINKING_TOKEN_TO_LEVEL = {
     "3": 3,
     "high": 3,
     "4": 4,
-    "max": 4,
     "xhigh": 4,
+    "5": 5,
+    "max": 5,
 }
 
 
@@ -902,12 +912,20 @@ def resolve_command(
     effective_thinking = parsed.thinking
     if effective_thinking is None and alias_def and alias_def.thinking is not None:
         effective_thinking = alias_def.thinking
+    if effective_thinking is None and info.default_thinking is not None:
+        effective_thinking = info.default_thinking
     if effective_thinking is None:
         effective_thinking = config.default_thinking
     thinking_flags_applied = False
-    if effective_thinking is not None and effective_thinking in info.thinking_flags:
-        argv.extend(info.thinking_flags[effective_thinking])
-        thinking_flags_applied = True
+    if effective_thinking is not None and info.thinking_flags:
+        level = effective_thinking
+        if level not in info.thinking_flags:
+            top = max(info.thinking_flags)
+            if level > top:
+                level = top
+        if level in info.thinking_flags:
+            argv.extend(info.thinking_flags[level])
+            thinking_flags_applied = True
 
     effective_show_thinking = parsed.show_thinking
     if effective_show_thinking is None and alias_def and alias_def.show_thinking is not None:

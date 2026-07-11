@@ -52,7 +52,7 @@
 | ID | Feature | Description |
 |----|---------|-------------|
 | F16 | Runner selector | e.g., `cc`, `oc`, `k`, `cu`, `g`, `p`, `gb`, `claude`, `opencode`, `kimi`, `cursor`, `gemini`, `pi`, `grok` |
-| F17 | Thinking level | `+0` through `+4` selector |
+| F17 | Thinking level | `+0` through `+5` selector (`0` none, `1` low, `2` medium, `3` high, `4` xhigh, `5` max); codex maps levels to `-c model_reasoning_effort` for gpt-5.6-style models and defaults to `medium`; lower-tier runners clamp `+5` to their top tier |
 | F18 | Provider/model selector | `:provider:model` and `:model` syntax |
 | F19 | Alias/preset | `@alias` named presets |
 | F20 | Config file loading | Read config for defaults, aliases, abbreviations |

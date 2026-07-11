@@ -554,7 +554,7 @@ while [ "$#" -gt 0 ]; do
                 shift
             fi
             ;;
-        --output-format|--format|--model|--permission-mode|--agent|--effort|--sandbox|--mode)
+        --output-format|--format|--model|--permission-mode|--agent|--effort|--sandbox|--mode|-c)
             shift 2
             ;;
         --prompt)

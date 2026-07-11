@@ -30,14 +30,16 @@ This order is not yet committed as final behavior.
 - A preset may carry runner/model/thinking defaults and an optional prompt fallback.
 - Explicit CLI prompt text overrides a preset prompt; blank or whitespace-only prompt text can fall back to the preset prompt when present.
 
-## `+0..+4` Thinking-Level Design Notes
+## `+0..+5` Thinking-Level Design Notes
 
 - Planned mapping:
-  - `+0`: off
+  - `+0`: off / none
   - `+1`: low
   - `+2`: medium
   - `+3`: high
-  - `+4`: top tier (`max` / `xhigh`, depending on vendor label)
+  - `+4`: `xhigh`
+  - `+5`: `max` (top tier)
+- `+xhigh` maps to level 4 and `+max` to level 5. Vendors that top out earlier clamp higher levels to their top tier (e.g. claude reaches `max` at level 4). Codex maps each level to `-c model_reasoning_effort` and defaults to `medium`.
 - The external contract should stay numeric even if internal runners use different labels.
 
 ## `:provider:model` And `:model` Design Notes

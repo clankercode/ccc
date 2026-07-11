@@ -36,6 +36,11 @@ EXAMPLE_CONFIG = """\
 # sanitize_osc = true
 # output_mode = "text"
 
+[update]
+# check = true
+# auto_update = false
+# interval_hours = 24
+
 [abbreviations]
 # mycc = "cc"
 
@@ -339,6 +344,23 @@ def _load_from_file_into(path: Path, config: CccConfig) -> None:
         sanitize_osc = defaults.get("sanitize_osc")
         if sanitize_osc is not None:
             config.default_sanitize_osc = _coerce_bool(sanitize_osc)
+
+    update = data.get("update", {})
+    if isinstance(update, dict):
+        check = update.get("check")
+        if check is not None:
+            config.update_check = _coerce_bool(check)
+        auto_update = update.get("auto_update")
+        if auto_update is not None:
+            config.auto_update = _coerce_bool(auto_update)
+        interval_hours = update.get("interval_hours")
+        if interval_hours is not None:
+            try:
+                parsed_interval = int(interval_hours)
+                if parsed_interval > 0:
+                    config.update_interval_hours = parsed_interval
+            except (TypeError, ValueError):
+                pass
 
     abbreviations = data.get("abbreviations", {})
     if isinstance(abbreviations, dict):

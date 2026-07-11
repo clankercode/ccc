@@ -100,6 +100,19 @@ ccc add reviewer --runner cc --prompt "Review the current changes" --prompt-mode
 
 The interactive wizard skips `prompt_mode` when prompt is unset. Final save confirmation accepts only `y`, `n`, `yes`, or `no`, case-insensitively.
 
+### Update checks
+
+After each coding-CLI run, `ccc` may warn when a newer version is available (crates.io, with GitHub releases as fallback). Cache file: `XDG_CACHE_HOME/ccc/update-check.json` (default re-check every 24 hours).
+
+```toml
+[update]
+check = true
+auto_update = false
+interval_hours = 24
+```
+
+Env overrides: `CCC_UPDATE_CHECK`, `CCC_AUTO_UPDATE`, `CCC_UPDATE_CACHE`, `CCC_UPDATE_INTERVAL_HOURS`. When `auto_update` is enabled and this install is under `~/.cargo/bin`, `ccc` starts a background `cargo install ccc --force`.
+
 ## Output And Artifacts
 
 Output modes are `text`, `stream-text`, `json`, `stream-json`, `formatted`, and `stream-formatted`, with dot shortcuts `.text`, `..text`, `.json`, `..json`, `.fmt`, and `..fmt`.

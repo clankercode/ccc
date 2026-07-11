@@ -39,6 +39,7 @@ try:
         write_alias_block,
     )
     from .help import print_help, print_usage, print_version
+    from .update_check import emit_post_run_update_notice, resolve_update_settings
 except ImportError:
     import artifacts
     from json_output import (
@@ -68,6 +69,7 @@ except ImportError:
         write_alias_block,
     )
     from help import print_help, print_usage, print_version
+    from update_check import emit_post_run_update_notice, resolve_update_settings
 
 
 ALIAS_FIELDS = {
@@ -292,7 +294,7 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
-        return _finish_run(parsed.timeout_secs, result, footer_line)
+        return _finish_run(parsed.timeout_secs, result, footer_line, config)
 
     if output_plan.mode in {"json", "pass-json"}:
         result = runner.run(spec)
@@ -310,7 +312,7 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
-        return _finish_run(parsed.timeout_secs, result, footer_line)
+        return _finish_run(parsed.timeout_secs, result, footer_line, config)
 
     if output_plan.mode in {"text", "pass-text"}:
         result = runner.run(spec)
@@ -324,7 +326,7 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
-        return _finish_run(parsed.timeout_secs, result, footer_line)
+        return _finish_run(parsed.timeout_secs, result, footer_line, config)
 
     if output_plan.mode in {"stream-text", "stream-json", "stream-pass-text", "stream-pass-json"}:
         result = runner.stream(
@@ -343,7 +345,7 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
-        return _finish_run(parsed.timeout_secs, result, footer_line)
+        return _finish_run(parsed.timeout_secs, result, footer_line, config)
 
     if output_plan.mode == "formatted":
         result = runner.run(spec)
@@ -371,7 +373,7 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
-        return _finish_run(parsed.timeout_secs, result, footer_line)
+        return _finish_run(parsed.timeout_secs, result, footer_line, config)
 
     renderer = FormattedRenderer(
         show_thinking=show_thinking,
@@ -414,7 +416,7 @@ def main(argv: list[str] | None = None) -> int:
     _print_cleanup_warnings(
         parsed.cleanup_session, output_plan.runner_name, spec, result
     )
-    return _finish_run(parsed.timeout_secs, result, footer_line)
+    return _finish_run(parsed.timeout_secs, result, footer_line, config)
 
 
 def _add_alias_command(args: list[str]) -> int:
@@ -891,6 +893,7 @@ def _finish_run(
     timeout_secs: int | None,
     result,
     footer_line: str | None,
+    config=None,
 ) -> int:
     if getattr(result, "timed_out", False):
         print(
@@ -899,6 +902,13 @@ def _finish_run(
         )
     if footer_line:
         print(footer_line, file=sys.stderr)
+    if config is not None:
+        settings = resolve_update_settings(
+            config_check=getattr(config, "update_check", True),
+            config_auto_update=getattr(config, "auto_update", False),
+            config_interval_hours=getattr(config, "update_interval_hours", 24),
+        )
+        emit_post_run_update_notice(settings)
     if getattr(result, "timed_out", False):
         return 124
     return result.exit_code

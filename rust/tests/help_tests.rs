@@ -228,6 +228,8 @@ fn test_add_alias_yes_writes_config() {
         .env("HOME", &home_root)
         .env("XDG_CONFIG_HOME", &xdg_root)
         .env("CCC_CONFIG", base_dir.join("missing.toml"))
+        .env("NO_COLOR", "1")
+        .env_remove("FORCE_COLOR")
         .output()
         .unwrap();
 

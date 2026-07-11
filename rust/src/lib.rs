@@ -130,6 +130,7 @@ mod json_output;
 mod output;
 mod parser;
 pub mod sugar;
+pub mod update_check;
 
 pub use artifacts::{
     output_write_warning, resolve_state_root, transcript_io_warning, RunArtifacts, TranscriptKind,
@@ -142,6 +143,9 @@ pub use config::{
 };
 pub use exec::{build_prompt_spec, CommandSpec, CompletedRun, Runner};
 pub use help::{print_help, print_usage, print_version};
+pub use update_check::{
+    emit_post_run_update_notice, resolve_update_settings, UpdateSettings,
+};
 pub use invoke::{Client, Error, OutputMode, Plan, Request, Run, RunnerKind};
 pub use json_output::{
     parse_claude_code_json, parse_codex_json, parse_cursor_agent_json, parse_gemini_json,

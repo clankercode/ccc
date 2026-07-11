@@ -1044,6 +1044,7 @@ fn finish_run(
     timed_out: bool,
     footer_line: Option<&str>,
     exit_code: i32,
+    config: Option<&call_coding_clis::CccConfig>,
 ) -> i32 {
     if timed_out {
         eprintln!(
@@ -1053,6 +1054,14 @@ fn finish_run(
     }
     if let Some(line) = footer_line {
         eprintln!("{}", line);
+    }
+    if let Some(config) = config {
+        let settings = call_coding_clis::resolve_update_settings(
+            config.update_check,
+            config.auto_update,
+            config.update_interval_hours,
+        );
+        let _ = call_coding_clis::emit_post_run_update_notice(&settings);
     }
     if timed_out {
         124
@@ -1795,6 +1804,7 @@ fn main() -> ExitCode {
                 result.timed_out(),
                 footer_line.as_deref(),
                 result.exit_code(),
+                Some(&config),
             ))
         }
         _ if text_mode_with_visible_work => {
@@ -1867,6 +1877,7 @@ fn main() -> ExitCode {
                 result.timed_out(),
                 footer_line.as_deref(),
                 result.exit_code(),
+                Some(&config),
             ))
         }
         "text" => {
@@ -1903,6 +1914,7 @@ fn main() -> ExitCode {
                 result.timed_out(),
                 footer_line.as_deref(),
                 result.exit_code(),
+                Some(&config),
             ))
         }
         "stream-text" | "stream-json" => {
@@ -1944,6 +1956,7 @@ fn main() -> ExitCode {
                 result.timed_out(),
                 footer_line.as_deref(),
                 result.exit_code(),
+                Some(&config),
             ))
         }
         "formatted" => {
@@ -1990,6 +2003,7 @@ fn main() -> ExitCode {
                 result.timed_out(),
                 footer_line.as_deref(),
                 result.exit_code(),
+                Some(&config),
             ))
         }
         "stream-formatted" => {
@@ -2062,6 +2076,7 @@ fn main() -> ExitCode {
                 result.timed_out(),
                 footer_line.as_deref(),
                 result.exit_code(),
+                Some(&config),
             ))
         }
         "pass-text" => {
@@ -2098,6 +2113,7 @@ fn main() -> ExitCode {
                 result.timed_out(),
                 footer_line.as_deref(),
                 result.exit_code(),
+                Some(&config),
             ))
         }
         "pass-json" => {
@@ -2134,6 +2150,7 @@ fn main() -> ExitCode {
                 result.timed_out(),
                 footer_line.as_deref(),
                 result.exit_code(),
+                Some(&config),
             ))
         }
         "stream-pass-text" | "stream-pass-json" => {
@@ -2170,6 +2187,7 @@ fn main() -> ExitCode {
                 result.timed_out(),
                 footer_line.as_deref(),
                 result.exit_code(),
+                Some(&config),
             ))
         }
         _ => {

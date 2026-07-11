@@ -33,6 +33,26 @@ def read_example_config_fixture() -> str:
     return FIXTURE_CONFIG_PATH.read_text(encoding="utf-8")
 
 
+class UpdateConfigTests(unittest.TestCase):
+    def test_example_config_includes_update_section(self):
+        text = render_example_config()
+        self.assertIn("[update]", text)
+        self.assertIn("auto_update", text)
+        self.assertEqual(text, read_example_config_fixture())
+
+    def test_load_update_section_from_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "config.toml"
+            path.write_text(
+                "[update]\ncheck = false\nauto_update = true\ninterval_hours = 6\n",
+                encoding="utf-8",
+            )
+            config = load_config(path)
+            self.assertFalse(config.update_check)
+            self.assertTrue(config.auto_update)
+            self.assertEqual(config.update_interval_hours, 6)
+
+
 class ParseArgsTests(unittest.TestCase):
     def test_prompt_only(self):
         parsed = parse_args(["hello world"])

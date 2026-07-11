@@ -629,6 +629,9 @@ class CrossLanguageHarness(unittest.TestCase):
         cls.base_env["XDG_CACHE_HOME"] = str(Path(cls.tmp_dir) / "xdg-cache")
         cls.base_env["XDG_STATE_HOME"] = str(Path(cls.tmp_dir) / "xdg-state")
         cls.base_env["CCC_CONFIG"] = str(Path(cls.tmp_dir) / "missing-config.toml")
+        cls.base_env["CCC_UPDATE_CHECK"] = "0"
+        cls.base_env.pop("FORCE_COLOR", None)
+        cls.base_env["NO_COLOR"] = "1"
         cls.base_env["CARGO_HOME"] = os.environ.get(
             "CARGO_HOME", str(Path.home() / ".cargo")
         )

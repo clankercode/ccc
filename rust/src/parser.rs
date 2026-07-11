@@ -109,6 +109,9 @@ pub struct CccConfig {
     pub default_show_thinking: bool,
     pub default_sanitize_osc: Option<bool>,
     pub default_output_mode: String,
+    pub update_check: bool,
+    pub auto_update: bool,
+    pub update_interval_hours: u64,
     pub aliases: BTreeMap<String, AliasDef>,
     pub abbreviations: BTreeMap<String, String>,
 }
@@ -123,6 +126,9 @@ impl Default for CccConfig {
             default_show_thinking: true,
             default_sanitize_osc: None,
             default_output_mode: "text".to_string(),
+            update_check: true,
+            auto_update: false,
+            update_interval_hours: 24,
             aliases: BTreeMap::new(),
             abbreviations: BTreeMap::new(),
         }
@@ -364,6 +370,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     };
     let grok = RunnerInfo {
         binary: "grok".into(),
+        default_thinking: None,
         fast_flags: BTreeMap::new(),
         extra_args: vec!["--no-auto-update".into()],
         no_persist_flags: vec![],

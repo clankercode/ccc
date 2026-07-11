@@ -208,6 +208,19 @@ prompt = "Review the current changes"
 prompt_mode = "default"
 ```
 
+### Update checks
+
+After each coding-CLI run, `ccc` may warn when a newer version is available (crates.io, with GitHub releases as fallback). Cache file: `XDG_CACHE_HOME/ccc/update-check.json` (default re-check every 24 hours).
+
+```toml
+[update]
+check = true
+auto_update = false
+interval_hours = 24
+```
+
+Env overrides: `CCC_UPDATE_CHECK`, `CCC_AUTO_UPDATE`, `CCC_UPDATE_CACHE`, `CCC_UPDATE_INTERVAL_HOURS`. When `auto_update` is enabled and this install is under `~/.cargo/bin`, `ccc` starts a background `cargo install ccc --force`.
+
 Then run it with:
 
 ```bash

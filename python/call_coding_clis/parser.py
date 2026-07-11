@@ -76,6 +76,9 @@ class CccConfig:
     default_show_thinking: bool = True
     default_sanitize_osc: bool | None = None
     default_output_mode: str = "text"
+    update_check: bool = True
+    auto_update: bool = False
+    update_interval_hours: int = 24
     aliases: dict[str, AliasDef] = field(default_factory=dict)
     abbreviations: dict[str, str] = field(default_factory=dict)
 

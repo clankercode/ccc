@@ -16,6 +16,11 @@ const EXAMPLE_CONFIG: &str = concat!(
     "# sanitize_osc = true\n",
     "# output_mode = \"text\"\n",
     "\n",
+    "[update]\n",
+    "# check = true\n",
+    "# auto_update = false\n",
+    "# interval_hours = 24\n",
+    "\n",
     "[abbreviations]\n",
     "# mycc = \"cc\"\n",
     "\n",
@@ -476,6 +481,8 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
             flush_alias(config, &mut current_alias_name, &mut current_alias);
             if trimmed == "[defaults]" {
                 section = "defaults";
+            } else if trimmed == "[update]" {
+                section = "update";
             } else if trimmed == "[abbreviations]" {
                 section = "abbreviations";
             } else if let Some(name) = trimmed
@@ -511,6 +518,23 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                 }
                 ("defaults", "sanitize_osc") => {
                     config.default_sanitize_osc = parse_bool(value);
+                }
+                ("update", "check") => {
+                    if let Some(flag) = parse_bool(value) {
+                        config.update_check = flag;
+                    }
+                }
+                ("update", "auto_update") => {
+                    if let Some(flag) = parse_bool(value) {
+                        config.auto_update = flag;
+                    }
+                }
+                ("update", "interval_hours") => {
+                    if let Ok(n) = value.parse::<u64>() {
+                        if n > 0 {
+                            config.update_interval_hours = n;
+                        }
+                    }
                 }
                 ("abbreviations", _) => {
                     config
@@ -549,6 +573,23 @@ mod tests {
     use crate::parser::CccConfig;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn test_parse_update_section() {
+        let mut config = CccConfig::default();
+        parse_toml_config(
+            r#"
+[update]
+check = false
+auto_update = true
+interval_hours = 12
+"#,
+            &mut config,
+        );
+        assert!(!config.update_check);
+        assert!(config.auto_update);
+        assert_eq!(config.update_interval_hours, 12);
+    }
 
     #[test]
     fn test_load_config_prefers_nearest_project_local_file() {

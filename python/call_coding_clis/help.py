@@ -124,6 +124,9 @@ Flags:
     CCC_FWD_UNKNOWN_JSON                Also controls unknown-JSON forwarding; defaults on for now
     FORCE_COLOR / NO_COLOR              Override TTY detection for formatted human output
                                         (FORCE_COLOR wins if both are set)
+    CCC_UPDATE_CHECK / CCC_AUTO_UPDATE    Override [update] check / auto_update after runs
+    CCC_UPDATE_CACHE / CCC_UPDATE_INTERVAL_HOURS
+                                        Override update cache path and re-check interval
   --            Treat all remaining args as prompt text, even if they look like controls
 
 Examples:
@@ -155,6 +158,9 @@ Config:
   .ccc.toml (searched upward from CWD)  — project-local presets and defaults
   XDG_CONFIG_HOME/ccc/config.toml       — global defaults when XDG is set
   ~/.config/ccc/config.toml             — legacy global fallback
+  [update] check / auto_update / interval_hours
+                                        — after each run, warn when a newer ccc is available;
+                                          auto_update can background `cargo install ccc`
 
 Agent tips:
   Run `ccc config` before relying on aliases or defaults; `ccc --help` lists the aliases visible from the current directory.

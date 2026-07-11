@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-07-11
 
+### Post-run version update detection and optional auto-update
+- Change: Python and Rust `ccc` now checks (by default) after each coding-CLI run whether a newer `ccc` version is available on crates.io (GitHub releases fallback). When newer, it prints a stderr warning with `cargo install ccc`. Results are cached under `XDG_CACHE_HOME/ccc/update-check.json` (default interval 24h, short network timeout). New config section `[update]` with `check` (default true), `auto_update` (default false), and `interval_hours` (default 24). Env overrides: `CCC_UPDATE_CHECK`, `CCC_AUTO_UPDATE`, `CCC_UPDATE_CACHE`, `CCC_UPDATE_INTERVAL_HOURS`. When `auto_update = true` and the binary is cargo-installed, `ccc` spawns a detached `cargo install ccc --force` and logs to the cache directory.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_update_check.py`, `tests/test_parser_config.py`, `tests/test_ccc_contract_impl.py`, `tests/test_harness.py`, `tests/fixtures/config-example.toml`, `rust/src/update_check.rs` unit tests, `rust/src/config.rs` unit tests
+- Docs updated: `README.md`, `python/README.md`, `rust/README.md`, `docs/llms.txt`, `FEATURES.md`, `CHANGELOG.md`, help text, `--print-config` example
+
 ### Grok Build runner support
 - Change: Python and Rust add Grok Build (`grok` binary) as a supported runner with selectors `gb` and `grok`. Non-interactive runs use `grok --no-auto-update -p`. Thinking `+0..+4` maps to `--reasoning-effort minimal|low|medium|high|xhigh` (`+0` uses `minimal` because current default model `grok-4.5` rejects `none`). Permission modes map to `--permission-mode default|auto|plan` and yolo to `--always-approve`. Structured modes use `--output-format json` / `streaming-json` with schema `grok`. Session runs warn by default; `--cleanup-session` deletes via `grok sessions delete <sessionId>` when an ID is available. Version discovery prefers `$GROK_HOME/version.json` / `~/.grok/version.json`. `CCC_REAL_GROK` overrides the binary for tests.
 - Required implementations: Python and Rust

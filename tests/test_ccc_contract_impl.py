@@ -124,7 +124,12 @@ class SingleImplCccContractTests(unittest.TestCase):
         env["XDG_DATA_HOME"] = str(config_root / "xdg-data")
         env["XDG_STATE_HOME"] = str(config_root / "xdg-state")
         env["CCC_CONFIG"] = str(config_root / "missing-config.toml")
+        env["CCC_UPDATE_CHECK"] = "0"
         env["HOME"] = str(config_root / "home")
+        # Isolate from the parent shell: empty FORCE_COLOR is treated as "force on"
+        # by resolve_human_tty, and colored output breaks plain-text assertions.
+        env.pop("FORCE_COLOR", None)
+        env["NO_COLOR"] = "1"
         env["DOTNET_NOLOGO"] = "1"
         env["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1"
         env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
@@ -893,6 +898,63 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["--help"], self._make_env(opencode_path, lang)
                     )
                     self.assert_help_mentions_sanitize_osc_flag(result)
+
+    def test_help_surface_mentions_update_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                with self.subTest(language=lang.name, extra_args=["--help"]):
+                    result = lang.invoke_extra(
+                        ["--help"], self._make_env(opencode_path, lang)
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn("CCC_UPDATE_CHECK", result.stdout)
+                    self.assertIn("auto_update", result.stdout)
+                    self.assertIn("[update]", result.stdout)
+
+    def test_update_notice_emitted_from_cache_after_run(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+            cache_path = tmp_path / "update-check.json"
+            cache_path.write_text(
+                json.dumps(
+                    {
+                        "checked_at": 9_999_999_999.0,
+                        "current": "0.0.1",
+                        "latest": "9.9.9",
+                        "source": "test",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                with self.subTest(language=lang.name):
+                    env = self._make_env(opencode_path, lang)
+                    env["CCC_UPDATE_CHECK"] = "1"
+                    env["CCC_UPDATE_CACHE"] = str(cache_path)
+                    env["CCC_UPDATE_INTERVAL_HOURS"] = "8760"
+                    result = lang.invoke("hello from update check", env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(
+                        "warning: ccc 9.9.9 is available",
+                        result.stderr,
+                    )
+                    self.assertIn("cargo install ccc", result.stderr)
 
     def test_help_surface_mentions_output_modes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

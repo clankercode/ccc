@@ -51,7 +51,7 @@
 
 | ID | Feature | Description |
 |----|---------|-------------|
-| F16 | Runner selector | e.g., `cc`, `oc`, `k`, `cu`, `claude`, `opencode`, `kimi`, `cursor` |
+| F16 | Runner selector | e.g., `cc`, `oc`, `k`, `cu`, `g`, `p`, `gb`, `claude`, `opencode`, `kimi`, `cursor`, `gemini`, `pi`, `grok` |
 | F17 | Thinking level | `+0` through `+4` selector |
 | F18 | Provider/model selector | `:provider:model` and `:model` syntax |
 | F19 | Alias/preset | `@alias` named presets |
@@ -75,6 +75,7 @@
 | F27 | JSON render | Render parsed JSON output consistently |
 | F36 | JSON schema: cursor-agent | Parse Cursor Agent JSON and stream-json output |
 | F37 | JSON schema: pi | Parse Pi JSON streaming format |
+| F39 | JSON schema: grok | Parse Grok Build JSON / streaming-json output |
 
 ### v4 Testing & Infrastructure
 
@@ -134,6 +135,7 @@
 | F27 JSON render | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | - | - | n/a | yes | yes |
 | F36 Schema: cursor-agent | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | n/a | - | - |
 | F37 Schema: pi | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | n/a | - | - |
+| F39 Schema: grok | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | n/a | - | - |
 
 ## Progress Tracking
 

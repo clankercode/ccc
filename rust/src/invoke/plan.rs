@@ -300,6 +300,7 @@ fn runner_kind_from_argv(argv: &[String]) -> Option<RunnerKind> {
         "roocode" => Some(RunnerKind::RooCode),
         "crush" => Some(RunnerKind::Crush),
         "pi" => Some(RunnerKind::Pi),
+        "grok" => Some(RunnerKind::Grok),
         _ => None,
     }
 }

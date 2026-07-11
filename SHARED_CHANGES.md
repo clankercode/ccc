@@ -20,6 +20,16 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-07-11
+
+### Grok Build runner support
+- Change: Python and Rust add Grok Build (`grok` binary) as a supported runner with selectors `gb` and `grok`. Non-interactive runs use `grok --no-auto-update -p`. Thinking `+0..+4` maps to `--reasoning-effort minimal|low|medium|high|xhigh` (`+0` uses `minimal` because current default model `grok-4.5` rejects `none`). Permission modes map to `--permission-mode default|auto|plan` and yolo to `--always-approve`. Structured modes use `--output-format json` / `streaming-json` with schema `grok`. Session runs warn by default; `--cleanup-session` deletes via `grok sessions delete <sessionId>` when an ID is available. Version discovery prefers `$GROK_HOME/version.json` / `~/.grok/version.json`. `CCC_REAL_GROK` overrides the binary for tests.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_parser_config.py`, `tests/test_json_output.py`, `tests/test_ccc_contract_impl.py`, `rust/tests/parser_tests.rs`, `rust/tests/json_output_tests.rs`, `rust/tests/help_tests.rs`
+- Docs updated: `docs/clis/grok.md`, `docs/clis/README.md`, `docs/clis/output-mode-compatibility.md`, `docs/clis/json-event-references.md`, `JSON_PARSING_MAP.md`, `README.md`, `python/README.md`, `rust/README.md`, `docs/llms.txt`, `docs/index.html`, `FEATURES.md`, help text
+- Notes: verified local `grok 0.2.93`; bare positional prompts start the TUI so `-p` is required; upstream streaming format is `streaming-json`, not `stream-json`; live smoke confirmed modes end-to-end and corrected `+0` from unsupported `none` to `minimal`.
+
 ## 2026-07-06
 
 ### Fast mode flag (`--fast` / `--no-fast`)

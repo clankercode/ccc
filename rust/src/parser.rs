@@ -343,6 +343,31 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         agent_flag: String::new(),
         prompt_flag: String::new(),
     };
+    let grok = RunnerInfo {
+        binary: "grok".into(),
+        fast_flags: BTreeMap::new(),
+        extra_args: vec!["--no-auto-update".into()],
+        no_persist_flags: vec![],
+        thinking_flags: {
+            let mut tf = BTreeMap::new();
+            tf.insert(0, vec!["--reasoning-effort".into(), "minimal".into()]);
+            tf.insert(1, vec!["--reasoning-effort".into(), "low".into()]);
+            tf.insert(2, vec!["--reasoning-effort".into(), "medium".into()]);
+            tf.insert(3, vec!["--reasoning-effort".into(), "high".into()]);
+            tf.insert(4, vec!["--reasoning-effort".into(), "xhigh".into()]);
+            tf
+        },
+        show_thinking_flags: {
+            let mut tf = BTreeMap::new();
+            tf.insert(true, vec!["--reasoning-effort".into(), "low".into()]);
+            tf
+        },
+        yolo_flags: vec!["--always-approve".into()],
+        provider_flag: String::new(),
+        model_flag: "--model".into(),
+        agent_flag: "--agent".into(),
+        prompt_flag: "-p".into(),
+    };
 
     let claude_clone = claude.clone();
     let kimi_clone = kimi.clone();
@@ -354,6 +379,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     let cursor_clone = cursor.clone();
     let gemini_clone = gemini.clone();
     let pi_clone = pi.clone();
+    let grok_clone = grok.clone();
 
     m.insert("opencode".into(), opencode);
     m.insert("claude".into(), claude);
@@ -364,6 +390,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     m.insert("cursor".into(), cursor);
     m.insert("gemini".into(), gemini);
     m.insert("pi".into(), pi);
+    m.insert("grok".into(), grok);
 
     m.insert("oc".into(), opencode_clone);
     m.insert("cc".into(), claude_clone.clone());
@@ -375,13 +402,14 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
     m.insert("cu".into(), cursor_clone);
     m.insert("g".into(), gemini_clone);
     m.insert("p".into(), pi_clone);
+    m.insert("gb".into(), grok_clone);
 
     RwLock::new(m)
 });
 
 static RUNNER_SELECTOR_STRS: &[&str] = &[
-    "oc", "cc", "c", "cx", "k", "rc", "cr", "cu", "g", "p", "pi", "codex", "claude", "opencode",
-    "kimi", "roocode", "crush", "cursor", "gemini",
+    "oc", "cc", "c", "cx", "k", "rc", "cr", "cu", "g", "p", "pi", "gb", "grok", "codex", "claude",
+    "opencode", "kimi", "roocode", "crush", "cursor", "gemini",
 ];
 
 fn is_runner_selector(s: &str) -> bool {
@@ -711,6 +739,9 @@ pub fn resolve_command(
             argv.push("--approval-mode".to_string());
             argv.push("default".to_string());
             argv.push("--sandbox".to_string());
+        } else if matches!(effective_runner_name.as_str(), "gb" | "grok") {
+            argv.push("--permission-mode".to_string());
+            argv.push("default".to_string());
         } else if matches!(effective_runner_name.as_str(), "rc" | "roocode") {
             warnings.push(
                 "warning: runner \"roocode\" safe mode is unverified; leaving default permissions unchanged"
@@ -726,6 +757,9 @@ pub fn resolve_command(
         } else if matches!(effective_runner_name.as_str(), "g" | "gemini") {
             argv.push("--approval-mode".to_string());
             argv.push("auto_edit".to_string());
+        } else if matches!(effective_runner_name.as_str(), "gb" | "grok") {
+            argv.push("--permission-mode".to_string());
+            argv.push("auto".to_string());
         } else {
             warnings.push(format!(
                 "warning: runner \"{}\" does not support permission mode \"auto\"; ignoring it",
@@ -763,6 +797,9 @@ pub fn resolve_command(
             argv.push("plan".to_string());
         } else if matches!(effective_runner_name.as_str(), "g" | "gemini") {
             argv.push("--approval-mode".to_string());
+            argv.push("plan".to_string());
+        } else if matches!(effective_runner_name.as_str(), "gb" | "grok") {
+            argv.push("--permission-mode".to_string());
             argv.push("plan".to_string());
         } else {
             warnings.push(format!(
@@ -818,6 +855,7 @@ fn canonical_runner_name(effective_runner_name: &str, info: &RunnerInfo) -> Stri
         "cu" | "cursor" => "cursor".to_string(),
         "g" | "gemini" => "gemini".to_string(),
         "p" | "pi" => "pi".to_string(),
+        "gb" | "grok" => "grok".to_string(),
         _ => info.binary.clone(),
     }
 }
@@ -832,7 +870,7 @@ fn session_persistence_warnings(
     }
     let display = canonical_runner_name(effective_runner_name, info);
     if parsed.cleanup_session {
-        if display == "opencode" || display == "kimi" {
+        if display == "opencode" || display == "kimi" || display == "grok" {
             return Vec::new();
         }
         return vec![format!(
@@ -957,7 +995,7 @@ fn supported_output_modes(runner_name: &str) -> &'static [&'static str] {
             OUTPUT_MODES
         }
         "k" | "kimi" => KIMI_OUTPUT_MODES,
-        "g" | "gemini" | "p" | "pi" => &[
+        "g" | "gemini" | "p" | "pi" | "gb" | "grok" => &[
             "text",
             "stream-text",
             "json",
@@ -1089,6 +1127,8 @@ pub fn resolve_output_plan(
                 vec!["--output-format".into(), "json".into()]
             } else if matches!(runner_name.as_str(), "g" | "gemini") {
                 vec!["--output-format".into(), "json".into()]
+            } else if matches!(runner_name.as_str(), "gb" | "grok") {
+                vec!["--output-format".into(), "json".into()]
             } else if matches!(runner_name.as_str(), "c" | "cx" | "codex") {
                 vec!["--json".into()]
             } else if matches!(runner_name.as_str(), "k" | "kimi") {
@@ -1115,6 +1155,8 @@ pub fn resolve_output_plan(
                 vec!["--output-format".into(), "stream-json".into()]
             } else if matches!(runner_name.as_str(), "g" | "gemini") {
                 vec!["--output-format".into(), "stream-json".into()]
+            } else if matches!(runner_name.as_str(), "gb" | "grok") {
+                vec!["--output-format".into(), "streaming-json".into()]
             } else if matches!(runner_name.as_str(), "c" | "cx" | "codex") {
                 vec!["--json".into()]
             } else if matches!(runner_name.as_str(), "k" | "kimi") {
@@ -1264,6 +1306,23 @@ pub fn resolve_output_plan(
             formatted: mode.contains("formatted"),
             schema: Some("pi".into()),
             argv_flags: vec!["--mode".into(), "json".into()],
+            warnings,
+        });
+    }
+
+    if matches!(runner_name.as_str(), "gb" | "grok") {
+        let argv_flags = if mode == "json" {
+            vec!["--output-format".into(), "json".into()]
+        } else {
+            vec!["--output-format".into(), "streaming-json".into()]
+        };
+        return Ok(OutputPlan {
+            runner_name,
+            mode: mode.clone(),
+            stream: mode.starts_with("stream-"),
+            formatted: mode.contains("formatted"),
+            schema: Some("grok".into()),
+            argv_flags,
             warnings,
         });
     }

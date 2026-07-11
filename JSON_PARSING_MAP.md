@@ -7,7 +7,7 @@ All 17 implementations share the same data model and parsing behavior.
 
 ```
 ParsedJsonOutput
-  schema_name : str          # "opencode" | "claude-code" | "kimi" | "cursor-agent" | "codex"
+  schema_name : str          # "opencode" | "claude-code" | "kimi" | "cursor-agent" | "codex" | "gemini" | "pi" | "grok"
   events      : [JsonEvent]
   final_text  : str
   session_id  : str
@@ -140,3 +140,15 @@ JSONL (`codex exec --json`).
 Codex command execution items use normalized tool name `command_execution` and store the command preview in `ToolCall.arguments` as `{"command": "..."}` so formatted rendering can show the shell command consistently.
 
 Duplicate Codex failure events with the same decoded message are collapsed so a single upstream error is rendered once.
+
+## Grok Build
+
+One-shot JSON (`--output-format json`) or NDJSON (`--output-format streaming-json`).
+
+| Wire shape | Extracted fields | → Event type |
+|---|---|---|
+| final object with `text` / `sessionId` | `text`, `sessionId`, optional `thought` | `assistant`, optional `thinking` |
+| `type=text` | `data` | `text_delta` |
+| `type=thought` | `data` | `thinking_delta` |
+| `type=end` | `sessionId` | (sets `session_id`) |
+| `type=error` | `message` | `error` |

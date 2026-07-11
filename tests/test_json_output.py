@@ -15,6 +15,7 @@ from call_coding_clis.json_output import (
     parse_gemini_json,
     parse_kimi_json,
     parse_pi_json,
+    parse_grok_json,
     ParsedJsonOutput,
     JsonEvent,
     ToolCall,
@@ -479,6 +480,73 @@ class ParsePiJsonTests(unittest.TestCase):
         result = parse_json_output(PI_SIMPLE, "pi")
         self.assertEqual(result.schema_name, "pi")
         self.assertEqual(result.final_text, "Hello!")
+
+
+GROK_ONE_SHOT = (
+    '{\n'
+    '  "text": "pong",\n'
+    '  "stopReason": "EndTurn",\n'
+    '  "sessionId": "grok-session-1",\n'
+    '  "requestId": "req-1",\n'
+    '  "thought": "Simple ping-pong test."\n'
+    '}\n'
+)
+
+GROK_STREAM = (
+    '{"type":"thought","data":"Thinking "}\n'
+    '{"type":"thought","data":"about it."}\n'
+    '{"type":"text","data":"po"}\n'
+    '{"type":"text","data":"ng"}\n'
+    '{"type":"end","stopReason":"EndTurn","sessionId":"grok-session-2","requestId":"req-2"}\n'
+)
+
+GROK_ERROR = '{"type":"error","message":"Couldn\'t start session"}\n'
+
+
+class ParseGrokJsonTests(unittest.TestCase):
+    def test_one_shot_json(self):
+        result = parse_grok_json(GROK_ONE_SHOT)
+        self.assertEqual(result.schema_name, "grok")
+        self.assertEqual(result.session_id, "grok-session-1")
+        self.assertEqual(result.final_text, "pong")
+        self.assertEqual(result.events[0].event_type, "thinking")
+        self.assertEqual(result.events[0].thinking, "Simple ping-pong test.")
+        self.assertEqual(result.events[1].event_type, "assistant")
+        self.assertEqual(result.events[1].text, "pong")
+        self.assertEqual(result.unknown_json_lines, [])
+
+    def test_stream_json(self):
+        result = parse_grok_json(GROK_STREAM)
+        self.assertEqual(result.session_id, "grok-session-2")
+        self.assertEqual(result.final_text, "pong")
+        thinking = "".join(e.thinking for e in result.events if e.event_type == "thinking_delta")
+        self.assertEqual(thinking, "Thinking about it.")
+        self.assertEqual(result.unknown_json_lines, [])
+
+    def test_error_object(self):
+        result = parse_grok_json(GROK_ERROR)
+        self.assertEqual(result.error, "Couldn't start session")
+        self.assertEqual(result.events[0].event_type, "error")
+
+    def test_render_stream(self):
+        result = parse_grok_json(GROK_STREAM)
+        rendered = render_parsed(result, show_thinking=True)
+        self.assertIn("[thinking]", rendered)
+        self.assertIn("[assistant] po", rendered)
+        self.assertIn("ng", rendered)
+
+    def test_stream_processor(self):
+        processor = StructuredStreamProcessor("grok", FormattedRenderer(show_thinking=True))
+        rendered = processor.feed(GROK_STREAM)
+        self.assertIn("[thinking]", rendered)
+        self.assertIn("[assistant]", rendered)
+        self.assertEqual(processor.output.session_id, "grok-session-2")
+        self.assertEqual(processor.output.final_text, "pong")
+
+    def test_parse_via_schema_dispatch(self):
+        result = parse_json_output(GROK_ONE_SHOT, "grok")
+        self.assertEqual(result.schema_name, "grok")
+        self.assertEqual(result.final_text, "pong")
 
 
 class RenderParsedTests(unittest.TestCase):

@@ -1350,6 +1350,147 @@ pub fn parse_pi_json(raw: &str) -> ParsedJsonOutput {
     result
 }
 
+fn apply_grok_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) -> bool {
+    let msg_type = obj.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+    // One-shot final object: {text, stopReason, sessionId, requestId, thought?}
+    if msg_type.is_empty()
+        && (obj.get("text").is_some()
+            || obj.get("sessionId").is_some()
+            || obj.get("stopReason").is_some())
+    {
+        if let Some(session_id) = obj.get("sessionId").and_then(|v| v.as_str()) {
+            if !session_id.is_empty() {
+                result.session_id = session_id.to_string();
+            }
+        }
+        if let Some(thought) = obj.get("thought").and_then(|v| v.as_str()) {
+            if !thought.is_empty() {
+                result.events.push(JsonEvent {
+                    event_type: "thinking".into(),
+                    text: String::new(),
+                    thinking: thought.to_string(),
+                    tool_call: None,
+                    tool_result: None,
+                });
+            }
+        }
+        if let Some(text) = obj.get("text").and_then(|v| v.as_str()) {
+            result.final_text = text.to_string();
+            if !text.is_empty() {
+                result.events.push(JsonEvent {
+                    event_type: "assistant".into(),
+                    text: text.to_string(),
+                    thinking: String::new(),
+                    tool_call: None,
+                    tool_result: None,
+                });
+            }
+        }
+        return true;
+    }
+
+    if let Some(session_id) = obj.get("sessionId").and_then(|v| v.as_str()) {
+        if !session_id.is_empty() {
+            result.session_id = session_id.to_string();
+        }
+    }
+
+    match msg_type {
+        "text" => {
+            if let Some(text) = obj.get("data").and_then(|v| v.as_str()) {
+                result.final_text.push_str(text);
+                if !text.is_empty() {
+                    result.events.push(JsonEvent {
+                        event_type: "text_delta".into(),
+                        text: text.to_string(),
+                        thinking: String::new(),
+                        tool_call: None,
+                        tool_result: None,
+                    });
+                }
+            }
+            true
+        }
+        "thought" => {
+            if let Some(thinking) = obj.get("data").and_then(|v| v.as_str()) {
+                if !thinking.is_empty() {
+                    result.events.push(JsonEvent {
+                        event_type: "thinking_delta".into(),
+                        text: String::new(),
+                        thinking: thinking.to_string(),
+                        tool_call: None,
+                        tool_result: None,
+                    });
+                }
+            }
+            true
+        }
+        "end" => true,
+        "error" => {
+            let message = obj
+                .get("message")
+                .and_then(|v| v.as_str())
+                .or_else(|| obj.get("data").and_then(|v| v.as_str()))
+                .unwrap_or("error")
+                .to_string();
+            result.error = message.clone();
+            result.events.push(JsonEvent {
+                event_type: "error".into(),
+                text: message,
+                thinking: String::new(),
+                tool_call: None,
+                tool_result: None,
+            });
+            true
+        }
+        "max_turns_reached" | "auto_compact_start" | "auto_compact_end" => true,
+        _ => false,
+    }
+}
+
+pub fn parse_grok_json(raw: &str) -> ParsedJsonOutput {
+    let mut result = new_output("grok");
+    let stripped = raw.trim();
+    // Prefer one-shot object when the whole payload is a single JSON object
+    // (including pretty-printed multi-line payloads).
+    if stripped.starts_with('{') {
+        if let Ok(obj) = serde_json::from_str::<serde_json::Value>(stripped) {
+            if obj.get("type").and_then(|v| v.as_str()) == Some("error") {
+                let message = obj
+                    .get("message")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("error")
+                    .to_string();
+                result.error = message.clone();
+                result.events.push(JsonEvent {
+                    event_type: "error".into(),
+                    text: message,
+                    thinking: String::new(),
+                    tool_call: None,
+                    tool_result: None,
+                });
+                return result;
+            }
+            if obj.get("text").is_some()
+                || obj.get("sessionId").is_some()
+                || obj.get("stopReason").is_some()
+            {
+                apply_grok_obj(&mut result, &obj);
+                return result;
+            }
+        }
+    }
+    for line in raw.lines() {
+        if let Some(obj) = parse_json_line(line) {
+            if !apply_grok_obj(&mut result, &obj) {
+                result.unknown_json_lines.push(line.trim().to_string());
+            }
+        }
+    }
+    result
+}
+
 pub fn parse_json_output(raw: &str, schema: &str) -> ParsedJsonOutput {
     match schema {
         "opencode" => parse_opencode_json(raw),
@@ -1359,6 +1500,7 @@ pub fn parse_json_output(raw: &str, schema: &str) -> ParsedJsonOutput {
         "codex" => parse_codex_json(raw),
         "gemini" => parse_gemini_json(raw),
         "pi" => parse_pi_json(raw),
+        "grok" => parse_grok_json(raw),
         _ => ParsedJsonOutput {
             schema_name: schema.into(),
             events: Vec::new(),
@@ -1745,6 +1887,7 @@ impl StructuredStreamProcessor {
             "codex" => apply_codex_obj(&mut self.output, obj),
             "gemini" => apply_gemini_obj(&mut self.output, obj),
             "pi" => apply_pi_obj(&mut self.output, obj),
+            "grok" => apply_grok_obj(&mut self.output, obj),
             _ => false,
         }
     }

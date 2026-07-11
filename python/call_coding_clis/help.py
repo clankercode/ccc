@@ -30,6 +30,8 @@ CANONICAL_RUNNERS = [
     ("crush", "cr"),
     ("cursor", "cu"),
     ("gemini", "g"),
+    ("pi", "p"),
+    ("grok", "gb"),
 ]
 ALIAS_SUMMARY_FIELDS = (
     "runner",
@@ -75,7 +77,7 @@ Usage:
 
 Controls (free order before the prompt):
   runner        Select which coding CLI to use (default: oc)
-                  opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g)
+                  opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g), pi (p), grok (gb)
   +thinking     Set thinking level: +0..+4 or +none/+low/+med/+mid/+medium/+high/+max/+xhigh
                 Claude maps +0 to --thinking disabled and +1..+4 to --thinking enabled with matching --effort
                 Kimi maps +0 to --no-thinking and +1..+4 to --thinking
@@ -284,6 +286,20 @@ def _discover_gemini_version(binary_path: str) -> str:
     return ""
 
 
+def _discover_grok_version(binary_path: str) -> str:
+    grok_home = Path(os.environ.get("GROK_HOME") or (Path.home() / ".grok"))
+    version_json = grok_home / "version.json"
+    try:
+        payload = json.loads(version_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        payload = None
+    if isinstance(payload, dict):
+        version = payload.get("version")
+        if isinstance(version, str) and version.strip():
+            return f"grok {version.strip()}"
+    return ""
+
+
 def _runner_statuses() -> list[RunnerStatus]:
     statuses: list[RunnerStatus] = []
     for name, alias in CANONICAL_RUNNERS:
@@ -317,6 +333,8 @@ def _get_runner_version(runner_name: str, binary: str, binary_path: str) -> str:
         version = _discover_cursor_version(binary_path)
     elif runner_name == "gemini":
         version = _discover_gemini_version(binary_path)
+    elif runner_name == "grok":
+        version = _discover_grok_version(binary_path)
     else:
         version = ""
     return version if version else _get_version(binary)

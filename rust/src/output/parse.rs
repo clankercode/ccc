@@ -18,6 +18,7 @@ pub fn schema_name_for_runner(runner: RunnerKind) -> Option<&'static str> {
         RunnerKind::Cursor => Some("cursor-agent"),
         RunnerKind::Gemini => Some("gemini"),
         RunnerKind::Pi => Some("pi"),
+        RunnerKind::Grok => Some("grok"),
         RunnerKind::RooCode | RunnerKind::Crush => None,
     }
 }

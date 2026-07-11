@@ -59,6 +59,10 @@ def _canonical_run_dir_prefix(run_dir_prefix: str | None) -> str | None:
         return "cursor"
     if name in {"g", "gemini"}:
         return "gemini"
+    if name in {"p", "pi"}:
+        return "pi"
+    if name in {"gb", "grok"}:
+        return "grok"
     return name
 
 

@@ -42,6 +42,7 @@ CRUSH_PERSISTENCE_WARNING = 'warning: runner "crush" may save this session; pass
 ROOCODE_PERSISTENCE_WARNING = 'warning: runner "roocode" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
 CURSOR_PERSISTENCE_WARNING = 'warning: runner "cursor" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
 GEMINI_PERSISTENCE_WARNING = 'warning: runner "gemini" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
+GROK_PERSISTENCE_WARNING = 'warning: runner "grok" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n'
 HELP_USAGE_LINE = 'ccc [controls...] "<Prompt>"'
 HELP_SLOT_LINE = (
     "Use a named preset from config; if no preset exists, runner names select runners before agent fallback"
@@ -445,6 +446,30 @@ class SingleImplCccContractTests(unittest.TestCase):
                     self.assertEqual(
                         result.stdout,
                         "gemini --prompt Fix the failing tests\n",
+                    )
+                    self.assertEqual(result.stderr, "")
+
+    def test_env_override_can_replace_grok_binary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            grok_path = bin_dir / "grok-mock"
+            self._write_opencode_stub(opencode_path)
+            self._write_runner_stub(grok_path, "grok")
+
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                with self.subTest(language=lang.name, env="CCC_REAL_GROK"):
+                    env = self._make_env(opencode_path, lang)
+                    env["CCC_REAL_GROK"] = str(grok_path)
+                    result = lang.invoke_extra(["gb", "--save-session", PROMPT], env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(
+                        result.stdout,
+                        "grok --no-auto-update --reasoning-effort low -p Fix the failing tests\n",
                     )
                     self.assertEqual(result.stderr, "")
 
@@ -1418,6 +1443,7 @@ class SingleImplCccContractTests(unittest.TestCase):
             roocode_path = bin_dir / "roocode"
             cursor_path = bin_dir / "cursor-agent"
             gemini_path = bin_dir / "gemini"
+            grok_path = bin_dir / "grok"
             self._write_argv_echo_stub(claude_path, "claude")
             self._write_argv_echo_stub(codex_path, "codex")
             self._write_argv_echo_stub(kimi_path, "kimi")
@@ -1425,6 +1451,7 @@ class SingleImplCccContractTests(unittest.TestCase):
             self._write_argv_echo_stub(roocode_path, "roocode")
             self._write_argv_echo_stub(cursor_path, "cursor-agent")
             self._write_argv_echo_stub(gemini_path, "gemini")
+            self._write_argv_echo_stub(grok_path, "grok")
 
             cases = {
                 "Python": [
@@ -1501,6 +1528,21 @@ class SingleImplCccContractTests(unittest.TestCase):
                         "gemini --approval-mode plan --prompt Fix the failing tests\n",
                         GEMINI_PERSISTENCE_WARNING,
                     ),
+                    (
+                        ["gb", "--permission-mode", "safe"],
+                        "grok --no-auto-update --reasoning-effort low --permission-mode default -p Fix the failing tests\n",
+                        GROK_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["grok", "--permission-mode", "auto"],
+                        "grok --no-auto-update --reasoning-effort low --permission-mode auto -p Fix the failing tests\n",
+                        GROK_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["gb", "--permission-mode", "plan"],
+                        "grok --no-auto-update --reasoning-effort low --permission-mode plan -p Fix the failing tests\n",
+                        GROK_PERSISTENCE_WARNING,
+                    ),
                 ],
                 "Rust": [
                     (
@@ -1575,6 +1617,21 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["g", "--permission-mode", "plan"],
                         "gemini --approval-mode plan --prompt Fix the failing tests\n",
                         GEMINI_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["gb", "--permission-mode", "safe"],
+                        "grok --no-auto-update --reasoning-effort low --permission-mode default -p Fix the failing tests\n",
+                        GROK_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["grok", "--permission-mode", "auto"],
+                        "grok --no-auto-update --reasoning-effort low --permission-mode auto -p Fix the failing tests\n",
+                        GROK_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["gb", "--permission-mode", "plan"],
+                        "grok --no-auto-update --reasoning-effort low --permission-mode plan -p Fix the failing tests\n",
+                        GROK_PERSISTENCE_WARNING,
                     ),
                 ],
             }
@@ -1738,12 +1795,14 @@ class SingleImplCccContractTests(unittest.TestCase):
             cursor_path = bin_dir / "cursor-agent"
             codex_path = bin_dir / "codex"
             gemini_path = bin_dir / "gemini"
+            grok_path = bin_dir / "grok"
             self._write_argv_echo_stub(claude_path, "claude")
             self._write_argv_echo_stub(kimi_path, "kimi")
             self._write_argv_echo_stub(opencode_path, "opencode")
             self._write_argv_echo_stub(cursor_path, "cursor-agent")
             self._write_argv_echo_stub(codex_path, "codex")
             self._write_argv_echo_stub(gemini_path, "gemini")
+            self._write_argv_echo_stub(grok_path, "grok")
 
             cases = {
                 "Python": [
@@ -1765,11 +1824,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", ".json"],
-                        "codex exec --json --ephemeral Fix the failing tests\n",
+                        "codex exec --json -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["codex", "..json"],
-                        "codex exec --json --ephemeral Fix the failing tests\n",
+                        "codex exec --json -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["cu", ".json"],
@@ -1786,6 +1845,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     (
                         ["gemini", "..json"],
                         "gemini --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["gb", ".json"],
+                        "grok --no-auto-update --output-format json --reasoning-effort low -p Fix the failing tests\n",
+                    ),
+                    (
+                        ["grok", "..json"],
+                        "grok --no-auto-update --output-format streaming-json --reasoning-effort low -p Fix the failing tests\n",
                     ),
                 ],
                 "Rust": [
@@ -1807,11 +1874,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", ".json"],
-                        "codex exec --json --ephemeral Fix the failing tests\n",
+                        "codex exec --json -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["codex", "..json"],
-                        "codex exec --json --ephemeral Fix the failing tests\n",
+                        "codex exec --json -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["cu", ".json"],
@@ -1828,6 +1895,14 @@ class SingleImplCccContractTests(unittest.TestCase):
                     (
                         ["gemini", "..json"],
                         "gemini --output-format stream-json --prompt Fix the failing tests\n",
+                    ),
+                    (
+                        ["gb", ".json"],
+                        "grok --no-auto-update --output-format json --reasoning-effort low -p Fix the failing tests\n",
+                    ),
+                    (
+                        ["grok", "..json"],
+                        "grok --no-auto-update --output-format streaming-json --reasoning-effort low -p Fix the failing tests\n",
                     ),
                 ],
             }
@@ -1925,11 +2000,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", ".pj"],
-                        "codex exec --json --ephemeral Fix the failing tests\n",
+                        "codex exec --json -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["c", "..pj"],
-                        "codex exec --json --ephemeral Fix the failing tests\n",
+                        "codex exec --json -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["cu", ".pt"],
@@ -2023,11 +2098,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", ".pj"],
-                        "codex exec --json --ephemeral Fix the failing tests\n",
+                        "codex exec --json -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["c", "..pj"],
-                        "codex exec --json --ephemeral Fix the failing tests\n",
+                        "codex exec --json -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n",
                     ),
                     (
                         ["cu", ".pt"],
@@ -2688,6 +2763,7 @@ class SingleImplCccContractTests(unittest.TestCase):
             opencode_path = bin_dir / "opencode"
             cursor_path = bin_dir / "cursor-agent"
             gemini_path = bin_dir / "gemini"
+            grok_path = bin_dir / "grok"
             self._write_argv_echo_stub(claude_path, "claude")
             self._write_argv_echo_stub(codex_path, "codex")
             self._write_argv_echo_stub(kimi_path, "kimi")
@@ -2695,6 +2771,7 @@ class SingleImplCccContractTests(unittest.TestCase):
             self._write_opencode_yolo_stub(opencode_path)
             self._write_argv_echo_stub(cursor_path, "cursor-agent")
             self._write_argv_echo_stub(gemini_path, "gemini")
+            self._write_argv_echo_stub(grok_path, "grok")
 
             cases = {
                 "Python": [
@@ -2734,6 +2811,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                         "gemini --approval-mode yolo --prompt Fix the failing tests\n",
                         GEMINI_PERSISTENCE_WARNING,
                     ),
+                    (
+                        ["gb", "--yolo"],
+                        "grok --no-auto-update --reasoning-effort low --always-approve -p Fix the failing tests\n",
+                        GROK_PERSISTENCE_WARNING,
+                    ),
                 ],
                 "Rust": [
                     (
@@ -2771,6 +2853,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                         ["g", "--yolo"],
                         "gemini --approval-mode yolo --prompt Fix the failing tests\n",
                         GEMINI_PERSISTENCE_WARNING,
+                    ),
+                    (
+                        ["gb", "--yolo"],
+                        "grok --no-auto-update --reasoning-effort low --always-approve -p Fix the failing tests\n",
+                        GROK_PERSISTENCE_WARNING,
                     ),
                 ],
             }
@@ -3008,11 +3095,15 @@ class SingleImplCccContractTests(unittest.TestCase):
             return CURSOR_PERSISTENCE_WARNING
         if "g" in extra_args or "gemini" in extra_args:
             return GEMINI_PERSISTENCE_WARNING
+        if "gb" in extra_args or "grok" in extra_args:
+            return GROK_PERSISTENCE_WARNING
         if (
             "cc" in extra_args
             or "claude" in extra_args
             or "c" in extra_args
             or "codex" in extra_args
+            or "p" in extra_args
+            or "pi" in extra_args
         ):
             return ""
         return OPENCODE_PERSISTENCE_WARNING

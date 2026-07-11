@@ -153,6 +153,26 @@ Current `ccc` integration note:
 - Usage counters are carried by `turn.completed.usage`, including observed `input_tokens`, `cached_input_tokens`, and `output_tokens`.
 - Failure output may arrive as `type:error` or `type:turn.failed`; observed Codex failures can nest a JSON error payload inside `message` or `error.message`, and Python/Rust decode that nested payload for formatted error rendering.
 
+## Grok Build
+
+Primary references:
+
+- local `grok --help` verified on 2026-07-11
+- Grok Build headless docs (`~/.grok/docs/user-guide/14-headless-mode.md`)
+
+Relevant local CLI surface:
+
+- `grok -p --output-format json`
+- `grok -p --output-format streaming-json`
+
+Current `ccc` integration note:
+
+- `ccc` uses `grok --no-auto-update -p`.
+- One-shot JSON objects expose `text`, `stopReason`, `sessionId`, `requestId`, and optional `thought`.
+- Streaming NDJSON events observed locally include `thought`, `text`, `end`, and `error`.
+- Tool-call events were not present on the streaming-json surface in local smoke tests; treat the list as non-exhaustive.
+- Failure objects may arrive as `{"type":"error","message":"..."}`.
+
 ## How To Use These References
 
 When updating a parser or adding a new language implementation:

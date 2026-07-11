@@ -152,6 +152,8 @@ println!("exit code: {}", completed.exit_code);
 | `k`, `kimi` | Kimi |
 | `cu`, `cursor` | Cursor Agent |
 | `g`, `gemini` | Gemini CLI |
+| `p`, `pi` | Pi |
+| `gb`, `grok` | Grok Build |
 | `rc`, `roocode` | RooCode |
 | `cr`, `crush` | Crush |
 

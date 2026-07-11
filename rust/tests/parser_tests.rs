@@ -108,6 +108,16 @@ fn test_parse_runner_selector_gemini_and_g() {
 }
 
 #[test]
+fn test_parse_runner_selector_grok_and_gb() {
+    for selector in ["grok", "gb"] {
+        let args: Vec<String> = vec![selector.into(), "fix bug".into()];
+        let parsed = parse_args(&args);
+        assert_eq!(parsed.runner.as_deref(), Some(selector));
+        assert_eq!(parsed.prompt, "fix bug");
+    }
+}
+
+#[test]
 fn test_parse_runner_selector_cr_remains_crush() {
     let args: Vec<String> = vec!["cr".into(), "fix bug".into()];
     let parsed = parse_args(&args);
@@ -631,8 +641,110 @@ fn test_resolve_gemini_runner_long_name_with_model() {
 }
 
 #[test]
+fn test_resolve_grok_runner_shape() {
+    let parsed = ParsedArgs {
+        runner: Some("gb".into()),
+        thinking: Some(2),
+        model: Some("grok-4.5".into()),
+        yolo: true,
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, env, warnings) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv,
+        vec![
+            "grok",
+            "--no-auto-update",
+            "--reasoning-effort",
+            "medium",
+            "--model",
+            "grok-4.5",
+            "--always-approve",
+            "-p",
+            "hello",
+        ]
+    );
+    assert!(env.is_empty());
+    assert!(warnings.is_empty());
+}
+
+#[test]
+fn test_resolve_grok_thinking_zero_uses_minimal() {
+    let parsed = ParsedArgs {
+        runner: Some("gb".into()),
+        thinking: Some(0),
+        prompt: "hello".into(),
+        ..Default::default()
+    };
+    let (argv, _, _) = resolve_command(&parsed, None).unwrap();
+    assert_eq!(
+        argv,
+        vec![
+            "grok",
+            "--no-auto-update",
+            "--reasoning-effort",
+            "minimal",
+            "-p",
+            "hello",
+        ]
+    );
+}
+
+#[test]
+fn test_resolve_grok_permission_modes() {
+    for (mode, expected) in [
+        ("safe", vec!["--permission-mode", "default"]),
+        ("auto", vec!["--permission-mode", "auto"]),
+        ("plan", vec!["--permission-mode", "plan"]),
+        ("yolo", vec!["--always-approve"]),
+    ] {
+        let parsed = ParsedArgs {
+            runner: Some("grok".into()),
+            permission_mode: Some(mode.into()),
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let (argv, _, _) = resolve_command(&parsed, None).unwrap();
+        for flag in expected {
+            assert!(argv.iter().any(|part| part == flag), "missing {flag} in {argv:?}");
+        }
+        assert_eq!(argv[0], "grok");
+        assert!(argv.iter().any(|part| part == "-p"));
+    }
+}
+
+#[test]
+fn test_resolve_grok_output_plans() {
+    for (mode, expected_flags, schema) in [
+        ("json", vec!["--output-format", "json"], Some("grok")),
+        (
+            "stream-json",
+            vec!["--output-format", "streaming-json"],
+            Some("grok"),
+        ),
+        (
+            "formatted",
+            vec!["--output-format", "streaming-json"],
+            Some("grok"),
+        ),
+        ("text", vec![], None),
+    ] {
+        let parsed = ParsedArgs {
+            runner: Some("gb".into()),
+            output_mode: Some(mode.into()),
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let plan = resolve_output_plan(&parsed, None).unwrap();
+        assert_eq!(plan.argv_flags, expected_flags);
+        assert_eq!(plan.schema.as_deref(), schema);
+    }
+}
+
+#[test]
 fn test_resolve_cleanup_session_warning_policy() {
-    for runner in ["oc", "k"] {
+    for runner in ["oc", "k", "gb"] {
         let parsed = ParsedArgs {
             runner: Some(runner.into()),
             cleanup_session: true,
@@ -643,6 +755,9 @@ fn test_resolve_cleanup_session_warning_policy() {
         assert!(!warnings
             .iter()
             .any(|warning| warning.contains("may save this session")));
+        assert!(!warnings
+            .iter()
+            .any(|warning| warning.contains("does not support automatic session cleanup")));
     }
 
     for (runner, display) in [

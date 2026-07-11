@@ -207,6 +207,24 @@ def _register_defaults() -> None:
         agent_flag="",
         prompt_flag="",
     )
+    RUNNER_REGISTRY["grok"] = RunnerInfo(
+        binary="grok",
+        extra_args=["--no-auto-update"],
+        no_persist_flags=[],
+        thinking_flags={
+            0: ["--reasoning-effort", "minimal"],
+            1: ["--reasoning-effort", "low"],
+            2: ["--reasoning-effort", "medium"],
+            3: ["--reasoning-effort", "high"],
+            4: ["--reasoning-effort", "xhigh"],
+        },
+        show_thinking_flags={True: ["--reasoning-effort", "low"]},
+        yolo_flags=["--always-approve"],
+        provider_flag="",
+        model_flag="--model",
+        agent_flag="--agent",
+        prompt_flag="-p",
+    )
 
     RUNNER_REGISTRY["oc"] = RUNNER_REGISTRY["opencode"]
     RUNNER_REGISTRY["cc"] = RUNNER_REGISTRY["claude"]
@@ -218,12 +236,13 @@ def _register_defaults() -> None:
     RUNNER_REGISTRY["cu"] = RUNNER_REGISTRY["cursor"]
     RUNNER_REGISTRY["g"] = RUNNER_REGISTRY["gemini"]
     RUNNER_REGISTRY["p"] = RUNNER_REGISTRY["pi"]
+    RUNNER_REGISTRY["gb"] = RUNNER_REGISTRY["grok"]
 
 
 _register_defaults()
 
 RUNNER_SELECTOR_RE = re.compile(
-    r"^(?:oc|cc|c|cx|k|rc|cr|cu|g|p|pi|codex|claude|opencode|kimi|roocode|crush|cursor|gemini)$",
+    r"^(?:oc|cc|c|cx|k|rc|cr|cu|g|p|pi|gb|grok|codex|claude|opencode|kimi|roocode|crush|cursor|gemini)$",
     re.IGNORECASE,
 )
 THINKING_RE = re.compile(
@@ -510,6 +529,19 @@ def _supported_output_modes(effective_runner_name: str) -> set[str]:
             "pass-json",
             "stream-pass-json",
         }
+    if key in {"gb", "grok"}:
+        return {
+            "text",
+            "stream-text",
+            "json",
+            "stream-json",
+            "formatted",
+            "stream-formatted",
+            "pass-text",
+            "stream-pass-text",
+            "pass-json",
+            "stream-pass-json",
+        }
     return {"text", "stream-text", "pass-text", "stream-pass-text", "pass-json", "stream-pass-json"}
 
 
@@ -704,6 +736,21 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
                 argv_flags=["--mode", "json"],
                 warnings=warnings,
             )
+        if key in {"gb", "grok"}:
+            flags = (
+                ["--output-format", "json"]
+                if mode == "pass-json"
+                else ["--output-format", "streaming-json"]
+            )
+            return OutputPlan(
+                runner_name=effective_runner_name,
+                mode=mode,
+                stream=is_stream,
+                formatted=False,
+                schema=None,
+                argv_flags=flags,
+                warnings=warnings,
+            )
         return OutputPlan(
             runner_name=effective_runner_name,
             mode=mode,
@@ -798,6 +845,21 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
             formatted="formatted" in mode,
             schema="pi",
             argv_flags=["--mode", "json"],
+            warnings=warnings,
+        )
+    if key in {"gb", "grok"}:
+        flags = (
+            ["--output-format", "json"]
+            if mode == "json"
+            else ["--output-format", "streaming-json"]
+        )
+        return OutputPlan(
+            runner_name=effective_runner_name,
+            mode=mode,
+            stream=mode.startswith("stream-"),
+            formatted="formatted" in mode,
+            schema="grok",
+            argv_flags=flags,
             warnings=warnings,
         )
     return OutputPlan(
@@ -912,6 +974,8 @@ def resolve_command(
             argv.extend(["--sandbox", "enabled"])
         elif effective_runner_name in {"g", "gemini"}:
             argv.extend(["--approval-mode", "default", "--sandbox"])
+        elif effective_runner_name in {"gb", "grok"}:
+            argv.extend(["--permission-mode", "default"])
         elif effective_runner_name in {"rc", "roocode"}:
             warnings.append(
                 'warning: runner "roocode" safe mode is unverified; leaving default permissions unchanged'
@@ -923,6 +987,8 @@ def resolve_command(
             argv.append("--full-auto")
         elif effective_runner_name in {"g", "gemini"}:
             argv.extend(["--approval-mode", "auto_edit"])
+        elif effective_runner_name in {"gb", "grok"}:
+            argv.extend(["--permission-mode", "auto"])
         else:
             warnings.append(
                 f'warning: runner "{effective_runner_name}" does not support permission mode "auto"; ignoring it'
@@ -951,6 +1017,8 @@ def resolve_command(
             argv.extend(["--mode", "plan"])
         elif effective_runner_name in {"g", "gemini"}:
             argv.extend(["--approval-mode", "plan"])
+        elif effective_runner_name in {"gb", "grok"}:
+            argv.extend(["--permission-mode", "plan"])
         else:
             warnings.append(
                 f'warning: runner "{effective_runner_name}" does not support permission mode "plan"; ignoring it'
@@ -1001,6 +1069,8 @@ def _canonical_runner_name(effective_runner_name: str, info: RunnerInfo) -> str:
         return "gemini"
     if name in {"p", "pi"}:
         return "pi"
+    if name in {"gb", "grok"}:
+        return "grok"
     return info.binary
 
 
@@ -1012,7 +1082,7 @@ def _session_persistence_warnings(
 
     display = _canonical_runner_name(effective_runner_name, info)
     if parsed.cleanup_session:
-        if display in {"opencode", "kimi"}:
+        if display in {"opencode", "kimi", "grok"}:
             return []
         return [
             f'warning: runner "{display}" does not support automatic session cleanup; '

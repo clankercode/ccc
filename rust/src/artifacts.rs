@@ -237,6 +237,8 @@ fn canonical_run_dir_prefix(run_dir_prefix: &str) -> String {
         "rc" | "roocode" => "roocode".to_string(),
         "cu" | "cursor" => "cursor".to_string(),
         "g" | "gemini" => "gemini".to_string(),
+        "p" | "pi" => "pi".to_string(),
+        "gb" | "grok" => "grok".to_string(),
         other => other.to_string(),
     }
 }

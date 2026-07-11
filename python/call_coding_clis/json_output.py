@@ -914,6 +914,84 @@ def parse_pi_json(raw_stdout: str) -> ParsedJsonOutput:
     return result
 
 
+def _apply_grok_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
+    result.raw_lines.append(obj)
+    msg_type = str(obj.get("type", ""))
+
+    # One-shot JSON final object: {text, stopReason, sessionId, requestId, thought?}
+    if not msg_type and ("text" in obj or "sessionId" in obj or "stopReason" in obj):
+        session_id = obj.get("sessionId")
+        if isinstance(session_id, str) and session_id:
+            result.session_id = session_id
+        thought = obj.get("thought")
+        if isinstance(thought, str) and thought:
+            result.events.append(JsonEvent(event_type="thinking", thinking=thought, raw=obj))
+        text = obj.get("text")
+        if isinstance(text, str):
+            result.final_text = text
+            if text:
+                result.events.append(JsonEvent(event_type="assistant", text=text, raw=obj))
+        return True
+
+    session_id = obj.get("sessionId")
+    if isinstance(session_id, str) and session_id:
+        result.session_id = session_id
+
+    if msg_type == "text":
+        text = str(obj.get("data", ""))
+        result.final_text += text
+        if text:
+            result.events.append(JsonEvent(event_type="text_delta", text=text, raw=obj))
+        return True
+
+    if msg_type == "thought":
+        thinking = str(obj.get("data", ""))
+        if thinking:
+            result.events.append(JsonEvent(event_type="thinking_delta", thinking=thinking, raw=obj))
+        return True
+
+    if msg_type == "end":
+        return True
+
+    if msg_type == "error":
+        message = str(obj.get("message") or obj.get("data") or "error")
+        result.error = message
+        result.events.append(JsonEvent(event_type="error", text=message, raw=obj))
+        return True
+
+    if msg_type in {"max_turns_reached", "auto_compact_start", "auto_compact_end"}:
+        return True
+
+    return False
+
+
+def parse_grok_json(raw_stdout: str) -> ParsedJsonOutput:
+    result = _new_output("grok")
+    stripped = raw_stdout.strip()
+    # Prefer one-shot object when the whole payload is a single JSON object
+    # (including pretty-printed multi-line payloads).
+    if stripped.startswith("{"):
+        try:
+            obj = json.loads(stripped)
+        except json.JSONDecodeError:
+            obj = None
+        if isinstance(obj, dict):
+            if obj.get("type") == "error":
+                message = str(obj.get("message") or "error")
+                result.error = message
+                result.events.append(JsonEvent(event_type="error", text=message, raw=obj))
+                result.raw_lines.append(obj)
+                return result
+            if "text" in obj or "sessionId" in obj or "stopReason" in obj:
+                _apply_grok_obj(result, obj)
+                return result
+    for line in raw_stdout.splitlines():
+        obj, raw_line = _parse_json_line(line)
+        if obj is not None and not _apply_grok_obj(result, obj):
+            result.unknown_json_lines.append(raw_line)
+    return result
+
+
 PARSERS = {
     "opencode": parse_opencode_json,
     "claude-code": parse_claude_code_json,
@@ -922,6 +1000,7 @@ PARSERS = {
     "codex": parse_codex_json,
     "gemini": parse_gemini_json,
     "pi": parse_pi_json,
+    "grok": parse_grok_json,
 }
 
 
@@ -1149,6 +1228,7 @@ class StructuredStreamProcessor:
             "codex": _apply_codex_obj,
             "gemini": _apply_gemini_obj,
             "pi": _apply_pi_obj,
+            "grok": _apply_grok_obj,
         }.get(schema)
         self._buffer = ""
         self._unknown_lines: list[str] = []

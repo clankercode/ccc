@@ -16,6 +16,8 @@ Current files:
 - [kimi.md](kimi.md)
 - [cursor.md](cursor.md)
 - [gemini.md](gemini.md)
+- [pi.md](pi.md)
+- [grok.md](grok.md)
 - [crush.md](crush.md)
 - [roocode.md](roocode.md)
 - [allow-deny-tool-plan.md](allow-deny-tool-plan.md)
@@ -49,6 +51,7 @@ This table describes the current `ccc` mapping and the likely future shape for f
 | Kimi | `--yolo` | Not much beyond yolo/plan | maybe `--plan` |
 | Cursor Agent | `--yolo` | Partly | `--permission-mode` or `--sandbox` |
 | Gemini CLI | `--approval-mode yolo` | Yes | `--permission-mode` |
+| Grok Build | `--always-approve` | Yes | `--permission-mode`, later tool allow/deny |
 | Crush | warn and ignore | Not reliable for non-interactive run mode | none until upstream CLI is clearer |
 | RooCode | warn and ignore | Unverified | none until upstream CLI is verified |
 
@@ -56,13 +59,13 @@ This table describes the current `ccc` mapping and the likely future shape for f
 
 `ccc` keeps the external thinking contract numeric. The top tier is vendor labeled: Anthropic says `max`, OpenAI-style labels say `xhigh`.
 
-| `ccc` token | Anthropic / Claude | OpenAI-style | Notes |
-|---|---|---|---|
-| `+0` | `disabled` | `disabled` | off |
-| `+1` | `low` | `low` | first non-off tier |
-| `+2` | `medium` | `medium` | middle tier |
-| `+3` | `high` | `high` | explicit high tier |
-| `+4` | `max` | `xhigh` | same semantic top tier; label differs |
+| `ccc` token | Anthropic / Claude | OpenAI-style | Grok Build | Notes |
+|---|---|---|---|---|
+| `+0` | `disabled` | `disabled` | `minimal` | off / lowest available; Grok uses `minimal` because current default model rejects `none` |
+| `+1` | `low` | `low` | `low` | first non-off tier |
+| `+2` | `medium` | `medium` | `medium` | middle tier |
+| `+3` | `high` | `high` | `high` | explicit high tier |
+| `+4` | `max` | `xhigh` | `xhigh` | same semantic top tier; label differs |
 
 Kimi does not expose the same numeric ladder; `ccc` currently maps `+0` to `--no-thinking` and `+1..+4` to `--thinking`.
 
@@ -94,12 +97,12 @@ If you update thinking-capability notes, follow [updating-model-capabilities.md]
 
 Python and Rust now implement `--permission-mode <safe|auto|yolo|plan>` with partial runner-specific mappings. The matrix below distinguishes explicit upstream controls from honest default passthroughs and unverified cases that warn.
 
-| Proposed `ccc` mode | OpenCode | Claude | Codex | Kimi | Cursor | Gemini | Crush | RooCode |
-|---|---|---|---|---|---|---|---|---|
-| `safe` | `OPENCODE_CONFIG_CONTENT='{"permission":"ask"}'` | `--permission-mode default` | leave default permissions unchanged | leave default permissions unchanged | `--sandbox enabled` | `--approval-mode default --sandbox` | leave default permissions unchanged | unverified; warn and leave defaults |
-| `auto` | likely config-driven `ask`/`allow` mix | `--permission-mode auto` | `--full-auto` | no honest mapping yet | no honest mapping yet | `--approval-mode auto_edit` | no honest mapping yet | unverified |
-| `yolo` | `OPENCODE_CONFIG_CONTENT='{"permission":"allow"}'` | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--yolo` | `--yolo` | `--approval-mode yolo` | unsupported in `run`; warn | unverified; warn |
-| `plan` | no verified equivalent yet | `--permission-mode plan` | no verified equivalent yet | `--plan` | `--mode plan` | `--approval-mode plan` | no verified equivalent yet | unverified |
+| Proposed `ccc` mode | OpenCode | Claude | Codex | Kimi | Cursor | Gemini | Grok | Crush | RooCode |
+|---|---|---|---|---|---|---|---|---|---|
+| `safe` | `OPENCODE_CONFIG_CONTENT='{"permission":"ask"}'` | `--permission-mode default` | leave default permissions unchanged | leave default permissions unchanged | `--sandbox enabled` | `--approval-mode default --sandbox` | `--permission-mode default` | leave default permissions unchanged | unverified; warn and leave defaults |
+| `auto` | likely config-driven `ask`/`allow` mix | `--permission-mode auto` | `--full-auto` | no honest mapping yet | no honest mapping yet | `--approval-mode auto_edit` | `--permission-mode auto` | no honest mapping yet | unverified |
+| `yolo` | `OPENCODE_CONFIG_CONTENT='{"permission":"allow"}'` | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--yolo` | `--yolo` | `--approval-mode yolo` | `--always-approve` | unsupported in `run`; warn | unverified; warn |
+| `plan` | no verified equivalent yet | `--permission-mode plan` | no verified equivalent yet | `--plan` | `--mode plan` | `--approval-mode plan` | `--permission-mode plan` | no verified equivalent yet | unverified |
 
 ## Session Persistence
 
@@ -113,6 +116,7 @@ Python and Rust now default to avoiding user-visible saved sessions where the up
 | Kimi | warns that the run may save a session | suppresses the warning | removes the matching session file under `KIMI_SHARE_DIR` or `~/.kimi` when the resume hint exposes an ID |
 | Cursor Agent | warns that the run may save a session | suppresses the warning | warns that automatic cleanup is unsupported |
 | Gemini CLI | warns that the run may save a session | suppresses the warning | warns that automatic cleanup is unsupported |
+| Grok Build | warns that the run may save a session | suppresses the warning | deletes the emitted `sessionId` with `grok sessions delete <id>` when available |
 | Crush | warns that the run may save a session | suppresses the warning | warns that automatic cleanup is unsupported |
 | RooCode | warns that the run may save a session | suppresses the warning | warns that automatic cleanup is unsupported |
 
@@ -136,7 +140,7 @@ Then update the corresponding file here before changing `ccc` runner assembly.
 
 When adding a new CLI, its note should record the verified non-interactive argv shape, permission controls, session persistence behavior, output modes, structured-output schema, version command behavior, and any faster local metadata source that can keep the `ccc --help` runner checklist from spawning a slow CLI.
 
-For the Python and Rust help checklist, runner version discovery now prefers trusted install metadata when the local layout is known, then falls back to `<cli> --version`. Current fast paths cover OpenCode, Codex, and Gemini `package.json`, Kimi `dist-info/METADATA`, Claude versioned local install paths, Cursor Agent's bundled `agent-cli@...` release marker, and Gemini's local npm `_npx` cache when the launcher uses `@google/gemini-cli`. Gemini npx wrappers report the wrapper identity instead of spawning npm when cached metadata is unavailable.
+For the Python and Rust help checklist, runner version discovery now prefers trusted install metadata when the local layout is known, then falls back to `<cli> --version`. Current fast paths cover OpenCode, Codex, and Gemini `package.json`, Kimi `dist-info/METADATA`, Claude versioned local install paths, Cursor Agent's bundled `agent-cli@...` release marker, Gemini's local npm `_npx` cache when the launcher uses `@google/gemini-cli`, and Grok Build's `$GROK_HOME/version.json` / `~/.grok/version.json`. Gemini npx wrappers report the wrapper identity instead of spawning npm when cached metadata is unavailable.
 
 `ccc --version` now reports the shared build version plus any resolved client versions. The reported `ccc` version comes from the repo-root `VERSION` file at build time, so keep that file in sync with the release you are building.
 

@@ -473,6 +473,7 @@ fn real_runner_override_env_var(kind: RunnerKind) -> Option<&'static str> {
         RunnerKind::Cursor => Some("CCC_REAL_CURSOR"),
         RunnerKind::Gemini => Some("CCC_REAL_GEMINI"),
         RunnerKind::Pi => Some("CCC_REAL_PI"),
+        RunnerKind::Grok => Some("CCC_REAL_GROK"),
         RunnerKind::Codex | RunnerKind::RooCode | RunnerKind::Crush => None,
     }
 }
@@ -485,6 +486,7 @@ fn configure_real_runner_overrides(mut client: Client) -> Client {
         RunnerKind::Cursor,
         RunnerKind::Gemini,
         RunnerKind::Pi,
+        RunnerKind::Grok,
     ] { 
         let Some(env_var) = real_runner_override_env_var(kind) else {
             continue;
@@ -1094,7 +1096,7 @@ fn session_persistence_pre_run_warnings(
     let display = canonical_session_runner_name(runner_name);
     if !matches!(
         display.as_str(),
-        "opencode" | "kimi" | "crush" | "roocode" | "cursor" | "gemini"
+        "opencode" | "kimi" | "crush" | "roocode" | "cursor" | "gemini" | "grok"
     ) {
         return Vec::new();
     }
@@ -1111,6 +1113,8 @@ fn canonical_session_runner_name(runner_name: &str) -> String {
         "rc" | "roocode" => "roocode".to_string(),
         "cu" | "cursor" => "cursor".to_string(),
         "g" | "gemini" => "gemini".to_string(),
+        "p" | "pi" => "pi".to_string(),
+        "gb" | "grok" => "grok".to_string(),
         _ => runner_name.to_string(),
     }
 }
@@ -1154,7 +1158,68 @@ fn cleanup_runner_session(
     match runner_name {
         "oc" | "opencode" => cleanup_opencode_session(runner_binary, stdout),
         "k" | "kimi" => cleanup_kimi_session(stderr, env_overrides),
+        "gb" | "grok" => cleanup_grok_session(runner_binary, stdout),
         _ => Vec::new(),
+    }
+}
+
+fn extract_grok_session_id(stdout: &str) -> Option<String> {
+    let stripped = stdout.trim();
+    if stripped.starts_with('{') {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(stripped) {
+            if let Some(session_id) = value.get("sessionId").and_then(|v| v.as_str()) {
+                if !session_id.is_empty() {
+                    return Some(session_id.to_string());
+                }
+            }
+        }
+    }
+    for line in stdout.lines() {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        if let Some(session_id) = value.get("sessionId").and_then(|v| v.as_str()) {
+            if !session_id.is_empty() {
+                return Some(session_id.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn cleanup_grok_session(runner_binary: &str, stdout: &str) -> Vec<String> {
+    let Some(session_id) = extract_grok_session_id(stdout) else {
+        return vec!["warning: could not find Grok session ID for cleanup".to_string()];
+    };
+    match Command::new(runner_binary)
+        .args(["sessions", "delete", &session_id])
+        .output()
+    {
+        Ok(output) if output.status.success() => Vec::new(),
+        Ok(output) => {
+            let detail = String::from_utf8_lossy(&output.stderr);
+            let detail = detail.trim();
+            if detail.is_empty() {
+                let detail = String::from_utf8_lossy(&output.stdout);
+                let detail = detail.trim();
+                if detail.is_empty() {
+                    vec![format!(
+                        "warning: failed to cleanup Grok session {session_id}"
+                    )]
+                } else {
+                    vec![format!(
+                        "warning: failed to cleanup Grok session {session_id}: {detail}"
+                    )]
+                }
+            } else {
+                vec![format!(
+                    "warning: failed to cleanup Grok session {session_id}: {detail}"
+                )]
+            }
+        }
+        Err(error) => vec![format!(
+            "warning: failed to cleanup Grok session {session_id}: {error}"
+        )],
     }
 }
 
@@ -1262,6 +1327,7 @@ fn apply_real_runner_override(spec: &mut call_coding_clis::CommandSpec) {
         "cursor-agent" => Some(RunnerKind::Cursor),
         "gemini" => Some(RunnerKind::Gemini),
         "pi" => Some(RunnerKind::Pi),
+        "grok" => Some(RunnerKind::Grok),
         _ => None,
     };
     let Some(kind) = runner_kind else {

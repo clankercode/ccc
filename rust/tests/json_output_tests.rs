@@ -400,6 +400,52 @@ fn test_gemini_stream_processor_renders_incrementally() {
 }
 
 #[test]
+fn test_grok_one_shot_json() {
+    let raw = r#"{
+  "text": "pong",
+  "stopReason": "EndTurn",
+  "sessionId": "grok-session-1",
+  "requestId": "req-1",
+  "thought": "Simple ping-pong test."
+}
+"#;
+    let parsed = parse_json_output(raw, "grok");
+    assert_eq!(parsed.schema_name, "grok");
+    assert_eq!(parsed.session_id, "grok-session-1");
+    assert_eq!(parsed.final_text, "pong");
+    assert!(parsed.unknown_json_lines.is_empty());
+}
+
+#[test]
+fn test_grok_stream_json() {
+    let raw = concat!(
+        "{\"type\":\"thought\",\"data\":\"Thinking \"}\n",
+        "{\"type\":\"thought\",\"data\":\"about it.\"}\n",
+        "{\"type\":\"text\",\"data\":\"po\"}\n",
+        "{\"type\":\"text\",\"data\":\"ng\"}\n",
+        "{\"type\":\"end\",\"stopReason\":\"EndTurn\",\"sessionId\":\"grok-session-2\",\"requestId\":\"req-2\"}\n",
+    );
+    let parsed = parse_json_output(raw, "grok");
+    assert_eq!(parsed.session_id, "grok-session-2");
+    assert_eq!(parsed.final_text, "pong");
+    assert!(parsed.unknown_json_lines.is_empty());
+}
+
+#[test]
+fn test_grok_stream_processor() {
+    let raw = concat!(
+        "{\"type\":\"text\",\"data\":\"pong\"}\n",
+        "{\"type\":\"end\",\"stopReason\":\"EndTurn\",\"sessionId\":\"grok-session-3\"}\n",
+    );
+    let mut processor =
+        StructuredStreamProcessor::new("grok", FormattedRenderer::new(true, false));
+    let rendered = processor.feed(raw);
+    assert!(rendered.contains("[assistant] pong"));
+    assert_eq!(processor.output().session_id, "grok-session-3");
+    assert!(processor.take_unknown_json_lines().is_empty());
+}
+
+#[test]
 fn test_render_opencode() {
     let raw = "{\"response\":\"hello\"}\n";
     let parsed = parse_opencode_json(raw);

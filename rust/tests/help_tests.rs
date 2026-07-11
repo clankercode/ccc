@@ -62,7 +62,7 @@ fn test_help_mentions_name_slot() {
     assert!(stdout.contains("Run `ccc config`"));
     assert!(stdout.contains("Configured aliases:"));
     assert!(stdout.contains(
-        "opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g)"
+        "opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g), pi (p), grok (gb)"
     ));
 }
 

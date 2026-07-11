@@ -125,6 +125,7 @@ def _apply_real_runner_override(spec: CommandSpec) -> None:
         "cursor-agent": "CCC_REAL_CURSOR",
         "gemini": "CCC_REAL_GEMINI",
         "pi": "CCC_REAL_PI",
+        "grok": "CCC_REAL_GROK",
     }
     env_var = env_var_by_binary.get(spec.argv[0])
     if not env_var:
@@ -1018,7 +1019,7 @@ def _session_persistence_pre_run_warnings(
     if save_session or cleanup_session:
         return []
     display = _canonical_session_runner_name(runner_name)
-    if display not in {"opencode", "kimi", "crush", "roocode", "cursor", "gemini"}:
+    if display not in {"opencode", "kimi", "crush", "roocode", "cursor", "gemini", "grok"}:
         return []
     return [
         f'warning: runner "{display}" may save this session; '
@@ -1042,6 +1043,8 @@ def _canonical_session_runner_name(runner_name: str) -> str:
         return "gemini"
     if key in {"p", "pi"}:
         return "pi"
+    if key in {"gb", "grok"}:
+        return "grok"
     return key
 
 
@@ -1067,6 +1070,30 @@ def _extract_kimi_resume_session_id(stderr: str) -> str:
     return match.group(1) if match else ""
 
 
+def _extract_grok_session_id(stdout: str) -> str:
+    stripped = stdout.strip()
+    if stripped.startswith("{"):
+        try:
+            obj = json.loads(stripped)
+        except json.JSONDecodeError:
+            obj = None
+        if isinstance(obj, dict):
+            session_id = obj.get("sessionId")
+            if isinstance(session_id, str) and session_id:
+                return session_id
+    for raw_line in stdout.splitlines():
+        try:
+            obj = json.loads(raw_line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        session_id = obj.get("sessionId")
+        if isinstance(session_id, str) and session_id:
+            return session_id
+    return ""
+
+
 def _cleanup_runner_session(
     *,
     runner_name: str,
@@ -1080,6 +1107,28 @@ def _cleanup_runner_session(
         return _cleanup_opencode_session(runner_binary, stdout)
     if key in {"k", "kimi"}:
         return _cleanup_kimi_session(stderr, env)
+    if key in {"gb", "grok"}:
+        return _cleanup_grok_session(runner_binary, stdout)
+    return []
+
+
+def _cleanup_grok_session(runner_binary: str, stdout: str) -> list[str]:
+    session_id = _extract_grok_session_id(stdout)
+    if not session_id:
+        return ["warning: could not find Grok session ID for cleanup"]
+    try:
+        result = subprocess.run(
+            [runner_binary, "sessions", "delete", session_id],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        return [f"warning: failed to cleanup Grok session {session_id}: {exc}"]
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        suffix = f": {detail}" if detail else ""
+        return [f"warning: failed to cleanup Grok session {session_id}{suffix}"]
     return []
 
 

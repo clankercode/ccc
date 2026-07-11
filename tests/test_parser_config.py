@@ -99,6 +99,13 @@ class ParseArgsTests(unittest.TestCase):
                 self.assertEqual(parsed.runner, selector)
                 self.assertEqual(parsed.prompt, "hello")
 
+    def test_runner_selector_grok_and_gb(self):
+        for selector in ("grok", "gb"):
+            with self.subTest(selector=selector):
+                parsed = parse_args([selector, "hello"])
+                self.assertEqual(parsed.runner, selector)
+                self.assertEqual(parsed.prompt, "hello")
+
     def test_runner_selector_cr_remains_crush(self):
         parsed = parse_args(["cr", "hello"])
         self.assertEqual(parsed.runner, "cr")
@@ -657,6 +664,80 @@ class ResolveCommandTests(unittest.TestCase):
             ],
         )
         self.assertEqual(env.get("CCC_PROVIDER"), "xiaomi-token-plan-sgp")
+
+    def test_grok_resolve_command_shape(self):
+        parsed = ParsedArgs(
+            runner="gb",
+            thinking=2,
+            model="grok-4.5",
+            yolo=True,
+            prompt="hello",
+        )
+        argv, _env, _warnings = resolve_command(parsed)
+        self.assertEqual(
+            argv,
+            [
+                "grok",
+                "--no-auto-update",
+                "--reasoning-effort",
+                "medium",
+                "--model",
+                "grok-4.5",
+                "--always-approve",
+                "-p",
+                "hello",
+            ],
+        )
+
+    def test_grok_thinking_zero_uses_minimal(self):
+        parsed = ParsedArgs(runner="gb", thinking=0, prompt="hello")
+        argv, _env, _warnings = resolve_command(parsed)
+        self.assertEqual(
+            argv,
+            [
+                "grok",
+                "--no-auto-update",
+                "--reasoning-effort",
+                "minimal",
+                "-p",
+                "hello",
+            ],
+        )
+
+    def test_grok_permission_modes(self):
+        cases = {
+            "safe": ["--permission-mode", "default"],
+            "auto": ["--permission-mode", "auto"],
+            "plan": ["--permission-mode", "plan"],
+            "yolo": ["--always-approve"],
+        }
+        for mode, expected_flags in cases.items():
+            with self.subTest(mode=mode):
+                parsed = ParsedArgs(
+                    runner="grok",
+                    permission_mode=mode,
+                    prompt="hello",
+                )
+                argv, _env, _warnings = resolve_command(parsed)
+                for flag in expected_flags:
+                    self.assertIn(flag, argv)
+                self.assertEqual(argv[0], "grok")
+                self.assertIn("-p", argv)
+                self.assertIn("hello", argv)
+
+    def test_grok_output_plans(self):
+        for mode, expected_flags, schema in (
+            ("json", ["--output-format", "json"], "grok"),
+            ("stream-json", ["--output-format", "streaming-json"], "grok"),
+            ("formatted", ["--output-format", "streaming-json"], "grok"),
+            ("stream-formatted", ["--output-format", "streaming-json"], "grok"),
+            ("text", [], None),
+        ):
+            with self.subTest(mode=mode):
+                parsed = ParsedArgs(runner="gb", output_mode=mode, prompt="hello")
+                plan = resolve_output_plan(parsed)
+                self.assertEqual(plan.argv_flags, expected_flags)
+                self.assertEqual(plan.schema, schema)
 
     def test_opencode_sets_terminal_title_env(self):
         parsed = ParsedArgs(runner="oc", prompt="hello")

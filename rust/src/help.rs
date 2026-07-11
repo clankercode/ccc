@@ -25,6 +25,7 @@ const CANONICAL_RUNNERS: &[(&str, &str)] = &[
     ("cursor", "cu"),
     ("gemini", "g"),
     ("pi", "p"),
+    ("grok", "gb"),
 ];
 
 const HELP_TEXT: &str = r#"ccc — call coding CLIs
@@ -43,7 +44,7 @@ Usage:
 
 Controls (free order before the prompt):
   runner        Select which coding CLI to use (default: oc)
-                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g), pi (p)
+                opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g), pi (p), grok (gb)
   +thinking     Set thinking level: +0..+4 or +none/+low/+med/+mid/+medium/+high/+max/+xhigh
                 Claude maps +0 to --thinking disabled and +1..+4 to --thinking enabled with matching --effort
                 Kimi maps +0 to --no-thinking and +1..+4 to --thinking
@@ -349,6 +350,29 @@ fn discover_gemini_version_with_home(binary_path: &Path, home: Option<&Path>) ->
     String::new()
 }
 
+fn discover_grok_version(_binary_path: &Path) -> String {
+    let grok_home = std::env::var_os("GROK_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".grok")));
+    let Some(grok_home) = grok_home else {
+        return String::new();
+    };
+    let version_json = grok_home.join("version.json");
+    let Ok(text) = fs::read_to_string(version_json) else {
+        return String::new();
+    };
+    let Ok(payload) = serde_json::from_str::<Value>(&text) else {
+        return String::new();
+    };
+    payload
+        .get("version")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(|v| format!("grok {v}"))
+        .unwrap_or_default()
+}
+
 fn get_runner_version(runner_name: &str, binary: &str, binary_path: &Path) -> String {
     let real_path = match fs::canonicalize(binary_path) {
         Ok(path) => path,
@@ -362,6 +386,7 @@ fn get_runner_version(runner_name: &str, binary: &str, binary_path: &Path) -> St
         "cursor" => discover_cursor_version(&real_path),
         "gemini" => discover_gemini_version(&real_path),
         "pi" => get_version(binary),
+        "grok" => discover_grok_version(&real_path),
         _ => String::new(),
     };
     if version.is_empty() {

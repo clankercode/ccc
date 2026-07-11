@@ -2,7 +2,7 @@
 
 > One command to run any coding CLI. A unified interface implemented in 20 programming languages.
 
-ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Claude Code, Codex, Kimi, Cursor Agent, Gemini CLI, Crush) behind a single consistent interface. Each of the 20 language implementations bundles an identical `ccc` CLI binary and a reusable library with `CommandSpec`, `CompletedRun`, and `Runner` types.
+ccc is a command-line tool that wraps terminal-first coding agents (OpenCode, Claude Code, Codex, Kimi, Cursor Agent, Gemini CLI, Pi, Grok Build, Crush) behind a single consistent interface. Each of the 20 language implementations bundles an identical `ccc` CLI binary and a reusable library with `CommandSpec`, `CompletedRun`, and `Runner` types.
 Python and Rust also expose `ccc --print-config`, which prints the canonical example config with the current supported keys, and `ccc config`, which prints every existing resolved config file path and contents.
 Python and Rust also expose `ccc config --edit [--user|--local]`, which opens the selected user or project-local config in `$EDITOR`.
 Python and Rust also expose `ccc add [-g] <alias>`, a line-prompt alias wizard that writes `[aliases.<name>]` entries to config; scriptable flags plus `--yes` can write aliases non-interactively.
@@ -15,7 +15,7 @@ Python and Rust `ccc --help` also lists configured aliases visible from the curr
 ccc [controls...] "<Prompt>"
 
 Slots are parsed in free order before the prompt, except that `help`, `-h`, and `--help` win anywhere in argv and print help immediately:
-- runner: Select which coding CLI (default: oc). Options: opencode (oc), claude (cc), kimi (k), cursor (cu), gemini (g), codex (c/cx), roocode (rc), crush (cr)
+- runner: Select which coding CLI (default: oc). Options: opencode (oc), claude (cc), kimi (k), cursor (cu), gemini (g), pi (p), grok (gb), codex (c/cx), roocode (rc), crush (cr)
 - +thinking: Set thinking level from +0 (off) to +4 (max)
   Claude keeps the same `ccc` scale: `+0` becomes `--thinking disabled`, and `+1..+4` become `--thinking enabled` with matching `--effort`.
   Kimi keeps the same `ccc` scale: `+0` becomes `--no-thinking`, and `+1..+4` become `--thinking`.

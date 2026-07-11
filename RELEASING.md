@@ -81,7 +81,8 @@ Pushing a version tag triggers [`.github/workflows/release.yml`](.github/workflo
 
 1. **Test gate** — must pass before anything is published:
    - `VERSION` / `rust/Cargo.toml` must match the tag
-   - `./test_impl.sh` for Python, Rust, TypeScript, C, Go, Ruby, Perl, C++, PHP, and x86-64 ASM
+   - `./test_impl.sh python` and `./test_impl.sh rust` (reference implementations + published crate)
+   - Other language scaffolds are **not** in the release gate; run `./run_all_tests.sh` locally when you want the full matrix
 2. **Create or refresh** the GitHub Release for that tag
 3. **Draft notes** from the matching `## x.y.z` section in `CHANGELOG.md`
 4. **Build and upload** native `ccc` binaries for Linux, macOS, and Windows

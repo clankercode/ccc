@@ -20,6 +20,8 @@ Shared feature changes that still need rollout to other implementations are note
 
 When changing the behavior of `ccc` in any way, including feature work and bug fixes, read [`ADDING_FEATURES.md`](ADDING_FEATURES.md) first.
 
+When cutting a release (version bump, tag, crates.io, GitHub Release), follow [`RELEASING.md`](RELEASING.md) end-to-end. After pushing a version tag, watch the `release` GitHub Actions workflow until it succeeds, then verify assets and populate/refresh the GitHub Release notes from `CHANGELOG.md`.
+
 When adding config fields, update any generated config example/schema output and the related docs at the same time.
 
 Always prefer cross-impl tests rather than language-specific tests.

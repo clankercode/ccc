@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import os
 import queue
+import signal
 import threading
 import subprocess
 from typing import Callable
@@ -83,6 +84,11 @@ class Runner:
     def _default_stream_executor(
         self, spec: CommandSpec, on_event: StreamCallback
     ) -> subprocess.CompletedProcess[str]:
+        # When a timeout is set on POSIX, put the child in its own session so the
+        # watchdog can SIGKILL the whole process group (shell + descendants).
+        popen_kwargs: dict = {}
+        if spec.timeout_secs is not None and os.name != "nt":
+            popen_kwargs["start_new_session"] = True
         try:
             process = subprocess.Popen(
                 spec.argv,
@@ -94,6 +100,7 @@ class Runner:
                 cwd=spec.cwd,
                 env=self._merged_env(spec.env),
                 text=True,
+                **popen_kwargs,
             )
         except OSError as error:
             stderr = f"failed to start {spec.argv[0]}: {error}\n"
@@ -184,7 +191,18 @@ def _watchdog(
     if process.poll() is not None:
         return
     timed_out.set()
+    _kill_process_tree(process)
+
+
+def _kill_process_tree(process: subprocess.Popen) -> None:
+    """Kill the child process, and on POSIX its process group when possible."""
     try:
+        if os.name != "nt" and process.pid is not None:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+                return
+            except (ProcessLookupError, PermissionError, OSError):
+                pass
         process.kill()
     except OSError:
         pass

@@ -474,12 +474,13 @@ class RunnerTests(unittest.TestCase):
 
         start = time.monotonic()
         result = Runner().run(
-            CommandSpec(argv=["/bin/sh", "-c", "sleep 5"], timeout_secs=1)
+            CommandSpec(argv=["/bin/sh", "-c", "sleep 30"], timeout_secs=1)
         )
         elapsed = time.monotonic() - start
 
         self.assertTrue(result.timed_out)
-        self.assertLess(elapsed, 3.0)
+        # Must die well before the full sleep; allow headroom for slow CI hosts.
+        self.assertLess(elapsed, 5.0)
 
     @unittest.skipIf(os.name == "nt", "SIGKILL via /bin/sh -c is POSIX-only")
     def test_stream_with_timeout_kills_slow_child(self) -> None:
@@ -489,13 +490,13 @@ class RunnerTests(unittest.TestCase):
 
         start = time.monotonic()
         result = Runner().stream(
-            CommandSpec(argv=["/bin/sh", "-c", "sleep 5"], timeout_secs=1),
+            CommandSpec(argv=["/bin/sh", "-c", "sleep 30"], timeout_secs=1),
             lambda _channel, _chunk: None,
         )
         elapsed = time.monotonic() - start
 
         self.assertTrue(result.timed_out)
-        self.assertLess(elapsed, 3.0)
+        self.assertLess(elapsed, 5.0)
 
     def test_stream_reports_missing_binary_start_failure(self) -> None:
         from call_coding_clis import CommandSpec, Runner

@@ -189,15 +189,16 @@ fn library_api_tests_client_run_exposes_parsed_output_for_formatted_modes() {
 #[cfg(unix)]
 #[test]
 fn library_api_tests_runner_run_with_timeout_kills_slow_child() {
-    let spec = CommandSpec::new(["/bin/sh", "-c", "sleep 5"]).with_timeout_secs(1);
+    let spec = CommandSpec::new(["/bin/sh", "-c", "sleep 30"]).with_timeout_secs(1);
     let start = std::time::Instant::now();
     let result = Runner::new().run(spec);
     let elapsed = start.elapsed();
 
     assert!(result.timed_out, "expected timed_out to be true");
+    // Must die well before the full sleep; allow headroom for slow CI hosts.
     assert!(
-        elapsed < std::time::Duration::from_secs(4),
-        "expected runner to exit under 4s, got {elapsed:?}"
+        elapsed < std::time::Duration::from_secs(5),
+        "expected runner to exit under 5s, got {elapsed:?}"
     );
 }
 

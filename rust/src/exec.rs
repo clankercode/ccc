@@ -165,6 +165,13 @@ fn default_stream_executor(spec: CommandSpec, callback: StreamCallback) -> Compl
     let mut command = build_command(&spec);
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
+    // Put the child in its own process group when a timeout is armed so the
+    // watchdog can kill shell wrappers and their descendants together.
+    #[cfg(unix)]
+    if timeout.is_some() {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
 
     let mut child = match command.spawn() {
         Ok(child) => child,
@@ -295,8 +302,25 @@ fn watchdog_run(
     let mut guard = child.lock().unwrap();
     if matches!(guard.try_wait(), Ok(None)) {
         timed_out.store(true, Ordering::SeqCst);
-        let _ = guard.kill();
+        kill_process_tree(&mut guard);
     }
+}
+
+fn kill_process_tree(child: &mut std::process::Child) {
+    #[cfg(unix)]
+    {
+        // kill(-pgid, SIGKILL) targets the whole process group created via
+        // Command::process_group(0). Fall back to killing the direct child.
+        let pid = child.id() as i32;
+        unsafe {
+            extern "C" {
+                fn kill(pid: i32, sig: i32) -> i32;
+            }
+            const SIGKILL: i32 = 9;
+            let _ = kill(-pid, SIGKILL);
+        }
+    }
+    let _ = child.kill();
 }
 
 fn build_command(spec: &CommandSpec) -> Command {

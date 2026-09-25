@@ -2620,6 +2620,100 @@ class SingleImplCccContractTests(unittest.TestCase):
                     self.assertNotIn(raw_error_prefix, result.stderr)
                     self.assertNotIn(raw_error_prefix, transcript)
 
+    def test_codex_item_completed_warnings_are_formatted_and_preserved(self) -> None:
+        warning = (
+            "Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\n"
+            "  user (/home/xertrov/.codex/config.toml): `xmodel_catalog_json` is ignored."
+        )
+        hooks_warning = (
+            "loading hooks from both /home/xertrov/.codex/hooks.json and "
+            "/home/xertrov/.codex/config.toml; prefer a single representation for this layer"
+        )
+        timeout_warning = "clamping SessionEnd hook timeout to 3s in /home/xertrov/.codex/config.toml"
+        unknown_line = '{"type":"codex.future_event","payload":"preserve-me"}'
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            codex_path = bin_dir / "codex"
+            self._write_opencode_stub(opencode_path)
+            self._write_codex_item_error_stream_stub(codex_path, unknown_line)
+
+            for lang in self.selected_languages:
+                if lang.name not in RUN_ARTIFACT_IMPLEMENTATIONS:
+                    continue
+                for mode in (".fmt", "..fmt"):
+                    env = self._make_env(opencode_path, lang)
+                    env["XDG_STATE_HOME"] = str(tmp_path / f"xdg-state-{lang.name}-{mode[0]}")
+                    env["CCC_FWD_UNKNOWN_JSON"] = "1"
+                    with self.subTest(language=lang.name, mode=mode):
+                        result = lang.invoke_with_args(
+                            ["codex", "--save-session", mode],
+                            PROMPT,
+                            env,
+                            include_output_log_path=True,
+                        )
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertIn("[error] " + warning.splitlines()[0], result.stdout)
+                        self.assertIn("[error] " + hooks_warning, result.stdout)
+                        self.assertIn("[error] " + timeout_warning, result.stdout)
+                        self.assertEqual(result.stdout.count("xmodel_catalog_json"), 1)
+                        self.assertIn("[assistant] done", result.stdout)
+                        self.assertNotIn('"type": "item.completed"', result.stderr)
+                        self.assertIn(unknown_line, result.stderr)
+                        run_dir = self._footer_run_dir(result.stderr)
+                        transcript = (run_dir / "transcript.txt").read_text(encoding="utf-8")
+                        self.assertTrue(transcript.startswith(result.stdout))
+                        self.assertIn(unknown_line, transcript)
+                        self.assertEqual((run_dir / "output.txt").read_text(encoding="utf-8"), "done")
+
+    def test_grok_stream_formatted_metadata_tools_and_unknowns(self) -> None:
+        unknown_line = '{"type":"grok.future_event","payload":"preserve-me"}'
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            grok_path = bin_dir / "grok"
+            self._write_opencode_stub(opencode_path)
+            self._write_grok_stream_formatted_stub(grok_path, unknown_line)
+
+            for lang in self.selected_languages:
+                if lang.name not in RUN_ARTIFACT_IMPLEMENTATIONS:
+                    continue
+                for mode in (".fmt", "..fmt"):
+                    env = self._make_env(opencode_path, lang)
+                    env["XDG_STATE_HOME"] = str(tmp_path / f"xdg-state-{lang.name}-{mode[0]}")
+                    env["CCC_FWD_UNKNOWN_JSON"] = "1"
+                    with self.subTest(language=lang.name, mode=mode):
+                        result = lang.invoke_with_args(
+                            ["grok", "--save-session", mode],
+                            PROMPT,
+                            env,
+                            include_output_log_path=True,
+                        )
+                        run_dir = self._assert_footer_artifacts(
+                            result,
+                            "transcript.txt",
+                            expected_prefix="grok-",
+                        )
+                        self.assertIn("[thinking] Checking the workspace.", result.stdout)
+                        self.assertIn("[tool:start] run_terminal_command: pwd", result.stdout)
+                        self.assertIn("[tool:result] run_terminal_command (ok)", result.stdout)
+                        self.assertIn("[assistant] done", result.stdout)
+                        self.assertIn(unknown_line, result.stderr)
+                        for known_type in ("available_commands", '"type": "usage"', '"type": "tool_call"', '"type": "tool_call_update"'):
+                            self.assertNotIn(known_type, result.stderr)
+                        transcript = (run_dir / "transcript.txt").read_text(encoding="utf-8")
+                        self.assertIn(unknown_line, transcript)
+                        self.assertEqual(
+                            (run_dir / "output.txt").read_text(encoding="utf-8"),
+                            "done",
+                        )
+
     def test_footer_follows_cleanup_warning(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -3309,6 +3403,75 @@ class SingleImplCccContractTests(unittest.TestCase):
             f"printf '%s\\n' {shlex.quote(error_event)}\n"
             f"printf '%s\\n' {shlex.quote(turn_failed_event)}\n"
         )
+        path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    def _write_codex_item_error_stream_stub(self, path: Path, unknown_line: str) -> None:
+        warning_messages = [
+            "Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\n  user (/home/xertrov/.codex/config.toml): `xmodel_catalog_json` is ignored.",
+            "Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\n  user (/home/xertrov/.codex/config.toml): `xmodel_catalog_json` is ignored.",
+            "loading hooks from both /home/xertrov/.codex/hooks.json and /home/xertrov/.codex/config.toml; prefer a single representation for this layer",
+            "clamping SessionEnd hook timeout to 3s in /home/xertrov/.codex/config.toml",
+        ]
+        lines = [
+            json.dumps(
+                {
+                    "type": "item.completed",
+                    "item": {"id": f"item_{index}", "type": "error", "message": message},
+                }
+            )
+            for index, message in enumerate(warning_messages)
+        ]
+        lines.append(json.dumps({
+            "type": "item.completed",
+            "item": {"id": "item_4", "type": "agent_message", "text": "done"},
+        }))
+        lines.append(unknown_line)
+        body = "#!/bin/sh\n" + "".join(
+            f"printf '%s\\n' {shlex.quote(line)}\n" for line in lines
+        )
+        path.write_text(body)
+        path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    def _write_grok_stream_formatted_stub(self, path: Path, unknown_line: str) -> None:
+        lines = [
+            {"type": "available_commands", "tools": [], "commands": []},
+            {"type": "thought", "data": "Checking the workspace."},
+            {"type": "usage", "usage": {"input_tokens": 3, "output_tokens": 1}},
+            {
+                "type": "tool_call",
+                "toolCallId": "call_1",
+                "title": "run_terminal_command",
+                "toolName": "run_terminal_command",
+                "rawInput": {"background": False, "command": "pwd"},
+                "status": "pending",
+            },
+            {
+                "type": "tool_call_update",
+                "toolCallId": "call_1",
+                "status": "completed",
+                "content": [
+                    {
+                        "type": "content",
+                        "content": {"type": "text", "text": "/home/xertrov/src/ccc\n"},
+                    }
+                ],
+                "rawOutput": {"exit_code": 0},
+            },
+            {"type": "text", "data": "done"},
+            unknown_line,
+            {
+                "type": "end",
+                "stopReason": "end_turn",
+                "sessionId": "grok-session-contract",
+                "requestId": "req-contract",
+                "usage": {"output_tokens": 1},
+            },
+        ]
+        body = "#!/bin/sh\n"
+        for line in lines:
+            raw = line if isinstance(line, str) else json.dumps(line)
+            body += f"printf '%s\\n' {shlex.quote(raw)}\n"
+        path.write_text(body)
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def _write_codex_stub(self, path: Path) -> None:

@@ -584,6 +584,9 @@ def _apply_codex_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
             result.final_text = text
             result.events.append(JsonEvent(event_type="assistant", text=text, raw=obj))
             return True
+        if item_type == "error" and msg_type == "item.completed":
+            text = _codex_error_event_text(item.get("message") or item.get("error"))
+            return _record_codex_error(result, text, obj)
         if item_type == "command_execution":
             command = str(item.get("command", ""))
             call_id = str(item.get("id", ""))
@@ -627,7 +630,7 @@ def _record_codex_error(
 ) -> bool:
     if not text:
         return False
-    if result.error == text:
+    if any(event.event_type == "error" and event.text == text for event in result.events):
         return True
     result.error = text
     result.events.append(JsonEvent(event_type="error", text=text, raw=obj))
@@ -918,6 +921,12 @@ def _apply_grok_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
     result.raw_lines.append(obj)
     msg_type = str(obj.get("type", ""))
 
+    # The headless CLI emits this capability advertisement at startup and
+    # after tool calls. It is useful to retain in raw_lines, but it has no
+    # human-facing transcript representation.
+    if msg_type == "available_commands":
+        return True
+
     # One-shot JSON final object: {text, stopReason, sessionId, requestId, thought?}
     if not msg_type and ("text" in obj or "sessionId" in obj or "stopReason" in obj):
         session_id = obj.get("sessionId")
@@ -951,6 +960,87 @@ def _apply_grok_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
         return True
 
     if msg_type == "end":
+        _merge_grok_usage(result, obj.get("usage", {}))
+        return True
+
+    if msg_type == "usage":
+        _merge_grok_usage(result, obj.get("usage", {}))
+        return True
+
+    if msg_type == "plan":
+        return True
+
+    if msg_type == "tool_call":
+        call_id = str(obj.get("toolCallId") or obj.get("id") or "")
+        tool_name = str(obj.get("toolName") or obj.get("title") or obj.get("name") or "tool")
+        raw_input = obj.get("rawInput", {})
+        if isinstance(raw_input, (dict, list)):
+            arguments = json.dumps(raw_input, separators=(",", ":"))
+        else:
+            arguments = str(raw_input or "")
+        result.events.append(
+            JsonEvent(
+                event_type="tool_use_start",
+                tool_call=ToolCall(id=call_id, name=tool_name, arguments=arguments),
+                raw=obj,
+            )
+        )
+        return True
+
+    if msg_type == "tool_call_update":
+        # Grok sends a pending update, one or more in-progress updates, and a
+        # final completed/failed update. Render only the terminal update so a
+        # command does not appear repeatedly in a formatted transcript.
+        status = str(obj.get("status") or "").lower()
+        if status not in {"completed", "success", "failed", "error", "cancelled", "canceled"}:
+            return True
+        call_id = str(obj.get("toolCallId") or obj.get("id") or "")
+        content = ""
+        content_items = obj.get("content", [])
+        if isinstance(content_items, list):
+            parts: list[str] = []
+            for item in content_items:
+                if not isinstance(item, dict):
+                    continue
+                nested = item.get("content", item)
+                if isinstance(nested, dict) and nested.get("type") == "text":
+                    parts.append(str(nested.get("text", "")).strip("\n"))
+                elif isinstance(item.get("text"), str):
+                    parts.append(str(item["text"]).strip("\n"))
+            content = "\n".join(part for part in parts if part)
+        if not content:
+            raw_output = obj.get("rawOutput")
+            if isinstance(raw_output, dict):
+                output_for_prompt = raw_output.get("output_for_prompt")
+                if isinstance(output_for_prompt, str) and output_for_prompt:
+                    content = output_for_prompt
+                elif isinstance(raw_output.get("output"), str):
+                    content = raw_output["output"]
+                elif isinstance(raw_output.get("output"), list):
+                    try:
+                        content = bytes(
+                            raw_output["output"]
+                        ).decode("utf-8", errors="replace")
+                    except (ValueError, TypeError):
+                        content = ""
+            elif isinstance(raw_output, str):
+                content = raw_output
+        raw_output = obj.get("rawOutput")
+        exit_code = raw_output.get("exit_code") if isinstance(raw_output, dict) else None
+        is_error = status not in {"completed", "success"} or (
+            isinstance(exit_code, int) and exit_code != 0
+        )
+        result.events.append(
+            JsonEvent(
+                event_type="tool_result",
+                tool_result=ToolResult(
+                    tool_call_id=call_id,
+                    content=content,
+                    is_error=is_error,
+                ),
+                raw=obj,
+            )
+        )
         return True
 
     if msg_type == "error":
@@ -963,6 +1053,18 @@ def _apply_grok_obj(result: ParsedJsonOutput, obj: dict[str, Any]) -> bool:
         return True
 
     return False
+
+
+def _merge_grok_usage(result: ParsedJsonOutput, usage: Any) -> None:
+    if not isinstance(usage, dict):
+        return
+    result.usage.update(
+        {
+            str(key): int(value)
+            for key, value in usage.items()
+            if isinstance(value, int)
+        }
+    )
 
 
 def parse_grok_json(raw_stdout: str) -> ParsedJsonOutput:

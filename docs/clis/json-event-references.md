@@ -152,12 +152,13 @@ Current `ccc` integration note:
 - Shell/tool work is carried by `command_execution` items with `command`, `aggregated_output`, `exit_code`, and `status`.
 - Usage counters are carried by `turn.completed.usage`, including observed `input_tokens`, `cached_input_tokens`, and `output_tokens`.
 - Failure output may arrive as `type:error` or `type:turn.failed`; observed Codex failures can nest a JSON error payload inside `message` or `error.message`, and Python/Rust decode that nested payload for formatted error rendering.
+- Startup warnings also arrive as `item.completed` with `item.type:error` and `item.message`; Python/Rust render these as errors and collapse repeated identical messages.
 
 ## Grok Build
 
 Primary references:
 
-- local `grok --help` verified on 2026-07-11
+- local `grok --help` verified on 2026-09-25
 - Grok Build headless docs (`~/.grok/docs/user-guide/14-headless-mode.md`)
 
 Relevant local CLI surface:
@@ -169,8 +170,8 @@ Current `ccc` integration note:
 
 - `ccc` uses `grok --no-auto-update -p`.
 - One-shot JSON objects expose `text`, `stopReason`, `sessionId`, `requestId`, and optional `thought`.
-- Streaming NDJSON events observed locally include `thought`, `text`, `end`, and `error`.
-- Tool-call events were not present on the streaming-json surface in local smoke tests; treat the list as non-exhaustive.
+- Streaming NDJSON events observed locally include `available_commands`, `thought`, `usage`, `plan`, `tool_call`, `tool_call_update`, `text`, `end`, and `error`.
+- `ccc` consumes capability, plan, and progress metadata without forwarding it as unknown JSON in formatted modes, and renders one terminal result for each tool call.
 - Failure objects may arrive as `{"type":"error","message":"..."}`.
 
 ## How To Use These References

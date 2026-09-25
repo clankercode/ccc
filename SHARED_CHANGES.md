@@ -20,6 +20,16 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-09-25
+
+### Stream-formatted Codex and Grok event handling
+- Change: Python and Rust now render Codex `item.completed` error items, collapse duplicate warning messages, consume Grok capability, plan, and usage metadata, and render Grok tool calls with one terminal result while streaming.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`; parser coverage in `tests/test_json_output.py` and `rust/tests/json_output_tests.rs`
+- Docs updated: `docs/clis/grok.md`, `docs/clis/json-event-references.md`, `JSON_PARSING_MAP.md`
+- Notes: verified against live Codex warning events and local Grok 1.0.41 `streaming-json` output.
+
 ## 2026-07-11
 
 ### Post-run version update detection and optional auto-update

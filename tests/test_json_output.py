@@ -114,6 +114,13 @@ CODEX_TOOL_STDOUT = (
     '{"type":"turn.completed","usage":{"input_tokens":20,"cached_input_tokens":4,"output_tokens":5}}\n'
 )
 
+CODEX_ITEM_ERROR_STREAM = (
+    '{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\\n  user (/home/xertrov/.codex/config.toml): `xmodel_catalog_json` is ignored."}}\n'
+    '{"type":"item.completed","item":{"id":"item_1","type":"error","message":"Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\\n  user (/home/xertrov/.codex/config.toml): `xmodel_catalog_json` is ignored."}}\n'
+    '{"type":"item.completed","item":{"id":"item_2","type":"error","message":"loading hooks from both /home/xertrov/.codex/hooks.json and /home/xertrov/.codex/config.toml; prefer a single representation for this layer"}}\n'
+    '{"type":"item.completed","item":{"id":"item_3","type":"error","message":"clamping SessionEnd hook timeout to 3s in /home/xertrov/.codex/config.toml"}}\n'
+)
+
 GEMINI_STREAM_JSON = (
     '{"type":"init","timestamp":"2026-04-14T06:57:06.152Z","session_id":"gemini-1","model":"auto-gemini-3"}\n'
     '{"type":"message","timestamp":"2026-04-14T06:57:06.153Z","role":"user","content":"Respond with exactly pong"}\n'
@@ -289,6 +296,20 @@ class ParseCodexJsonTests(unittest.TestCase):
         self.assertIn("[tool:start] command_execution: /usr/bin/bash -lc pwd", rendered)
         self.assertIn("[tool:result] command_execution (ok): /usr/bin/bash -lc pwd", rendered)
         self.assertIn("[assistant] done", rendered)
+        self.assertEqual(processor.take_unknown_json_lines(), [])
+
+    def test_item_completed_error_events_render_once_per_message(self):
+        result = parse_codex_json(CODEX_ITEM_ERROR_STREAM)
+        errors = [event for event in result.events if event.event_type == "error"]
+        self.assertEqual(len(errors), 3)
+        self.assertIn("xmodel_catalog_json", errors[0].text)
+        self.assertEqual(result.unknown_json_lines, [])
+
+        processor = StructuredStreamProcessor("codex", FormattedRenderer())
+        rendered = processor.feed(CODEX_ITEM_ERROR_STREAM)
+        self.assertEqual(rendered.count("Codex is ignoring"), 1)
+        self.assertIn("loading hooks from both", rendered)
+        self.assertIn("clamping SessionEnd hook timeout", rendered)
         self.assertEqual(processor.take_unknown_json_lines(), [])
 
 
@@ -500,6 +521,18 @@ GROK_STREAM = (
     '{"type":"end","stopReason":"EndTurn","sessionId":"grok-session-2","requestId":"req-2"}\n'
 )
 
+GROK_STREAM_WITH_METADATA_AND_TOOL = (
+    '{"type":"available_commands","tools":[],"commands":[]}\n'
+    '{"type":"thought","data":"Checking the workspace."}\n'
+    '{"type":"usage","usage":{"input_tokens":3,"output_tokens":1,"reasoning_tokens":1}}\n'
+    '{"type":"tool_call","toolCallId":"call_1","title":"run_terminal_command","toolName":"run_terminal_command","rawInput":{"background":false,"command":"pwd"},"status":"pending"}\n'
+    '{"type":"tool_call_update","toolCallId":"call_1","status":null,"content":[]}\n'
+    '{"type":"tool_call_update","toolCallId":"call_1","status":"completed","content":[{"type":"content","content":{"type":"text","text":"/home/xertrov/src/ccc\\n"}},{"type":"content","content":{"type":"text","text":"second line"}}],"rawOutput":{"exit_code":0}}\n'
+    '{"type":"text","data":"done"}\n'
+    '{"type":"plan","entries":[{"content":"inspect"}]}\n'
+    '{"type":"end","stopReason":"end_turn","sessionId":"grok-session-3","requestId":"req-3","usage":{"output_tokens":3}}\n'
+)
+
 GROK_ERROR = '{"type":"error","message":"Couldn\'t start session"}\n'
 
 
@@ -542,6 +575,31 @@ class ParseGrokJsonTests(unittest.TestCase):
         self.assertIn("[assistant]", rendered)
         self.assertEqual(processor.output.session_id, "grok-session-2")
         self.assertEqual(processor.output.final_text, "pong")
+
+    def test_stream_metadata_and_tool_events_are_consumed(self):
+        result = parse_grok_json(GROK_STREAM_WITH_METADATA_AND_TOOL)
+        self.assertEqual(result.session_id, "grok-session-3")
+        self.assertEqual(result.final_text, "done")
+        self.assertEqual(result.usage["input_tokens"], 3)
+        self.assertEqual(result.usage["reasoning_tokens"], 1)
+        self.assertEqual(result.usage["output_tokens"], 3)
+        self.assertEqual(result.unknown_json_lines, [])
+        tool_result = next(
+            event.tool_result for event in result.events if event.event_type == "tool_result"
+        )
+        self.assertEqual(tool_result.content, "/home/xertrov/src/ccc\nsecond line")
+        self.assertEqual(
+            [event.event_type for event in result.events],
+            ["thinking_delta", "tool_use_start", "tool_result", "text_delta"],
+        )
+
+        processor = StructuredStreamProcessor("grok", FormattedRenderer(show_thinking=True))
+        rendered = processor.feed(GROK_STREAM_WITH_METADATA_AND_TOOL)
+        self.assertIn("[thinking] Checking the workspace.", rendered)
+        self.assertIn("[tool:start] run_terminal_command: pwd", rendered)
+        self.assertIn("[tool:result] run_terminal_command (ok)", rendered)
+        self.assertIn("[assistant] done", rendered)
+        self.assertEqual(processor.take_unknown_json_lines(), [])
 
     def test_parse_via_schema_dispatch(self):
         result = parse_json_output(GROK_ONE_SHOT, "grok")

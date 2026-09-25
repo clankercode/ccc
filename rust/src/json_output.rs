@@ -858,7 +858,16 @@ fn apply_codex_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) -> bo
                 .get("type")
                 .and_then(|value| value.as_str())
                 .unwrap_or("");
-            if item_type == "agent_message"
+            if item_type == "error"
+                && obj.get("type").and_then(|value| value.as_str()) == Some("item.completed")
+            {
+                let text = item
+                    .get("message")
+                    .or_else(|| item.get("error"))
+                    .map(codex_error_event_text)
+                    .unwrap_or_default();
+                record_codex_error(result, text)
+            } else if item_type == "agent_message"
                 && obj.get("type").and_then(|value| value.as_str()) == Some("item.completed")
             {
                 let text = item
@@ -935,7 +944,11 @@ fn record_codex_error(result: &mut ParsedJsonOutput, text: String) -> bool {
     if text.is_empty() {
         return false;
     }
-    if result.error == text {
+    if result
+        .events
+        .iter()
+        .any(|event| event.event_type == "error" && event.text == text)
+    {
         return true;
     }
     result.error = text.clone();
@@ -1397,6 +1410,21 @@ fn apply_grok_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) -> boo
     }
 
     match msg_type {
+        // Grok emits command discovery metadata on the streaming-json
+        // channel. It is useful to the interactive client, but has no
+        // transcript representation.
+        "available_commands" => true,
+        "usage" => {
+            if let Some(usage) = obj.get("usage").and_then(|value| value.as_object()) {
+                for (key, value) in usage {
+                    if let Some(count) = value.as_i64() {
+                        result.usage.insert(key.clone(), count);
+                    }
+                }
+            }
+            true
+        }
+        "plan" => true,
         "text" => {
             if let Some(text) = obj.get("data").and_then(|v| v.as_str()) {
                 result.final_text.push_str(text);
@@ -1426,7 +1454,140 @@ fn apply_grok_obj(result: &mut ParsedJsonOutput, obj: &serde_json::Value) -> boo
             }
             true
         }
-        "end" => true,
+        "end" => {
+            if let Some(usage) = obj.get("usage").and_then(|value| value.as_object()) {
+                for (key, value) in usage {
+                    if let Some(count) = value.as_i64() {
+                        result.usage.insert(key.clone(), count);
+                    }
+                }
+            }
+            true
+        }
+        "tool_call" => {
+            let call_id = obj
+                .get("toolCallId")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .to_string();
+            let name = obj
+                .get("toolName")
+                .and_then(|value| value.as_str())
+                .or_else(|| obj.get("title").and_then(|value| value.as_str()))
+                .or_else(|| obj.get("name").and_then(|value| value.as_str()))
+                .unwrap_or("")
+                .to_string();
+            let arguments = obj
+                .get("rawInput")
+                .map(|value| {
+                    value
+                        .as_str()
+                        .map(str::to_string)
+                        .unwrap_or_else(|| serde_json::to_string(value).unwrap_or_default())
+                })
+                .unwrap_or_default();
+            result.events.push(JsonEvent {
+                event_type: "tool_use_start".into(),
+                text: String::new(),
+                thinking: String::new(),
+                tool_call: Some(ToolCall {
+                    id: call_id,
+                    name,
+                    arguments,
+                }),
+                tool_result: None,
+            });
+            true
+        }
+        "tool_call_update" => {
+            let status = obj.get("status").and_then(|value| value.as_str());
+            // Grok sends several updates for one call (including pending and
+            // in-progress metadata). Render only the terminal result so a
+            // stream-formatted transcript does not duplicate tool output.
+            let terminal = status
+                .map(|value| {
+                    matches!(
+                        value.to_ascii_lowercase().as_str(),
+                        "completed"
+                            | "success"
+                            | "failed"
+                            | "error"
+                            | "cancelled"
+                            | "canceled"
+                    )
+                })
+                .unwrap_or(false);
+            if !terminal {
+                return true;
+            }
+            let call_id = obj
+                .get("toolCallId")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .to_string();
+            let content = obj
+                .get("content")
+                .and_then(|value| value.as_array())
+                .map(|items| {
+                    items.iter().filter_map(|item| {
+                        let block = item.get("content").unwrap_or(item);
+                        if block.get("type").and_then(|value| value.as_str()) == Some("text") {
+                            block.get("text").and_then(|value| value.as_str())
+                        } else {
+                            item.get("text").and_then(|value| value.as_str())
+                        }
+                    }).map(|text| text.trim_matches('\n'))
+                        .filter(|text| !text.is_empty())
+                        .collect::<Vec<_>>().join("\n")
+                })
+                .filter(|content| !content.is_empty())
+                .or_else(|| {
+                    let value = obj.get("rawOutput")?;
+                    if let Some(text) = value.as_str() {
+                        return Some(text.to_string());
+                    }
+                    if let Some(text) = value.get("output_for_prompt")
+                        .and_then(|output| output.as_str())
+                        .filter(|text| !text.is_empty())
+                    {
+                        return Some(text.to_string());
+                    }
+                    if let Some(text) = value.get("output").and_then(|output| output.as_str()) {
+                        return Some(text.to_string());
+                    }
+                    let values = value.get("output")?.as_array()?;
+                    let bytes = values.iter().map(|byte| {
+                        byte.as_u64().and_then(|number| u8::try_from(number).ok())
+                    }).collect::<Option<Vec<_>>>()?;
+                    Some(String::from_utf8_lossy(&bytes).into_owned())
+                })
+                .unwrap_or_default();
+            let is_error = status
+                .map(|value| {
+                    matches!(
+                        value.to_ascii_lowercase().as_str(),
+                        "failed" | "error" | "cancelled" | "canceled"
+                    )
+                })
+                .unwrap_or(false)
+                || obj
+                    .get("rawOutput")
+                    .and_then(|value| value.get("exit_code"))
+                    .and_then(|value| value.as_i64())
+                    .is_some_and(|code| code != 0);
+            result.events.push(JsonEvent {
+                event_type: "tool_result".into(),
+                text: String::new(),
+                thinking: String::new(),
+                tool_call: None,
+                tool_result: Some(ToolResult {
+                    tool_call_id: call_id,
+                    content,
+                    is_error,
+                }),
+            });
+            true
+        }
         "error" => {
             let message = obj
                 .get("message")

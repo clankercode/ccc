@@ -2,8 +2,8 @@
 
 ## Status
 
-- Verified against local binary on 2026-07-11: `grok`
-- Local version checked: `0.2.93`
+- Verified against local binary on 2026-09-25: `grok`
+- Local version checked: `1.0.41`
 - Primary references:
   - local `grok --help`
   - Grok Build headless docs (`~/.grok/docs/user-guide/14-headless-mode.md`)
@@ -85,10 +85,15 @@ Streaming NDJSON event types observed locally:
 
 - `thought` — reasoning chunk (`data`)
 - `text` — assistant text chunk (`data`)
-- `end` — final metadata (`sessionId`, `requestId`, `stopReason`)
+- `usage` — usage counters (`usage`)
+- `plan` — current plan metadata (`entries`)
+- `tool_call` — tool invocation (`toolCallId`, `toolName`, `title`, `rawInput`)
+- `tool_call_update` — tool progress and terminal result (`toolCallId`, `status`, `content`, `rawOutput`)
+- `end` — final metadata (`sessionId`, `requestId`, `stopReason`, `usage`)
+- `available_commands` — capability metadata emitted by the headless client
 - `error` — failure (`message`)
 
-Tool-call events were not present on the streaming-json surface in local smoke tests; treat the event list as non-exhaustive.
+`ccc` consumes capability, plan, and progress metadata without adding it to the human-readable transcript. It renders a tool start and one terminal tool result for each `tool_call`; pending and in-progress `tool_call_update` records are bookkeeping events.
 
 ## Quick checks
 
@@ -105,5 +110,5 @@ grok -p "Respond with exactly pong" --always-approve --output-format streaming-j
 - `ccc` uses `grok --no-auto-update -p`
 - the canonical selectors are `grok` and `gb`
 - thinking `+0..+4` maps to `--reasoning-effort minimal|low|medium|high|xhigh`
-  - `+0` uses `minimal` rather than `none` because `grok-4.5` rejects `none` at the API
+  - `+0` uses `minimal` rather than `none` because the default model rejects `none` at the API
 - Python and Rust support `CCC_REAL_GROK` for mock or local smoke overrides

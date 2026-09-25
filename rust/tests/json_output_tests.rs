@@ -317,6 +317,31 @@ fn test_codex_tool_use_and_result_response() {
 }
 
 #[test]
+fn test_codex_item_completed_error_response() {
+    let raw = concat!(
+        "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"error\",\"message\":\"Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\\n  user (/home/xertrov/.codex/config.toml): `xmodel_catalog_json` is ignored.\"}}\n",
+        "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"error\",\"message\":\"Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\\n  user (/home/xertrov/.codex/config.toml): `xmodel_catalog_json` is ignored.\"}}\n",
+        "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_2\",\"type\":\"error\",\"message\":\"loading hooks from both /home/xertrov/.codex/hooks.json and /home/xertrov/.codex/config.toml; prefer a single representation for this layer\"}}\n",
+        "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_3\",\"type\":\"error\",\"message\":\"clamping SessionEnd hook timeout to 3s in /home/xertrov/.codex/config.toml\"}}\n",
+    );
+    let parsed = parse_codex_json(raw);
+    assert_eq!(
+        parsed.error,
+        "clamping SessionEnd hook timeout to 3s in /home/xertrov/.codex/config.toml"
+    );
+    assert_eq!(
+        parsed
+            .events
+            .iter()
+            .filter(|event| event.event_type == "error")
+            .count(),
+        3
+    );
+    assert!(parsed.events[0].text.contains("xmodel_catalog_json"));
+    assert!(parsed.unknown_json_lines.is_empty());
+}
+
+#[test]
 fn test_render_codex_tool_use() {
     let raw = concat!(
         "{\"type\":\"thread.started\",\"thread_id\":\"thread-3\"}\n",
@@ -442,6 +467,38 @@ fn test_grok_stream_processor() {
     let rendered = processor.feed(raw);
     assert!(rendered.contains("[assistant] pong"));
     assert_eq!(processor.output().session_id, "grok-session-3");
+    assert!(processor.take_unknown_json_lines().is_empty());
+}
+
+#[test]
+fn test_grok_stream_processor_handles_metadata_and_tools() {
+    let raw = concat!(
+        "{\"type\":\"available_commands\",\"tools\":[]}\n",
+        "{\"type\":\"usage\",\"usage\":{\"input_tokens\":12,\"output_tokens\":2}}\n",
+        "{\"type\":\"tool_call\",\"toolCallId\":\"call_1\",\"title\":\"run_terminal_command\",\"toolName\":\"run_terminal_command\",\"rawInput\":{\"command\":\"pwd\"},\"status\":\"pending\"}\n",
+        "{\"type\":\"tool_call_update\",\"toolCallId\":\"call_1\",\"status\":\"in_progress\",\"rawOutput\":{\"output_for_prompt\":\"\"}}\n",
+        "{\"type\":\"tool_call_update\",\"toolCallId\":\"call_1\",\"status\":\"completed\",\"content\":[{\"type\":\"content\",\"content\":{\"type\":\"text\",\"text\":\"first\"}},{\"type\":\"content\",\"content\":{\"type\":\"text\",\"text\":\"second\"}}],\"rawOutput\":{\"exit_code\":0}}\n",
+        "{\"type\":\"plan\",\"entries\":[{\"content\":\"inspect\"}]}\n",
+        "{\"type\":\"text\",\"data\":\"done\"}\n",
+        "{\"type\":\"end\",\"sessionId\":\"grok-session-tools\",\"usage\":{\"output_tokens\":3}}\n",
+    );
+    let mut processor =
+        StructuredStreamProcessor::new("grok", FormattedRenderer::new(true, false));
+    let rendered = processor.feed(raw);
+    assert!(rendered.contains("[tool:start] run_terminal_command: pwd"));
+    assert!(rendered.contains("[tool:result] run_terminal_command (ok): pwd"));
+    assert!(rendered.contains("[tool:result] first"));
+    assert!(rendered.contains("[tool:result] second"));
+    assert!(rendered.contains("[assistant] done"));
+    assert_eq!(processor.output().session_id, "grok-session-tools");
+    assert_eq!(
+        processor.output().usage.get("input_tokens").copied(),
+        Some(12)
+    );
+    assert_eq!(
+        processor.output().usage.get("output_tokens").copied(),
+        Some(3)
+    );
     assert!(processor.take_unknown_json_lines().is_empty());
 }
 

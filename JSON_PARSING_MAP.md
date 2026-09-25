@@ -134,6 +134,7 @@ JSONL (`codex exec --json`).
 | `item.started`, item type=`command_execution` | `item.id`, `item.command` | `tool_use_start` |
 | `item.completed`, item type=`command_execution` | `item.id`, `aggregated_output`, `exit_code`, `status` | `tool_result` |
 | `item.completed`, item type=`agent_message` | `item.text` | `assistant` |
+| `item.completed`, item type=`error` | `item.message` | `error` (duplicate messages collapsed) |
 | `turn.completed` | `usage` counters | (sets output field) |
 | `error`, `turn.failed` | nested JSON `message` / `error.message` payload, `status`, error type | `error` |
 
@@ -150,5 +151,10 @@ One-shot JSON (`--output-format json`) or NDJSON (`--output-format streaming-jso
 | final object with `text` / `sessionId` | `text`, `sessionId`, optional `thought` | `assistant`, optional `thinking` |
 | `type=text` | `data` | `text_delta` |
 | `type=thought` | `data` | `thinking_delta` |
-| `type=end` | `sessionId` | (sets `session_id`) |
+| `type=usage` | integer fields under `usage` | (sets `usage`) |
+| `type=plan` | `entries` | (consumed) |
+| `type=tool_call` | `toolCallId`, `toolName`/`title`, `rawInput` | `tool_use_start` |
+| `type=tool_call_update` (terminal status) | `toolCallId`, `content`/`rawOutput` | `tool_result` |
+| `type=available_commands` | capability metadata | (consumed) |
+| `type=end` | `sessionId`, optional `usage` | (sets `session_id`, `usage`) |
 | `type=error` | `message` | `error` |

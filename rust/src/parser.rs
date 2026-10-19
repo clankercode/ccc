@@ -81,6 +81,7 @@ pub struct AliasDef {
     pub agent: Option<String>,
     pub prompt: Option<String>,
     pub prompt_mode: Option<String>,
+    pub fallback_models: Option<Vec<String>>,
 }
 
 impl Default for AliasDef {
@@ -96,6 +97,7 @@ impl Default for AliasDef {
             agent: None,
             prompt: None,
             prompt_mode: None,
+            fallback_models: None,
         }
     }
 }
@@ -1006,7 +1008,7 @@ fn resolve_runner_name(parsed_runner: Option<&str>, config: &CccConfig) -> Strin
         .unwrap_or_else(|| runner_name.to_string())
 }
 
-fn resolve_effective_runner<'a>(
+pub(crate) fn resolve_effective_runner<'a>(
     parsed: &'a ParsedArgs,
     config: &'a CccConfig,
     registry: &'a BTreeMap<String, RunnerInfo>,

@@ -20,6 +20,13 @@ try:
     )
     from .json_output import resolve_human_tty
     from .runner import CommandSpec, Runner
+    from .model_fallback import (
+        ModelFallbackCursor,
+        argv_with_model,
+        assistant_output_started,
+        plan_model_fallback,
+        terminal_notice,
+    )
     from .parser import (
         parse_args,
         resolve_command,
@@ -50,6 +57,13 @@ except ImportError:
     )
     from json_output import resolve_human_tty
     from runner import CommandSpec, Runner
+    from model_fallback import (
+        ModelFallbackCursor,
+        argv_with_model,
+        assistant_output_started,
+        plan_model_fallback,
+        terminal_notice,
+    )
     from parser import (
         parse_args,
         resolve_command,
@@ -83,6 +97,7 @@ ALIAS_FIELDS = {
     "agent",
     "prompt",
     "prompt_mode",
+    "fallback_models",
 }
 
 THINKING_ALIASES = {
@@ -128,6 +143,7 @@ def _apply_real_runner_override(spec: CommandSpec) -> None:
         "gemini": "CCC_REAL_GEMINI",
         "pi": "CCC_REAL_PI",
         "grok": "CCC_REAL_GROK",
+        "codex": "CCC_REAL_CODEX",
     }
     env_var = env_var_by_binary.get(spec.argv[0])
     if not env_var:
@@ -249,6 +265,9 @@ def main(argv: list[str] | None = None) -> int:
         print(warning, file=sys.stderr)
 
     runner = Runner()
+    fallback_cursor = ModelFallbackCursor(plan_model_fallback(command_parsed, config))
+    for notice in fallback_cursor.plan.pre_notices:
+        _emit_fallback_notice(notice, artifact_writer)
     sanitize_osc = resolve_sanitize_osc(parsed, config)
     forward_unknown_json = parsed.forward_unknown_json or _env_bool_default_true(
         "CCC_FWD_UNKNOWN_JSON"
@@ -263,8 +282,12 @@ def main(argv: list[str] | None = None) -> int:
         renderer = FormattedRenderer(show_thinking=show_thinking, tty=human_tty)
         processor = StructuredStreamProcessor(output_plan.schema or "", renderer)
         stderr_filter = _HumanStderrFilter(output_plan.runner_name)
-        result = runner.stream(
+        result = _run_model_attempts(
+            fallback_cursor,
+            runner,
             spec,
+            artifact_writer,
+            output_plan.runner_name,
             lambda channel, chunk: _handle_structured_chunk(
                 channel,
                 chunk,
@@ -294,10 +317,13 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
+        _finish_model_fallback(fallback_cursor, result, artifact_writer)
         return _finish_run(parsed.timeout_secs, result, footer_line, config)
 
     if output_plan.mode in {"json", "pass-json"}:
-        result = runner.run(spec)
+        result = _run_model_attempts(
+            fallback_cursor, runner, spec, artifact_writer, output_plan.runner_name, None
+        )
         stdout = _sanitize_raw_output(result.stdout, output_plan.runner_name)
         stderr = _sanitize_raw_output(result.stderr, output_plan.runner_name)
         if stdout:
@@ -312,10 +338,13 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
+        _finish_model_fallback(fallback_cursor, result, artifact_writer)
         return _finish_run(parsed.timeout_secs, result, footer_line, config)
 
     if output_plan.mode in {"text", "pass-text"}:
-        result = runner.run(spec)
+        result = _run_model_attempts(
+            fallback_cursor, runner, spec, artifact_writer, output_plan.runner_name, None
+        )
         stdout = _sanitize_raw_output(result.stdout, output_plan.runner_name)
         stderr = _sanitize_raw_output(result.stderr, output_plan.runner_name)
         if stdout:
@@ -326,11 +355,16 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
+        _finish_model_fallback(fallback_cursor, result, artifact_writer)
         return _finish_run(parsed.timeout_secs, result, footer_line, config)
 
     if output_plan.mode in {"stream-text", "stream-json", "stream-pass-text", "stream-pass-json"}:
-        result = runner.stream(
+        result = _run_model_attempts(
+            fallback_cursor,
+            runner,
             spec,
+            artifact_writer,
+            output_plan.runner_name,
             lambda channel, chunk: _handle_raw_stream_chunk(
                 channel, chunk, artifact_writer
             ),
@@ -345,10 +379,13 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
+        _finish_model_fallback(fallback_cursor, result, artifact_writer)
         return _finish_run(parsed.timeout_secs, result, footer_line, config)
 
     if output_plan.mode == "formatted":
-        result = runner.run(spec)
+        result = _run_model_attempts(
+            fallback_cursor, runner, spec, artifact_writer, output_plan.runner_name, None
+        )
         stderr = _filtered_human_stderr(result.stderr, output_plan.runner_name)
         if stderr:
             print(_sanitize_human_output(stderr, sanitize_osc), end="", file=sys.stderr)
@@ -373,6 +410,7 @@ def main(argv: list[str] | None = None) -> int:
         _print_cleanup_warnings(
             parsed.cleanup_session, output_plan.runner_name, spec, result
         )
+        _finish_model_fallback(fallback_cursor, result, artifact_writer)
         return _finish_run(parsed.timeout_secs, result, footer_line, config)
 
     renderer = FormattedRenderer(
@@ -381,8 +419,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     processor = StructuredStreamProcessor(output_plan.schema or "", renderer)
     stderr_filter = _HumanStderrFilter(output_plan.runner_name)
-    result = runner.stream(
+    result = _run_model_attempts(
+        fallback_cursor,
+        runner,
         spec,
+        artifact_writer,
+        output_plan.runner_name,
         lambda channel, chunk: _handle_structured_chunk(
             channel,
             chunk,
@@ -416,7 +458,53 @@ def main(argv: list[str] | None = None) -> int:
     _print_cleanup_warnings(
         parsed.cleanup_session, output_plan.runner_name, spec, result
     )
+    _finish_model_fallback(fallback_cursor, result, artifact_writer)
     return _finish_run(parsed.timeout_secs, result, footer_line, config)
+
+
+def _emit_fallback_notice(notice: str, artifact_writer) -> None:
+    print(notice, end="", file=sys.stderr)
+    _record_transcript_line(notice.rstrip("\n"), artifact_writer)
+
+
+def _run_model_attempts(
+    fallback,
+    runner: Runner,
+    spec: CommandSpec,
+    artifact_writer,
+    runner_name: str,
+    stream_callback,
+):
+    while True:
+        if stream_callback is None:
+            result = runner.run(spec)
+        else:
+            result = runner.stream(spec, stream_callback)
+        notice = fallback.retry_notice(
+            result.exit_code, result.timed_out, result.stdout, result.stderr
+        )
+        if notice is None:
+            return result
+        if stream_callback is None:
+            if result.stderr:
+                print(result.stderr, end="", file=sys.stderr)
+            if result.stdout.strip() and not assistant_output_started(result.stdout):
+                print(result.stdout, end="", file=sys.stderr)
+        _emit_fallback_notice(notice, artifact_writer)
+        spec.argv = argv_with_model(spec.argv, fallback.current_label(), runner_name)
+
+
+def _finish_model_fallback(fallback, result, artifact_writer) -> None:
+    if not fallback.plan.announce:
+        return
+    notice = terminal_notice(
+        fallback.current_label(),
+        result.exit_code,
+        result.timed_out,
+        result.stdout,
+        result.stderr,
+    )
+    _emit_fallback_notice(notice, artifact_writer)
 
 
 def _add_alias_command(args: list[str]) -> int:
@@ -585,6 +673,10 @@ def _set_alias_field(alias: AliasDef, field: str, value: str) -> None:
         if value not in {"default", "prepend", "append"}:
             raise ValueError("prompt_mode must be one of: default, prepend, append")
         alias.prompt_mode = value
+    elif field == "fallback_models":
+        alias.fallback_models = [
+            part.strip() for part in value.split(",") if part.strip()
+        ]
     elif field in {"show_thinking", "sanitize_osc"}:
         setattr(alias, field, _parse_add_bool(value))
     else:
@@ -870,7 +962,7 @@ def _record_transcript_line(
     if artifact_writer is None:
         return
     try:
-        artifact_writer.write_transcript(text + "\n")
+        artifact_writer.append_transcript(text + "\n")
     except OSError as exc:
         print(
             f"warning: could not write {artifact_writer.transcript_name}: {exc}",

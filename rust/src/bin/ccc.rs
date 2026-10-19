@@ -50,6 +50,7 @@ fn alias_has_any_field(alias: &AliasDef) -> bool {
         || alias.agent.is_some()
         || alias.prompt.is_some()
         || alias.prompt_mode.is_some()
+        || alias.fallback_models.is_some()
 }
 
 fn parse_add_bool(value: &str) -> Result<bool, String> {
@@ -103,6 +104,15 @@ fn set_add_alias_field(alias: &mut AliasDef, field: &str, value: &str) -> Result
                 return Err("prompt_mode must be one of: default, prepend, append".to_string());
             }
             alias.prompt_mode = Some(value.to_string());
+        }
+        "fallback_models" => {
+            let models = value
+                .split(',')
+                .map(str::trim)
+                .filter(|model| !model.is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            alias.fallback_models = Some(models);
         }
         _ => {
             return Err(format!(
@@ -337,6 +347,7 @@ fn is_add_alias_field(field: &str) -> bool {
             | "agent"
             | "prompt"
             | "prompt_mode"
+            | "fallback_models"
     )
 }
 
@@ -352,6 +363,7 @@ fn alias_field_is_set(alias: &AliasDef, field: &str) -> bool {
         "agent" => alias.agent.is_some(),
         "prompt" => alias.prompt.is_some(),
         "prompt_mode" => alias.prompt_mode.is_some(),
+        "fallback_models" => alias.fallback_models.is_some(),
         _ => false,
     }
 }
@@ -368,6 +380,7 @@ fn unset_alias_field(alias: &mut AliasDef, field: &str) {
         "agent" => alias.agent = None,
         "prompt" => alias.prompt = None,
         "prompt_mode" => alias.prompt_mode = None,
+        "fallback_models" => alias.fallback_models = None,
         _ => {}
     }
 }
@@ -403,6 +416,9 @@ fn merge_alias(current: &AliasDef, overlay: &AliasDef, unset_fields: &[String]) 
     }
     if overlay.prompt_mode.is_some() {
         result.prompt_mode = overlay.prompt_mode.clone();
+    }
+    if overlay.fallback_models.is_some() {
+        result.fallback_models = overlay.fallback_models.clone();
     }
     for field in unset_fields {
         unset_alias_field(&mut result, field);
@@ -475,7 +491,8 @@ fn real_runner_override_env_var(kind: RunnerKind) -> Option<&'static str> {
         RunnerKind::Gemini => Some("CCC_REAL_GEMINI"),
         RunnerKind::Pi => Some("CCC_REAL_PI"),
         RunnerKind::Grok => Some("CCC_REAL_GROK"),
-        RunnerKind::Codex | RunnerKind::RooCode | RunnerKind::Crush => None,
+        RunnerKind::Codex => Some("CCC_REAL_CODEX"),
+        RunnerKind::RooCode | RunnerKind::Crush => None,
     }
 }
 
@@ -488,6 +505,7 @@ fn configure_real_runner_overrides(mut client: Client) -> Client {
         RunnerKind::Gemini,
         RunnerKind::Pi,
         RunnerKind::Grok,
+        RunnerKind::Codex,
     ] { 
         let Some(env_var) = real_runner_override_env_var(kind) else {
             continue;
@@ -1003,6 +1021,14 @@ fn emit_stdout_line(artifacts: Option<&RunArtifacts>, text: &str) {
                 "{}",
                 transcript_io_warning("write", artifacts.transcript_path(), &error)
             );
+        }
+    }
+}
+
+fn record_model_fallback_lines(artifacts: Option<&RunArtifacts>, stderr: &str) {
+    for line in stderr.lines() {
+        if line.starts_with("ccc: ") {
+            record_transcript_line(artifacts, line);
         }
     }
 }
@@ -1799,6 +1825,7 @@ fn main() -> ExitCode {
             } else {
                 None
             };
+            record_model_fallback_lines(artifacts.as_deref(), result.stderr());
             std::process::exit(finish_run(
                 parsed.timeout_secs,
                 result.timed_out(),
@@ -1872,6 +1899,7 @@ fn main() -> ExitCode {
             } else {
                 None
             };
+            record_model_fallback_lines(artifacts.as_deref(), result.stderr());
             std::process::exit(finish_run(
                 parsed.timeout_secs,
                 result.timed_out(),
@@ -1909,6 +1937,7 @@ fn main() -> ExitCode {
             } else {
                 None
             };
+            record_model_fallback_lines(artifacts.as_deref(), result.stderr());
             std::process::exit(finish_run(
                 parsed.timeout_secs,
                 result.timed_out(),
@@ -1951,6 +1980,7 @@ fn main() -> ExitCode {
             } else {
                 None
             };
+            record_model_fallback_lines(artifacts.as_deref(), result.stderr());
             std::process::exit(finish_run(
                 parsed.timeout_secs,
                 result.timed_out(),
@@ -1998,6 +2028,7 @@ fn main() -> ExitCode {
             } else {
                 None
             };
+            record_model_fallback_lines(artifacts.as_deref(), result.stderr());
             std::process::exit(finish_run(
                 parsed.timeout_secs,
                 result.timed_out(),
@@ -2071,6 +2102,7 @@ fn main() -> ExitCode {
             } else {
                 None
             };
+            record_model_fallback_lines(artifacts.as_deref(), result.stderr());
             std::process::exit(finish_run(
                 parsed.timeout_secs,
                 result.timed_out(),
@@ -2108,6 +2140,7 @@ fn main() -> ExitCode {
             } else {
                 None
             };
+            record_model_fallback_lines(artifacts.as_deref(), result.stderr());
             std::process::exit(finish_run(
                 parsed.timeout_secs,
                 result.timed_out(),
@@ -2145,6 +2178,7 @@ fn main() -> ExitCode {
             } else {
                 None
             };
+            record_model_fallback_lines(artifacts.as_deref(), result.stderr());
             std::process::exit(finish_run(
                 parsed.timeout_secs,
                 result.timed_out(),
@@ -2182,6 +2216,7 @@ fn main() -> ExitCode {
             } else {
                 None
             };
+            record_model_fallback_lines(artifacts.as_deref(), result.stderr());
             std::process::exit(finish_run(
                 parsed.timeout_secs,
                 result.timed_out(),

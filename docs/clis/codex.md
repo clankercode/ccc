@@ -79,6 +79,17 @@ To inspect the effective documented safety surface quickly:
 codex exec --help | rg "sandbox|full-auto|dangerously"
 ```
 
+## Model fallback
+
+Presets can list `fallback_models`. `ccc` keeps the codex runner and retries once per listed model when codex fails with a capacity or overload error (`Selected model is at capacity`, `server_overloaded`) before any assistant output. A 401 or other authentication error, including `OpenAI account pool has no usable account credential`, does not fall back. `ccc` prints `ccc: ran model <id>` on stderr and records that line in the run transcript.
+
+```toml
+[aliases.cx-reviewer]
+runner = "codex"
+model = "gpt-6.1-sol"
+fallback_models = ["gpt-6-astra", "gpt-6-sol"]
+```
+
 ## Notes for `ccc`
 
 - `ccc` uses `codex exec`

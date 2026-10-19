@@ -1,10 +1,18 @@
 use crate::exec::{CommandSpec, Runner};
+use crate::model_fallback::{
+    failure_allows_fallback, is_disallowed_fallback_model, is_disallowed_fallback_runner,
+    terminal_notice, trying_notice,
+};
 use crate::output::{parse_transcript_for_runner, schema_name_for_runner, Transcript};
-use crate::parser::{parse_args, resolve_command, resolve_output_mode, CccConfig};
+use crate::parser::{
+    parse_args, resolve_command, resolve_effective_runner, resolve_output_mode, CccConfig,
+    RUNNER_REGISTRY,
+};
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::fmt;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 use super::request::{OutputMode, Request, RunnerKind};
 
@@ -194,8 +202,42 @@ impl Client {
     }
 
     pub fn run_unchecked(&self, request: &Request) -> Result<Run, Error> {
-        let plan = self.plan(request)?;
-        Ok(self.run_preplanned(plan))
+        let attempts = self.model_attempts(request);
+        let mut prefix = attempts.pre_notices.clone();
+        let mut index = 0;
+        loop {
+            let plan = self.plan(&attempts.requests[index])?;
+            let mut run = self.run_preplanned(plan);
+            if index + 1 < attempts.requests.len()
+                && failure_allows_fallback(
+                    run.exit_code,
+                    run.timed_out,
+                    &run.stdout,
+                    &run.stderr,
+                )
+            {
+                prefix.push_str(&run.stderr);
+                prefix.push_str(&trying_notice(
+                    &attempts.labels[index],
+                    &attempts.labels[index + 1],
+                ));
+                index += 1;
+                continue;
+            }
+            let mut stderr = prefix;
+            stderr.push_str(&run.stderr);
+            if attempts.announce {
+                stderr.push_str(&terminal_notice(
+                    &attempts.labels[index],
+                    run.exit_code,
+                    run.timed_out,
+                    &run.stdout,
+                    &run.stderr,
+                ));
+            }
+            run.stderr = stderr;
+            return Ok(run);
+        }
     }
 
     pub fn stream<F>(&self, request: &Request, on_event: F) -> Result<Run, Error>
@@ -216,8 +258,117 @@ impl Client {
     where
         F: FnMut(&str, &str) + Send + 'static,
     {
-        let plan = self.plan(request)?;
-        Ok(self.stream_preplanned(plan, on_event))
+        let on_event = Arc::new(Mutex::new(on_event));
+        let emit = |text: &str| {
+            if let Ok(mut callback) = on_event.lock() {
+                callback("stderr", text);
+            }
+        };
+        let attempts = self.model_attempts(request);
+        let mut prefix = attempts.pre_notices.clone();
+        if !prefix.is_empty() {
+            emit(&prefix);
+        }
+        let mut index = 0;
+        loop {
+            let plan = self.plan(&attempts.requests[index])?;
+            let callback = Arc::clone(&on_event);
+            let mut run = self.stream_preplanned(plan, move |channel, chunk| {
+                if let Ok(mut callback) = callback.lock() {
+                    callback(channel, chunk);
+                }
+            });
+            if index + 1 < attempts.requests.len()
+                && failure_allows_fallback(
+                    run.exit_code,
+                    run.timed_out,
+                    &run.stdout,
+                    &run.stderr,
+                )
+            {
+                prefix.push_str(&run.stderr);
+                let notice = trying_notice(&attempts.labels[index], &attempts.labels[index + 1]);
+                emit(&notice);
+                prefix.push_str(&notice);
+                index += 1;
+                continue;
+            }
+            let mut stderr = prefix;
+            stderr.push_str(&run.stderr);
+            if attempts.announce {
+                let notice = terminal_notice(
+                    &attempts.labels[index],
+                    run.exit_code,
+                    run.timed_out,
+                    &run.stdout,
+                    &run.stderr,
+                );
+                emit(&notice);
+                stderr.push_str(&notice);
+            }
+            run.stderr = stderr;
+            return Ok(run);
+        }
+    }
+
+    fn model_attempts(&self, request: &Request) -> ModelAttempts {
+        let config = self.config.clone().unwrap_or_default();
+        let parsed = parse_args(&request.to_cli_tokens());
+        let registry = RUNNER_REGISTRY.read().unwrap_or_else(|error| error.into_inner());
+        let Some((runner_name, _info, alias)) =
+            resolve_effective_runner(&parsed, &config, &registry)
+        else {
+            return ModelAttempts::single(request.clone(), "(default)".to_string());
+        };
+        let configured = alias
+            .and_then(|alias| alias.fallback_models.clone())
+            .unwrap_or_default();
+        let primary = parsed
+            .model
+            .clone()
+            .or_else(|| alias.and_then(|alias| alias.model.clone()))
+            .filter(|model| !model.is_empty())
+            .or_else(|| {
+                if config.default_model.is_empty() {
+                    None
+                } else {
+                    Some(config.default_model.clone())
+                }
+            })
+            .unwrap_or_else(|| "(default)".to_string());
+        if configured.is_empty() {
+            return ModelAttempts::single(request.clone(), primary);
+        }
+        if is_disallowed_fallback_runner(&runner_name) {
+            return ModelAttempts {
+                requests: vec![request.clone()],
+                labels: vec![primary],
+                announce: false,
+                pre_notices: format!("ccc: ignoring fallback_models for runner {runner_name}\n"),
+            };
+        }
+        let mut requests = vec![request.clone()];
+        let mut labels = vec![primary];
+        let mut pre_notices = String::new();
+        for model in configured {
+            if is_disallowed_fallback_model(&model) {
+                pre_notices.push_str(&format!(
+                    "ccc: skipping fallback model {model}; MiniMax and Claude models are not fallback targets\n"
+                ));
+                continue;
+            }
+            if labels.iter().any(|label| label == &model) {
+                continue;
+            }
+            requests.push(request.clone().with_model(model.clone()));
+            labels.push(model);
+        }
+        ModelAttempts {
+            requests,
+            labels,
+            announce: true,
+            pre_notices,
+        }
     }
 
     fn run_preplanned(&self, plan: Plan) -> Run {
@@ -271,6 +422,24 @@ impl Client {
 impl Default for Client {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+struct ModelAttempts {
+    requests: Vec<Request>,
+    labels: Vec<String>,
+    announce: bool,
+    pre_notices: String,
+}
+
+impl ModelAttempts {
+    fn single(request: Request, label: String) -> Self {
+        Self {
+            requests: vec![request],
+            labels: vec![label],
+            announce: false,
+            pre_notices: String::new(),
+        }
     }
 }
 

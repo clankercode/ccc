@@ -37,6 +37,7 @@ For every implementation that claims `ccc` support:
 - exposes `build_prompt_spec`
 - runner supports `run` and `stream`
 - `CCC_REAL_OPENCODE` env var support
+- alias `fallback_models` retries the same runner after a capacity or overload error that happens before assistant output
 
 ### Rust
 
@@ -45,6 +46,7 @@ For every implementation that claims `ccc` support:
 - exposes `build_prompt_spec`
 - runner supports `run` and `stream` (real concurrent streaming via threads)
 - `CCC_REAL_OPENCODE` env var support
+- alias `fallback_models` retries the same runner after a capacity or overload error that happens before assistant output
 
 ### TypeScript
 

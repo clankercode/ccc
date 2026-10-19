@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added alias `fallback_models` in Python and Rust. After a capacity or overload error that happens before any assistant output, `ccc` retries the same runner once per listed model and reports the model that ran on stderr and in the run transcript. Authentication errors do not fall back. Claude runners are not retried, and MiniMax or Claude model ids are skipped.
+
+
 
 ## 0.4.2 - 2026-07-11
 - Added post-run version update detection in Python and Rust: after a coding-CLI run, `ccc` may warn on stderr when a newer version is available (crates.io + GitHub releases, cached under `~/.cache/ccc/update-check.json`). New `[update]` config keys `check`, `auto_update`, and `interval_hours`, plus env overrides `CCC_UPDATE_CHECK`, `CCC_AUTO_UPDATE`, `CCC_UPDATE_CACHE`, and `CCC_UPDATE_INTERVAL_HOURS`. Optional `auto_update` starts a background `cargo install ccc --force` for cargo-installed binaries.

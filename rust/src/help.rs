@@ -55,6 +55,7 @@ Controls (free order before the prompt):
   @name         Use a named preset from config; if no preset exists, runner names select runners before agent fallback
                 Presets can also define a default prompt when the user leaves prompt text blank
                 prompt_mode lets alias prompts prepend or append text; prepend/append require an explicit prompt argument
+                fallback_models retries the same runner once per model after a capacity or overload error that happens before any assistant output. Authentication errors and failures after output has started do not fall back. Claude runners are not retried, and MiniMax or Claude model ids are skipped.
   .mode / ..mode
                 Output-mode sugar with a shared dot identity:
                   .text / ..text, .json / ..json, .fmt / ..fmt, .pt / ..pt, .pj / ..pj
@@ -523,6 +524,11 @@ fn format_alias_summary(alias: &AliasDef) -> String {
     }
     if let Some(value) = &alias.prompt_mode {
         fields.push(format!("prompt_mode={}", format_alias_value(value)));
+    }
+    if let Some(models) = &alias.fallback_models {
+        if !models.is_empty() {
+            fields.push(format!("fallback_models={}", models.join(",")));
+        }
     }
     if fields.is_empty() {
         "(empty)".to_string()

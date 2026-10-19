@@ -20,6 +20,16 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-10-19
+
+### Preset model fallback
+- Change: Alias config accepts `fallback_models`, a list of model ids. When a run fails with a capacity or overload error before any assistant output, Python and Rust retry the same runner once per listed model, in order, and print which model ran on stderr and in the run transcript. Authentication errors, timeouts, and failures after assistant output do not fall back. Claude runners are not retried. MiniMax and Claude model ids in the list are skipped.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_model_fallback.py`, `tests/test_ccc_contract_impl.py`, `tests/test_parser_config.py`, `rust/src/model_fallback.rs`, `rust/src/config.rs`
+- Docs updated: `README.md`, `FEATURES.md`, `docs/clis/codex.md`, `python/README.md`, `rust/README.md`, help text, `ccc --print-config`
+- Notes: capacity and OpenCodex account-pool 401s are different failures. Only the former triggers fallback.
+
 ## 2026-09-25
 
 ### Stream-formatted Codex and Grok event handling

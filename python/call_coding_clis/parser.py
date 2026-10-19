@@ -63,6 +63,7 @@ class AliasDef:
     agent: str | None = None
     prompt: str | None = None
     prompt_mode: str | None = None
+    fallback_models: list[str] | None = None
     allow_tool: list[str] = field(default_factory=list)
     deny_tool: list[str] = field(default_factory=list)
 

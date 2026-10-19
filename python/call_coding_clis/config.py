@@ -55,6 +55,15 @@ EXAMPLE_CONFIG = """\
 # agent = "reviewer"
 # prompt = "Review the current changes"
 # prompt_mode = "default"
+# fallback_models = ["gpt-6-sol", "glm-5.3"]
+
+[aliases.cursor]
+runner = "cursor"
+model = "auto"
+
+[aliases.cu-auto]
+runner = "cursor"
+model = "auto"
 """
 
 
@@ -232,9 +241,16 @@ def render_alias_block(name: str, alias: AliasDef) -> str:
         "agent",
         "prompt",
         "prompt_mode",
+        "fallback_models",
     ):
         value = getattr(alias, key)
         if value is None:
+            continue
+        if key == "fallback_models":
+            if not value:
+                continue
+            rendered = ", ".join(_toml_string(str(item)) for item in value)
+            lines.append(f"{key} = [{rendered}]")
             continue
         if isinstance(value, bool):
             rendered = "true" if value else "false"
@@ -381,6 +397,16 @@ def _load_from_file_into(path: Path, config: CccConfig) -> None:
                 alias.agent = defn.get("agent", alias.agent)
                 alias.prompt = defn.get("prompt", alias.prompt)
                 alias.prompt_mode = defn.get("prompt_mode", alias.prompt_mode)
+                if "fallback_models" in defn:
+                    raw_models = defn.get("fallback_models")
+                    if isinstance(raw_models, list):
+                        alias.fallback_models = [
+                            str(item).strip()
+                            for item in raw_models
+                            if str(item).strip()
+                        ]
+                    elif isinstance(raw_models, str) and raw_models.strip():
+                        alias.fallback_models = [raw_models.strip()]
                 if alias.thinking is not None:
                     alias.thinking = int(alias.thinking)
                 if alias.show_thinking is not None:

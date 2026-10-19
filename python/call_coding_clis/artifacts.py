@@ -124,6 +124,14 @@ class RunArtifactWriter:
                 self._transcript_handle = None
             raise
 
+    def append_transcript(self, text: str) -> None:
+        """Write transcript text, appending to the file after close()."""
+        if self._transcript_handle is not None:
+            self.write_transcript(text)
+            return
+        with self.transcript_path.open("a", encoding="utf-8") as handle:
+            handle.write(text)
+
     def write_output(self, text: str) -> None:
         self.output_path.write_text(text, encoding="utf-8")
 

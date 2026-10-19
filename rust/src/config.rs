@@ -35,6 +35,15 @@ const EXAMPLE_CONFIG: &str = concat!(
     "# agent = \"reviewer\"\n",
     "# prompt = \"Review the current changes\"\n",
     "# prompt_mode = \"default\"\n",
+    "# fallback_models = [\"gpt-6-sol\", \"glm-5.3\"]\n",
+    "\n",
+    "[aliases.cursor]\n",
+    "runner = \"cursor\"\n",
+    "model = \"auto\"\n",
+    "\n",
+    "[aliases.cu-auto]\n",
+    "runner = \"cursor\"\n",
+    "model = \"auto\"\n",
 );
 
 pub fn render_example_config() -> String {
@@ -252,6 +261,21 @@ pub fn render_alias_block(name: &str, alias: &AliasDef) -> Result<String, String
             "prompt_mode",
             alias.prompt_mode.as_ref().map(|value| toml_string(value)),
         ),
+        (
+            "fallback_models",
+            alias.fallback_models.as_ref().and_then(|models| {
+                if models.is_empty() {
+                    None
+                } else {
+                    let rendered = models
+                        .iter()
+                        .map(|model| toml_string(model))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    Some(format!("[{rendered}]"))
+                }
+            }),
+        ),
     ] {
         if let Some(rendered) = value {
             lines.push(format!("{key} = {rendered}"));
@@ -450,12 +474,35 @@ fn merge_alias(target: &mut crate::parser::AliasDef, overlay: &crate::parser::Al
     if overlay.prompt_mode.is_some() {
         target.prompt_mode = overlay.prompt_mode.clone();
     }
+    if overlay.fallback_models.is_some() {
+        target.fallback_models = overlay.fallback_models.clone();
+    }
+}
+
+fn parse_string_array(raw: &str) -> Vec<String> {
+    let raw = raw.trim();
+    let inner = raw
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+        .unwrap_or("");
+    inner
+        .split(',')
+        .filter_map(|part| {
+            let part = part.trim().trim_matches('"').trim_matches('\'');
+            if part.is_empty() {
+                None
+            } else {
+                Some(part.to_string())
+            }
+        })
+        .collect()
 }
 
 fn parse_toml_config(content: &str, config: &mut CccConfig) {
     let mut section: &str = "";
     let mut current_alias_name: Option<String> = None;
     let mut current_alias = crate::parser::AliasDef::default();
+    let mut array_buf: Option<String> = None;
 
     let flush_alias = |config: &mut CccConfig,
                        current_alias_name: &mut Option<String>,
@@ -472,6 +519,18 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
 
     for line in content.lines() {
         let trimmed = line.trim();
+
+        if let Some(buf) = array_buf.as_mut() {
+            if !trimmed.is_empty() && !trimmed.starts_with('#') {
+                buf.push(' ');
+                buf.push_str(trimmed);
+            }
+            if trimmed.ends_with(']') {
+                current_alias.fallback_models = Some(parse_string_array(buf));
+                array_buf = None;
+            }
+            continue;
+        }
 
         if trimmed.starts_with('#') || trimmed.is_empty() {
             continue;
@@ -499,7 +558,16 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
 
         if let Some((key, value)) = trimmed.split_once('=') {
             let key = key.trim();
-            let value = value.trim().trim_matches('"');
+            let raw_value = value.trim();
+            if section == "alias" && key == "fallback_models" {
+                if raw_value.starts_with('[') && !raw_value.ends_with(']') {
+                    array_buf = Some(raw_value.to_string());
+                } else {
+                    current_alias.fallback_models = Some(parse_string_array(raw_value));
+                }
+                continue;
+            }
+            let value = raw_value.trim_matches('"');
 
             match (section, key) {
                 ("defaults", "runner") => config.default_runner = value.to_string(),
@@ -674,5 +742,24 @@ model = "xdg-model"
         assert_eq!(review.model.as_deref(), Some("xdg-model"));
         assert_eq!(review.show_thinking, Some(true));
         assert_eq!(review.agent.as_deref(), None);
+    }
+
+    #[test]
+    fn test_parse_alias_fallback_models() {
+        let mut config = CccConfig::default();
+        parse_toml_config(
+            r#"
+[aliases.review]
+runner = "codex"
+model = "gpt-6.1-sol"
+fallback_models = ["gpt-6-astra", "gpt-6-sol"]
+"#,
+            &mut config,
+        );
+        let review = config.aliases.get("review").unwrap();
+        assert_eq!(
+            review.fallback_models.as_deref(),
+            Some(["gpt-6-astra".to_string(), "gpt-6-sol".to_string()].as_slice())
+        );
     }
 }

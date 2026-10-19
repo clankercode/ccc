@@ -79,6 +79,17 @@ To inspect the effective documented safety surface quickly:
 codex exec --help | rg "sandbox|full-auto|dangerously"
 ```
 
+## Model fallback
+
+Presets can list `fallback_models`. When codex fails with a capacity or overload error (`Selected model is at capacity`, `server_overloaded`) before any assistant output, `ccc` retries once per listed model. Models that are not in the cross-runner map stay on codex. `glm-5.3`, `llmp-glm-5-3`, and `glm-5.3-flash` are retried as grok (`grok --no-auto-update -p --model <id>`), keeping the preset's thinking level, output mode, and prompt. JSON and formatted output from that retry is parsed with the grok schema. A 401 or other authentication error, including `OpenAI account pool has no usable account credential`, does not fall back. MiniMax, Claude, and Astra model ids in the list are skipped; a preset whose primary model is Astra still runs that model. `ccc` prints `ccc: ran model <id>` on stderr and records that line in the run transcript.
+
+```toml
+[aliases.cx-reviewer]
+runner = "codex"
+model = "gpt-6.1-sol"
+fallback_models = ["gpt-6-sol", "glm-5.3"]
+```
+
 ## Notes for `ccc`
 
 - `ccc` uses `codex exec`

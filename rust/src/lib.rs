@@ -126,6 +126,7 @@ mod config;
 mod exec;
 mod help;
 mod invoke;
+mod model_fallback;
 mod json_output;
 mod output;
 mod parser;

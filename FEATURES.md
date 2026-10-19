@@ -64,7 +64,7 @@
 | F35 | Session persistence controls | `--save-session` explicitly allows saved sessions, while default runner mappings avoid persistence where supported and warn otherwise; `--cleanup-session` tries safe post-run cleanup |
 | F38 | Fast mode | `--fast` / `--no-fast` toggles the runner's fast mode where supported (codex maps to `--enable fast_mode` / `--disable fast_mode`); unsupported runners warn and ignore it |
 | F40 | Version update check | After a run, warn when a newer `ccc` is available (crates.io / GitHub); config `[update] check` / `auto_update` / `interval_hours`; env `CCC_UPDATE_CHECK`, `CCC_AUTO_UPDATE` |
-| F41 | Preset model fallback | Alias `fallback_models` retries the same runner once per model after a capacity or overload error that happens before assistant output. Auth errors, Claude runners, and MiniMax or Claude model ids do not fall back. |
+| F41 | Preset model fallback | Alias `fallback_models` retries once per model after a capacity or overload error that happens before assistant output. `glm-5.3`, `llmp-glm-5-3`, and `glm-5.3-flash` switch to grok; other models stay on the same runner. JSON and formatted output from that retry is parsed with the fallback runner's schema. Auth errors, Claude runners, and MiniMax, Claude, or Astra model ids do not fall back. |
 
 ### v3 JSON Output Features
 

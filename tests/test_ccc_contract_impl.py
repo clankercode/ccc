@@ -3602,7 +3602,7 @@ model = "gpt-6.1-sol"
 thinking = 0
 show_thinking = false
 output_mode = "text"
-fallback_models = ["MiniMax-M3", "gpt-6-astra", "gpt-6-sol"]
+fallback_models = ["MiniMax-M3", "GPT-6-Astra", "gpt-6-luna", "gpt-6-sol"]
 
 [aliases.cx-stream]
 runner = "codex"
@@ -3610,7 +3610,7 @@ model = "gpt-6.1-sol"
 thinking = 0
 show_thinking = false
 output_mode = "stream-text"
-fallback_models = ["gpt-6-astra"]
+fallback_models = ["gpt-6-sol"]
 
 [aliases.claude-review]
 runner = "claude"
@@ -3619,10 +3619,66 @@ thinking = 0
 show_thinking = false
 output_mode = "text"
 fallback_models = ["gpt-6-sol"]
+
+[aliases.cx-glm]
+runner = "codex"
+model = "gpt-6.1-sol"
+thinking = 4
+show_thinking = false
+output_mode = "stream-text"
+fallback_models = ["glm-5.3"]
+
+[aliases.cx-astra]
+runner = "codex"
+model = "gpt-6-astra"
+thinking = 0
+show_thinking = false
+output_mode = "text"
+fallback_models = ["glm-5.3"]
+
+[aliases.cx-astra-only]
+runner = "codex"
+model = "gpt-6.1-sol"
+thinking = 0
+show_thinking = false
+output_mode = "text"
+fallback_models = ["gpt-6-astra--fast"]
+
+[aliases.cx-glm-formatted]
+runner = "codex"
+model = "gpt-6.1-sol"
+thinking = 0
+show_thinking = false
+output_mode = "formatted"
+fallback_models = ["glm-5.3"]
+
+[aliases.cx-glm-stream-formatted]
+runner = "codex"
+model = "gpt-6.1-sol"
+thinking = 0
+show_thinking = false
+output_mode = "stream-formatted"
+fallback_models = ["glm-5.3"]
+
+[aliases.cx-glm-json]
+runner = "codex"
+model = "gpt-6.1-sol"
+thinking = 0
+show_thinking = false
+output_mode = "json"
+fallback_models = ["glm-5.3"]
+
+[aliases.cx-glm-stream-json]
+runner = "codex"
+model = "gpt-6.1-sol"
+thinking = 0
+show_thinking = false
+output_mode = "stream-json"
+fallback_models = ["glm-5.3"]
 """
         stub = """\
 #!/bin/sh
-printf '%s\\n' "$*" >> "$CCC_STUB_LOG"
+printf '%s\\n' "$0 $*" >> "$CCC_STUB_LOG"
 model=""
 prev=""
 for arg in "$@"; do
@@ -3652,7 +3708,7 @@ case "$CCC_STUB_MODE" in
         echo "server_overloaded" >&2
         exit 1
         ;;
-      gpt-6-astra)
+      gpt-6-luna)
         if [ "$CCC_STUB_MODE" = "twice" ]; then
           echo "Selected model is at capacity. Please try a different model." >&2
           exit 1
@@ -3661,6 +3717,21 @@ case "$CCC_STUB_MODE" in
         exit 0
         ;;
       *)
+        case "$0" in
+          *grok)
+            case " $* " in
+              *" --output-format json "*)
+                printf '%s\n' '{"text":"pong","stopReason":"EndTurn","sessionId":"grok-session-1"}'
+                exit 0
+                ;;
+              *" --output-format streaming-json "*)
+                printf '%s\n' '{"type":"text","data":"pong"}'
+                printf '%s\n' '{"type":"end","stopReason":"EndTurn","sessionId":"grok-session-2"}'
+                exit 0
+                ;;
+            esac
+            ;;
+        esac
         echo "pong from $model"
         exit 0
         ;;
@@ -3674,10 +3745,13 @@ esac
             bin_dir.mkdir()
             codex_path = bin_dir / "codex"
             claude_path = bin_dir / "claude"
+            grok_path = bin_dir / "grok"
             codex_path.write_text(stub, encoding="utf-8")
             claude_path.write_text(stub, encoding="utf-8")
+            grok_path.write_text(stub, encoding="utf-8")
             codex_path.chmod(codex_path.stat().st_mode | stat.S_IXUSR)
             claude_path.chmod(claude_path.stat().st_mode | stat.S_IXUSR)
+            grok_path.chmod(grok_path.stat().st_mode | stat.S_IXUSR)
             opencode_path = bin_dir / "opencode"
             self._write_opencode_stub(opencode_path)
 
@@ -3687,6 +3761,7 @@ esac
                 env = self._make_env(opencode_path, lang)
                 env["CCC_REAL_CODEX"] = str(codex_path)
                 env["CCC_REAL_CLAUDE"] = str(claude_path)
+                env["CCC_REAL_GROK"] = str(grok_path)
                 env["CCC_STUB_LOG"] = str(tmp_path / f"calls-{lang.name}")
                 for config_dir in (
                     Path(env["XDG_CONFIG_HOME"]) / "ccc",
@@ -3717,18 +3792,21 @@ esac
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertIn("pong from gpt-6-sol", result.stdout)
                     self.assertIn("skipping fallback model MiniMax-M3", result.stderr)
+                    self.assertIn("skipping fallback model GPT-6-Astra", result.stderr)
                     self.assertIn(
-                        "ccc: model gpt-6.1-sol is at capacity before producing output; trying gpt-6-astra",
+                        "ccc: model gpt-6.1-sol is at capacity before producing output; trying gpt-6-luna",
                         result.stderr,
                     )
                     self.assertIn(
-                        "ccc: model gpt-6-astra is at capacity before producing output; trying gpt-6-sol",
+                        "ccc: model gpt-6-luna is at capacity before producing output; trying gpt-6-sol",
                         result.stderr,
                     )
+                    self.assertNotIn("trying gpt-6-astra", result.stderr.lower())
                     self.assertIn("ccc: ran model gpt-6-sol", result.stderr)
                     self.assertEqual(len(calls), 3)
+                    self.assertTrue(calls[0].split()[0].endswith("codex"))
                     self.assertIn("--model gpt-6.1-sol", calls[0])
-                    self.assertIn("--model gpt-6-astra", calls[1])
+                    self.assertIn("--model gpt-6-luna", calls[1])
                     self.assertIn("--model gpt-6-sol", calls[2])
                     transcript = self._latest_transcript(env)
                     self.assertIn("ccc: ran model gpt-6-sol", transcript)
@@ -3736,8 +3814,8 @@ esac
                 with self.subTest(language=lang.name, case="stream-text"):
                     result, calls = run("once", ["@cx-stream", "ping"])
                     self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertIn("pong from gpt-6-astra", result.stdout)
-                    self.assertIn("ccc: ran model gpt-6-astra", result.stderr)
+                    self.assertIn("pong from gpt-6-sol", result.stdout)
+                    self.assertIn("ccc: ran model gpt-6-sol", result.stderr)
                     self.assertEqual(len(calls), 2)
 
                 with self.subTest(language=lang.name, case="auth"):
@@ -3766,6 +3844,93 @@ esac
                     self.assertEqual(len(calls), 1)
                     self.assertIn("ccc: ran model gpt-6.1-sol", result.stderr)
                     self.assertNotIn("trying ", result.stderr)
+
+                with self.subTest(language=lang.name, case="cross-runner-glm"):
+                    result, calls = run("once", ["@cx-glm", "ping"])
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn("pong from glm-5.3", result.stdout)
+                    self.assertIn(
+                        "ccc: model gpt-6.1-sol is at capacity before producing output; trying glm-5.3 on grok",
+                        result.stderr,
+                    )
+                    self.assertIn(GROK_PERSISTENCE_WARNING.strip(), result.stderr)
+                    self.assertIn("ccc: ran model glm-5.3", result.stderr)
+                    self.assertEqual(len(calls), 2)
+                    self.assertTrue(calls[0].split()[0].endswith("codex"))
+                    self.assertIn("model_reasoning_effort=xhigh", calls[0])
+                    self.assertIn("--model gpt-6.1-sol", calls[0])
+                    self.assertTrue(calls[1].split()[0].endswith("grok"))
+                    self.assertIn("--model glm-5.3", calls[1])
+                    self.assertIn("--reasoning-effort xhigh", calls[1])
+                    self.assertIn(" -p ", f" {calls[1]} ")
+                    self.assertNotIn("model_reasoning_effort", calls[1])
+                    self.assertNotIn(" exec ", f" {calls[1]} ")
+
+                with self.subTest(language=lang.name, case="primary-astra"):
+                    result, calls = run("success", ["@cx-astra", "ping"])
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(len(calls), 1)
+                    self.assertIn("--model gpt-6-astra", calls[0])
+                    self.assertTrue(calls[0].split()[0].endswith("codex"))
+                    self.assertIn("pong from gpt-6-astra", result.stdout)
+                    self.assertIn("ccc: ran model gpt-6-astra", result.stderr)
+                    self.assertNotIn("skipping fallback model", result.stderr)
+                    self.assertNotIn("trying ", result.stderr)
+
+                with self.subTest(language=lang.name, case="astra-not-fallback"):
+                    result, calls = run("once", ["@cx-astra-only", "ping"])
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(len(calls), 1)
+                    self.assertIn("skipping fallback model gpt-6-astra--fast", result.stderr)
+                    self.assertNotIn("trying ", result.stderr)
+                    self.assertIn("no fallback models left", result.stderr)
+
+                for case, alias, flag in (
+                    ("cross-runner-formatted", "@cx-glm-formatted", "--output-format streaming-json"),
+                    (
+                        "cross-runner-stream-formatted",
+                        "@cx-glm-stream-formatted",
+                        "--output-format streaming-json",
+                    ),
+                ):
+                    with self.subTest(language=lang.name, case=case):
+                        result, calls = run("once", [alias, "ping"])
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertIn("[assistant] pong", result.stdout)
+                        self.assertEqual(self._latest_output(env), "pong")
+                        self.assertIn("trying glm-5.3 on grok", result.stderr)
+                        self.assertEqual(len(calls), 2)
+                        self.assertTrue(calls[1].split()[0].endswith("grok"))
+                        self.assertIn(flag, calls[1])
+                        self.assertNotIn(" --json", f" {calls[1]} ")
+
+                with self.subTest(language=lang.name, case="cross-runner-json"):
+                    result, calls = run("once", ["@cx-glm-json", "ping"])
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn('"text":"pong"', result.stdout)
+                    self.assertNotIn("[assistant]", result.stdout)
+                    self.assertEqual(self._latest_output(env), "pong")
+                    self.assertIn("trying glm-5.3 on grok", result.stderr)
+                    self.assertEqual(len(calls), 2)
+                    self.assertTrue(calls[1].split()[0].endswith("grok"))
+                    self.assertIn("--output-format json", calls[1])
+                    self.assertNotIn("streaming-json", calls[1])
+
+                with self.subTest(language=lang.name, case="cross-runner-stream-json"):
+                    result, calls = run("once", ["@cx-glm-stream-json", "ping"])
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn('{"type":"text","data":"pong"}', result.stdout)
+                    self.assertEqual(self._latest_output(env), "pong")
+                    self.assertIn("trying glm-5.3 on grok", result.stderr)
+                    self.assertEqual(len(calls), 2)
+                    self.assertTrue(calls[1].split()[0].endswith("grok"))
+                    self.assertIn("--output-format streaming-json", calls[1])
+
+    def _latest_output(self, env: Dict[str, str]) -> str:
+        runs = Path(env["XDG_STATE_HOME"]) / "ccc" / "runs"
+        outputs = sorted(runs.glob("*/output.txt"), key=lambda path: path.stat().st_mtime)
+        self.assertTrue(outputs, "expected output.txt")
+        return outputs[-1].read_text(encoding="utf-8")
 
     def _latest_transcript(self, env: Dict[str, str]) -> str:
         runs = Path(env["XDG_STATE_HOME"]) / "ccc" / "runs"

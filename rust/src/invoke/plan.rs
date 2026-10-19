@@ -1,7 +1,8 @@
 use crate::exec::{CommandSpec, Runner};
 use crate::model_fallback::{
-    failure_allows_fallback, is_disallowed_fallback_model, is_disallowed_fallback_runner,
-    terminal_notice, trying_notice,
+    canonical_runner_name, failure_allows_fallback, fallback_runner_for_model,
+    is_disallowed_fallback_model, is_disallowed_fallback_runner, session_save_notice,
+    terminal_notice, trying_notice, DISALLOWED_FALLBACK_REASON,
 };
 use crate::output::{parse_transcript_for_runner, schema_name_for_runner, Transcript};
 use crate::parser::{
@@ -209,18 +210,10 @@ impl Client {
             let plan = self.plan(&attempts.requests[index])?;
             let mut run = self.run_preplanned(plan);
             if index + 1 < attempts.requests.len()
-                && failure_allows_fallback(
-                    run.exit_code,
-                    run.timed_out,
-                    &run.stdout,
-                    &run.stderr,
-                )
+                && failure_allows_fallback(run.exit_code, run.timed_out, &run.stdout, &run.stderr)
             {
                 prefix.push_str(&run.stderr);
-                prefix.push_str(&trying_notice(
-                    &attempts.labels[index],
-                    &attempts.labels[index + 1],
-                ));
+                prefix.push_str(&switch_notice(&attempts, index));
                 index += 1;
                 continue;
             }
@@ -258,6 +251,23 @@ impl Client {
     where
         F: FnMut(&str, &str) + Send + 'static,
     {
+        self.stream_unchecked_with_attempt(request, |_| {}, on_event)
+    }
+
+    /// Like [`Self::stream_unchecked`], and calls `on_attempt` with the canonical
+    /// runner id before each attempt. Callers that render structured output use
+    /// this to switch schema when a fallback changes runner, before that
+    /// attempt's stdout is delivered.
+    pub fn stream_unchecked_with_attempt<F, A>(
+        &self,
+        request: &Request,
+        mut on_attempt: A,
+        on_event: F,
+    ) -> Result<Run, Error>
+    where
+        F: FnMut(&str, &str) + Send + 'static,
+        A: FnMut(&str),
+    {
         let on_event = Arc::new(Mutex::new(on_event));
         let emit = |text: &str| {
             if let Ok(mut callback) = on_event.lock() {
@@ -272,6 +282,7 @@ impl Client {
         let mut index = 0;
         loop {
             let plan = self.plan(&attempts.requests[index])?;
+            on_attempt(plan.runner().canonical_id());
             let callback = Arc::clone(&on_event);
             let mut run = self.stream_preplanned(plan, move |channel, chunk| {
                 if let Ok(mut callback) = callback.lock() {
@@ -279,15 +290,10 @@ impl Client {
                 }
             });
             if index + 1 < attempts.requests.len()
-                && failure_allows_fallback(
-                    run.exit_code,
-                    run.timed_out,
-                    &run.stdout,
-                    &run.stderr,
-                )
+                && failure_allows_fallback(run.exit_code, run.timed_out, &run.stdout, &run.stderr)
             {
                 prefix.push_str(&run.stderr);
-                let notice = trying_notice(&attempts.labels[index], &attempts.labels[index + 1]);
+                let notice = switch_notice(&attempts, index);
                 emit(&notice);
                 prefix.push_str(&notice);
                 index += 1;
@@ -314,12 +320,21 @@ impl Client {
     fn model_attempts(&self, request: &Request) -> ModelAttempts {
         let config = self.config.clone().unwrap_or_default();
         let parsed = parse_args(&request.to_cli_tokens());
-        let registry = RUNNER_REGISTRY.read().unwrap_or_else(|error| error.into_inner());
+        let registry = RUNNER_REGISTRY
+            .read()
+            .unwrap_or_else(|error| error.into_inner());
+        let warn_session_switch = !parsed.save_session && !parsed.cleanup_session;
         let Some((runner_name, _info, alias)) =
             resolve_effective_runner(&parsed, &config, &registry)
         else {
-            return ModelAttempts::single(request.clone(), "(default)".to_string());
+            return ModelAttempts::single(
+                request.clone(),
+                "(default)".to_string(),
+                "(default)".to_string(),
+                warn_session_switch,
+            );
         };
+        let primary_runner = canonical_runner_name(&runner_name);
         let configured = alias
             .and_then(|alias| alias.fallback_models.clone())
             .unwrap_or_default();
@@ -337,37 +352,62 @@ impl Client {
             })
             .unwrap_or_else(|| "(default)".to_string());
         if configured.is_empty() {
-            return ModelAttempts::single(request.clone(), primary);
+            return ModelAttempts::single(
+                request.clone(),
+                primary,
+                primary_runner,
+                warn_session_switch,
+            );
         }
         if is_disallowed_fallback_runner(&runner_name) {
             return ModelAttempts {
                 requests: vec![request.clone()],
                 labels: vec![primary],
+                runners: vec![primary_runner],
                 announce: false,
                 pre_notices: format!("ccc: ignoring fallback_models for runner {runner_name}\n"),
+                warn_session_switch,
             };
         }
         let mut requests = vec![request.clone()];
         let mut labels = vec![primary];
+        let mut runners = vec![primary_runner.clone()];
         let mut pre_notices = String::new();
         for model in configured {
             if is_disallowed_fallback_model(&model) {
                 pre_notices.push_str(&format!(
-                    "ccc: skipping fallback model {model}; MiniMax and Claude models are not fallback targets\n"
+                    "ccc: skipping fallback model {model}; {DISALLOWED_FALLBACK_REASON}\n"
                 ));
                 continue;
             }
             if labels.iter().any(|label| label == &model) {
                 continue;
             }
-            requests.push(request.clone().with_model(model.clone()));
+            let target =
+                fallback_runner_for_model(&model).unwrap_or_else(|| primary_runner.clone());
+            if is_disallowed_fallback_runner(&target) {
+                pre_notices.push_str(&format!(
+                    "ccc: skipping fallback model {model}; runner {target} is not a fallback target\n"
+                ));
+                continue;
+            }
+            let mut next = request.clone().with_model(model.clone());
+            if target != primary_runner {
+                if let Some(kind) = RunnerKind::from_cli_token(&target) {
+                    next = next.with_runner(kind);
+                }
+            }
+            requests.push(next);
             labels.push(model);
+            runners.push(target);
         }
         ModelAttempts {
             requests,
             labels,
+            runners,
             announce: true,
             pre_notices,
+            warn_session_switch,
         }
     }
 
@@ -428,19 +468,43 @@ impl Default for Client {
 struct ModelAttempts {
     requests: Vec<Request>,
     labels: Vec<String>,
+    runners: Vec<String>,
     announce: bool,
     pre_notices: String,
+    warn_session_switch: bool,
 }
 
 impl ModelAttempts {
-    fn single(request: Request, label: String) -> Self {
+    fn single(request: Request, label: String, runner: String, warn_session_switch: bool) -> Self {
         Self {
             requests: vec![request],
             labels: vec![label],
+            runners: vec![runner],
             announce: false,
             pre_notices: String::new(),
+            warn_session_switch,
         }
     }
+}
+
+fn switch_notice(attempts: &ModelAttempts, index: usize) -> String {
+    let next_runner = &attempts.runners[index + 1];
+    let runner_change = attempts.runners[index] != *next_runner;
+    let mut notice = if runner_change {
+        trying_notice(
+            &attempts.labels[index],
+            &attempts.labels[index + 1],
+            Some(next_runner),
+        )
+    } else {
+        trying_notice(&attempts.labels[index], &attempts.labels[index + 1], None)
+    };
+    if runner_change && attempts.warn_session_switch {
+        if let Some(warning) = session_save_notice(next_runner) {
+            notice.push_str(&warning);
+        }
+    }
+    notice
 }
 
 fn should_parse_output_mode(output_mode: OutputMode) -> bool {
@@ -471,5 +535,42 @@ fn runner_kind_from_argv(argv: &[String]) -> Option<RunnerKind> {
         "pi" => Some(RunnerKind::Pi),
         "grok" => Some(RunnerKind::Grok),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Client, OutputMode, Request, RunnerKind};
+    use crate::parser::{AliasDef, CccConfig};
+
+    #[test]
+    fn glm_fallback_request_plans_grok_argv() {
+        let mut alias = AliasDef::default();
+        alias.runner = Some("codex".to_string());
+        alias.model = Some("gpt-6.1-sol".to_string());
+        alias.thinking = Some(4);
+        alias.show_thinking = Some(false);
+        alias.output_mode = Some("stream-text".to_string());
+        alias.fallback_models = Some(vec!["glm-5.3".to_string()]);
+        let mut config = CccConfig::default();
+        config.aliases.insert("cx-reviewer".to_string(), alias);
+        let request = Request::new("ping")
+            .with_agent("cx-reviewer")
+            .with_runner(RunnerKind::Grok)
+            .with_model("glm-5.3")
+            .with_output_mode(OutputMode::StreamText);
+        let plan = Client::new().with_config(config).plan(&request).unwrap();
+        assert_eq!(plan.runner(), RunnerKind::Grok);
+        let argv = &plan.command_spec().argv;
+        assert_eq!(argv.first().map(String::as_str), Some("grok"));
+        let model_at = argv.iter().position(|arg| arg == "--model").unwrap();
+        assert_eq!(argv[model_at + 1], "glm-5.3");
+        let effort_at = argv
+            .iter()
+            .position(|arg| arg == "--reasoning-effort")
+            .unwrap();
+        assert_eq!(argv[effort_at + 1], "xhigh");
+        assert!(argv.iter().any(|arg| arg == "-p"));
+        assert!(!argv.iter().any(|arg| arg == "exec"));
     }
 }

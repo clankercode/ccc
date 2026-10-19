@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- Added alias `fallback_models` in Python and Rust. After a capacity or overload error that happens before any assistant output, `ccc` retries the same runner once per listed model and reports the model that ran on stderr and in the run transcript. Authentication errors do not fall back. Claude runners are not retried, and MiniMax or Claude model ids are skipped.
+- Added alias `fallback_models` in Python and Rust. After a capacity or overload error that happens before any assistant output, `ccc` retries once per listed model and reports the model that ran on stderr and in the run transcript. `glm-5.3`, `llmp-glm-5-3`, and `glm-5.3-flash` are retried on grok; other models stay on the same runner. JSON and formatted output from that retry is parsed with the fallback runner's schema. Authentication errors do not fall back. Claude runners are not retried. MiniMax, Claude, and Astra model ids are skipped as fallback targets; using them as the primary model is unchanged. Example config includes Cursor auto presets `@cursor` and `@cu-auto` (`runner = "cursor"`, `model = "auto"`).
 
 
 

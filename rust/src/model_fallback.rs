@@ -1,7 +1,8 @@
 //! Decide when a preset may retry on another model.
 //!
-//! Fallbacks stay on the same runner. They run only after a capacity or overload
-//! failure that produced no assistant output.
+//! Fallbacks run only after a capacity or overload failure that produced no
+//! assistant output. Most models stay on the same runner. Model ids in
+//! [`FALLBACK_MODEL_RUNNERS`] are retried on the mapped runner instead.
 
 use serde_json::Value;
 
@@ -11,11 +12,9 @@ fn contains_any(haystack: &str, needles: &[&str]) -> bool {
 
 fn has_status_401(haystack: &str) -> bool {
     haystack.match_indices("401").any(|(index, value)| {
-        let before_ok = index == 0
-            || !haystack.as_bytes()[index - 1].is_ascii_digit();
+        let before_ok = index == 0 || !haystack.as_bytes()[index - 1].is_ascii_digit();
         let after = index + value.len();
-        let after_ok = after >= haystack.len()
-            || !haystack.as_bytes()[after].is_ascii_digit();
+        let after_ok = after >= haystack.len() || !haystack.as_bytes()[after].is_ascii_digit();
         before_ok && after_ok
     })
 }
@@ -23,9 +22,45 @@ fn has_status_401(haystack: &str) -> bool {
 const NON_OUTPUT_EVENT_TYPES: &[&str] = &["error", "turn.failed", "thread.started", "turn.started"];
 const NON_OUTPUT_ITEM_TYPES: &[&str] = &["error", "warning"];
 
+/// Exact model ids that cannot run on the preset's runner.
+/// Lookup is case-sensitive; add new cross-runner targets here rather than guessing.
+pub(crate) fn fallback_model_runners() -> &'static [(&'static str, &'static str)] {
+    &[
+        ("glm-5.3", "grok"),
+        ("llmp-glm-5-3", "grok"),
+        ("glm-5.3-flash", "grok"),
+    ]
+}
+
+pub(crate) const DISALLOWED_FALLBACK_REASON: &str =
+    "MiniMax, Claude, and Astra models are not fallback targets";
+
+pub(crate) fn canonical_runner_name(name: &str) -> String {
+    match name.to_ascii_lowercase().as_str() {
+        "oc" | "opencode" => "opencode".to_string(),
+        "cc" | "claude" => "claude".to_string(),
+        "c" | "cx" | "codex" => "codex".to_string(),
+        "k" | "kimi" => "kimi".to_string(),
+        "cu" | "cursor" => "cursor".to_string(),
+        "g" | "gemini" => "gemini".to_string(),
+        "rc" | "roocode" => "roocode".to_string(),
+        "cr" | "crush" => "crush".to_string(),
+        "p" | "pi" => "pi".to_string(),
+        "gb" | "grok" => "grok".to_string(),
+        other => other.to_string(),
+    }
+}
+
+pub(crate) fn fallback_runner_for_model(model: &str) -> Option<String> {
+    fallback_model_runners()
+        .iter()
+        .find(|(candidate, _)| *candidate == model)
+        .map(|(_, runner)| canonical_runner_name(runner))
+}
+
 pub(crate) fn is_disallowed_fallback_model(model: &str) -> bool {
     let lowered = model.to_ascii_lowercase();
-    lowered.contains("minimax") || lowered.contains("claude")
+    lowered.contains("minimax") || lowered.contains("claude") || lowered.contains("astra")
 }
 
 pub(crate) fn is_disallowed_fallback_runner(runner_name: &str) -> bool {
@@ -151,8 +186,28 @@ pub(crate) fn terminal_notice(
     format!("ccc: model {label} failed; not falling back\n")
 }
 
-pub(crate) fn trying_notice(current: &str, next: &str) -> String {
-    format!("ccc: model {current} is at capacity before producing output; trying {next}\n")
+pub(crate) fn trying_notice(current: &str, next: &str, runner: Option<&str>) -> String {
+    match runner {
+        Some(runner) => format!(
+            "ccc: model {current} is at capacity before producing output; trying {next} on {runner}\n"
+        ),
+        None => {
+            format!("ccc: model {current} is at capacity before producing output; trying {next}\n")
+        }
+    }
+}
+
+pub(crate) fn session_save_notice(runner_name: &str) -> Option<String> {
+    let display = canonical_runner_name(runner_name);
+    if !matches!(
+        display.as_str(),
+        "opencode" | "kimi" | "crush" | "roocode" | "cursor" | "gemini" | "grok"
+    ) {
+        return None;
+    }
+    Some(format!(
+        "warning: runner \"{display}\" may save this session; pass --save-session to allow this explicitly or --cleanup-session to try cleanup\n"
+    ))
 }
 
 #[cfg(test)]
@@ -207,6 +262,30 @@ mod tests {
         assert!(!is_disallowed_fallback_runner("codex"));
         assert!(is_disallowed_fallback_model("MiniMax-M3"));
         assert!(is_disallowed_fallback_model("claude-sonnet-4"));
-        assert!(!is_disallowed_fallback_model("gpt-6-astra"));
+        assert!(is_disallowed_fallback_model("gpt-6-astra"));
+        assert!(is_disallowed_fallback_model("GPT-6-Astra--fast"));
+        assert!(is_disallowed_fallback_model("openai/gpt-6-astra"));
+        assert!(!is_disallowed_fallback_model("gpt-6-sol"));
+        assert!(!is_disallowed_fallback_model("glm-5.3"));
+    }
+
+    #[test]
+    fn glm_models_map_to_grok() {
+        assert_eq!(
+            super::fallback_runner_for_model("glm-5.3").as_deref(),
+            Some("grok")
+        );
+        assert_eq!(
+            super::fallback_runner_for_model("llmp-glm-5-3").as_deref(),
+            Some("grok")
+        );
+        assert_eq!(
+            super::fallback_runner_for_model("glm-5.3-flash").as_deref(),
+            Some("grok")
+        );
+        assert_eq!(super::fallback_runner_for_model("GLM-5.3"), None);
+        assert_eq!(super::fallback_runner_for_model("gpt-6-sol"), None);
+        assert_eq!(super::canonical_runner_name("cx"), "codex");
+        assert_eq!(super::canonical_runner_name("gb"), "grok");
     }
 }

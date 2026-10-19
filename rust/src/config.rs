@@ -35,7 +35,15 @@ const EXAMPLE_CONFIG: &str = concat!(
     "# agent = \"reviewer\"\n",
     "# prompt = \"Review the current changes\"\n",
     "# prompt_mode = \"default\"\n",
-    "# fallback_models = [\"gpt-6-astra\", \"gpt-6-sol\"]\n",
+    "# fallback_models = [\"gpt-6-sol\", \"glm-5.3\"]\n",
+    "\n",
+    "[aliases.cursor]\n",
+    "runner = \"cursor\"\n",
+    "model = \"auto\"\n",
+    "\n",
+    "[aliases.cu-auto]\n",
+    "runner = \"cursor\"\n",
+    "model = \"auto\"\n",
 );
 
 pub fn render_example_config() -> String {

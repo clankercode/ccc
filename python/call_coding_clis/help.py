@@ -89,7 +89,7 @@ Controls (free order before the prompt):
   @name         Use a named preset from config; if no preset exists, runner names select runners before agent fallback
                 Presets can also define a default prompt when the user leaves prompt text blank
                 prompt_mode lets alias prompts prepend or append text; prepend/append require an explicit prompt argument
-                fallback_models retries the same runner once per model after a capacity or overload error that happens before any assistant output. Authentication errors and failures after output has started do not fall back. Claude runners are not retried, and MiniMax or Claude model ids are skipped.
+                fallback_models retries once per model after a capacity or overload error that happens before any assistant output. Mapped models such as glm-5.3, llmp-glm-5-3, and glm-5.3-flash switch to grok; other models stay on the same runner. JSON and formatted output from that retry is parsed with the fallback runner's schema. Authentication errors and failures after output has started do not fall back. Claude runners are not retried, and MiniMax, Claude, or Astra model ids are skipped.
   .mode / ..mode
                 Output-mode sugar with a shared dot identity:
                   .text / ..text, .json / ..json, .fmt / ..fmt

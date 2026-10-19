@@ -37,7 +37,7 @@ For every implementation that claims `ccc` support:
 - exposes `build_prompt_spec`
 - runner supports `run` and `stream`
 - `CCC_REAL_OPENCODE` env var support
-- alias `fallback_models` retries the same runner after a capacity or overload error that happens before assistant output
+- alias `fallback_models` retries after a capacity or overload error that happens before assistant output; `glm-5.3`, `llmp-glm-5-3`, and `glm-5.3-flash` switch to the grok runner; JSON and formatted output from that retry is parsed with the fallback runner's schema; MiniMax, Claude, and Astra model ids are not fallback targets
 
 ### Rust
 
@@ -46,7 +46,7 @@ For every implementation that claims `ccc` support:
 - exposes `build_prompt_spec`
 - runner supports `run` and `stream` (real concurrent streaming via threads)
 - `CCC_REAL_OPENCODE` env var support
-- alias `fallback_models` retries the same runner after a capacity or overload error that happens before assistant output
+- alias `fallback_models` retries after a capacity or overload error that happens before assistant output; `glm-5.3`, `llmp-glm-5-3`, and `glm-5.3-flash` switch to the grok runner; JSON and formatted output from that retry is parsed with the fallback runner's schema; MiniMax, Claude, and Astra model ids are not fallback targets
 
 ### TypeScript
 

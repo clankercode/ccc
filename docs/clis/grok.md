@@ -109,6 +109,7 @@ grok -p "Respond with exactly pong" --always-approve --output-format streaming-j
 
 - `ccc` uses `grok --no-auto-update -p`
 - the canonical selectors are `grok` and `gb`
+- preset fallbacks `glm-5.3`, `llmp-glm-5-3`, and `glm-5.3-flash` are replanned on this runner when the original runner hits a capacity error before assistant output; JSON and formatted output from that retry is parsed with the grok schema
 - thinking `+0..+4` maps to `--reasoning-effort minimal|low|medium|high|xhigh`
   - `+0` uses `minimal` rather than `none` because the default model rejects `none` at the API
 - Python and Rust support `CCC_REAL_GROK` for mock or local smoke overrides

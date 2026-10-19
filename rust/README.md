@@ -208,13 +208,13 @@ prompt = "Review the current changes"
 prompt_mode = "default"
 ```
 
-`fallback_models` retries that same runner once per model when the run fails with a capacity or overload error before any assistant output. Authentication errors do not fall back. Claude runners are not retried, and MiniMax or Claude model ids are skipped. `ccc` prints the model that ran on stderr and in the run transcript.
+`fallback_models` retries once per model when the run fails with a capacity or overload error before any assistant output. `glm-5.3`, `llmp-glm-5-3`, and `glm-5.3-flash` are retried on grok; other models stay on the same runner. JSON and formatted output from that retry is parsed with the fallback runner's schema. Authentication errors do not fall back. Claude runners are not retried, and MiniMax, Claude, or Astra model ids are skipped. `ccc` prints the model that ran on stderr and in the run transcript.
 
 ```toml
 [aliases.cx-reviewer]
 runner = "codex"
 model = "gpt-6.1-sol"
-fallback_models = ["gpt-6-astra", "gpt-6-sol"]
+fallback_models = ["gpt-6-sol", "glm-5.3"]
 ```
 
 ### Update checks

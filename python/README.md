@@ -100,7 +100,7 @@ ccc add reviewer --runner cc --prompt "Review the current changes" --prompt-mode
 
 The interactive wizard skips `prompt_mode` when prompt is unset. Final save confirmation accepts only `y`, `n`, `yes`, or `no`, case-insensitively.
 
-An alias may set `fallback_models = ["other-model"]`. `ccc` retries that same runner once per model after a capacity or overload error that happens before assistant output, then reports the model that ran. Authentication errors do not fall back. Claude runners are not retried, and MiniMax or Claude model ids are skipped. Non-interactive writes accept `--fallback-models model-a,model-b`.
+An alias may set `fallback_models = ["other-model", "glm-5.3"]`. `ccc` retries once per model after a capacity or overload error that happens before assistant output, then reports the model that ran. `glm-5.3`, `llmp-glm-5-3`, and `glm-5.3-flash` are retried on grok; other models stay on the same runner. JSON and formatted output from that retry is parsed with the fallback runner's schema. Authentication errors do not fall back. Claude runners are not retried, and MiniMax, Claude, or Astra model ids are skipped. Non-interactive writes accept `--fallback-models model-a,model-b`.
 
 ### Update checks
 

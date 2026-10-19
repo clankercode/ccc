@@ -55,7 +55,15 @@ EXAMPLE_CONFIG = """\
 # agent = "reviewer"
 # prompt = "Review the current changes"
 # prompt_mode = "default"
-# fallback_models = ["gpt-6-astra", "gpt-6-sol"]
+# fallback_models = ["gpt-6-sol", "glm-5.3"]
+
+[aliases.cursor]
+runner = "cursor"
+model = "auto"
+
+[aliases.cu-auto]
+runner = "cursor"
+model = "auto"
 """
 
 

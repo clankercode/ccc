@@ -316,6 +316,21 @@ impl Request {
 }
 
 impl RunnerKind {
+    pub fn canonical_id(self) -> &'static str {
+        match self {
+            RunnerKind::OpenCode => "opencode",
+            RunnerKind::Claude => "claude",
+            RunnerKind::Codex => "codex",
+            RunnerKind::Kimi => "kimi",
+            RunnerKind::Cursor => "cursor",
+            RunnerKind::Gemini => "gemini",
+            RunnerKind::RooCode => "roocode",
+            RunnerKind::Crush => "crush",
+            RunnerKind::Pi => "pi",
+            RunnerKind::Grok => "grok",
+        }
+    }
+
     pub(crate) fn as_cli_token(self) -> &'static str {
         match self {
             RunnerKind::OpenCode => "oc",

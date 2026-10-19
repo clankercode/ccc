@@ -69,12 +69,43 @@ class ModelFallbackDecisionTests(unittest.TestCase):
         config.aliases["cx"] = AliasDef(
             runner="codex",
             model="gpt-6.1-sol",
-            fallback_models=["MiniMax-M3", "gpt-6-astra", "gpt-6.1-sol"],
+            fallback_models=["MiniMax-M3", "gpt-6-astra", "gpt-6-sol"],
         )
         codex_plan = plan_model_fallback(parse_args(["@cx", "hello"]), config)
-        self.assertEqual(codex_plan.models, ["gpt-6.1-sol", "gpt-6-astra"])
+        self.assertEqual(codex_plan.models, ["gpt-6.1-sol", "gpt-6-sol"])
+        self.assertEqual(codex_plan.runners, ["codex", "codex"])
         self.assertTrue(codex_plan.announce)
         self.assertIn("MiniMax-M3", codex_plan.pre_notices[0])
+        self.assertIn("gpt-6-astra", codex_plan.pre_notices[1])
+
+    def test_primary_astra_stays_and_glm_switches_runner(self) -> None:
+        from dataclasses import replace
+
+        from call_coding_clis.parser import AliasDef, resolve_command
+
+        config = CccConfig()
+        config.aliases["cx-astra"] = AliasDef(
+            runner="codex",
+            model="gpt-6-astra",
+            thinking=4,
+            show_thinking=False,
+            output_mode="stream-text",
+            fallback_models=["glm-5.3", "GPT-6-Astra--fast", "llmp-glm-5-3"],
+        )
+        parsed = parse_args(["@cx-astra", "ping"])
+        plan = plan_model_fallback(parsed, config)
+        self.assertEqual(plan.models, ["gpt-6-astra", "glm-5.3", "llmp-glm-5-3"])
+        self.assertEqual(plan.runners, ["codex", "grok", "grok"])
+        self.assertIn("GPT-6-Astra--fast", plan.pre_notices[0])
+        overridden = replace(parsed, runner="grok", model="glm-5.3")
+        argv, _env, _warnings = resolve_command(overridden, config)
+        self.assertEqual(argv[0], "grok")
+        model_at = argv.index("--model")
+        self.assertEqual(argv[model_at + 1], "glm-5.3")
+        effort_at = argv.index("--reasoning-effort")
+        self.assertEqual(argv[effort_at + 1], "xhigh")
+        self.assertIn("-p", argv)
+        self.assertNotIn("exec", argv)
 
     def test_load_config_reads_fallback_models(self) -> None:
         import tempfile
@@ -92,7 +123,9 @@ class ModelFallbackDecisionTests(unittest.TestCase):
         self.assertEqual(alias.fallback_models, ["gpt-6-astra", "gpt-6-sol"])
         parsed = ParsedArgs(alias="cx-reviewer", prompt="hello", prompt_supplied=True)
         plan = plan_model_fallback(parsed, config)
-        self.assertEqual(plan.models, ["gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol"])
+        self.assertEqual(plan.models, ["gpt-6.1-sol", "gpt-6-sol"])
+        self.assertEqual(plan.runners, ["codex", "codex"])
+        self.assertIn("gpt-6-astra", plan.pre_notices[0])
 
 
 if __name__ == "__main__":

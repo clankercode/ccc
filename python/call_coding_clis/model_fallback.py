@@ -1,8 +1,9 @@
 """Decide when a preset may retry on another model.
 
-Fallbacks are model substitutions on the same runner. They run only after a
-capacity or overload failure that produced no assistant output. Authentication
-failures, timeouts, and any assistant output keep the original result.
+Fallbacks run only after a capacity or overload failure that produced no
+assistant output. Authentication failures, timeouts, and any assistant output
+keep the original result. Most models stay on the same runner. Model ids in
+FALLBACK_MODEL_RUNNERS are retried on the mapped runner instead.
 """
 
 from __future__ import annotations
@@ -37,18 +38,71 @@ _NON_OUTPUT_EVENT_TYPES = {
 _NON_OUTPUT_ITEM_TYPES = {"error", "warning"}
 
 
+# Exact model ids that cannot run on the preset's runner. Lookup is
+# case-sensitive; add new cross-runner targets here rather than guessing.
+FALLBACK_MODEL_RUNNERS: dict[str, str] = {
+    "glm-5.3": "grok",
+    "llmp-glm-5-3": "grok",
+    "glm-5.3-flash": "grok",
+}
+
+_CANONICAL_RUNNERS = {
+    "opencode": "opencode",
+    "oc": "opencode",
+    "claude": "claude",
+    "cc": "claude",
+    "codex": "codex",
+    "c": "codex",
+    "cx": "codex",
+    "kimi": "kimi",
+    "k": "kimi",
+    "cursor": "cursor",
+    "cu": "cursor",
+    "gemini": "gemini",
+    "g": "gemini",
+    "roocode": "roocode",
+    "rc": "roocode",
+    "crush": "crush",
+    "cr": "crush",
+    "pi": "pi",
+    "p": "pi",
+    "grok": "grok",
+    "gb": "grok",
+}
+
+DISALLOWED_FALLBACK_REASON = (
+    "MiniMax, Claude, and Astra models are not fallback targets"
+)
+
+
 @dataclass(slots=True)
 class ModelFallbackPlan:
-    """models[0] is the attempt already present in the planned argv."""
+    """models[0] is the attempt already present in the planned argv.
+
+    runners[i] is the canonical runner for models[i]. A later entry that
+    differs from runners[0] must be planned again for that runner.
+    """
 
     models: list[str]
+    runners: list[str] = field(default_factory=list)
     announce: bool = False
     pre_notices: list[str] = field(default_factory=list)
 
 
+def canonical_runner_name(name: str) -> str:
+    return _CANONICAL_RUNNERS.get(name.lower(), name.lower())
+
+
+def fallback_runner_for_model(model: str) -> str | None:
+    mapped = FALLBACK_MODEL_RUNNERS.get(model)
+    if mapped is None:
+        return None
+    return canonical_runner_name(mapped)
+
+
 def is_disallowed_fallback_model(model: str) -> bool:
     lowered = model.lower()
-    return "minimax" in lowered or "claude" in lowered
+    return "minimax" in lowered or "claude" in lowered or "astra" in lowered
 
 
 def is_disallowed_fallback_runner(runner_name: str) -> bool:
@@ -127,10 +181,15 @@ def terminal_notice(
     return f"ccc: model {label} failed; not falling back\n"
 
 
-def trying_notice(current: str, nxt: str) -> str:
+def trying_notice(current: str, nxt: str, runner: str | None = None) -> str:
+    target = f"{nxt} on {runner}" if runner else nxt
     return (
-        f"ccc: model {current} is at capacity before producing output; trying {nxt}\n"
+        f"ccc: model {current} is at capacity before producing output; trying {target}\n"
     )
+
+
+def disallowed_fallback_notice(model: str) -> str:
+    return f"ccc: skipping fallback model {model}; {DISALLOWED_FALLBACK_REASON}\n"
 
 
 def argv_with_model(argv: list[str], model: str, runner_name: str) -> list[str]:
@@ -177,40 +236,58 @@ class ModelFallbackCursor:
         if not failure_allows_fallback(exit_code, timed_out, stdout, stderr):
             return None
         current = self.plan.models[self.index]
+        current_runner = self.current_runner()
         self.index += 1
-        return trying_notice(current, self.plan.models[self.index])
+        nxt = self.plan.models[self.index]
+        next_runner = self.current_runner()
+        runner_note = next_runner if next_runner != current_runner else None
+        return trying_notice(current, nxt, runner_note)
 
     def current_label(self) -> str:
         return self.plan.models[self.index]
+
+    def current_runner(self) -> str:
+        if self.index < len(self.plan.runners):
+            return self.plan.runners[self.index]
+        return ""
 
 
 def plan_model_fallback(parsed: ParsedArgs, config: CccConfig) -> ModelFallbackPlan:
     runner_name, _info, alias = resolve_effective_runner(parsed, config)
     configured = list(alias.fallback_models or []) if alias is not None else []
     primary = _effective_model_label(parsed, config, alias)
+    primary_runner = canonical_runner_name(runner_name)
     if not configured:
-        return ModelFallbackPlan(models=[primary])
+        return ModelFallbackPlan(models=[primary], runners=[primary_runner])
     if is_disallowed_fallback_runner(runner_name):
         return ModelFallbackPlan(
             models=[primary],
+            runners=[primary_runner],
             pre_notices=[
                 f"ccc: ignoring fallback_models for runner {runner_name}\n"
             ],
         )
     models = [primary]
+    runners = [primary_runner]
     notices: list[str] = []
     for model in configured:
         if is_disallowed_fallback_model(model):
-            notices.append(
-                "ccc: skipping fallback model "
-                f"{model}; MiniMax and Claude models are not fallback targets\n"
-            )
+            notices.append(disallowed_fallback_notice(model))
             continue
         if model in models:
             continue
+        target = fallback_runner_for_model(model) or primary_runner
+        if is_disallowed_fallback_runner(target):
+            notices.append(
+                "ccc: skipping fallback model "
+                f"{model}; runner {target} is not a fallback target\n"
+            )
+            continue
         models.append(model)
+        runners.append(target)
     return ModelFallbackPlan(
         models=models,
+        runners=runners,
         announce=True,
         pre_notices=notices,
     )

@@ -20,6 +20,16 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-10-20
+
+### Cross-runner fallback and Astra skip
+- Change: `fallback_models` still retries only after a capacity or overload error before assistant output. Model ids containing `astra` (case-insensitive), plus MiniMax and Claude ids, are skipped as fallback targets; primary use is unchanged. An explicit map sends `glm-5.3`, `llmp-glm-5-3`, and `glm-5.3-flash` to the grok runner and replans that attempt with the preset's thinking level, output mode, and prompt. JSON and formatted output from that retry is parsed with the fallback runner's schema. Other models stay on the same runner. Authentication errors still do not fall back, and Claude runners are still not retried. Example config documents Cursor auto presets `@cursor` and `@cu-auto`.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_model_fallback.py`, `tests/test_ccc_contract_impl.py`, `rust/src/model_fallback.rs`, `rust/src/invoke/plan.rs`
+- Docs updated: `README.md`, `FEATURES.md`, `CHANGELOG.md`, `CCC_BEHAVIOR_CONTRACT.md`, `docs/clis/codex.md`, `docs/clis/cursor.md`, `python/README.md`, `rust/README.md`, help text, `ccc --print-config`
+- Notes: the map is exact and case-sensitive. New cross-runner models are added to `FALLBACK_MODEL_RUNNERS` in both implementations. Switching to grok emits the usual session-save warning because grok has no no-persist flag.
+
 ## 2026-10-19
 
 ### Preset model fallback

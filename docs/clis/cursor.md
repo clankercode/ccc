@@ -74,6 +74,22 @@ cursor-agent --print --mode ask --trust --output-format json "Respond with exact
 cursor-agent --print --mode ask --trust --output-format stream-json "Respond with exactly pong"
 ```
 
+## Auto preset
+
+Cursor's automatic model is the literal model id `auto`:
+
+```toml
+[aliases.cursor]
+runner = "cursor"
+model = "auto"
+
+[aliases.cu-auto]
+runner = "cursor"
+model = "auto"
+```
+
+`ccc @cursor` and `ccc @cu-auto` run `cursor-agent --print --trust --model auto`.
+
 ## Notes for `ccc`
 
 - `ccc` uses `cursor-agent --print --trust`

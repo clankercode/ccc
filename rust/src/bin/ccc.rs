@@ -3,9 +3,9 @@ use call_coding_clis::{
     normalize_alias_name, output_write_warning, parse_args, parse_json_output,
     parse_tokens_with_config, print_help, print_usage, print_version, render_alias_block,
     render_example_config, render_parsed, resolve_human_tty, resolve_output_plan,
-    resolve_sanitize_osc, resolve_show_thinking, transcript_io_warning, write_alias_block,
-    AliasDef, Client, Error as ClientError, FormattedRenderer, OutputMode, RunArtifacts,
-    RunnerKind, StructuredStreamProcessor, TranscriptKind,
+    resolve_sanitize_osc, resolve_show_thinking, schema_name_for_runner, transcript_io_warning,
+    write_alias_block, AliasDef, Client, Error as ClientError, FormattedRenderer, OutputMode,
+    RunArtifacts, RunnerKind, StructuredStreamProcessor, TranscriptKind,
 };
 use std::collections::BTreeMap;
 use std::env;
@@ -118,7 +118,7 @@ fn set_add_alias_field(alias: &mut AliasDef, field: &str, value: &str) -> Result
             return Err(format!(
                 "unknown ccc add option: --{}",
                 field.replace('_', "-")
-            ))
+            ));
         }
     }
     Ok(())
@@ -506,7 +506,7 @@ fn configure_real_runner_overrides(mut client: Client) -> Client {
         RunnerKind::Pi,
         RunnerKind::Grok,
         RunnerKind::Codex,
-    ] { 
+    ] {
         let Some(env_var) = real_runner_override_env_var(kind) else {
             continue;
         };
@@ -916,6 +916,39 @@ fn confirm(prompt: &str) -> Result<bool, String> {
         true,
     )?;
     Ok(answer == "yes")
+}
+
+fn completed_run_schema(result: &call_coding_clis::Run) -> &'static str {
+    schema_name_for_runner(result.plan().runner()).unwrap_or("")
+}
+
+fn rebind_structured_processor(
+    processor: &Mutex<StructuredStreamProcessor>,
+    active_runner: &Mutex<String>,
+    parsed: &call_coding_clis::ParsedArgs,
+    config: &call_coding_clis::CccConfig,
+    runner_name: &str,
+    show_thinking: bool,
+    human_tty: bool,
+) {
+    let mut current = active_runner
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    if *current == runner_name {
+        return;
+    }
+    *current = runner_name.to_string();
+    drop(current);
+    let mut switched = parsed.clone();
+    switched.runner = Some(runner_name.to_string());
+    let Ok(plan) = resolve_output_plan(&switched, Some(config)) else {
+        return;
+    };
+    let mut processor = processor.lock().unwrap_or_else(|error| error.into_inner());
+    *processor = StructuredStreamProcessor::new(
+        plan.schema.as_deref().unwrap_or(""),
+        FormattedRenderer::new(show_thinking, human_tty),
+    );
 }
 
 fn filtered_human_stderr(stderr: &str, runner_name: &str) -> String {
@@ -1755,8 +1788,6 @@ fn main() -> ExitCode {
     for warning in command_plan.warnings() {
         eprintln!("{warning}");
     }
-    let spec = command_plan.command_spec().clone();
-    let cleanup_spec = spec.clone();
     for warning in session_persistence_pre_run_warnings(
         parsed.save_session,
         parsed.cleanup_session,
@@ -1802,8 +1833,7 @@ fn main() -> ExitCode {
                     return ExitCode::from(1);
                 }
             };
-            let parsed_output =
-                parse_json_output(result.stdout(), output_plan.schema.as_deref().unwrap_or(""));
+            let parsed_output = parse_json_output(result.stdout(), completed_run_schema(&result));
             let stdout = sanitize_raw_output(result.stdout(), &output_plan.runner_name);
             let stderr = sanitize_raw_output(result.stderr(), &output_plan.runner_name);
             if !stdout.is_empty() {
@@ -1816,8 +1846,8 @@ fn main() -> ExitCode {
             let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
-                &output_plan.runner_name,
-                &cleanup_spec,
+                result.plan().runner().canonical_id(),
+                result.plan().command_spec(),
                 &completed,
             );
             let footer_line = if footer_enabled {
@@ -1835,35 +1865,59 @@ fn main() -> ExitCode {
             ))
         }
         _ if text_mode_with_visible_work => {
-            let stream_runner_name = command_output_plan.runner_name.clone();
+            let active_runner =
+                Arc::new(Mutex::new(command_plan.runner().canonical_id().to_string()));
             let processor = Arc::new(Mutex::new(StructuredStreamProcessor::new(
                 command_output_plan.schema.as_deref().unwrap_or(""),
                 FormattedRenderer::new(show_thinking, human_tty),
             )));
+            let attempt_processor = Arc::clone(&processor);
+            let attempt_runner = Arc::clone(&active_runner);
+            let attempt_parsed = command_parsed.clone();
+            let attempt_config = config.clone();
             let callback_processor = Arc::clone(&processor);
+            let callback_runner = Arc::clone(&active_runner);
             let artifacts_for_stream = artifacts.clone();
-            let result = match client.stream_unchecked(&command_request, move |channel, chunk| {
-                if channel == "stderr" {
-                    let filtered = filtered_human_stderr(chunk, &stream_runner_name);
-                    if !filtered.is_empty() {
-                        eprint!("{}", sanitize_human_output(&filtered, sanitize_osc));
+            let result = match client.stream_unchecked_with_attempt(
+                &command_request,
+                move |runner_name| {
+                    rebind_structured_processor(
+                        &attempt_processor,
+                        &attempt_runner,
+                        &attempt_parsed,
+                        &attempt_config,
+                        runner_name,
+                        show_thinking,
+                        human_tty,
+                    );
+                },
+                move |channel, chunk| {
+                    let stream_runner_name = callback_runner
+                        .lock()
+                        .unwrap_or_else(|error| error.into_inner())
+                        .clone();
+                    if channel == "stderr" {
+                        let filtered = filtered_human_stderr(chunk, &stream_runner_name);
+                        if !filtered.is_empty() {
+                            eprint!("{}", sanitize_human_output(&filtered, sanitize_osc));
+                        }
+                        return;
                     }
-                    return;
-                }
-                if let Ok(mut processor) = callback_processor.lock() {
-                    let rendered = processor.feed(chunk);
-                    if !rendered.is_empty() {
-                        let rendered = sanitize_human_output(&rendered, sanitize_osc);
-                        emit_stdout_line(artifacts_for_stream.as_deref(), &rendered);
-                    }
-                    for raw_line in processor.take_unknown_json_lines() {
-                        record_transcript_line(artifacts_for_stream.as_deref(), &raw_line);
-                        if forward_unknown_json {
-                            eprintln!("{}", raw_line);
+                    if let Ok(mut processor) = callback_processor.lock() {
+                        let rendered = processor.feed(chunk);
+                        if !rendered.is_empty() {
+                            let rendered = sanitize_human_output(&rendered, sanitize_osc);
+                            emit_stdout_line(artifacts_for_stream.as_deref(), &rendered);
+                        }
+                        for raw_line in processor.take_unknown_json_lines() {
+                            record_transcript_line(artifacts_for_stream.as_deref(), &raw_line);
+                            if forward_unknown_json {
+                                eprintln!("{}", raw_line);
+                            }
                         }
                     }
-                }
-            }) {
+                },
+            ) {
                 Ok(result) => result,
                 Err(error) => {
                     print_client_error(error);
@@ -1890,8 +1944,8 @@ fn main() -> ExitCode {
             let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
-                &command_output_plan.runner_name,
-                &cleanup_spec,
+                result.plan().runner().canonical_id(),
+                result.plan().command_spec(),
                 &completed,
             );
             let footer_line = if footer_enabled {
@@ -1928,8 +1982,8 @@ fn main() -> ExitCode {
             let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
-                &output_plan.runner_name,
-                &cleanup_spec,
+                result.plan().runner().canonical_id(),
+                result.plan().command_spec(),
                 &completed,
             );
             let footer_line = if footer_enabled {
@@ -1962,8 +2016,7 @@ fn main() -> ExitCode {
                 }
             };
             let final_output_text = if output_plan.mode == "stream-json" {
-                parse_json_output(result.stdout(), output_plan.schema.as_deref().unwrap_or(""))
-                    .final_text
+                parse_json_output(result.stdout(), completed_run_schema(&result)).final_text
             } else {
                 sanitize_raw_output(result.stdout(), &output_plan.runner_name)
             };
@@ -1971,8 +2024,8 @@ fn main() -> ExitCode {
             let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
-                &output_plan.runner_name,
-                &cleanup_spec,
+                result.plan().runner().canonical_id(),
+                result.plan().command_spec(),
                 &completed,
             );
             let footer_line = if footer_enabled {
@@ -2001,8 +2054,7 @@ fn main() -> ExitCode {
             if !stderr.is_empty() {
                 eprint!("{}", sanitize_human_output(&stderr, sanitize_osc));
             }
-            let parsed_output =
-                parse_json_output(result.stdout(), output_plan.schema.as_deref().unwrap_or(""));
+            let parsed_output = parse_json_output(result.stdout(), completed_run_schema(&result));
             let output_text = parsed_output.final_text.clone();
             let rendered = render_parsed(&parsed_output, show_thinking, human_tty);
             if !rendered.is_empty() {
@@ -2019,8 +2071,8 @@ fn main() -> ExitCode {
             let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
-                &output_plan.runner_name,
-                &cleanup_spec,
+                result.plan().runner().canonical_id(),
+                result.plan().command_spec(),
                 &completed,
             );
             let footer_line = if footer_enabled {
@@ -2038,35 +2090,59 @@ fn main() -> ExitCode {
             ))
         }
         "stream-formatted" => {
-            let stream_runner_name = output_plan.runner_name.clone();
+            let active_runner =
+                Arc::new(Mutex::new(command_plan.runner().canonical_id().to_string()));
             let processor = Arc::new(Mutex::new(StructuredStreamProcessor::new(
                 output_plan.schema.as_deref().unwrap_or(""),
                 FormattedRenderer::new(show_thinking, human_tty),
             )));
+            let attempt_processor = Arc::clone(&processor);
+            let attempt_runner = Arc::clone(&active_runner);
+            let attempt_parsed = command_parsed.clone();
+            let attempt_config = config.clone();
             let callback_processor = Arc::clone(&processor);
+            let callback_runner = Arc::clone(&active_runner);
             let artifacts_for_stream = artifacts.clone();
-            let result = match client.stream_unchecked(&command_request, move |channel, chunk| {
-                if channel == "stderr" {
-                    let filtered = filtered_human_stderr(chunk, &stream_runner_name);
-                    if !filtered.is_empty() {
-                        eprint!("{}", sanitize_human_output(&filtered, sanitize_osc));
+            let result = match client.stream_unchecked_with_attempt(
+                &command_request,
+                move |runner_name| {
+                    rebind_structured_processor(
+                        &attempt_processor,
+                        &attempt_runner,
+                        &attempt_parsed,
+                        &attempt_config,
+                        runner_name,
+                        show_thinking,
+                        human_tty,
+                    );
+                },
+                move |channel, chunk| {
+                    let stream_runner_name = callback_runner
+                        .lock()
+                        .unwrap_or_else(|error| error.into_inner())
+                        .clone();
+                    if channel == "stderr" {
+                        let filtered = filtered_human_stderr(chunk, &stream_runner_name);
+                        if !filtered.is_empty() {
+                            eprint!("{}", sanitize_human_output(&filtered, sanitize_osc));
+                        }
+                        return;
                     }
-                    return;
-                }
-                if let Ok(mut processor) = callback_processor.lock() {
-                    let rendered = processor.feed(chunk);
-                    if !rendered.is_empty() {
-                        let rendered = sanitize_human_output(&rendered, sanitize_osc);
-                        emit_stdout_line(artifacts_for_stream.as_deref(), &rendered);
-                    }
-                    for raw_line in processor.take_unknown_json_lines() {
-                        record_transcript_line(artifacts_for_stream.as_deref(), &raw_line);
-                        if forward_unknown_json {
-                            eprintln!("{}", raw_line);
+                    if let Ok(mut processor) = callback_processor.lock() {
+                        let rendered = processor.feed(chunk);
+                        if !rendered.is_empty() {
+                            let rendered = sanitize_human_output(&rendered, sanitize_osc);
+                            emit_stdout_line(artifacts_for_stream.as_deref(), &rendered);
+                        }
+                        for raw_line in processor.take_unknown_json_lines() {
+                            record_transcript_line(artifacts_for_stream.as_deref(), &raw_line);
+                            if forward_unknown_json {
+                                eprintln!("{}", raw_line);
+                            }
                         }
                     }
-                }
-            }) {
+                },
+            ) {
                 Ok(result) => result,
                 Err(error) => {
                     print_client_error(error);
@@ -2093,8 +2169,8 @@ fn main() -> ExitCode {
             let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
-                &output_plan.runner_name,
-                &cleanup_spec,
+                result.plan().runner().canonical_id(),
+                result.plan().command_spec(),
                 &completed,
             );
             let footer_line = if footer_enabled {
@@ -2131,8 +2207,8 @@ fn main() -> ExitCode {
             let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
-                &output_plan.runner_name,
-                &cleanup_spec,
+                result.plan().runner().canonical_id(),
+                result.plan().command_spec(),
                 &completed,
             );
             let footer_line = if footer_enabled {
@@ -2169,8 +2245,8 @@ fn main() -> ExitCode {
             let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
-                &output_plan.runner_name,
-                &cleanup_spec,
+                result.plan().runner().canonical_id(),
+                result.plan().command_spec(),
                 &completed,
             );
             let footer_line = if footer_enabled {
@@ -2207,8 +2283,8 @@ fn main() -> ExitCode {
             let completed = completed_run_from_library_run(&result);
             print_cleanup_warnings(
                 parsed.cleanup_session,
-                &output_plan.runner_name,
-                &cleanup_spec,
+                result.plan().runner().canonical_id(),
+                result.plan().command_spec(),
                 &completed,
             );
             let footer_line = if footer_enabled {

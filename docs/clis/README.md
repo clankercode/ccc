@@ -146,6 +146,8 @@ When adding a new CLI, its note should record the verified non-interactive argv 
 
 For the Python and Rust help checklist, runner version discovery now prefers trusted install metadata when the local layout is known, then falls back to `<cli> --version`. Current fast paths cover OpenCode, Codex, and Gemini `package.json`, Kimi `dist-info/METADATA`, Claude versioned local install paths, Cursor Agent's bundled `agent-cli@...` release marker, Gemini's local npm `_npx` cache when the launcher uses `@google/gemini-cli`, and Grok Build's `$GROK_HOME/version.json` / `~/.grok/version.json`. Gemini npx wrappers report the wrapper identity instead of spawning npm when cached metadata is unavailable.
 
+Runner tables in help, usage errors, and version output show executable names, versions, and version-lookup milliseconds in aligned columns. The timing covers metadata discovery and any fallback command, using a monotonic clock; it excludes executable resolution and table rendering. Timings have one decimal place and turn red above 50 ms when color is enabled by `FORCE_COLOR` / `NO_COLOR` or the destination stream's TTY status. Missing executables show `not found` and `-` for timing; an installed runner whose lookup fails shows `found` with its measured duration.
+
 `ccc --version` now reports the shared build version plus any resolved client versions. The reported `ccc` version comes from the repo-root `VERSION` file at build time, so keep that file in sync with the release you are building.
 
 ## Output Modes

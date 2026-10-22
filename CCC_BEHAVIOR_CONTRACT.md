@@ -30,6 +30,8 @@ For every implementation that claims `ccc` support:
 
 ## Implemented Languages
 
+Python and Rust runner checklists display `[+]` or `[-]`, the executable name, version/status, and version-lookup duration in aligned columns. `cursor-agent` appears directly, without a duplicate runner name. The monotonic timer covers metadata discovery and any fallback version command, excluding executable resolution and rendering. Installed runners show elapsed milliseconds to one decimal place even if no version is returned (`found`); missing executables show `not found` and `-` for timing. Durations strictly greater than 50 ms are red when color is enabled. Nonempty `FORCE_COLOR` takes precedence over nonempty `NO_COLOR`; otherwise color follows the destination stream's TTY status. Help and version output use stdout; usage errors use stderr. `--version` / `-v` apply the same columns to resolved clients and retain the unresolved count.
+
 Python and Rust support standalone controls: CLI `--standalone` / `--no-daemon` select true, `--no-standalone` selects false, and defaults/aliases can set `standalone`. CLI overrides aliases, then defaults. True emits `codex --no-daemon exec` or `opencode run --standalone`; false omits the override and permits upstream defaults. Other runners warn when true is requested. Codex internal in-process app-server operation remains available.
 
 Python and Rust map `+ultra` / `+6` and alias `thinking = 6` to Codex `-c model_reasoning_effort=ultra`; other runners clamp to their supported maximum. Effort and service tier are independent. OpenCode uses `opencode run` without the unsupported `--pure` flag.

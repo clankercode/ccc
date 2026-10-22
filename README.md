@@ -116,6 +116,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
 - `precurl` uses the Rust library layer for delegated LLM analysis — see the [precurl SECURITY.md](../precurl/SECURITY.md) for threat model and prompt-injection mitigation details
 - Python and Rust also support free-order control tokens before the prompt, `--` to force literal prompt text, `--show-thinking` / `--no-show-thinking`, `--yolo` / `-y`, and `--fast` / `--no-fast`
 - `-v` / `--version` prints the shared build version plus resolved client versions
+- Python and Rust runner tables in help, usage errors, and version output show the executable name (for example, `cursor-agent`), version/status, and version-lookup time in aligned columns. Timings use milliseconds with one decimal place; lookups over 50 ms appear red when color is enabled. Missing executables show `not found` and `-` for timing. Color follows `FORCE_COLOR` / `NO_COLOR`, then the output stream's TTY status.
 
 ## First-Pass `ccc` Contract
 

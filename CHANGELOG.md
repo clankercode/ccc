@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Python and Rust help/version runner tables now show executable names, aligned versions, and per-runner version-lookup milliseconds. Timings above 50 ms appear red when color is enabled; existing metadata fast paths remain in use.
+
 ## 0.4.3 - 2026-10-22
 
 - Added standalone controls through CLI (`--standalone` / `--no-daemon`, `--no-standalone`), config defaults, profiles, wizard, and Rust Request builder. Codex receives its root `--no-daemon` before `exec`; OpenCode receives `run --standalone`. False permits upstream defaults.

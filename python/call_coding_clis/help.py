@@ -9,6 +9,8 @@ import re
 import shutil
 import subprocess
 import sys
+import time
+from typing import TextIO
 
 try:
     from .parser import RUNNER_REGISTRY
@@ -19,6 +21,11 @@ try:
     from .config import load_config
 except ImportError:
     from config import load_config
+
+try:
+    from .json_output import resolve_human_tty
+except ImportError:
+    from json_output import resolve_human_tty
 
 
 CANONICAL_RUNNERS = [
@@ -61,6 +68,7 @@ class RunnerStatus:
     binary: str
     found: bool
     version: str
+    elapsed_ns: int | None = None
 
 
 HELP_TEXT = """\
@@ -325,7 +333,12 @@ def _runner_statuses() -> list[RunnerStatus]:
         binary = info.binary if info else name
         binary_path = shutil.which(binary)
         found = binary_path is not None
-        version = _get_runner_version(name, binary, binary_path) if found and binary_path else ""
+        version = ""
+        elapsed_ns = None
+        if binary_path is not None:
+            started_ns = time.monotonic_ns()
+            version = _get_runner_version(name, binary, binary_path)
+            elapsed_ns = time.monotonic_ns() - started_ns
         statuses.append(
             RunnerStatus(
                 name=name,
@@ -333,6 +346,7 @@ def _runner_statuses() -> list[RunnerStatus]:
                 binary=binary,
                 found=found,
                 version=version,
+                elapsed_ns=elapsed_ns,
             )
         )
     return statuses
@@ -358,15 +372,42 @@ def _get_runner_version(runner_name: str, binary: str, binary_path: str) -> str:
     return version if version else _get_version(binary)
 
 
-def runner_checklist() -> str:
-    lines = ["Runners:"]
-    for status in _runner_statuses():
-        if status.found:
-            tag = status.version if status.version else "found"
-            lines.append(f"  [+] {status.name:10s} ({status.binary})  {tag}")
-        else:
-            lines.append(f"  [-] {status.name:10s} ({status.binary})  not found")
-    return "\n".join(lines)
+def _runner_color_enabled(stream: TextIO) -> bool:
+    return resolve_human_tty(
+        stream.isatty(),
+        os.environ.get("FORCE_COLOR"),
+        os.environ.get("NO_COLOR"),
+    )
+
+
+def _format_runner_rows(statuses: list[RunnerStatus], *, color: bool) -> list[str]:
+    tags = [
+        (status.version or "found") if status.found else "not found"
+        for status in statuses
+    ]
+    binary_width = max((len(status.binary) for status in statuses), default=0)
+    tag_width = max((len(tag) for tag in tags), default=0)
+    lines = []
+    for status, tag in zip(statuses, tags):
+        elapsed = "-"
+        if status.found and status.elapsed_ns is not None:
+            elapsed = f"{status.elapsed_ns / 1_000_000:.1f} ms"
+            if color and status.elapsed_ns > 50_000_000:
+                elapsed = f"\x1b[31m{elapsed}\x1b[0m"
+        mark = "+" if status.found else "-"
+        lines.append(
+            f"  [{mark}] {status.binary:<{binary_width}}  {tag:<{tag_width}}  {elapsed}"
+        )
+    return lines
+
+
+def runner_checklist(*, stream: TextIO | None = None) -> str:
+    if stream is None:
+        stream = sys.stdout
+    return "\n".join(
+        ["Runners:"]
+        + _format_runner_rows(_runner_statuses(), color=_runner_color_enabled(stream))
+    )
 
 
 def _format_alias_value(value: object) -> str:
@@ -406,15 +447,17 @@ def alias_checklist() -> str:
     return "\n".join(lines)
 
 
-def _format_version_report(version: str, statuses: list[RunnerStatus]) -> str:
+def _format_version_report(
+    version: str, statuses: list[RunnerStatus], *, stream: TextIO | None = None
+) -> str:
+    if stream is None:
+        stream = sys.stdout
     lines = [f"ccc version {version}", "Resolved clients:"]
-    resolved = 0
-    for status in statuses:
-        if not status.version:
-            continue
-        resolved += 1
-        lines.append(f"  [+] {status.name:10s} ({status.binary})  {status.version}")
-    unresolved = len(statuses) - resolved
+    resolved = [status for status in statuses if status.version]
+    lines.extend(
+        _format_runner_rows(resolved, color=_runner_color_enabled(stream))
+    )
+    unresolved = len(statuses) - len(resolved)
     if unresolved:
         lines.append(f"  (and {unresolved} unresolved)")
     return "\n".join(lines)
@@ -433,4 +476,4 @@ def print_usage() -> None:
         'usage: ccc [controls...] "<Prompt>"',
         file=sys.stderr,
     )
-    print(runner_checklist(), file=sys.stderr)
+    print(runner_checklist(stream=sys.stderr), file=sys.stderr)

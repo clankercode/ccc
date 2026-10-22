@@ -1,18 +1,19 @@
 use crate::config::load_config;
+use crate::json_output::resolve_human_tty;
 use crate::parser::AliasDef;
 use crate::RUNNER_REGISTRY;
 use serde_json::Value;
 use std::fs;
+use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 struct RunnerStatus {
-    name: String,
-    #[allow(dead_code)]
-    alias: String,
     binary: String,
     found: bool,
     version: String,
+    elapsed: Option<Duration>,
 }
 
 const CANONICAL_RUNNERS: &[(&str, &str)] = &[
@@ -402,7 +403,6 @@ fn get_runner_version(runner_name: &str, binary: &str, binary_path: &Path) -> St
         "kimi" => discover_kimi_version(&real_path),
         "cursor" => discover_cursor_version(&real_path),
         "gemini" => discover_gemini_version(&real_path),
-        "pi" => get_version(binary),
         "grok" => discover_grok_version(&real_path),
         _ => String::new(),
     };
@@ -411,10 +411,6 @@ fn get_runner_version(runner_name: &str, binary: &str, binary_path: &Path) -> St
     } else {
         version
     }
-}
-
-fn is_on_path(binary: &str) -> bool {
-    resolve_binary_path(binary).is_some()
 }
 
 fn resolve_binary_path(binary: &str) -> Option<String> {
@@ -437,7 +433,7 @@ fn resolve_binary_path(binary: &str) -> Option<String> {
 
 fn runner_checklist() -> Vec<RunnerStatus> {
     let mut statuses = Vec::new();
-    for &(name, alias) in CANONICAL_RUNNERS {
+    for &(name, _) in CANONICAL_RUNNERS {
         let registry = RUNNER_REGISTRY.read().unwrap();
         let binary = registry
             .get(name)
@@ -445,41 +441,86 @@ fn runner_checklist() -> Vec<RunnerStatus> {
             .unwrap_or_else(|| name.to_string());
         drop(registry);
 
-        let found = is_on_path(&binary);
-        let version = if found {
-            let binary_path = resolve_binary_path(&binary);
-            match binary_path {
-                Some(path) => get_runner_version(name, &binary, Path::new(&path)),
-                None => get_version(&binary),
-            }
+        let binary_path = resolve_binary_path(&binary);
+        let found = binary_path.is_some();
+        let (version, elapsed) = if let Some(path) = binary_path {
+            let started = Instant::now();
+            let version = get_runner_version(name, &binary, Path::new(&path));
+            (version, Some(started.elapsed()))
         } else {
-            String::new()
+            (String::new(), None)
         };
         statuses.push(RunnerStatus {
-            name: name.to_string(),
-            alias: alias.to_string(),
             binary,
             found,
             version,
+            elapsed,
         });
     }
     statuses
 }
 
-fn format_runner_checklist() -> String {
-    let mut out = String::from("Runners:\n");
-    for s in runner_checklist() {
-        if s.found {
-            let tag = if s.version.is_empty() {
+fn format_elapsed(elapsed: Option<Duration>, color: bool) -> String {
+    let text = elapsed
+        .map(|elapsed| format!("{:.1} ms", elapsed.as_secs_f64() * 1000.0))
+        .unwrap_or_else(|| "-".to_string());
+    if color && elapsed.is_some_and(|elapsed| elapsed > Duration::from_millis(50)) {
+        format!("\x1b[31m{text}\x1b[0m")
+    } else {
+        text
+    }
+}
+
+fn format_runner_rows<'a>(
+    statuses: impl IntoIterator<Item = &'a RunnerStatus>,
+    color: bool,
+) -> String {
+    let rows: Vec<_> = statuses
+        .into_iter()
+        .map(|status| {
+            let tag = if !status.found {
+                "not found"
+            } else if status.version.is_empty() {
                 "found"
             } else {
-                &s.version
+                &status.version
             };
-            out.push_str(&format!("  [+] {:10} ({})  {}\n", s.name, s.binary, tag));
-        } else {
-            out.push_str(&format!("  [-] {:10} ({})  not found\n", s.name, s.binary));
-        }
+            (status, tag)
+        })
+        .collect();
+    let binary_width = rows
+        .iter()
+        .map(|(status, _)| status.binary.chars().count())
+        .max()
+        .unwrap_or(0);
+    let version_width = rows
+        .iter()
+        .map(|(_, tag)| tag.chars().count())
+        .max()
+        .unwrap_or(0);
+    let mut out = String::new();
+    for (status, tag) in rows {
+        let marker = if status.found { '+' } else { '-' };
+        let elapsed = format_elapsed(status.elapsed, color);
+        out.push_str(&format!(
+            "  [{marker}] {:binary_width$}  {tag:version_width$}  {elapsed}\n",
+            status.binary
+        ));
     }
+    out
+}
+
+fn runner_color_enabled(is_terminal: bool) -> bool {
+    resolve_human_tty(
+        is_terminal,
+        std::env::var("FORCE_COLOR").ok().as_deref(),
+        std::env::var("NO_COLOR").ok().as_deref(),
+    )
+}
+
+fn format_runner_checklist(color: bool) -> String {
+    let mut out = String::from("Runners:\n");
+    out.push_str(&format_runner_rows(&runner_checklist(), color));
     out
 }
 
@@ -563,19 +604,11 @@ fn format_alias_checklist() -> String {
     out
 }
 
-fn format_version_report(version: &str, statuses: &[RunnerStatus]) -> String {
+fn format_version_report(version: &str, statuses: &[RunnerStatus], color: bool) -> String {
     let mut out = format!("ccc version {version}\nResolved clients:\n");
-    let mut resolved = 0usize;
-    for s in statuses {
-        if s.version.is_empty() {
-            continue;
-        }
-        resolved += 1;
-        out.push_str(&format!(
-            "  [+] {:10} ({})  {}\n",
-            s.name, s.binary, s.version
-        ));
-    }
+    let resolved_statuses: Vec<_> = statuses.iter().filter(|s| !s.version.is_empty()).collect();
+    let resolved = resolved_statuses.len();
+    out.push_str(&format_runner_rows(resolved_statuses, color));
     let unresolved = statuses.len().saturating_sub(resolved);
     if unresolved > 0 {
         out.push_str(&format!("  (and {unresolved} unresolved)\n"));
@@ -588,19 +621,29 @@ pub fn print_help() {
     println!();
     println!("{}", format_alias_checklist().trim_end());
     println!();
-    print!("{}", format_runner_checklist());
+    print!(
+        "{}",
+        format_runner_checklist(runner_color_enabled(io::stdout().is_terminal()))
+    );
 }
 
 pub fn print_version() {
     println!(
         "{}",
-        format_version_report(&ccc_version(), &runner_checklist())
+        format_version_report(
+            &ccc_version(),
+            &runner_checklist(),
+            runner_color_enabled(io::stdout().is_terminal()),
+        )
     );
 }
 
 pub fn print_usage() {
     eprintln!("usage: ccc [controls...] \"<Prompt>\"");
-    eprint!("{}", format_runner_checklist());
+    eprint!(
+        "{}",
+        format_runner_checklist(runner_color_enabled(io::stderr().is_terminal()))
+    );
 }
 
 #[cfg(test)]
@@ -616,6 +659,23 @@ mod tests {
         let path = std::env::temp_dir().join(format!("ccc-help-{label}-{unique}"));
         fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    #[test]
+    fn test_elapsed_color_uses_unrounded_strict_threshold() {
+        let threshold = Duration::from_millis(50);
+        let just_above = Duration::from_micros(50_010);
+        assert_eq!(
+            format_elapsed(Some(Duration::from_micros(49_990)), true),
+            "50.0 ms"
+        );
+        assert_eq!(format_elapsed(Some(threshold), true), "50.0 ms");
+        assert_eq!(
+            format_elapsed(Some(just_above), true),
+            "\x1b[31m50.0 ms\x1b[0m"
+        );
+        assert_eq!(format_elapsed(Some(just_above), false), "50.0 ms");
+        assert_eq!(format_elapsed(None, true), "-");
     }
 
     #[test]

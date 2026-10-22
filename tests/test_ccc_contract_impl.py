@@ -749,6 +749,138 @@ class SingleImplCccContractTests(unittest.TestCase):
                         self.assertIn("1.3.17", result.stdout)
                         self.assertIn("unresolved", result.stdout)
 
+    def test_runner_version_tables_show_aligned_lookup_timings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bin_dir = root / "bin"
+            package_root = root / "node_modules" / "opencode-ai"
+            package_bin = package_root / "bin"
+            bin_dir.mkdir()
+            package_bin.mkdir(parents=True)
+            (bin_dir / "python3").symlink_to(Path(sys.executable))
+            (package_root / "package.json").write_text(
+                '{"name":"opencode-ai","version":"1.3.17"}', encoding="utf-8"
+            )
+            opencode_path = bin_dir / "opencode"
+            opencode_path.symlink_to(package_bin / "opencode")
+            scripts = {
+                package_bin / "opencode": "#!/bin/sh\nexit 99\n",
+                bin_dir / "which": (
+                    "#!/bin/sh\n"
+                    'candidate="${0%/*}/$1"\n'
+                    'if [ -x "$candidate" ]; then printf "%s\\n" "$candidate"; else exit 1; fi\n'
+                ),
+                bin_dir / "cursor-agent": (
+                    "#!/bin/sh\n"
+                    'printf "cursor-agent %s\\n" "$*" >> "$CCC_VERSION_PROBE_LOG"\n'
+                    f"{shlex.quote(sys.executable)} -c 'import time; time.sleep(0.08)'\n"
+                    "printf 'Cursor Agent version with a long label 2026.10.23\\n'\n"
+                ),
+                bin_dir / "pi": (
+                    "#!/bin/sh\n"
+                    'printf "pi %s\\n" "$*" >> "$CCC_VERSION_PROBE_LOG"\n'
+                    f"{shlex.quote(sys.executable)} -c 'import time; time.sleep(0.08)'\n"
+                    "exit 1\n"
+                ),
+            }
+            for path, body in scripts.items():
+                path.write_text(body, encoding="utf-8")
+                path.chmod(0o755)
+
+            row_pattern = re.compile(
+                r"^  \[(?P<mark>[+-])\] (?P<binary>\S+) {2,}"
+                r"(?P<version>.+?) {2,}(?P<elapsed>\d+\.\d ms|-) *$"
+            )
+            color_cases = (
+                ({"NO_COLOR": "1"}, False),
+                ({"FORCE_COLOR": "1", "NO_COLOR": "1"}, True),
+                ({"FORCE_COLOR": "0"}, True),
+                ({"FORCE_COLOR": "", "NO_COLOR": "1"}, False),
+                ({}, False),
+            )
+            for lang in self.selected_languages:
+                if lang.name not in VERSION_IMPLEMENTATIONS:
+                    continue
+                for args in (["--help"], ["--version"], ["-v"], []):
+                    for color_env, colored in color_cases:
+                        with self.subTest(language=lang.name, args=args, color=color_env):
+                            env = self._make_env(opencode_path, lang)
+                            env["PATH"] = str(bin_dir)
+                            env.pop("FORCE_COLOR", None)
+                            env.pop("NO_COLOR", None)
+                            env.update(color_env)
+                            log = root / "probes.log"
+                            log.write_text("", encoding="utf-8")
+                            env["CCC_VERSION_PROBE_LOG"] = str(log)
+                            result = lang.invoke_extra(args, env)
+                            self.assertEqual(
+                                result.returncode, 0 if args else 1, result.stderr
+                            )
+                            text = result.stdout if args else result.stderr
+                            self.assertEqual(
+                                result.stderr if args else result.stdout, ""
+                            )
+                            raw_rows = [
+                                line for line in text.splitlines()
+                                if re.match(r"^  \[[+-]\] ", line)
+                            ]
+                            rows = []
+                            for raw in raw_rows:
+                                plain = re.sub(r"\x1b\[[0-9;]*m", "", raw)
+                                match = row_pattern.fullmatch(plain)
+                                self.assertIsNotNone(match, raw)
+                                rows.append((raw, match))
+                            resolved_only = args in (["--version"], ["-v"])
+                            self.assertEqual(len(rows), 2 if resolved_only else 10, text)
+                            self.assertEqual(
+                                len({match.start("version") for _, match in rows}), 1
+                            )
+                            self.assertEqual(
+                                len({match.start("elapsed") for _, match in rows}), 1
+                            )
+                            by_binary = {
+                                match["binary"]: (raw, match) for raw, match in rows
+                            }
+                            self.assertIn("cursor-agent", by_binary)
+                            self.assertNotIn("cursor", by_binary)
+                            opencode_raw, opencode = by_binary["opencode"]
+                            self.assertEqual(opencode["version"], "1.3.17")
+                            self.assertRegex(opencode["elapsed"], r"^\d+\.\d ms$")
+                            if float(opencode["elapsed"].split()[0]) < 50:
+                                self.assertNotIn("\x1b[", opencode_raw)
+                            cursor_raw, cursor = by_binary["cursor-agent"]
+                            self.assertEqual(
+                                cursor["version"],
+                                "Cursor Agent version with a long label 2026.10.23",
+                            )
+                            self.assertGreater(float(cursor["elapsed"].split()[0]), 50)
+                            if colored:
+                                self.assertIn(
+                                    f'\x1b[31m{cursor["elapsed"]}\x1b[0m', cursor_raw
+                                )
+                            else:
+                                self.assertNotIn("\x1b[", text)
+                            if resolved_only:
+                                self.assertIn("(and 8 unresolved)", text)
+                            else:
+                                roocode_raw, roocode = by_binary["roocode"]
+                                self.assertEqual(roocode["mark"], "-")
+                                self.assertEqual(roocode["version"], "not found")
+                                self.assertEqual(roocode["elapsed"], "-")
+                                self.assertNotIn("\x1b[", roocode_raw)
+                                pi_raw, pi = by_binary["pi"]
+                                self.assertEqual(pi["mark"], "+")
+                                self.assertEqual(pi["version"], "found")
+                                self.assertGreater(float(pi["elapsed"].split()[0]), 50)
+                                if colored:
+                                    self.assertIn(
+                                        f'\x1b[31m{pi["elapsed"]}\x1b[0m', pi_raw
+                                    )
+                            self.assertEqual(
+                                log.read_text(encoding="utf-8").splitlines(),
+                                ["cursor-agent --version", "pi --version"],
+                            )
+
     def test_help_surface_mentions_show_thinking_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

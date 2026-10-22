@@ -18,7 +18,7 @@ from call_coding_clis.cli import (
     _session_persistence_pre_run_warnings,
 )
 from call_coding_clis.help import _get_runner_version
-from call_coding_clis.help import RunnerStatus, _format_version_report
+from call_coding_clis.help import RunnerStatus, _format_version_report, runner_checklist
 
 
 FIXTURE_CONFIG_PATH = Path(__file__).parent / "fixtures" / "config-example.toml"
@@ -219,6 +219,7 @@ class RunnerTests(unittest.TestCase):
                     binary="opencode",
                     found=True,
                     version="1.3.17",
+                    elapsed_ns=12_300_000,
                 ),
                 RunnerStatus(
                     name="claude",
@@ -226,6 +227,7 @@ class RunnerTests(unittest.TestCase):
                     binary="claude",
                     found=True,
                     version="",
+                    elapsed_ns=8_000_000,
                 ),
             ],
         )
@@ -234,9 +236,40 @@ class RunnerTests(unittest.TestCase):
             report,
             "ccc version 0.1.2\n"
             "Resolved clients:\n"
-            "  [+] opencode   (opencode)  1.3.17\n"
+            "  [+] opencode  1.3.17  12.3 ms\n"
             "  (and 1 unresolved)",
         )
+
+    def test_runner_timing_color_uses_unrounded_monotonic_duration(self) -> None:
+        for elapsed_ns, red in (
+            (49_990_000, False),
+            (50_000_000, False),
+            (50_010_000, True),
+        ):
+            with self.subTest(elapsed_ns=elapsed_ns):
+                with (
+                    mock.patch.dict(os.environ, {"FORCE_COLOR": "1"}),
+                    mock.patch(
+                        "call_coding_clis.help.CANONICAL_RUNNERS", [("opencode", "oc")]
+                    ),
+                    mock.patch("call_coding_clis.help.shutil.which", return_value="/bin/opencode"),
+                    mock.patch(
+                        "call_coding_clis.help.time.monotonic_ns",
+                        side_effect=[1_000_000_000, 1_000_000_000 + elapsed_ns],
+                    ) as clock,
+                    mock.patch(
+                        "call_coding_clis.help._get_runner_version", return_value="1.3.17"
+                    ) as lookup,
+                ):
+                    report = runner_checklist(stream=io.StringIO())
+                clock.assert_has_calls([mock.call(), mock.call()])
+                self.assertEqual(clock.call_count, 2)
+                lookup.assert_called_once_with("opencode", "opencode", "/bin/opencode")
+                if red:
+                    self.assertIn("\x1b[31m50.0 ms\x1b[0m", report)
+                else:
+                    self.assertIn("50.0 ms", report)
+                    self.assertNotIn("\x1b[", report)
 
     def test_filtered_human_stderr_strips_kimi_resume_hint(self) -> None:
         stderr = (

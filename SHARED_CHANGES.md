@@ -20,6 +20,15 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-10-23
+
+### Runner version lookup timings
+- Change: Python and Rust runner tables in help, usage errors, and version output show executable names without redundant runner labels, aligned version/status text, and monotonic version-lookup milliseconds to one decimal place. Lookups strictly above 50 ms are red under existing color controls. Missing executables show `not found` and `-` for timing; failed installed-runner probes retain their measured duration. Metadata fast paths and the version report's unresolved summary are preserved.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py` covers alignment, executable labels, missing and failed probes, timing, slow-probe color and environment precedence, stdout/stderr destinations, metadata discovery, and single fallback invocation across help/version/usage output.
+- Docs updated: [README.md](README.md), [CCC_BEHAVIOR_CONTRACT.md](CCC_BEHAVIOR_CONTRACT.md), [docs/clis/README.md](docs/clis/README.md), [CHANGELOG.md](CHANGELOG.md)
+
 ## 2026-10-22
 
 ### Standalone execution controls and fallback warnings

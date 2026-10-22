@@ -24,11 +24,12 @@
       "2": "medium",
       "3": "high",
       "4": "xhigh",
-      "5": "max"
+      "5": "max",
+      "6": "ultra"
     },
     "notes": [
       "ccc keeps the public contract numeric even when vendor labels differ.",
-      "Levels 0-4 map to none/low/medium/high/xhigh; level 5 is max.",
+      "Levels 0-4 map to none/low/medium/high/xhigh; level 5 is max and level 6 is ultra.",
       "OpenAI's gpt-5.6 family exposes all six tiers (none/low/medium/high/xhigh/max), so ccc separates xhigh (4) from max (5). Anthropic still tops out at max, which ccc reaches at level 4 and above via clamping.",
       "Runners exposing fewer tiers clamp requests above their top tier down to it (e.g. claude +5 -> max, pi +5 -> xhigh)."
     ]
@@ -166,16 +167,17 @@
         "real_cli_help",
         "real_cli_smoke"
       ],
-      "last_verified": "2026-07-11",
+      "last_verified": "2026-10-22",
       "thinking_mode": "ladder",
-      "supported_levels": [0, 1, 2, 3, 4, 5],
+      "supported_levels": [0, 1, 2, 3, 4, 5, 6],
       "level_labels": {
         "0": "none",
         "1": "low",
         "2": "medium",
         "3": "high",
         "4": "xhigh",
-        "5": "max"
+        "5": "max",
+        "6": "ultra"
       },
       "default_level": 2,
       "visible_thinking": "unknown",
@@ -184,7 +186,7 @@
         "real_cli_smoke",
         "upstream_docs"
       ],
-      "notes": "ccc maps each level to `-c model_reasoning_effort=<value>`; effort tiers match OpenAI gpt-5.6 (none/low/medium/high/xhigh/max). gpt-5.6 `ultra` is a parallel-agent run mode, not an effort tier, so ccc does not map it. Codex has no verified visible-thinking stream and defaults to medium when no level is set. Verified against codex-cli 0.144.1."
+      "notes": "ccc maps levels to `-c model_reasoning_effort=<value>` (none/low/medium/high/xhigh/max/ultra), defaults to medium, and leaves model-specific effort availability to Codex. A real request with ultra effort and the ultrafast service tier completed on 2026-10-22. Service tiers default/fast/ultrafast also completed separate smoke requests. Codex has no verified visible-thinking stream."
     },
     {
       "provider": "openai",

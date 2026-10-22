@@ -16,10 +16,12 @@ ccc [controls...] "<Prompt>"
 
 Slots are parsed in free order before the prompt, except that `help`, `-h`, and `--help` win anywhere in argv and print help immediately:
 - runner: Select which coding CLI (default: oc). Options: opencode (oc), claude (cc), kimi (k), cursor (cu), gemini (g), pi (p), grok (gb), codex (c/cx), roocode (rc), crush (cr)
-- +thinking: Set thinking level from +0 (off) to +4 (max)
+- +thinking: Python/Rust support +0 through +6; +xhigh=4, +max=5, +ultra=6. Codex maps these to model_reasoning_effort and other runners clamp to their supported maximum.
   Claude keeps the same `ccc` scale: `+0` becomes `--thinking disabled`, and `+1..+4` become `--thinking enabled` with matching `--effort`.
   Kimi keeps the same `ccc` scale: `+0` becomes `--no-thinking`, and `+1..+4` become `--thinking`.
 - --show-thinking: Request visible thinking output when supported; default on. Implemented in Python and Rust for now.
+- --service-tier default|fast|priority|ultrafast: Select Codex service priority. --fast and --no-fast select fast/default. CLI overrides alias service_tier, then [defaults].service_tier; omitted fields inherit Codex settings. The alias wizard distinguishes inherit from default. Effort and service tier are independent; alias thinking = 6 or ccc add --thinking ultra selects ultra effort.
+- --standalone / --no-daemon: Opt out of the shared daemon. Codex: codex --no-daemon exec; OpenCode: opencode run --standalone. --no-standalone allows upstream defaults; standalone = true|false works in defaults, aliases, and wizard. Internal in-process app-server operation is unaffected.
 - --save-session: Explicitly allow the selected runner's normal session persistence. Implemented in Python and Rust for now.
 - --cleanup-session: Try post-run cleanup when the selected runner lacks a no-persist flag. Implemented in Python and Rust for now.
 - --output-log-path / --no-output-log-path: emit or suppress the final run-directory footer for scripts
@@ -34,7 +36,7 @@ Slots are parsed in free order before the prompt, except that `help`, `-h`, and 
 - Config: in Python and Rust, project-local `.ccc.toml` files are searched upward from the current directory, then `XDG_CONFIG_HOME/ccc/config.toml`, then `~/.config/ccc/config.toml`
 - Generated config: `ccc --print-config` prints the canonical schema using `[defaults]`, `[update]`, `[abbreviations]`, and `[aliases.<name>]`
 - Update checks: after each coding-CLI run, Python and Rust may warn when a newer `ccc` is on crates.io (GitHub releases fallback). Config: `[update] check` (default true), `auto_update` (default false, backgrounds `cargo install ccc` for cargo installs), `interval_hours` (default 24). Env: `CCC_UPDATE_CHECK`, `CCC_AUTO_UPDATE`, `CCC_UPDATE_CACHE`, `CCC_UPDATE_INTERVAL_HOURS`
-- Resolved config: `ccc config` prints all active config file paths and their raw contents in merge order; `CCC_CONFIG` wins alone when it points at an existing file
+- Resolved config: `ccc config` prints all active config file paths and their raw contents in merge order; an existing `CCC_CONFIG` file wins alone for execution, aliases, help, and config display. Missing overrides retain normal discovery.
 - Config editing: `ccc config --edit` opens the selected config in `$EDITOR`; `--user` targets the XDG/home user config and `--local` targets the nearest `.ccc.toml`, creating one in the current directory if needed
 - Alias wizard: `ccc add <alias>` writes the active write target; `-g` forces the effective global config instead of project-local config; blank/default answers omit alias keys; menu prompt color follows TTY detection and honors FORCE_COLOR/NO_COLOR; the wizard skips `prompt_mode` when prompt is unset and final save confirmation only accepts `y`, `n`, `yes`, or `no`
 - `ccc` writes `transcript.txt` for text and human transcript paths, `transcript.jsonl` for JSON-oriented paths, keeps `text` requests upgraded into structured streaming on `transcript.txt`, and places the files under a client-prefixed run directory such as `opencode-<run-id>`

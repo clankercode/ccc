@@ -177,6 +177,9 @@ fn test_parse_named_thinking_levels() {
         ("+xhigh", 4),
         ("+5", 5),
         ("+max", 5),
+        ("+6", 6),
+        ("+ultra", 6),
+        ("+ULTRA", 6),
     ];
     for (token, expected) in cases {
         let args: Vec<String> = vec![token.into(), "hello".into()];
@@ -882,6 +885,7 @@ fn test_resolve_codex_effort_ladder_maps_each_level() {
         (3, "high"),
         (4, "xhigh"),
         (5, "max"),
+        (6, "ultra"),
     ];
     for (level, effort) in expected {
         let parsed = ParsedArgs {
@@ -897,6 +901,79 @@ fn test_resolve_codex_effort_ladder_maps_each_level() {
 }
 
 #[test]
+fn test_standalone_precedence_and_unsupported_runner_warning() {
+    let mut config = CccConfig {
+        default_standalone: Some(true),
+        ..CccConfig::default()
+    };
+    let mut parsed = ParsedArgs {
+        runner: Some("c".into()),
+        prompt: "hello".into(),
+        ..ParsedArgs::default()
+    };
+    let (argv, _, _) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(argv[..3], ["codex", "--no-daemon", "exec"]);
+    config.aliases.insert(
+        "speed".into(),
+        AliasDef {
+            standalone: Some(false),
+            ..AliasDef::default()
+        },
+    );
+    parsed.alias = Some("speed".into());
+    let (argv, _, _) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(argv[..2], ["codex", "exec"]);
+    parsed.standalone = Some(true);
+    let (argv, _, _) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(argv[..3], ["codex", "--no-daemon", "exec"]);
+    parsed.standalone = Some(false);
+    config.aliases.get_mut("speed").unwrap().standalone = Some(true);
+    let (argv, _, _) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert_eq!(argv[..2], ["codex", "exec"]);
+    parsed.runner = Some("g".into());
+    let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert!(!argv
+        .iter()
+        .any(|arg| arg == "--standalone" || arg == "--no-daemon"));
+    assert!(!warnings
+        .iter()
+        .any(|warning| warning.contains("standalone")));
+    parsed.standalone = Some(true);
+    let (_, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert!(warnings.iter().any(|warning| warning
+        == "warning: runner \"gemini\" does not support standalone mode; ignoring it"));
+}
+
+#[test]
+fn test_programmatic_tier_controls_override_alias_defaults() {
+    let mut config = CccConfig::default();
+    config.aliases.insert(
+        "speed".into(),
+        AliasDef {
+            service_tier: Some("ultrafast".into()),
+            ..AliasDef::default()
+        },
+    );
+    let mut parsed = ParsedArgs {
+        runner: Some("c".into()),
+        alias: Some("speed".into()),
+        fast: Some(false),
+        service_tier: Some("PrIoRiTy".into()),
+        prompt: "hello".into(),
+        ..ParsedArgs::default()
+    };
+    let (argv, _, _) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert!(argv
+        .windows(2)
+        .any(|pair| pair == ["-c", "service_tier=\"priority\""]));
+    parsed.service_tier = None;
+    let (argv, _, _) = resolve_command(&parsed, Some(&config)).unwrap();
+    assert!(argv
+        .windows(2)
+        .any(|pair| pair == ["-c", "service_tier=\"default\""]));
+}
+
+#[test]
 fn test_resolve_codex_defaults_to_medium_effort() {
     let parsed = ParsedArgs {
         runner: Some("c".into()),
@@ -908,26 +985,28 @@ fn test_resolve_codex_defaults_to_medium_effort() {
 }
 
 #[test]
-fn test_resolve_thinking_five_clamps_for_lower_tier_runners() {
-    let claude = ParsedArgs {
-        runner: Some("cc".into()),
-        thinking: Some(5),
-        prompt: "hello".into(),
-        ..Default::default()
-    };
-    let (argv, _, _) = resolve_command(&claude, None).unwrap();
-    assert_eq!(
-        argv[..6],
-        ["claude", "-p", "--thinking", "enabled", "--effort", "max"]
-    );
-    let pi = ParsedArgs {
-        runner: Some("p".into()),
-        thinking: Some(5),
-        prompt: "hello".into(),
-        ..Default::default()
-    };
-    let (argv, _, _) = resolve_command(&pi, None).unwrap();
-    assert_eq!(argv[..4], ["pi", "-p", "--thinking", "xhigh"]);
+fn test_resolve_high_thinking_clamps_for_lower_tier_runners() {
+    for level in [5, 6] {
+        let claude = ParsedArgs {
+            runner: Some("cc".into()),
+            thinking: Some(level),
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let (argv, _, _) = resolve_command(&claude, None).unwrap();
+        assert_eq!(
+            argv[..6],
+            ["claude", "-p", "--thinking", "enabled", "--effort", "max"]
+        );
+        let pi = ParsedArgs {
+            runner: Some("p".into()),
+            thinking: Some(level),
+            prompt: "hello".into(),
+            ..Default::default()
+        };
+        let (argv, _, _) = resolve_command(&pi, None).unwrap();
+        assert_eq!(argv[..4], ["pi", "-p", "--thinking", "xhigh"]);
+    }
 }
 
 #[test]
@@ -999,10 +1078,9 @@ fn test_resolve_show_thinking_for_opencode() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
-        argv[..4],
+        argv[..3],
         [
             "opencode".to_string(),
-            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string()
         ]
@@ -1131,7 +1209,7 @@ fn test_resolve_default_show_thinking_enables_opencode_thinking() {
         ..Default::default()
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
-    assert_eq!(argv[..4], ["opencode", "--pure", "run", "--thinking"]);
+    assert_eq!(argv[..3], ["opencode", "run", "--thinking"]);
     assert!(warnings.is_empty());
 }
 
@@ -1165,7 +1243,7 @@ fn test_resolve_no_show_thinking_overrides_default_for_opencode() {
         ..Default::default()
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
-    assert_eq!(argv[..3], ["opencode", "--pure", "run"]);
+    assert_eq!(argv[..2], ["opencode", "run"]);
     assert!(!argv.contains(&"--thinking".to_string()));
     assert!(warnings.is_empty());
 }
@@ -1530,7 +1608,7 @@ fn test_resolve_alias_prompt_fills_missing_prompt() {
     let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
     assert_eq!(
         argv,
-        vec!["opencode", "--pure", "run", "--thinking", "Commit all changes"]
+        vec!["opencode", "run", "--thinking", "Commit all changes"]
     );
     assert!(warnings.is_empty());
 }
@@ -1561,7 +1639,6 @@ fn test_resolve_explicit_prompt_overrides_alias_prompt() {
         argv,
         vec![
             "opencode".to_string(),
-            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "Write the commit summary".to_string()
@@ -1598,7 +1675,6 @@ fn test_resolve_alias_prompt_mode_prepend_uses_newline_separator() {
         argv,
         vec![
             "opencode".to_string(),
-            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "Commit all changes\nInclude the failing tests".to_string()
@@ -1635,7 +1711,6 @@ fn test_resolve_alias_prompt_mode_append_uses_newline_separator() {
         argv,
         vec![
             "opencode".to_string(),
-            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "Include the failing tests\nCommit all changes".to_string()
@@ -1701,7 +1776,6 @@ fn test_resolve_alias_prompt_mode_allows_explicit_empty_prompt() {
         argv,
         vec![
             "opencode".to_string(),
-            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "Commit all changes".to_string()
@@ -1816,7 +1890,6 @@ fn test_explicit_runner_keeps_runner_like_alias_as_agent() {
         argv,
         vec![
             "opencode".to_string(),
-            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "--agent".to_string(),
@@ -1845,8 +1918,8 @@ fn test_configured_alias_named_like_runner_selector_wins() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, Some(&config)).unwrap();
     assert_eq!(
-        argv[..6],
-        ["opencode", "--pure", "run", "--thinking", "--agent", "specialist"]
+        argv[..5],
+        ["opencode", "run", "--thinking", "--agent", "specialist"]
     );
     assert!(warnings.is_empty());
 }
@@ -1966,7 +2039,6 @@ fn test_resolve_yolo_for_opencode_uses_env_override() {
         argv,
         vec![
             "opencode".to_string(),
-            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "hello".to_string()
@@ -2049,7 +2121,6 @@ fn test_resolve_permission_mode_safe_for_opencode_uses_ask_override() {
         argv,
         [
             "opencode".to_string(),
-            "--pure".to_string(),
             "run".to_string(),
             "--thinking".to_string(),
             "hello".to_string()
@@ -2212,13 +2283,16 @@ fn test_resolve_permission_mode_auto_for_codex() {
     };
     let (argv, _, warnings) = resolve_command(&parsed, None).unwrap();
     assert_eq!(
-        argv[..5],
+        argv[..8],
         [
             "codex".to_string(),
             "exec".to_string(),
             "-c".to_string(),
             "model_reasoning_effort=medium".to_string(),
-            "--full-auto".to_string()
+            "-c".to_string(),
+            "approval_policy=\"on-request\"".to_string(),
+            "--sandbox".to_string(),
+            "workspace-write".to_string()
         ]
     );
     assert!(warnings.is_empty());

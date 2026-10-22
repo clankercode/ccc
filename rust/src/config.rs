@@ -15,6 +15,8 @@ const EXAMPLE_CONFIG: &str = concat!(
     "# show_thinking = true\n",
     "# sanitize_osc = true\n",
     "# output_mode = \"text\"\n",
+    "# service_tier = \"default\" # Codex: default, fast (or priority), ultrafast\n",
+    "# standalone = true # Codex/OpenCode; omit for upstream default\n",
     "\n",
     "[update]\n",
     "# check = true\n",
@@ -32,6 +34,8 @@ const EXAMPLE_CONFIG: &str = concat!(
     "# show_thinking = true\n",
     "# sanitize_osc = true\n",
     "# output_mode = \"formatted\"\n",
+    "# service_tier = \"fast\" # Codex only; omit to inherit\n",
+    "# standalone = true # Codex/OpenCode; omit for upstream default\n",
     "# agent = \"reviewer\"\n",
     "# prompt = \"Review the current changes\"\n",
     "# prompt_mode = \"default\"\n",
@@ -250,6 +254,14 @@ pub fn render_alias_block(name: &str, alias: &AliasDef) -> Result<String, String
             alias.output_mode.as_ref().map(|value| toml_string(value)),
         ),
         (
+            "service_tier",
+            alias.service_tier.as_ref().map(|value| toml_string(value)),
+        ),
+        (
+            "standalone",
+            alias.standalone.map(|value| value.to_string()),
+        ),
+        (
             "agent",
             alias.agent.as_ref().map(|value| toml_string(value)),
         ),
@@ -358,8 +370,12 @@ pub fn write_alias_block(path: &Path, name: &str, alias: &AliasDef) -> Result<()
 
 pub fn load_config(path: Option<&Path>) -> CccConfig {
     let mut config = CccConfig::default();
+    let explicit = std::env::var("CCC_CONFIG")
+        .ok()
+        .map(|value| PathBuf::from(value.trim()))
+        .filter(|candidate| candidate.is_file());
 
-    let config_paths = match path {
+    let config_paths = match path.or(explicit.as_deref()) {
         Some(p) => vec![p.to_path_buf()],
         None => {
             let current_dir = std::env::current_dir().ok();
@@ -459,6 +475,12 @@ fn merge_alias(target: &mut crate::parser::AliasDef, overlay: &crate::parser::Al
     if overlay.output_mode.is_some() {
         target.output_mode = overlay.output_mode.clone();
     }
+    if overlay.service_tier.is_some() {
+        target.service_tier = overlay.service_tier.clone();
+    }
+    if overlay.standalone.is_some() {
+        target.standalone = overlay.standalone;
+    }
     if overlay.provider.is_some() {
         target.provider = overlay.provider.clone();
     }
@@ -496,6 +518,26 @@ fn parse_string_array(raw: &str) -> Vec<String> {
             }
         })
         .collect()
+}
+
+fn parse_service_tier_value(raw_value: &str) -> String {
+    let mut strings = serde_json::Deserializer::from_str(raw_value).into_iter::<String>();
+    if let Some(Ok(value)) = strings.next() {
+        let suffix = raw_value[strings.byte_offset()..].trim_start();
+        if suffix.is_empty() || suffix.starts_with('#') {
+            return value;
+        }
+    }
+    if let Some((value, suffix)) = raw_value
+        .strip_prefix('\'')
+        .and_then(|value| value.split_once('\''))
+    {
+        if suffix.trim().is_empty() || suffix.trim_start().starts_with('#') {
+            return value.to_string();
+        }
+    }
+    // Preserve non-string or malformed values so resolution rejects them.
+    raw_value.to_string()
 }
 
 fn parse_toml_config(content: &str, config: &mut CccConfig) {
@@ -574,6 +616,12 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                 ("defaults", "provider") => config.default_provider = value.to_string(),
                 ("defaults", "model") => config.default_model = value.to_string(),
                 ("defaults", "output_mode") => config.default_output_mode = value.to_string(),
+                ("defaults", "service_tier") => {
+                    config.default_service_tier = Some(parse_service_tier_value(raw_value))
+                }
+                ("defaults", "standalone") => {
+                    config.default_standalone = parse_bool(value.split('#').next().unwrap_or(""));
+                }
                 ("defaults", "thinking") => {
                     if let Ok(n) = value.parse::<i32>() {
                         config.default_thinking = Some(n);
@@ -622,6 +670,12 @@ fn parse_toml_config(content: &str, config: &mut CccConfig) {
                     current_alias.sanitize_osc = parse_bool(value);
                 }
                 ("alias", "output_mode") => current_alias.output_mode = Some(value.to_string()),
+                ("alias", "service_tier") => {
+                    current_alias.service_tier = Some(parse_service_tier_value(raw_value))
+                }
+                ("alias", "standalone") => {
+                    current_alias.standalone = parse_bool(value.split('#').next().unwrap_or(""));
+                }
                 ("alias", "provider") => current_alias.provider = Some(value.to_string()),
                 ("alias", "model") => current_alias.model = Some(value.to_string()),
                 ("alias", "agent") => current_alias.agent = Some(value.to_string()),
@@ -695,6 +749,7 @@ agent = "outer-agent"
             r#"
 [aliases.review]
 prompt = "Repo prompt"
+standalone = false
 "#,
         )
         .unwrap();
@@ -703,9 +758,11 @@ prompt = "Repo prompt"
             r#"
 [defaults]
 runner = "k"
+standalone = true
 
 [aliases.review]
 show_thinking = true
+standalone = true
 "#,
         )
         .unwrap();
@@ -736,11 +793,13 @@ model = "xdg-model"
         }
 
         assert_eq!(config.default_runner, "k");
+        assert_eq!(config.default_standalone, Some(true));
         assert_eq!(config.default_model, "xdg-model");
         let review = config.aliases.get("review").unwrap();
         assert_eq!(review.prompt.as_deref(), Some("Repo prompt"));
         assert_eq!(review.model.as_deref(), Some("xdg-model"));
         assert_eq!(review.show_thinking, Some(true));
+        assert_eq!(review.standalone, Some(false));
         assert_eq!(review.agent.as_deref(), None);
     }
 

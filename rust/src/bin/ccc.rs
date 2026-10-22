@@ -4,8 +4,9 @@ use call_coding_clis::{
     parse_tokens_with_config, print_help, print_usage, print_version, render_alias_block,
     render_example_config, render_parsed, resolve_human_tty, resolve_output_plan,
     resolve_sanitize_osc, resolve_show_thinking, schema_name_for_runner, transcript_io_warning,
-    write_alias_block, AliasDef, Client, Error as ClientError, FormattedRenderer, OutputMode,
-    RunArtifacts, RunnerKind, StructuredStreamProcessor, TranscriptKind,
+    validate_service_tier, write_alias_block, AliasDef, Client, Error as ClientError,
+    FormattedRenderer, OutputMode, RunArtifacts, RunnerKind, StructuredStreamProcessor,
+    TranscriptKind,
 };
 use std::collections::BTreeMap;
 use std::env;
@@ -45,6 +46,8 @@ fn alias_has_any_field(alias: &AliasDef) -> bool {
         || alias.show_thinking.is_some()
         || alias.sanitize_osc.is_some()
         || alias.output_mode.is_some()
+        || alias.service_tier.is_some()
+        || alias.standalone.is_some()
         || alias.provider.is_some()
         || alias.model.is_some()
         || alias.agent.is_some()
@@ -69,11 +72,12 @@ fn parse_add_thinking(value: &str) -> Result<i32, String> {
         "high" => Ok(3),
         "xhigh" => Ok(4),
         "max" => Ok(5),
+        "ultra" => Ok(6),
         _ => match value.parse::<i32>() {
-            Ok(parsed @ 0..=5) => Ok(parsed),
-            Ok(_) => Err("thinking must be 0, 1, 2, 3, 4, or 5".to_string()),
+            Ok(parsed @ 0..=6) => Ok(parsed),
+            Ok(_) => Err("thinking must be 0, 1, 2, 3, 4, 5, or 6".to_string()),
             Err(_) => Err(
-                "thinking must be 0, 1, 2, 3, 4, 5, none, low, medium, high, xhigh, or max"
+                "thinking must be 0, 1, 2, 3, 4, 5, 6, none, low, medium, high, xhigh, max, or ultra"
                     .to_string(),
             ),
         },
@@ -97,6 +101,8 @@ fn set_add_alias_field(alias: &mut AliasDef, field: &str, value: &str) -> Result
             }
             alias.output_mode = Some(value.to_string());
         }
+        "service_tier" => alias.service_tier = Some(validate_service_tier(value)?),
+        "standalone" => alias.standalone = Some(parse_add_bool(value)?),
         "agent" => alias.agent = Some(value.to_string()),
         "prompt" => alias.prompt = Some(value.to_string()),
         "prompt_mode" => {
@@ -146,10 +152,11 @@ fn parse_add_alias_args(
             let value = args
                 .get(index + 1)
                 .ok_or_else(|| "--unset requires a value".to_string())?;
-            if !is_add_alias_field(value) {
+            let field = value.replace('-', "_");
+            if !is_add_alias_field(&field) {
                 return Err(format!("unknown alias field for --unset: {value}"));
             }
-            unset_fields.push(value.to_string());
+            unset_fields.push(field);
             index += 1;
         } else if token == "--show-thinking" {
             alias.show_thinking = Some(true);
@@ -159,6 +166,10 @@ fn parse_add_alias_args(
             alias.sanitize_osc = Some(true);
         } else if token == "--no-sanitize-osc" {
             alias.sanitize_osc = Some(false);
+        } else if token == "--standalone" || token == "--no-daemon" {
+            alias.standalone = Some(true);
+        } else if token == "--no-standalone" {
+            alias.standalone = Some(false);
         } else if let Some(field) = token.strip_prefix("--") {
             let value = args
                 .get(index + 1)
@@ -344,6 +355,8 @@ fn is_add_alias_field(field: &str) -> bool {
             | "show_thinking"
             | "sanitize_osc"
             | "output_mode"
+            | "service_tier"
+            | "standalone"
             | "agent"
             | "prompt"
             | "prompt_mode"
@@ -360,6 +373,8 @@ fn alias_field_is_set(alias: &AliasDef, field: &str) -> bool {
         "show_thinking" => alias.show_thinking.is_some(),
         "sanitize_osc" => alias.sanitize_osc.is_some(),
         "output_mode" => alias.output_mode.is_some(),
+        "service_tier" => alias.service_tier.is_some(),
+        "standalone" => alias.standalone.is_some(),
         "agent" => alias.agent.is_some(),
         "prompt" => alias.prompt.is_some(),
         "prompt_mode" => alias.prompt_mode.is_some(),
@@ -377,6 +392,8 @@ fn unset_alias_field(alias: &mut AliasDef, field: &str) {
         "show_thinking" => alias.show_thinking = None,
         "sanitize_osc" => alias.sanitize_osc = None,
         "output_mode" => alias.output_mode = None,
+        "service_tier" => alias.service_tier = None,
+        "standalone" => alias.standalone = None,
         "agent" => alias.agent = None,
         "prompt" => alias.prompt = None,
         "prompt_mode" => alias.prompt_mode = None,
@@ -407,6 +424,12 @@ fn merge_alias(current: &AliasDef, overlay: &AliasDef, unset_fields: &[String]) 
     }
     if overlay.output_mode.is_some() {
         result.output_mode = overlay.output_mode.clone();
+    }
+    if overlay.service_tier.is_some() {
+        result.service_tier = overlay.service_tier.clone();
+    }
+    if overlay.standalone.is_some() {
+        result.standalone = overlay.standalone;
     }
     if overlay.agent.is_some() {
         result.agent = overlay.agent.clone();
@@ -564,8 +587,7 @@ fn choose(
             menu_style("default", "2", color),
             menu_style(default_label, "33", color),
             menu_style("choice >", "1;36", color),
-        ))?
-        .to_ascii_lowercase();
+        ))?;
         if answer.is_empty() {
             if let Some(index) = default {
                 return Ok(choices[index - 1].value.to_string());
@@ -583,6 +605,11 @@ fn choose(
             }
             return Ok(blank_value.unwrap_or("").to_string());
         }
+        // Uppercase keys distinguish max/ultra from medium/unset.
+        if let Some(choice) = choices.iter().find(|choice| answer == choice.key) {
+            return Ok(choice.value.to_string());
+        }
+        let answer = answer.to_ascii_lowercase();
         for (index, choice) in choices.iter().enumerate() {
             if answer == (index + 1).to_string()
                 || answer == choice.label
@@ -661,7 +688,7 @@ fn prompt_alias_fields(alias: &AliasDef) -> Result<AliasDef, String> {
         ("model", "Model", alias.model.clone()),
         (
             "thinking",
-            "Thinking 0-5",
+            "Thinking 0-6",
             alias.thinking.map(|value| value.to_string()),
         ),
         (
@@ -675,6 +702,16 @@ fn prompt_alias_fields(alias: &AliasDef) -> Result<AliasDef, String> {
             alias.sanitize_osc.map(|value| value.to_string()),
         ),
         ("output_mode", "Output mode", alias.output_mode.clone()),
+        (
+            "service_tier",
+            "Service tier (Codex)",
+            alias.service_tier.clone(),
+        ),
+        (
+            "standalone",
+            "Standalone",
+            alias.standalone.map(|value| value.to_string()),
+        ),
         ("agent", "Agent", alias.agent.clone()),
         ("prompt", "Prompt", alias.prompt.clone()),
         ("prompt_mode", "Prompt mode", alias.prompt_mode.clone()),
@@ -682,7 +719,56 @@ fn prompt_alias_fields(alias: &AliasDef) -> Result<AliasDef, String> {
         let suffix = current
             .as_ref()
             .map(|value| format!(" [{value}]"))
-            .unwrap_or_else(|| " [default]".to_string());
+            .unwrap_or_else(|| {
+                if field == "standalone" {
+                    " [inherit]"
+                } else {
+                    " [default]"
+                }
+                .to_string()
+            });
+        if field == "service_tier" {
+            let suffix = current
+                .as_ref()
+                .map(|value| format!(" [{value}]"))
+                .unwrap_or_else(|| " [inherit]".to_string());
+            let choice = choose_optional_field(
+                label,
+                &suffix,
+                &[
+                    WizardChoice {
+                        label: "inherit",
+                        key: "i",
+                        value: UNSET_CHOICE,
+                        aliases: &["inherit", "unset"],
+                    },
+                    WizardChoice {
+                        label: "default",
+                        key: "d",
+                        value: "default",
+                        aliases: &["default"],
+                    },
+                    WizardChoice {
+                        label: "fast",
+                        key: "f",
+                        value: "fast",
+                        aliases: &["fast", "priority"],
+                    },
+                    WizardChoice {
+                        label: "ultrafast",
+                        key: "u",
+                        value: "ultrafast",
+                        aliases: &["ultrafast"],
+                    },
+                ],
+            )?;
+            if choice == UNSET_CHOICE {
+                result.service_tier = None;
+            } else if choice != KEEP_CURRENT_CHOICE {
+                set_add_alias_field(&mut result, field, &choice)?;
+            }
+            continue;
+        }
         if field == "thinking" {
             let choice = choose_optional_field(
                 label,
@@ -730,6 +816,12 @@ fn prompt_alias_fields(alias: &AliasDef) -> Result<AliasDef, String> {
                         value: "max",
                         aliases: &["max"],
                     },
+                    WizardChoice {
+                        label: "ultra",
+                        key: "U",
+                        value: "ultra",
+                        aliases: &["ultra"],
+                    },
                 ],
             )?;
             if choice == KEEP_CURRENT_CHOICE {
@@ -742,16 +834,24 @@ fn prompt_alias_fields(alias: &AliasDef) -> Result<AliasDef, String> {
             }
             continue;
         }
-        if matches!(field, "show_thinking" | "sanitize_osc") {
+        if matches!(field, "show_thinking" | "sanitize_osc" | "standalone") {
             let choice = choose_optional_field(
                 label,
                 &suffix,
                 &[
                     WizardChoice {
-                        label: "unset",
-                        key: "u",
+                        label: if field == "standalone" {
+                            "inherit"
+                        } else {
+                            "unset"
+                        },
+                        key: if field == "standalone" { "i" } else { "u" },
                         value: UNSET_CHOICE,
-                        aliases: &["unset", "default"],
+                        aliases: if field == "standalone" {
+                            &["inherit", "unset", "default", "u"]
+                        } else {
+                            &["unset", "default"]
+                        },
                     },
                     WizardChoice {
                         label: "true",
@@ -1060,7 +1160,8 @@ fn emit_stdout_line(artifacts: Option<&RunArtifacts>, text: &str) {
 
 fn record_model_fallback_lines(artifacts: Option<&RunArtifacts>, stderr: &str) {
     for line in stderr.lines() {
-        if line.starts_with("ccc: ") {
+        // Fallback planning warnings accompany the model notices in runtime stderr.
+        if line.starts_with("ccc: ") || line.starts_with("warning: ") {
             record_transcript_line(artifacts, line);
         }
     }

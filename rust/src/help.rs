@@ -45,12 +45,12 @@ Usage:
 Controls (free order before the prompt):
   runner        Select which coding CLI to use (default: oc)
                 opencode (oc), claude (cc), kimi (k), codex (c/cx), roocode (rc), crush (cr), cursor (cu), gemini (g), pi (p), grok (gb)
-  +thinking     Set thinking level: +0..+5 or +none/+low/+med/+mid/+medium/+high/+xhigh/+max
-                Levels map 0 none, 1 low, 2 medium, 3 high, 4 xhigh, 5 max
-                Claude maps +0 to --thinking disabled and +1..+5 to --thinking enabled with matching --effort
-                Kimi maps +0 to --no-thinking and +1..+5 to --thinking
-                Codex maps each level to -c model_reasoning_effort (none/low/medium/high/xhigh/max) for gpt-5.6-style models
-                Runners with fewer tiers clamp +5 down to their top tier
+  +thinking     Set thinking level: +0..+6 or +none/+low/+med/+mid/+medium/+high/+xhigh/+max/+ultra
+                Levels map 0 none, 1 low, 2 medium, 3 high, 4 xhigh, 5 max, 6 ultra
+                Claude maps +0 to --thinking disabled and +1..+6 to --thinking enabled with matching --effort (capped at max)
+                Kimi maps +0 to --no-thinking and +1..+6 to --thinking
+                Codex maps each level to -c model_reasoning_effort (none/low/medium/high/xhigh/max/ultra)
+                Runners with fewer effort levels clamp +6 down to their top level
   :provider:model  Override provider and model
   @name         Use a named preset from config; if no preset exists, runner names select runners before agent fallback
                 Presets can also define a default prompt when the user leaves prompt text blank
@@ -63,8 +63,15 @@ Controls (free order before the prompt):
                 Request a higher-level permission profile when the selected runner supports it
   --yolo / -y   Request the runner's lowest-friction auto-approval mode when supported
   --fast / --no-fast
-                Toggle the runner's fast mode when supported (codex: --enable/--disable fast_mode);
+                Select fast/default service tier (Codex: -c service_tier="fast"/"default");
                 unsupported runners warn and ignore it
+  --service-tier <default|fast|priority|ultrafast>
+                Select the Codex service tier; CLI overrides alias and config defaults
+  --standalone / --no-daemon / --no-standalone
+                Request an explicit upstream daemon opt-out: codex --no-daemon exec ...;
+                OpenCode uses opencode run --standalone. --no-standalone omits the option.
+                Codex exec currently uses an in-process app-server; this cannot force shared daemon execution.
+                Unsupported runners warn only when standalone is true.
   --save-session
                 Allow the selected runner to save this run in its normal session history
   --cleanup-session
@@ -515,6 +522,12 @@ fn format_alias_summary(alias: &AliasDef) -> String {
     }
     if let Some(value) = &alias.output_mode {
         fields.push(format!("output_mode={}", format_alias_value(value)));
+    }
+    if let Some(value) = &alias.service_tier {
+        fields.push(format!("service_tier={}", format_alias_value(value)));
+    }
+    if let Some(value) = alias.standalone {
+        fields.push(format!("standalone={value}"));
     }
     if let Some(value) = &alias.agent {
         fields.push(format!("agent={}", format_alias_value(value)));

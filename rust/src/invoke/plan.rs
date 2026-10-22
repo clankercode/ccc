@@ -9,7 +9,7 @@ use crate::parser::{
     parse_args, resolve_command, resolve_effective_runner, resolve_output_mode, CccConfig,
     RUNNER_REGISTRY,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error as StdError;
 use std::fmt;
 use std::path::Path;
@@ -205,9 +205,11 @@ impl Client {
     pub fn run_unchecked(&self, request: &Request) -> Result<Run, Error> {
         let attempts = self.model_attempts(request);
         let mut prefix = attempts.pre_notices.clone();
+        let mut seen_warnings = BTreeSet::new();
         let mut index = 0;
         loop {
             let plan = self.plan(&attempts.requests[index])?;
+            prefix.push_str(&fallback_warnings(&plan, &mut seen_warnings, index > 0));
             let mut run = self.run_preplanned(plan);
             if index + 1 < attempts.requests.len()
                 && failure_allows_fallback(run.exit_code, run.timed_out, &run.stdout, &run.stderr)
@@ -279,10 +281,16 @@ impl Client {
         if !prefix.is_empty() {
             emit(&prefix);
         }
+        let mut seen_warnings = BTreeSet::new();
         let mut index = 0;
         loop {
             let plan = self.plan(&attempts.requests[index])?;
             on_attempt(plan.runner().canonical_id());
+            let warnings = fallback_warnings(&plan, &mut seen_warnings, index > 0);
+            if !warnings.is_empty() {
+                emit(&warnings);
+                prefix.push_str(&warnings);
+            }
             let callback = Arc::clone(&on_event);
             let mut run = self.stream_preplanned(plan, move |channel, chunk| {
                 if let Ok(mut callback) = callback.lock() {
@@ -485,6 +493,25 @@ impl ModelAttempts {
             warn_session_switch,
         }
     }
+}
+
+fn fallback_warnings(
+    plan: &Plan,
+    seen_warnings: &mut BTreeSet<String>,
+    is_fallback: bool,
+) -> String {
+    // Initial warnings stay in Plan for callers such as the CLI to print. Only
+    // new fallback warnings enter runtime stderr, outside runner error matching.
+    let mut warnings = String::new();
+    for warning in plan.warnings() {
+        if seen_warnings.insert(warning.clone()) && is_fallback {
+            warnings.push_str(warning);
+            if !warning.ends_with('\n') {
+                warnings.push('\n');
+            }
+        }
+    }
+    warnings
 }
 
 fn switch_notice(attempts: &ModelAttempts, index: usize) -> String {

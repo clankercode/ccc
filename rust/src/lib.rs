@@ -43,7 +43,7 @@
 //! ```no_run
 //! use call_coding_clis::{CommandSpec, Runner};
 //!
-//! let spec = CommandSpec::new(["opencode", "--pure", "run", "Explain this module"]);
+//! let spec = CommandSpec::new(["opencode", "run", "Explain this module"]);
 //! let result = Runner::new().run(spec);
 //!
 //! println!("stdout: {}", result.stdout);
@@ -85,7 +85,7 @@
 //! ```no_run
 //! use call_coding_clis::{CommandSpec, Runner};
 //!
-//! let spec = CommandSpec::new(["opencode", "--pure", "run", "Describe the next step"]);
+//! let spec = CommandSpec::new(["opencode", "run", "Describe the next step"]);
 //! let runner = Runner::new();
 //!
 //! let completed = runner.stream(spec, |channel, chunk| {
@@ -161,7 +161,7 @@ pub use output::{
 };
 pub use parser::{
     parse_args, resolve_command, resolve_output_mode, resolve_output_plan, resolve_sanitize_osc,
-    resolve_show_thinking, AliasDef, CccConfig, OutputPlan, ParsedArgs, RunnerInfo,
-    RUNNER_REGISTRY,
+    resolve_show_thinking, validate_service_tier, AliasDef, CccConfig, OutputPlan, ParsedArgs,
+    RunnerInfo, RUNNER_REGISTRY,
 };
 pub use sugar::{parse_tokens_with_config, ParsedRequest};

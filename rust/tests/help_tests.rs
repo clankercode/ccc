@@ -324,7 +324,7 @@ fn test_add_alias_existing_replace_accepts_numbered_choices() {
         .stdin
         .as_mut()
         .unwrap()
-        .write_all(b"2\noc\n\n\n3\n3\n1\n2\n\nFix the failing tests\n2\n1\n")
+        .write_all(b"2\noc\n\n\n3\n3\n1\n2\n\n\n\nFix the failing tests\n2\n1\n")
         .unwrap();
     let output = child.wait_with_output().unwrap();
 
@@ -343,6 +343,49 @@ output_mode = \"text\"\n\
 prompt = \"Fix the failing tests\"\n\
 prompt_mode = \"default\"\n"
     );
+}
+
+#[test]
+fn test_add_alias_thinking_keys_preserve_case() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-thinking-keys-{unique}"));
+    let config_path = base_dir.join("config.toml");
+    fs::create_dir_all(&base_dir).unwrap();
+    for (choice, expected) in [("U", Some(6)), ("M", Some(5)), ("u", None), ("m", Some(2))] {
+        fs::write(&config_path, "").unwrap();
+        let mut child = Command::new(ccc_bin())
+            .args(["add", "effort", "--runner", "c", "--thinking", "3"])
+            .env("HOME", base_dir.join("home"))
+            .env("XDG_CONFIG_HOME", base_dir.join("xdg"))
+            .env("CCC_CONFIG", &config_path)
+            .current_dir(&base_dir)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(format!("\n\n\n{choice}\n\n\n\n\n\n\n\ny\n").as_bytes())
+            .unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(
+            output.status.success(),
+            "choice {choice}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let config = call_coding_clis::load_config(Some(&config_path));
+        assert_eq!(
+            config.aliases["effort"].thinking, expected,
+            "choice {choice}"
+        );
+    }
+    fs::remove_dir_all(base_dir).unwrap();
 }
 
 #[test]

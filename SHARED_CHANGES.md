@@ -20,6 +20,49 @@ Entry format:
 - Notes: optional short context
 ```
 
+## 2026-10-22
+
+### Standalone execution controls and fallback warnings
+- Change: Python and Rust support `--standalone` / `--no-daemon`, `--no-standalone`, `[defaults].standalone`, alias `standalone`, wizard editing, and Rust Request `with_standalone`. CLI overrides aliases, then defaults; last CLI control wins. Codex receives `--no-daemon` before `exec`; OpenCode receives `run --standalone`. False omits the override and allows upstream defaults.
+- Fixes: Rust model retries now surface warnings introduced by the fallback plan in buffered and streamed stderr, including unsupported service-tier requests, without repeating initial warnings.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/fixtures/config-example.toml`
+- Docs updated: `README.md`, `CHANGELOG.md`, `CCC_BEHAVIOR_CONTRACT.md`, `docs/clis/README.md`, `docs/clis/codex.md`, `docs/clis/opencode.md`, `docs/index.html`, `docs/llms.txt`, Python/Rust READMEs, help and generated config
+- Notes: standalone controls target the shared background daemon; Codex's internal in-process app-server remains available. Unsupported runners warn and ignore a true standalone request.
+
+### Codex service tiers across CLI, config, aliases, and wizard
+- Change: Python and Rust support `--service-tier default|fast|priority|ultrafast`, `[defaults].service_tier`, alias `service_tier`, and the `ccc add` wizard and flags. CLI controls override alias settings, then defaults; omitted settings inherit upstream configuration. Explicit `default` selects standard service. The last CLI tier selector wins. The Rust Request builder supports `with_service_tier`.
+- Fixes: `--fast` / `--no-fast` now select `service_tier` instead of toggling Codex's feature controls. Codex `--permission-mode auto` uses explicit on-request approval and workspace-write sandbox settings because current Codex rejects the removed `--full-auto` flag. Alias `--unset` accepts hyphenated field names alongside TOML field names. Wizard shortcuts preserve uppercase `M`/`U` for max/ultra instead of confusing them with medium/unset.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/fixtures/config-example.toml`
+- Docs updated: `README.md`, `FEATURES.md`, `CHANGELOG.md`, `CCC_BEHAVIOR_CONTRACT.md`, `docs/clis/README.md`, `docs/clis/codex.md`, Python/Rust READMEs, help text, `ccc --print-config`
+- Notes: unsupported runners warn and ignore tiers; invalid tier values fail. The wizard distinguishes inherit from explicit default. Fast and Ultrafast remain subject to upstream model/account availability.
+
+### Codex ultra effort and current OpenCode command shape
+- Change: `+ultra` / `+6` map to Codex `model_reasoning_effort=ultra`; alias `thinking = 6`, `ccc add --thinking ultra`, and the thinking wizard support the new level. Other runners clamp it to their supported maximum. OpenCode invocation now uses `opencode run` because OpenCode v2 rejects the formerly hardcoded `--pure` option.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`, `tests/rust_runner.rs`
+- Docs updated: `README.md`, `FEATURES.md`, `CHANGELOG.md`, `CCC_BEHAVIOR_CONTRACT.md`, `docs/clis/README.md`, `docs/clis/codex.md`, `docs/clis/opencode.md`, `docs/clis/model-capabilities.json`, `docs/index.html`, `docs/llms.txt`, Python/Rust READMEs, help text
+- Notes: real Codex smoke requests completed with ultra effort and all three service tiers. Enabling a tier or effort remains subject to upstream availability. OpenCode plugin auto-update suppression is no longer forced through an unsupported flag.
+
+### Config overrides now select the same runtime configuration they display
+- Change: when `CCC_CONFIG` points to an existing file, Python and Rust use that file alone for normal invocations and alias/help resolution, matching `ccc config`. Explicit library `load_config(path)` calls still take precedence over the environment; missing override files retain the normal config chain.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py`
+- Docs updated: `README.md`, `CHANGELOG.md`, `docs/index.html`, `docs/llms.txt`
+- Notes: previously `ccc config` showed the override while execution silently loaded home/XDG/project config instead.
+
+### Rust harness uses the actual rustup configuration
+- Change: the shared harness builds with the real toolchain environment and reserves its isolated `HOME` for runner execution. It also preserves `RUSTUP_HOME` alongside `CARGO_HOME`. Rust checks now build and run instead of being skipped because wrappers or rustup resolve their tools against the temporary home.
+- Required implementations: none (test harness)
+- Additional rollout: Rust build verification
+- Shared tests updated: `tests/test_harness.py`
+- Docs updated: this log
+
 ## 2026-10-20
 
 ### Cross-runner fallback and Astra skip

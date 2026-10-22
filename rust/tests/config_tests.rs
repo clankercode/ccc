@@ -36,6 +36,8 @@ runner = "cc"
 provider = "anthropic"
 model = "claude-4"
 output_mode = "stream-formatted"
+service_tier = "default"
+standalone = true # Codex/OpenCode; omit for upstream default
 thinking = 2
 show_thinking = true
 sanitize_osc = false
@@ -49,6 +51,8 @@ thinking = 3
 show_thinking = true
 sanitize_osc = false
 output_mode = "formatted"
+service_tier = "fast"
+standalone = false
 model = "claude-4"
 agent = "reviewer"
 
@@ -68,6 +72,8 @@ prompt_mode = "append"
     assert_eq!(config.default_provider, "anthropic");
     assert_eq!(config.default_model, "claude-4");
     assert_eq!(config.default_output_mode, "stream-formatted");
+    assert_eq!(config.default_service_tier.as_deref(), Some("default"));
+    assert_eq!(config.default_standalone, Some(true));
     assert_eq!(config.default_thinking, Some(2));
     assert!(config.default_show_thinking);
     assert_eq!(config.default_sanitize_osc, Some(false));
@@ -81,6 +87,8 @@ prompt_mode = "append"
     assert_eq!(work.show_thinking, Some(true));
     assert_eq!(work.sanitize_osc, Some(false));
     assert_eq!(work.output_mode.as_deref(), Some("formatted"));
+    assert_eq!(work.service_tier.as_deref(), Some("fast"));
+    assert_eq!(work.standalone, Some(false));
     assert_eq!(work.model.as_deref(), Some("claude-4"));
     assert_eq!(work.agent.as_deref(), Some("reviewer"));
     let quick = config.aliases.get("quick").unwrap();
@@ -93,6 +101,30 @@ prompt_mode = "append"
 #[test]
 fn test_render_example_config_matches_fixture() {
     assert_eq!(render_example_config(), example_config_fixture());
+}
+
+#[test]
+fn test_generated_service_tier_examples_can_be_uncommented() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base_dir = std::env::temp_dir().join(format!("ccc-rust-service-tier-example-{unique}"));
+    let config_path = base_dir.join("config.toml");
+    fs::create_dir_all(&base_dir).unwrap();
+    let example = render_example_config()
+        .replace("# service_tier", "service_tier")
+        .replace("# standalone", "standalone");
+    fs::write(&config_path, example).unwrap();
+    let config = load_config(Some(&config_path));
+    assert_eq!(config.default_service_tier.as_deref(), Some("default"));
+    assert_eq!(config.default_standalone, Some(true));
+    assert_eq!(config.aliases["reviewer"].standalone, Some(true));
+    assert_eq!(
+        config.aliases["reviewer"].service_tier.as_deref(),
+        Some("fast")
+    );
+    fs::remove_dir_all(base_dir).unwrap();
 }
 
 #[test]
@@ -283,6 +315,7 @@ fn test_render_alias_block_omits_unset_keys_and_escapes_strings() {
         model: Some("claude \"quoted\"".to_string()),
         thinking: Some(3),
         show_thinking: Some(true),
+        standalone: Some(false),
         prompt: Some("Review\nchanges".to_string()),
         prompt_mode: Some("append".to_string()),
         ..AliasDef::default()
@@ -295,6 +328,7 @@ runner = \"cc\"\n\
 model = \"claude \\\"quoted\\\"\"\n\
 thinking = 3\n\
 show_thinking = true\n\
+standalone = false\n\
 prompt = \"Review\\nchanges\"\n\
 prompt_mode = \"append\"\n"
     );

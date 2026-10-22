@@ -213,7 +213,8 @@ class SingleImplCccContractTests(unittest.TestCase):
                     env = self._make_env(opencode_path, lang)
                     env["HOME"] = str(tmp_path)
                     env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
-                    env["CCC_CONFIG"] = str(tmp_path / "legacy-config")
+                    if lang.name not in {"Python", "Rust"}:
+                        env["CCC_CONFIG"] = str(tmp_path / "legacy-config")
                     env.pop("CCC_REAL_OPENCODE", None)
                     if lang.name == "x86-64 ASM":
                         asm_config_path = tmp_path / "asm-config"
@@ -270,7 +271,8 @@ class SingleImplCccContractTests(unittest.TestCase):
                     env = self._make_env(opencode_path, lang)
                     env["HOME"] = str(tmp_path)
                     env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
-                    env["CCC_CONFIG"] = str(tmp_path / "legacy-config")
+                    if lang.name not in {"Python", "Rust"}:
+                        env["CCC_CONFIG"] = str(tmp_path / "legacy-config")
                     result = lang.invoke_extra(["@reviewer", PROMPT], env)
                     assertion(result)
 
@@ -290,7 +292,8 @@ class SingleImplCccContractTests(unittest.TestCase):
                     env = self._make_env(opencode_path, lang)
                     env["HOME"] = str(tmp_path)
                     env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
-                    env["CCC_CONFIG"] = str(tmp_path / "legacy-config")
+                    if lang.name not in {"Python", "Rust"}:
+                        env["CCC_CONFIG"] = str(tmp_path / "legacy-config")
                     if prompt is None:
                         result = lang.invoke_extra(["@commit"], env)
                     else:
@@ -315,7 +318,8 @@ class SingleImplCccContractTests(unittest.TestCase):
                     env = self._make_env(opencode_path, lang)
                     env["HOME"] = str(tmp_path)
                     env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg")
-                    env["CCC_CONFIG"] = str(tmp_path / "legacy-config")
+                    if lang.name not in {"Python", "Rust"}:
+                        env["CCC_CONFIG"] = str(tmp_path / "legacy-config")
                     if prompt is None:
                         result = lang.invoke_extra(["@add-task"], env)
                     else:
@@ -1199,6 +1203,7 @@ class SingleImplCccContractTests(unittest.TestCase):
             bin_dir.mkdir()
             opencode_path = bin_dir / "opencode"
             self._write_opencode_stub(opencode_path)
+            self._write_argv_echo_stub(bin_dir / "claude", "claude")
 
             for lang in self.selected_languages:
                 if lang.name not in CONFIG_COMMAND_IMPLEMENTATIONS:
@@ -1217,6 +1222,9 @@ class SingleImplCccContractTests(unittest.TestCase):
                     self.assert_config_command_output(
                         result, override_path, override_body
                     )
+                    runtime_result = lang.invoke_with_args([], PROMPT, env)
+                    self.assertEqual(runtime_result.returncode, 0, runtime_result.stderr)
+                    self.assertEqual(runtime_result.stdout, CLAUDE_RUNNER_NO_PERSIST_EXPECTED)
 
     def test_config_command_falls_back_when_ccc_config_is_missing(self) -> None:
         fallback_body = '[defaults]\nrunner = "k"\n'
@@ -1350,7 +1358,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                         command,
                         env=lang.prepared_env(env),
                         cwd=ROOT,
-                        input="\n\n\n\n\n\n\n\n\ny\n",
+                        input="\n" * 11 + "y\n",
                         capture_output=True,
                         text=True,
                         check=False,
@@ -1381,7 +1389,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                         command,
                         env=lang.prepared_env(env),
                         cwd=ROOT,
-                        input="\n\n\n\n\n\n\n\n\n\nmaybe\n\nYES\n",
+                        input="\n" * 12 + "maybe\n\nYES\n",
                         capture_output=True,
                         text=True,
                         check=False,
@@ -1540,7 +1548,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", "--permission-mode", "auto"],
-                        "codex exec -c model_reasoning_effort=medium --full-auto --ephemeral Fix the failing tests\n",
+                        'codex exec -c model_reasoning_effort=medium -c approval_policy="on-request" --sandbox workspace-write --ephemeral Fix the failing tests\n',
                         "",
                     ),
                     (
@@ -1630,7 +1638,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["c", "--permission-mode", "auto"],
-                        "codex exec -c model_reasoning_effort=medium --full-auto --ephemeral Fix the failing tests\n",
+                        'codex exec -c model_reasoning_effort=medium -c approval_policy="on-request" --sandbox workspace-write --ephemeral Fix the failing tests\n',
                         "",
                     ),
                     (
@@ -1882,7 +1890,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["oc", ".json"],
-                        "opencode --pure run --format json --thinking Fix the failing tests\n",
+                        "opencode run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["c", ".json"],
@@ -1932,7 +1940,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["oc", ".json"],
-                        "opencode --pure run --format json --thinking Fix the failing tests\n",
+                        "opencode run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["c", ".json"],
@@ -2038,19 +2046,19 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["oc", ".pt"],
-                        "opencode --pure run --thinking Fix the failing tests\n",
+                        "opencode run --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", "..pt"],
-                        "opencode --pure run --thinking Fix the failing tests\n",
+                        "opencode run --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", ".pj"],
-                        "opencode --pure run --format json --thinking Fix the failing tests\n",
+                        "opencode run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", "..pj"],
-                        "opencode --pure run --format json --thinking Fix the failing tests\n",
+                        "opencode run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["c", ".pt"],
@@ -2136,19 +2144,19 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["oc", ".pt"],
-                        "opencode --pure run --thinking Fix the failing tests\n",
+                        "opencode run --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", "..pt"],
-                        "opencode --pure run --thinking Fix the failing tests\n",
+                        "opencode run --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", ".pj"],
-                        "opencode --pure run --format json --thinking Fix the failing tests\n",
+                        "opencode run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", "..pj"],
-                        "opencode --pure run --format json --thinking Fix the failing tests\n",
+                        "opencode run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["c", ".pt"],
@@ -2256,11 +2264,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["oc", ".fmt"],
-                        "[assistant] opencode --pure run --format json --thinking Fix the failing tests\n",
+                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", "..fmt"],
-                        "[assistant] opencode --pure run --format json --thinking Fix the failing tests\n",
+                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["c", ".fmt"],
@@ -2306,11 +2314,11 @@ class SingleImplCccContractTests(unittest.TestCase):
                     ),
                     (
                         ["oc", ".fmt"],
-                        "[assistant] opencode --pure run --format json --thinking Fix the failing tests\n",
+                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["oc", "..fmt"],
-                        "[assistant] opencode --pure run --format json --thinking Fix the failing tests\n",
+                        "[assistant] opencode run --format json --thinking Fix the failing tests\n",
                     ),
                     (
                         ["c", ".fmt"],
@@ -2365,7 +2373,7 @@ class SingleImplCccContractTests(unittest.TestCase):
             self._write_structured_argv_echo_stub(opencode_path, "opencode", "opencode")
 
             expected_stdout = (
-                "\x1b[96m💬\x1b[0m opencode --pure run --format json --thinking Fix the failing tests\n"
+                "\x1b[96m💬\x1b[0m opencode run --format json --thinking Fix the failing tests\n"
             )
 
             for lang in self.selected_languages:
@@ -3047,12 +3055,12 @@ class SingleImplCccContractTests(unittest.TestCase):
             cases = [
                 (
                     ["c", "--fast"],
-                    "codex exec -c model_reasoning_effort=medium --enable fast_mode --ephemeral Fix the failing tests\n",
+                    'codex exec -c model_reasoning_effort=medium -c service_tier="fast" --ephemeral Fix the failing tests\n',
                     "",
                 ),
                 (
                     ["c", "--no-fast"],
-                    "codex exec -c model_reasoning_effort=medium --disable fast_mode --ephemeral Fix the failing tests\n",
+                    'codex exec -c model_reasoning_effort=medium -c service_tier="default" --ephemeral Fix the failing tests\n',
                     "",
                 ),
                 (
@@ -3084,6 +3092,192 @@ class SingleImplCccContractTests(unittest.TestCase):
                                 {expected_stderr, expected_stderr + "\n"},
                             )
 
+    def test_service_tier_precedence_and_cli_controls(self) -> None:
+        cases = [
+            ("", "", [], None),
+            ('service_tier = "fast"', "", [], "fast"),
+            ('service_tier = "ultrafast"', 'service_tier = "default"', [], "default"),
+            ('service_tier = "default"', 'service_tier = "ultrafast"', [], "ultrafast"),
+            ('service_tier = "ultrafast"', 'service_tier = "fast"', ["--service-tier", "default"], "default"),
+            ("", "", ["--service-tier", "priority"], "priority"),
+            ("", "", ["--service-tier", "ULTRAFAST"], "ultrafast"),
+            ("", "", ["--fast", "--service-tier", "ultrafast"], "ultrafast"),
+            ("", "", ["--service-tier", "ultrafast", "--fast"], "fast"),
+            ("", 'service_tier = "ultrafast"', ["--no-fast"], "default"),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            bin_dir = Path(tmp) / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+            self._write_argv_echo_stub(bin_dir / "codex", "codex")
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                for defaults, alias, args, tier in cases:
+                    with self.subTest(language=lang.name, defaults=defaults, alias=alias, args=args):
+                        config_path.write_text(
+                            f'[defaults]\n{defaults}\n[aliases.tier]\nrunner = "c"\n{alias}\n',
+                            encoding="utf-8",
+                        )
+                        result = lang.invoke_with_args(["@tier", *args], PROMPT, env)
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        tier_args = f' -c service_tier="{tier}"' if tier else ""
+                        self.assertEqual(
+                            result.stdout,
+                            f"codex exec -c model_reasoning_effort=medium{tier_args} --ephemeral {PROMPT}\n",
+                        )
+                        self.assertEqual(result.stderr.strip(), "")
+
+    def test_service_tier_rejects_invalid_cli_and_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bin_dir = Path(tmp) / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+            self._write_argv_echo_stub(bin_dir / "codex", "codex")
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                for content, args in [
+                    ("", ["c", "--service-tier"]),
+                    ("", ["c", "--service-tier", "turbo", PROMPT]),
+                    ('[defaults]\nservice_tier = "turbo"\n', ["c", PROMPT]),
+                    ('[defaults]\nservice_tier = 3\n', ["c", PROMPT]),
+                    ('[aliases.bad]\nrunner = "c"\nservice_tier = "turbo"\n', ["@bad", PROMPT]),
+                    ('[aliases.bad]\nrunner = "c"\nservice_tier = true\n', ["@bad", PROMPT]),
+                ]:
+                    with self.subTest(language=lang.name, content=content, args=args):
+                        config_path.write_text(content, encoding="utf-8")
+                        result = lang.invoke_extra(args, env)
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn("default, fast, priority, ultrafast", result.stderr)
+                        self.assertNotIn("codex exec", result.stdout)
+
+    def test_service_tier_warns_for_unsupported_runner(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bin_dir = Path(tmp) / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+            self._write_argv_echo_stub(bin_dir / "gemini", "gemini")
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                result = lang.invoke_with_args(["g", "--service-tier", "ultrafast"], PROMPT, env)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, f"gemini --prompt {PROMPT}\n")
+                self.assertIn('runner "gemini" does not support service tiers; ignoring service tier "ultrafast"', result.stderr)
+
+    def test_service_tier_alias_add_merge_unset_and_help(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bin_dir = Path(tmp) / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                with self.subTest(language=lang.name):
+                    added = lang.invoke_extra(["add", "speed", "--runner", "c", "--thinking", "ultra", "--service-tier", "ultrafast", "--standalone", "--yes"], env)
+                    self.assertEqual(added.returncode, 0, added.stderr)
+                    self.assertIn('service_tier = "ultrafast"', config_path.read_text())
+                    self.assertIn("thinking = 6", config_path.read_text())
+                    self.assertIn("standalone = true", config_path.read_text())
+                    merged = lang.invoke_extra(["add", "speed", "--model", "test-model", "--yes"], env)
+                    self.assertEqual(merged.returncode, 0, merged.stderr)
+                    self.assertIn('service_tier = "ultrafast"', config_path.read_text())
+                    help_result = lang.invoke_extra(["--help"], env)
+                    self.assertIn("--service-tier <default|fast|priority|ultrafast>", help_result.stdout)
+                    self.assertIn("service_tier=ultrafast", help_result.stdout)
+                    unset = lang.invoke_extra(["add", "speed", "--unset", "service-tier", "--yes"], env)
+                    self.assertEqual(unset.returncode, 0, unset.stderr)
+                    self.assertNotIn("service_tier", config_path.read_text())
+
+    def test_service_tier_wizard_distinguishes_default_from_inherit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bin_dir = Path(tmp) / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                for choice, tier, effort_choice, effort, standalone in [
+                    ("ultrafast", "ultrafast", "ultra", 6, "true"),
+                    ("default", "default", "U", 6, "false"),
+                    ("inherit", None, "M", 5, "unset"),
+                ]:
+                    with self.subTest(language=lang.name, choice=choice):
+                        config_path.write_text("", encoding="utf-8")
+                        command = lang.invoke_fn("__placeholder__")[:-1] + ["add", "speed", "--runner", "c"]
+                        result = subprocess.run(
+                            command, env=lang.prepared_env(env), cwd=ROOT,
+                            input="\n" * 3 + effort_choice + "\n" + "\n" * 3 + "invalid-tier\n" + choice + "\n" + standalone + "\n" + "\n" * 2 + "y\n",
+                            capture_output=True, text=True, check=False,
+                        )
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertIn("Service tier", result.stdout)
+                        self.assertIn("Please choose one of:", result.stdout)
+                        self.assertIn(f"thinking = {effort}", config_path.read_text())
+                        if standalone != "unset":
+                            self.assertIn(f"standalone = {standalone}", config_path.read_text())
+                        else:
+                            self.assertNotIn("standalone =", config_path.read_text())
+                        if tier:
+                            self.assertIn(f'service_tier = "{tier}"', config_path.read_text())
+                        else:
+                            self.assertNotIn("service_tier", config_path.read_text())
+
+    def test_standalone_controls_preserve_codex_root_flag_and_config_precedence(self) -> None:
+        cases = [
+            ("", "", ["--standalone"], True),
+            ("", "", ["--no-daemon"], True),
+            ("standalone = true", "", [], True),
+            ("standalone = true", "standalone = false", [], False),
+            ("", "standalone = true", ["--no-standalone"], False),
+            ("standalone = false", "standalone = false", ["--standalone"], True),
+            ("", "", ["--standalone", "--no-standalone"], False),
+            ("", "", ["--no-standalone", "--no-daemon"], True),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            bin_dir = Path(tmp) / "bin"
+            bin_dir.mkdir()
+            opencode_path = bin_dir / "opencode"
+            self._write_opencode_stub(opencode_path)
+            self._write_argv_echo_stub(bin_dir / "codex", "codex")
+            self._write_argv_echo_stub(bin_dir / "gemini", "gemini")
+            for lang in self.selected_languages:
+                if lang.name not in {"Python", "Rust"}:
+                    continue
+                env = self._make_env(opencode_path, lang)
+                config_path = Path(env["XDG_CONFIG_HOME"]) / "ccc" / "config.toml"
+                for defaults, alias, args, enabled in cases:
+                    with self.subTest(language=lang.name, defaults=defaults, alias=alias, args=args):
+                        config_path.write_text(f'[defaults]\n{defaults}\n[aliases.solo]\nrunner = "c"\n{alias}\n', encoding="utf-8")
+                        result = lang.invoke_with_args(["@solo", *args], PROMPT, env)
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        root_flag = " --no-daemon" if enabled else ""
+                        self.assertEqual(result.stdout, f"codex{root_flag} exec -c model_reasoning_effort=medium --ephemeral {PROMPT}\n")
+                        self.assertEqual(result.stderr.strip(), "")
+                config_path.write_text("", encoding="utf-8")
+                unsupported = lang.invoke_with_args(["g", "--standalone"], PROMPT, env)
+                self.assertEqual(unsupported.returncode, 0, unsupported.stderr)
+                self.assertIn('runner "gemini" does not support standalone mode', unsupported.stderr)
+                self._write_argv_echo_stub(opencode_path, "opencode")
+                opencode = lang.invoke_with_args(["oc", "--standalone", "-o", "pass-text"], PROMPT, env)
+                self.assertEqual(opencode.returncode, 0, opencode.stderr)
+                self.assertEqual(opencode.stdout, f"opencode run --thinking --standalone {PROMPT}\n")
+
     def test_codex_effort_ladder_maps_to_model_reasoning_effort(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -3103,6 +3297,8 @@ class SingleImplCccContractTests(unittest.TestCase):
                 (["c", "+5"], "codex exec -c model_reasoning_effort=max --ephemeral Fix the failing tests\n"),
                 (["c", "+xhigh"], "codex exec -c model_reasoning_effort=xhigh --ephemeral Fix the failing tests\n"),
                 (["c", "+max"], "codex exec -c model_reasoning_effort=max --ephemeral Fix the failing tests\n"),
+                (["c", "+6"], "codex exec -c model_reasoning_effort=ultra --ephemeral Fix the failing tests\n"),
+                (["c", "+ultra"], "codex exec -c model_reasoning_effort=ultra --ephemeral Fix the failing tests\n"),
                 # No explicit level: codex falls back to its own medium default.
                 (["c"], "codex exec -c model_reasoning_effort=medium --ephemeral Fix the failing tests\n"),
             ]
@@ -3865,6 +4061,16 @@ esac
                     self.assertIn(" -p ", f" {calls[1]} ")
                     self.assertNotIn("model_reasoning_effort", calls[1])
                     self.assertNotIn(" exec ", f" {calls[1]} ")
+
+                for output_mode in ("text", "stream-text"):
+                    with self.subTest(language=lang.name, case="fallback-tier-warning", mode=output_mode):
+                        result, calls = run("once", ["@cx-glm", "--service-tier", "ultrafast", "-o", output_mode, "ping"])
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertEqual(len(calls), 2)
+                        warning = 'runner "grok" does not support service tiers; ignoring service tier "ultrafast"'
+                        self.assertEqual(result.stderr.count(warning), 1, result.stderr)
+                        self.assertIn(warning, self._latest_transcript(env))
+                        self.assertNotIn("service_tier", calls[1])
 
                 with self.subTest(language=lang.name, case="primary-astra"):
                     result, calls = run("success", ["@cx-astra", "ping"])

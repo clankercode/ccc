@@ -30,6 +30,12 @@ For every implementation that claims `ccc` support:
 
 ## Implemented Languages
 
+Python and Rust support standalone controls: CLI `--standalone` / `--no-daemon` select true, `--no-standalone` selects false, and defaults/aliases can set `standalone`. CLI overrides aliases, then defaults. True emits `codex --no-daemon exec` or `opencode run --standalone`; false omits the override and permits upstream defaults. Other runners warn when true is requested. Codex internal in-process app-server operation remains available.
+
+Python and Rust map `+ultra` / `+6` and alias `thinking = 6` to Codex `-c model_reasoning_effort=ultra`; other runners clamp to their supported maximum. Effort and service tier are independent. OpenCode uses `opencode run` without the unsupported `--pure` flag.
+
+Python and Rust support Codex service tiers through `--service-tier default|fast|priority|ultrafast`, `[defaults].service_tier`, and `[aliases.<name>].service_tier`. Explicit CLI controls take precedence over aliases, then defaults. The last CLI tier control wins; `--fast` selects fast and `--no-fast` selects default. Omitted fields inherit upstream configuration; explicit default overrides an upstream faster tier. Other runners warn and ignore tier selection. Invalid tiers fail. Alias creation/editing, generated config, help summaries, and the wizard preserve this distinction. Codex auto permissions use `-c 'approval_policy="on-request"' --sandbox workspace-write` instead of the removed `--full-auto` flag.
+
 ### Python
 
 - supports first-pass `ccc "<Prompt>"`

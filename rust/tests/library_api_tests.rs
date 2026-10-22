@@ -19,6 +19,161 @@ fn library_api_tests_request_builder_sets_expected_fields() {
 }
 
 #[test]
+fn library_api_tests_standalone_builder_and_token_roundtrip() {
+    assert_eq!(Request::new("hello").standalone(), None);
+    for (runner, token) in [(RunnerKind::Codex, "c"), (RunnerKind::OpenCode, "oc")] {
+        for (controls, expected) in [
+            (vec!["--standalone"], true),
+            (vec!["--no-daemon"], true),
+            (vec!["--no-standalone"], false),
+            (vec!["--standalone", "--no-standalone"], false),
+            (vec!["--no-standalone", "--no-daemon"], true),
+        ] {
+            let tokens = [vec![token], controls, vec!["hello"]].concat();
+            let parsed = sugar::parse_tokens(tokens).unwrap();
+            let request = Request::new("hello")
+                .with_runner(runner)
+                .with_standalone(expected);
+            assert_eq!(parsed.request, request);
+            assert_eq!(request.standalone(), Some(expected));
+            let plan = Client::new().plan(&request).unwrap();
+            assert_eq!(plan.runner(), runner);
+            let argv = &plan.command_spec().argv;
+            if runner == RunnerKind::Codex {
+                if expected {
+                    assert_eq!(argv[..3], ["codex", "--no-daemon", "exec"]);
+                    assert_eq!(argv.iter().filter(|arg| *arg == "--no-daemon").count(), 1);
+                } else {
+                    assert_eq!(argv[..2], ["codex", "exec"]);
+                    assert!(!argv.iter().any(|arg| arg == "--no-daemon"));
+                }
+            } else {
+                assert_eq!(argv[..2], ["opencode", "run"]);
+                assert_eq!(argv.iter().any(|arg| arg == "--standalone"), expected);
+            }
+        }
+    }
+    let request = Request::new("hello")
+        .with_runner(RunnerKind::Codex)
+        .with_standalone(true)
+        .with_standalone(false);
+    assert_eq!(request.standalone(), Some(false));
+    let client = Client::new().with_config(CccConfig {
+        default_standalone: Some(true),
+        ..CccConfig::default()
+    });
+    assert!(!client
+        .plan(&request)
+        .unwrap()
+        .command_spec()
+        .argv
+        .iter()
+        .any(|arg| arg == "--no-daemon"));
+}
+
+#[test]
+fn library_api_tests_service_tier_builder_last_control_wins() {
+    let base = Request::new("hello").with_runner(RunnerKind::Codex);
+    for (request, expected) in [
+        (base.clone(), None),
+        (base.clone().with_service_tier("PrIoRiTy"), Some("priority")),
+        (
+            base.clone().with_fast(true).with_service_tier("ultrafast"),
+            Some("ultrafast"),
+        ),
+        (
+            base.clone().with_service_tier("ultrafast").with_fast(true),
+            Some("fast"),
+        ),
+        (
+            base.with_service_tier("priority").with_fast(false),
+            Some("default"),
+        ),
+    ] {
+        let plan = Client::new().plan(&request).unwrap();
+        let tiers: Vec<_> = plan
+            .command_spec()
+            .argv
+            .windows(2)
+            .filter(|pair| pair[0] == "-c" && pair[1].starts_with("service_tier="))
+            .map(|pair| pair[1].as_str())
+            .collect();
+        let expected: Vec<_> = expected
+            .into_iter()
+            .map(|tier| format!("service_tier=\"{tier}\""))
+            .collect();
+        assert_eq!(tiers, expected);
+    }
+}
+
+#[test]
+fn library_api_tests_service_tier_survives_parsed_request_roundtrip() {
+    for (controls, tier) in [
+        (vec!["--service-tier", "PrIoRiTy"], "priority"),
+        (vec!["--fast", "--service-tier", "default"], "default"),
+        (vec!["--service-tier", "ultrafast", "--fast"], "fast"),
+        (vec!["--service-tier", "fast", "--no-fast"], "default"),
+    ] {
+        let tokens = [vec!["c"], controls, vec!["hello"]].concat();
+        let parsed = sugar::parse_tokens(tokens).unwrap();
+        let plan = Client::new().plan(&parsed.request).unwrap();
+        assert!(plan
+            .command_spec()
+            .argv
+            .windows(2)
+            .any(|pair| pair == ["-c", &format!("service_tier=\"{tier}\"")]));
+        if tier == "priority" {
+            assert_eq!(parsed.request.service_tier(), Some("priority"));
+        }
+    }
+}
+
+#[test]
+fn library_api_tests_service_tier_validation_includes_unsupported_runners() {
+    for runner in [RunnerKind::Codex, RunnerKind::Claude] {
+        let request = Request::new("hello")
+            .with_runner(runner)
+            .with_service_tier("turbo");
+        let error = Client::new().plan(&request).unwrap_err().to_string();
+        assert!(error.contains("service tier must be one of: default, fast, priority, ultrafast"));
+    }
+    for tokens in [
+        vec!["c", "--service-tier", "turbo", "--fast", "hello"],
+        vec![
+            "c",
+            "--service-tier",
+            "turbo",
+            "--service-tier",
+            "fast",
+            "hello",
+        ],
+    ] {
+        assert!(sugar::parse_tokens(tokens).is_err());
+    }
+}
+
+#[test]
+fn library_api_tests_request_preserves_ultra_effort() {
+    let builder = Request::new("hello")
+        .with_runner(RunnerKind::Codex)
+        .with_thinking(6);
+    let parsed = sugar::parse_tokens(["c", "+ultra", "hello"]).unwrap();
+    assert_eq!(parsed.request, builder);
+    let plan = Client::new().plan(&builder).unwrap();
+    assert!(plan
+        .command_spec()
+        .argv
+        .windows(2)
+        .any(|pair| pair == ["-c", "model_reasoning_effort=ultra"]));
+}
+
+#[test]
+fn library_api_tests_build_prompt_spec_uses_opencode_run() {
+    let spec = call_coding_clis::build_prompt_spec(" hello ").unwrap();
+    assert_eq!(spec.argv, ["opencode", "run", "hello"]);
+}
+
+#[test]
 fn library_api_tests_sugar_parse_tokens_supports_provider_model_sugar() {
     let parsed = sugar::parse_tokens(["c", ":openai:gpt-5.4-mini", "debug this"])
         .expect("parse should succeed");

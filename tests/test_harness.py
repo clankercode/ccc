@@ -635,9 +635,15 @@ class CrossLanguageHarness(unittest.TestCase):
         cls.base_env["CARGO_HOME"] = os.environ.get(
             "CARGO_HOME", str(Path.home() / ".cargo")
         )
+        cls.base_env["RUSTUP_HOME"] = os.environ.get(
+            "RUSTUP_HOME", str(Path.home() / ".rustup")
+        )
 
+        # Build tools need the user's toolchain configuration; only runner
+        # execution should use the isolated HOME below.
+        build_env = os.environ.copy()
         for lang in cls.selected_languages:
-            lang.build(cls.base_env)
+            lang.build(build_env)
 
     def _make_env(self, lang: LanguageSpec) -> Dict[str, str]:
         env = self.base_env.copy()

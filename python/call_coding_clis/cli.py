@@ -94,6 +94,8 @@ ALIAS_FIELDS = {
     "show_thinking",
     "sanitize_osc",
     "output_mode",
+    "service_tier",
+    "standalone",
     "agent",
     "prompt",
     "prompt_mode",
@@ -109,6 +111,7 @@ THINKING_ALIASES = {
     "high": 3,
     "xhigh": 4,
     "max": 5,
+    "ultra": 6,
 }
 OUTPUT_MODE_CHOICES = [
     "text",
@@ -129,7 +132,7 @@ def build_prompt_spec(prompt: str) -> CommandSpec:
     normalized_prompt = prompt.strip()
     if not normalized_prompt:
         raise ValueError("prompt must not be empty")
-    return CommandSpec(argv=["opencode", "--pure", "run", normalized_prompt])
+    return CommandSpec(argv=["opencode", "run", normalized_prompt])
 
 
 def _apply_real_runner_override(spec: CommandSpec) -> None:
@@ -740,6 +743,7 @@ def _parse_add_alias_args(
             replace = True
         elif token == "--unset":
             value, index = _read_option_value(args, index, token)
+            value = value.replace("-", "_")
             if value not in ALIAS_FIELDS:
                 raise ValueError(f"unknown alias field for --unset: {value}")
             unset_fields.add(value)
@@ -747,6 +751,8 @@ def _parse_add_alias_args(
             alias.show_thinking = token == "--show-thinking"
         elif token in {"--sanitize-osc", "--no-sanitize-osc"}:
             alias.sanitize_osc = token == "--sanitize-osc"
+        elif token in {"--standalone", "--no-standalone", "--no-daemon"}:
+            alias.standalone = token != "--no-standalone"
         elif token.startswith("--"):
             field = token[2:].replace("-", "_")
             value, index = _read_option_value(args, index, token)
@@ -798,11 +804,15 @@ def _set_alias_field(alias: AliasDef, field: str, value: str) -> None:
         if value not in {"default", "prepend", "append"}:
             raise ValueError("prompt_mode must be one of: default, prepend, append")
         alias.prompt_mode = value
+    elif field == "service_tier":
+        if value.lower() not in {"default", "fast", "priority", "ultrafast"}:
+            raise ValueError("service tier must be one of: default, fast, priority, ultrafast")
+        alias.service_tier = value.lower()
     elif field == "fallback_models":
         alias.fallback_models = [
             part.strip() for part in value.split(",") if part.strip()
         ]
-    elif field in {"show_thinking", "sanitize_osc"}:
+    elif field in {"show_thinking", "sanitize_osc", "standalone"}:
         setattr(alias, field, _parse_add_bool(value))
     else:
         setattr(alias, field, value)
@@ -816,10 +826,10 @@ def _parse_add_thinking(value: str) -> int:
         parsed = int(value)
     except ValueError as exc:
         raise ValueError(
-            "thinking must be 0, 1, 2, 3, 4, 5, none, low, medium, high, xhigh, or max"
+            "thinking must be 0, 1, 2, 3, 4, 5, 6, none, low, medium, high, xhigh, max, or ultra"
         ) from exc
-    if parsed not in {0, 1, 2, 3, 4, 5}:
-        raise ValueError("thinking must be 0, 1, 2, 3, 4, or 5")
+    if parsed not in {0, 1, 2, 3, 4, 5, 6}:
+        raise ValueError("thinking must be 0, 1, 2, 3, 4, 5, or 6")
     return parsed
 
 
@@ -852,10 +862,12 @@ def _prompt_alias_fields(alias: AliasDef, keep_current: bool) -> AliasDef:
         ("runner", "Runner"),
         ("provider", "Provider"),
         ("model", "Model"),
-        ("thinking", "Thinking 0-5"),
+        ("thinking", "Thinking 0-6"),
         ("show_thinking", "Show thinking true/false"),
         ("sanitize_osc", "Sanitize OSC true/false"),
         ("output_mode", "Output mode"),
+        ("service_tier", "Service tier (Codex)"),
+        ("standalone", "Standalone (Codex/OpenCode) true/false"),
         ("agent", "Agent"),
         ("prompt", "Prompt"),
         ("prompt_mode", "Prompt mode"),
@@ -863,6 +875,23 @@ def _prompt_alias_fields(alias: AliasDef, keep_current: bool) -> AliasDef:
     for field, label in prompts:
         current = getattr(result, field)
         suffix = f" [{current}]" if current is not None else " [default]"
+        if field == "standalone" and current is None:
+            suffix = " [inherit]"
+        if field == "service_tier":
+            suffix = f" [{current}]" if current is not None else " [inherit]"
+            choice = _choose_optional_field(
+                label,
+                suffix,
+                [
+                    ("inherit", "i", None, {"inherit", "unset"}),
+                    ("default", "d", "default", {"default"}),
+                    ("fast", "f", "fast", {"fast", "priority"}),
+                    ("ultrafast", "u", "ultrafast", {"ultrafast"}),
+                ],
+            )
+            if choice is not _KEEP_CURRENT:
+                result.service_tier = choice
+            continue
         if field == "thinking":
             choice = _choose_optional_field(
                 label,
@@ -875,17 +904,23 @@ def _prompt_alias_fields(alias: AliasDef, keep_current: bool) -> AliasDef:
                     ("high", "h", 3, {"high"}),
                     ("xhigh", "x", 4, {"xhigh"}),
                     ("max", "M", 5, {"max"}),
+                    ("ultra", "U", 6, {"ultra"}),
                 ],
             )
             if choice is not _KEEP_CURRENT:
                 result.thinking = choice
             continue
-        if field in {"show_thinking", "sanitize_osc"}:
+        if field in {"show_thinking", "sanitize_osc", "standalone"}:
+            unset_label, unset_key, unset_aliases = (
+                ("inherit", "i", {"inherit", "unset", "default", "u"})
+                if field == "standalone"
+                else ("unset", "u", {"unset", "default"})
+            )
             choice = _choose_optional_field(
                 label,
                 suffix,
                 [
-                    ("unset", "u", None, {"unset", "default"}),
+                    (unset_label, unset_key, None, unset_aliases),
                     ("true", "t", True, {"true", "yes", "y", "on"}),
                     ("false", "f", False, {"false", "no", "n", "off"}),
                 ],
@@ -1014,7 +1049,6 @@ def _choose(
                 f"{_menu_style('choice >', '1;36', color)} "
             )
             .strip()
-            .lower()
         )
         if answer == "":
             if default is not None:
@@ -1027,6 +1061,10 @@ def _choose(
                 )
                 continue
             return blank_value
+        for _, key, value, _ in choices:
+            if answer == key:
+                return value
+        answer = answer.lower()
         for index, (label, key, value, aliases) in enumerate(choices, 1):
             accepted = {str(index), label, key, *aliases}
             if answer in accepted:

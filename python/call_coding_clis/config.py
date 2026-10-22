@@ -35,6 +35,8 @@ EXAMPLE_CONFIG = """\
 # show_thinking = true
 # sanitize_osc = true
 # output_mode = "text"
+# service_tier = "default" # Codex: default, fast (or priority), ultrafast
+# standalone = true # Codex/OpenCode; omit for upstream default
 
 [update]
 # check = true
@@ -52,6 +54,8 @@ EXAMPLE_CONFIG = """\
 # show_thinking = true
 # sanitize_osc = true
 # output_mode = "formatted"
+# service_tier = "fast" # Codex only; omit to inherit
+# standalone = true # Codex/OpenCode; omit for upstream default
 # agent = "reviewer"
 # prompt = "Review the current changes"
 # prompt_mode = "default"
@@ -78,6 +82,9 @@ def _coerce_bool(value: object) -> bool:
 
 
 def _default_config_paths() -> list[Path]:
+    explicit = os.environ.get("CCC_CONFIG", "").strip()
+    if explicit and Path(explicit).is_file():
+        return [Path(explicit)]
     paths: list[Path] = []
     home_path = Path.home() / ".config" / CONFIG_DIR_NAME / CONFIG_FILE_NAME
     paths.append(home_path)
@@ -238,6 +245,8 @@ def render_alias_block(name: str, alias: AliasDef) -> str:
         "show_thinking",
         "sanitize_osc",
         "output_mode",
+        "service_tier",
+        "standalone",
         "agent",
         "prompt",
         "prompt_mode",
@@ -348,6 +357,9 @@ def _load_from_file_into(path: Path, config: CccConfig) -> None:
         config.default_runner = defaults.get("runner", config.default_runner)
         config.default_provider = defaults.get("provider", config.default_provider)
         config.default_model = defaults.get("model", config.default_model)
+        config.default_service_tier = defaults.get("service_tier", config.default_service_tier)
+        if "standalone" in defaults:
+            config.default_standalone = _coerce_bool(defaults["standalone"])
         output_mode = defaults.get("output_mode")
         if output_mode is not None:
             config.default_output_mode = str(output_mode)
@@ -392,6 +404,9 @@ def _load_from_file_into(path: Path, config: CccConfig) -> None:
                 alias.show_thinking = defn.get("show_thinking", alias.show_thinking)
                 alias.sanitize_osc = defn.get("sanitize_osc", alias.sanitize_osc)
                 alias.output_mode = defn.get("output_mode", alias.output_mode)
+                alias.service_tier = defn.get("service_tier", alias.service_tier)
+                if "standalone" in defn:
+                    alias.standalone = _coerce_bool(defn["standalone"])
                 alias.provider = defn.get("provider", alias.provider)
                 alias.model = defn.get("model", alias.model)
                 alias.agent = defn.get("agent", alias.agent)

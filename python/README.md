@@ -22,7 +22,7 @@ For the targeted implementation check:
 from call_coding_clis import CommandSpec, Runner
 
 spec = CommandSpec(
-    argv=["opencode", "--pure", "run", "Explain this code"],
+    argv=["opencode", "run", "Explain this code"],
     cwd="/path/to/project",
 )
 
@@ -35,7 +35,7 @@ Streaming uses a callback that receives `stdout` or `stderr` plus the chunk text
 ```python
 from call_coding_clis import CommandSpec, Runner
 
-spec = CommandSpec(argv=["opencode", "--pure", "run", "Build a CLI"])
+spec = CommandSpec(argv=["opencode", "run", "Build a CLI"])
 
 def on_chunk(channel: str, chunk: str) -> None:
     print(f"{channel}: {chunk}", end="")
@@ -96,6 +96,7 @@ Add aliases interactively or non-interactively:
 ```bash
 ccc add reviewer
 ccc add reviewer --runner cc --prompt "Review the current changes" --prompt-mode default --yes
+ccc add quick --runner c --thinking ultra --service-tier ultrafast --standalone --yes
 ```
 
 The interactive wizard skips `prompt_mode` when prompt is unset. Final save confirmation accepts only `y`, `n`, `yes`, or `no`, case-insensitively.

@@ -52,7 +52,7 @@
 | ID | Feature | Description |
 |----|---------|-------------|
 | F16 | Runner selector | e.g., `cc`, `oc`, `k`, `cu`, `g`, `p`, `gb`, `claude`, `opencode`, `kimi`, `cursor`, `gemini`, `pi`, `grok` |
-| F17 | Thinking level | `+0` through `+5` selector (`0` none, `1` low, `2` medium, `3` high, `4` xhigh, `5` max); codex maps levels to `-c model_reasoning_effort` for gpt-5.6-style models and defaults to `medium`; lower-tier runners clamp `+5` to their top tier |
+| F17 | Thinking level | `+0` through `+6` selector (`0` none, `1` low, `2` medium, `3` high, `4` xhigh, `5` max, `6` ultra); codex maps levels to `-c model_reasoning_effort` and defaults to `medium`; lower-tier runners clamp higher requests to their top tier |
 | F18 | Provider/model selector | `:provider:model` and `:model` syntax |
 | F19 | Alias/preset | `@alias` named presets |
 | F20 | Config file loading | Read config for defaults, aliases, abbreviations |
@@ -62,7 +62,7 @@
 | F33 | Order-independent controls | Pre-prompt control tokens may appear in any order; `--` forces literal prompt text |
 | F34 | Permission mode | `--permission-mode <safe|auto|yolo|plan>` maps to runner-specific permission profiles where supported |
 | F35 | Session persistence controls | `--save-session` explicitly allows saved sessions, while default runner mappings avoid persistence where supported and warn otherwise; `--cleanup-session` tries safe post-run cleanup |
-| F38 | Fast mode | `--fast` / `--no-fast` toggles the runner's fast mode where supported (codex maps to `--enable fast_mode` / `--disable fast_mode`); unsupported runners warn and ignore it |
+| F38 | Service tiers | Python/Rust: `--service-tier default\|fast\|priority\|ultrafast`, config defaults, alias profiles, and wizard; `--fast` / `--no-fast` select fast / default. Codex maps to `-c service_tier`; unsupported runners warn and ignore it |
 | F40 | Version update check | After a run, warn when a newer `ccc` is available (crates.io / GitHub); config `[update] check` / `auto_update` / `interval_hours`; env `CCC_UPDATE_CHECK`, `CCC_AUTO_UPDATE` |
 | F41 | Preset model fallback | Alias `fallback_models` retries once per model after a capacity or overload error that happens before assistant output. `glm-5.3`, `llmp-glm-5-3`, and `glm-5.3-flash` switch to grok; other models stay on the same runner. JSON and formatted output from that retry is parsed with the fallback runner's schema. Auth errors, Claude runners, and MiniMax, Claude, or Astra model ids do not fall back. |
 
@@ -140,6 +140,8 @@
 | F39 Schema: grok | yes | yes | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | n/a | - | - |
 
 ## Progress Tracking
+
+The language matrix records baseline coverage. Newer controls such as Codex ultra effort, service tiers, and standalone execution are currently implemented in Python and Rust only.
 
 ### Current Focus
 - All phases complete. Full test suite: 17 PASS, 0 FAIL, 5 SKIP

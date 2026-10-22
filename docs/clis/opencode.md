@@ -14,6 +14,10 @@
 opencode run "your prompt"
 ```
 
+Python and Rust use this shape without `--pure`: OpenCode v2.0.32 rejects that legacy flag. Plugin auto-update suppression is no longer forced through `--pure`.
+
+`ccc oc --standalone` maps to `opencode run --standalone`, which starts a private server rather than using the background service. Defaults and aliases can also set `standalone = true`; `--no-standalone` overrides that setting and allows the upstream default. A real v2.0.32 invocation with `--standalone --format json` completed successfully.
+
 Useful flags from local help:
 
 - `--agent`

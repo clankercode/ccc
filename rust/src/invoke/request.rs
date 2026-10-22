@@ -55,6 +55,8 @@ pub struct Request {
     sanitize_osc: Option<bool>,
     permission_mode: Option<String>,
     fast: Option<bool>,
+    service_tier: Option<String>,
+    standalone: Option<bool>,
     save_session: bool,
     cleanup_session: bool,
     provider: Option<String>,
@@ -76,6 +78,8 @@ impl Request {
             sanitize_osc: None,
             permission_mode: None,
             fast: None,
+            service_tier: None,
+            standalone: None,
             save_session: false,
             cleanup_session: false,
             provider: None,
@@ -121,8 +125,27 @@ impl Request {
         self
     }
 
+    /// Select `fast` when enabled, or `default` otherwise, replacing any explicit tier.
     pub fn with_fast(mut self, enabled: bool) -> Self {
         self.fast = Some(enabled);
+        self.service_tier = None;
+        self
+    }
+
+    /// Select a Codex service tier, replacing any previous `with_fast` control.
+    ///
+    /// Planning validates `default`, `fast`, `priority`, and `ultrafast` case-insensitively.
+    pub fn with_service_tier(mut self, tier: impl Into<String>) -> Self {
+        self.service_tier = Some(tier.into());
+        self.fast = None;
+        self
+    }
+
+    /// Request an explicit upstream daemon opt-out for Codex or OpenCode.
+    ///
+    /// `false` omits the upstream flag; it does not force shared daemon execution.
+    pub fn with_standalone(mut self, enabled: bool) -> Self {
+        self.standalone = Some(enabled);
         self
     }
 
@@ -174,6 +197,14 @@ impl Request {
 
     pub fn model(&self) -> Option<&str> {
         self.model.as_deref()
+    }
+
+    pub fn service_tier(&self) -> Option<&str> {
+        self.service_tier.as_deref()
+    }
+
+    pub fn standalone(&self) -> Option<bool> {
+        self.standalone
     }
 
     pub fn output_mode(&self) -> Option<OutputMode> {
@@ -237,6 +268,8 @@ impl Request {
             sanitize_osc: parsed.sanitize_osc,
             permission_mode: parsed.permission_mode.clone(),
             fast: parsed.fast,
+            service_tier: parsed.service_tier.clone(),
+            standalone: parsed.standalone,
             save_session: parsed.save_session,
             cleanup_session: parsed.cleanup_session,
             provider: parsed.provider.clone(),
@@ -278,6 +311,17 @@ impl Request {
                 "--fast".to_string()
             } else {
                 "--no-fast".to_string()
+            });
+        }
+        if let Some(tier) = &self.service_tier {
+            tokens.push("--service-tier".to_string());
+            tokens.push(tier.clone());
+        }
+        if let Some(standalone) = self.standalone {
+            tokens.push(if standalone {
+                "--standalone".to_string()
+            } else {
+                "--no-standalone".to_string()
             });
         }
         if self.save_session {

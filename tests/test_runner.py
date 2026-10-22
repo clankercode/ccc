@@ -518,7 +518,7 @@ class RunnerTests(unittest.TestCase):
 
         spec = build_prompt_spec("Fix the failing tests")
 
-        self.assertEqual(spec.argv, ["opencode", "--pure", "run", "Fix the failing tests"])
+        self.assertEqual(spec.argv, ["opencode", "run", "Fix the failing tests"])
 
     def test_apply_real_runner_override_for_claude(self) -> None:
         from call_coding_clis import CommandSpec
@@ -678,6 +678,8 @@ class RunnerTests(unittest.TestCase):
                     "3",  # show_thinking: false
                     "1",  # sanitize_osc: default
                     "2",  # output_mode: text
+                    "",  # service_tier: inherit
+                    "",  # standalone: inherit
                     "",  # agent
                     "Fix the failing tests",  # prompt
                     "2",  # prompt_mode: default

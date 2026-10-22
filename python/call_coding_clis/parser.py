@@ -7,6 +7,7 @@ import re
 RUNNER_REGISTRY: dict[str, RunnerInfo] = {}
 PERMISSION_MODES = {"safe", "auto", "yolo", "plan"}
 PROMPT_MODES = {"default", "prepend", "append"}
+SERVICE_TIERS = {"default", "fast", "priority", "ultrafast"}
 
 
 @dataclass(slots=True)
@@ -39,6 +40,8 @@ class ParsedArgs:
     cleanup_session: bool = False
     yolo: bool = False
     fast: bool | None = None
+    service_tier: str | None = None
+    standalone: bool | None = None
     permission_mode: str | None = None
     timeout_secs: int | None = None
     runner_args: list[str] = field(default_factory=list)
@@ -58,6 +61,8 @@ class AliasDef:
     show_thinking: bool | None = None
     sanitize_osc: bool | None = None
     output_mode: str | None = None
+    service_tier: str | None = None
+    standalone: bool | None = None
     provider: str | None = None
     model: str | None = None
     agent: str | None = None
@@ -77,6 +82,8 @@ class CccConfig:
     default_show_thinking: bool = True
     default_sanitize_osc: bool | None = None
     default_output_mode: str = "text"
+    default_service_tier: str | None = None
+    default_standalone: bool | None = None
     update_check: bool = True
     auto_update: bool = False
     update_interval_hours: int = 24
@@ -89,7 +96,7 @@ def _register_defaults() -> None:
         return
     RUNNER_REGISTRY["opencode"] = RunnerInfo(
         binary="opencode",
-        extra_args=["--pure", "run"],
+        extra_args=["run"],
         no_persist_flags=[],
         thinking_flags={},
         show_thinking_flags={True: ["--thinking"]},
@@ -146,13 +153,14 @@ def _register_defaults() -> None:
             3: ["-c", "model_reasoning_effort=high"],
             4: ["-c", "model_reasoning_effort=xhigh"],
             5: ["-c", "model_reasoning_effort=max"],
+            6: ["-c", "model_reasoning_effort=ultra"],
         },
         show_thinking_flags={},
         default_thinking=2,
         yolo_flags=["--dangerously-bypass-approvals-and-sandbox"],
         fast_flags={
-            True: ["--enable", "fast_mode"],
-            False: ["--disable", "fast_mode"],
+            True: ["-c", 'service_tier="fast"'],
+            False: ["-c", 'service_tier="default"'],
         },
         provider_flag="",
         model_flag="--model",
@@ -259,7 +267,7 @@ RUNNER_SELECTOR_RE = re.compile(
     re.IGNORECASE,
 )
 THINKING_RE = re.compile(
-    r"^\+(0|1|2|3|4|5|none|low|med|mid|medium|high|xhigh|max)$",
+    r"^\+(0|1|2|3|4|5|6|none|low|med|mid|medium|high|xhigh|max|ultra)$",
     re.IGNORECASE,
 )
 PROVIDER_MODEL_RE = re.compile(r"^:([a-zA-Z0-9_-]+):([a-zA-Z0-9._-]+)$")
@@ -299,6 +307,8 @@ THINKING_TOKEN_TO_LEVEL = {
     "xhigh": 4,
     "5": 5,
     "max": 5,
+    "6": 6,
+    "ultra": 6,
 }
 
 
@@ -365,6 +375,15 @@ def parse_args(argv: list[str]) -> ParsedArgs:
             parsed.output_mode = OUTPUT_MODE_SUGAR[token.lower()]
         elif token in {"--fast", "--no-fast"}:
             parsed.fast = token == "--fast"
+            parsed.service_tier = None
+        elif token == "--service-tier":
+            if index + 1 >= len(argv):
+                raise ValueError("--service-tier requires one of: default, fast, priority, ultrafast")
+            parsed.service_tier = validate_service_tier(argv[index + 1])
+            parsed.fast = None
+            index += 1
+        elif token in {"--standalone", "--no-standalone", "--no-daemon"}:
+            parsed.standalone = token != "--no-standalone"
         elif token in {"--yolo", "-y"}:
             parsed.yolo = True
             parsed.permission_mode = "yolo"
@@ -887,6 +906,12 @@ def resolve_output_plan(parsed: ParsedArgs, config: CccConfig | None = None) -> 
     )
 
 
+def validate_service_tier(value: str) -> str:
+    if not isinstance(value, str) or value.lower() not in SERVICE_TIERS:
+        raise ValueError("service tier must be one of: default, fast, priority, ultrafast")
+    return value.lower()
+
+
 def resolve_command(
     parsed: ParsedArgs,
     config: CccConfig | None = None,
@@ -1006,7 +1031,7 @@ def resolve_command(
         if effective_runner_name in {"cc", "claude"}:
             argv.extend(["--permission-mode", "auto"])
         elif effective_runner_name in {"c", "cx", "codex"}:
-            argv.append("--full-auto")
+            argv.extend(["-c", 'approval_policy="on-request"', "--sandbox", "workspace-write"])
         elif effective_runner_name in {"g", "gemini"}:
             argv.extend(["--approval-mode", "auto_edit"])
         elif effective_runner_name in {"gb", "grok"}:
@@ -1046,15 +1071,45 @@ def resolve_command(
                 f'warning: runner "{effective_runner_name}" does not support permission mode "plan"; ignoring it'
             )
 
-    if parsed.fast is not None:
-        if parsed.fast in info.fast_flags:
-            argv.extend(info.fast_flags[parsed.fast])
+    service_tier = parsed.service_tier
+    if service_tier is None and parsed.fast is not None:
+        service_tier = "fast" if parsed.fast else "default"
+    if service_tier is None and alias_def:
+        service_tier = alias_def.service_tier
+    if service_tier is None:
+        service_tier = config.default_service_tier
+    if service_tier is not None:
+        service_tier = validate_service_tier(service_tier)
+        if effective_runner_name in {"c", "cx", "codex"}:
+            argv.extend(["-c", f'service_tier="{service_tier}"'])
+        elif parsed.fast is not None:
+            if parsed.fast in info.fast_flags:
+                argv.extend(info.fast_flags[parsed.fast])
+            else:
+                display = _canonical_runner_name(effective_runner_name, info)
+                flag = "--fast" if parsed.fast else "--no-fast"
+                warnings.append(
+                    f'warning: runner "{display}" does not support fast mode; ignoring {flag}'
+                )
         else:
             display = _canonical_runner_name(effective_runner_name, info)
-            flag = "--fast" if parsed.fast else "--no-fast"
             warnings.append(
-                f'warning: runner "{display}" does not support fast mode; ignoring {flag}'
+                f'warning: runner "{display}" does not support service tiers; ignoring service tier "{service_tier}"'
             )
+
+    standalone = parsed.standalone
+    if standalone is None and alias_def:
+        standalone = alias_def.standalone
+    if standalone is None:
+        standalone = config.default_standalone
+    if standalone:
+        if effective_runner_name in {"c", "cx", "codex"}:
+            argv.insert(1, "--no-daemon")
+        elif effective_runner_name in {"oc", "opencode"}:
+            argv.append("--standalone")
+        else:
+            display = _canonical_runner_name(effective_runner_name, info)
+            warnings.append(f'warning: runner "{display}" does not support standalone mode; ignoring it')
 
     if not parsed.save_session:
         argv.extend(info.no_persist_flags)

@@ -9,6 +9,8 @@
 # show_thinking = true
 # sanitize_osc = true
 # output_mode = "text"
+# service_tier = "default" # Codex: default, fast (or priority), ultrafast
+# standalone = true # Codex/OpenCode; omit for upstream default
 
 [update]
 # check = true
@@ -26,6 +28,8 @@
 # show_thinking = true
 # sanitize_osc = true
 # output_mode = "formatted"
+# service_tier = "fast" # Codex only; omit to inherit
+# standalone = true # Codex/OpenCode; omit for upstream default
 # agent = "reviewer"
 # prompt = "Review the current changes"
 # prompt_mode = "default"

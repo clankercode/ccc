@@ -57,7 +57,7 @@ This table describes the current `ccc` mapping and the likely future shape for f
 
 ## Thinking Matrix
 
-`ccc` keeps the external thinking contract numeric. The top tier is vendor labeled: Anthropic says `max`, OpenAI-style labels say `xhigh`.
+`ccc` keeps the external thinking contract numeric. Each runner clamps levels above its supported maximum; Codex supports explicit `max` and `ultra` efforts on models that advertise them.
 
 | `ccc` token | Anthropic / Claude | OpenAI-style | Grok Build | Notes |
 |---|---|---|---|---|
@@ -66,8 +66,10 @@ This table describes the current `ccc` mapping and the likely future shape for f
 | `+2` | `medium` | `medium` | `medium` | middle tier |
 | `+3` | `high` | `high` | `high` | explicit high tier |
 | `+4` | `max` | `xhigh` | `xhigh` | same semantic top tier; label differs |
+| `+5` / `+max` | `max` (clamped) | `max` on Codex | `xhigh` (clamped) | model-dependent availability |
+| `+6` / `+ultra` | `max` (clamped) | `ultra` on Codex | `xhigh` (clamped) | independent of service tier |
 
-Kimi does not expose the same numeric ladder; `ccc` currently maps `+0` to `--no-thinking` and `+1..+4` to `--thinking`.
+Kimi does not expose the same numeric ladder; `ccc` currently maps `+0` to `--no-thinking` and positive levels to `--thinking`.
 
 ## Model Thinking Capability Source Of Truth
 
@@ -88,7 +90,8 @@ Current structured coverage summary:
 |---|---|---|---|---|---|
 | Anthropic | `claude-4` | `cc` | ladder | yes | 5 tiers; `+5` clamps to `max` |
 | OpenAI-style | `gpt-5` | `c` | ladder | unknown | top label is `xhigh` (level 4) |
-| OpenAI | `gpt-5.6` | `c` | ladder | unknown | 6 tiers via `-c model_reasoning_effort`; `+4` xhigh, `+5` max; default medium; `ultra` is a run mode, not an effort |
+| OpenAI | `gpt-5.6` | `c` | ladder | unknown | historical snapshot verified through `max`; current effort availability is model-dependent |
+| OpenAI | Codex runner | `c` | ladder | unknown | `+6` / `+ultra` requests ultra effort; real CLI verified 2026-10-22; model support varies |
 | Moonshot | `kimi-k2` | `k` | binary | yes | `+1..+5` collapse to `--thinking` |
 | OpenCode | unverified | `oc` | unknown | yes | visible-thinking support known, tier mapping not yet verified |
 
@@ -101,7 +104,7 @@ Python and Rust now implement `--permission-mode <safe|auto|yolo|plan>` with par
 | Proposed `ccc` mode | OpenCode | Claude | Codex | Kimi | Cursor | Gemini | Grok | Crush | RooCode |
 |---|---|---|---|---|---|---|---|---|---|
 | `safe` | `OPENCODE_CONFIG_CONTENT='{"permission":"ask"}'` | `--permission-mode default` | leave default permissions unchanged | leave default permissions unchanged | `--sandbox enabled` | `--approval-mode default --sandbox` | `--permission-mode default` | leave default permissions unchanged | unverified; warn and leave defaults |
-| `auto` | likely config-driven `ask`/`allow` mix | `--permission-mode auto` | `--full-auto` | no honest mapping yet | no honest mapping yet | `--approval-mode auto_edit` | `--permission-mode auto` | no honest mapping yet | unverified |
+| `auto` | likely config-driven `ask`/`allow` mix | `--permission-mode auto` | `-c 'approval_policy="on-request"' --sandbox workspace-write` | no honest mapping yet | no honest mapping yet | `--approval-mode auto_edit` | `--permission-mode auto` | no honest mapping yet | unverified |
 | `yolo` | `OPENCODE_CONFIG_CONTENT='{"permission":"allow"}'` | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--yolo` | `--yolo` | `--approval-mode yolo` | `--always-approve` | unsupported in `run`; warn | unverified; warn |
 | `plan` | no verified equivalent yet | `--permission-mode plan` | no verified equivalent yet | `--plan` | `--mode plan` | `--approval-mode plan` | `--permission-mode plan` | no verified equivalent yet | unverified |
 
@@ -209,8 +212,12 @@ Python and Rust support `ccc add [-g] <alias>` for writing `[aliases.<name>]` co
 ```bash
 ccc add mm27
 ccc add mm27 --runner cc --model claude-4 --prompt "Review changes" --prompt-mode default --yes
+ccc add quick --runner c --service-tier ultrafast --yes
+ccc add solo --runner c --thinking ultra --service-tier ultrafast --standalone --yes
 ```
 
 Without `-g`, the command writes the same config file that `ccc config` resolves, creating a new global config under `XDG_CONFIG_HOME/ccc/config.toml` or `~/.config/ccc/config.toml` when no config exists. With `-g`, it ignores project-local config and writes the effective global config, preferring XDG over home when both exist.
 
-Blank/default wizard answers omit alias keys. Existing aliases first ask whether to modify, replace, or cancel; `--yes` modifies existing aliases unless `--replace` is provided. Wizard menu prompts use color on TTYs, can be forced with `FORCE_COLOR=1`, and are disabled with `NO_COLOR=1`. Successful writes print a checkmarked heading followed by the written alias block indented for readability.
+`standalone` is an optional boolean in defaults and aliases and has a wizard menu. `true` maps to Codex's root `--no-daemon` or OpenCode's `run --standalone`; `false` lets upstream choose its default. CLI `--standalone` / `--no-daemon` and `--no-standalone` override the saved value. The last CLI standalone control wins. Other runners warn and ignore a standalone request.
+
+Blank/unset wizard answers omit alias keys when creating an alias and preserve current values when modifying one. The service-tier menu offers inherit, default, fast, and ultrafast: inherit omits the field, while default explicitly selects Codex standard service. `priority` is also accepted as an input for fast. `service_tier` is supported in `[defaults]` and alias profiles; CLI `--service-tier`, `--fast`, and `--no-fast` override them. Other runners warn and ignore the setting. Existing aliases first ask whether to modify, replace, or cancel; `--yes` modifies existing aliases unless `--replace` is provided. Wizard menu prompts use color on TTYs, can be forced with `FORCE_COLOR=1`, and are disabled with `NO_COLOR=1`. Successful writes print a checkmarked heading followed by the written alias block indented for readability.

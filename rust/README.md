@@ -87,7 +87,7 @@ The help output lists aliases loaded from the current config chain and includes 
 ```rust,no_run
 use call_coding_clis::{CommandSpec, Runner};
 
-let spec = CommandSpec::new(["opencode", "--pure", "run", "Explain this module"]);
+let spec = CommandSpec::new(["opencode", "run", "Explain this module"]);
 let result = Runner::new().run(spec);
 
 println!("{}", result.stdout);
@@ -128,7 +128,7 @@ assert_eq!(parsed.request.model(), Some("gpt-5.4-mini"));
 ```rust,no_run
 use call_coding_clis::{CommandSpec, Runner};
 
-let spec = CommandSpec::new(["opencode", "--pure", "run", "Explain this module"]);
+let spec = CommandSpec::new(["opencode", "run", "Explain this module"]);
 let runner = Runner::new();
 
 let completed = runner.stream(spec, |channel, chunk| {
@@ -171,6 +171,16 @@ println!("exit code: {}", completed.exit_code);
 | `stream-formatted` | `..fmt` | Parsed transcript while the runner is still working |
 
 Unhandled structured JSON is always preserved in run transcripts. In formatted modes, `--forward-unknown-json` or `CCC_FWD_UNKNOWN_JSON` controls whether unknown objects are also forwarded to stderr. The environment default is currently on.
+
+`--service-tier <default|fast|priority|ultrafast>` selects the Codex service tier, with case-insensitive values. `--fast` selects `fast`, and `--no-fast` selects `default`. The last tier control before the prompt wins. Codex receives `-c 'service_tier="<value>"'`, including explicit `default`; omitting a tier inherits the upstream setting. Other runners warn and ignore the tier.
+
+Thinking effort uses `+0` through `+6`, with named levels `none`, `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`. Codex maps `+6` and `+ultra` to `-c model_reasoning_effort=ultra`; `+5`/`+max` and `+4`/`+xhigh` retain their existing mappings. Other runners clamp effort to their supported top level. Use `ccc add reviewer --thinking ultra --yes` (or `--thinking 6`) to set an alias; the wizard offers ultra with key `U`, while max keeps key `M`. Rust requests support `.with_thinking(6)`.
+
+Tier precedence is the explicit CLI or Request tier, programmatic `ParsedArgs.fast`, alias `service_tier`, then `[defaults].service_tier`. `Request::with_service_tier` and `Request::with_fast` use the last builder call. The alias wizard offers inherit, default, fast, and ultrafast after output mode; priority selects fast in the wizard. Use `ccc add reviewer --service-tier fast --yes` to set a tier or `ccc add reviewer --unset service-tier --yes` to inherit.
+
+`--standalone` (also `--no-daemon`) requests an explicit upstream daemon opt-out. Codex receives `codex --no-daemon exec ...`, with the root flag before `exec`; OpenCode receives `opencode run --standalone ...`. Current Codex exec uses an in-process app-server, and its root no-daemon option primarily controls the TUI. `ccc` cannot force shared daemon execution: `--no-standalone` only omits the upstream option. Other runners warn when standalone is true and ignore it; false is a no-op.
+
+Standalone precedence is CLI, alias `standalone`, then `[defaults].standalone`; omission inherits upstream behavior. The last standalone CLI control wins. Both config fields are optional booleans. Use `ccc add reviewer --standalone --yes` (or `--no-daemon`), `ccc add reviewer --no-standalone --yes`, or `ccc add reviewer --unset standalone --yes`. The alias wizard offers inherit/true/false immediately after service tier. Rust requests expose `.with_standalone(bool)` and `.standalone() -> Option<bool>`.
 
 ## Config And Aliases
 
@@ -319,6 +329,7 @@ use call_coding_clis::{Client, OutputMode, Request, RunnerKind};
 let request = Request::new("summarize the failing test")
     .with_runner(RunnerKind::Codex)
     .with_model("gpt-5.4-mini")
+    .with_service_tier("fast")
     .with_output_mode(OutputMode::Formatted);
 
 let client = Client::new();

@@ -4,6 +4,7 @@ use std::sync::RwLock;
 
 const PERMISSION_MODES: &[&str] = &["safe", "auto", "yolo", "plan"];
 const PROMPT_MODES: &[&str] = &["default", "prepend", "append"];
+const SERVICE_TIERS: &[&str] = &["default", "fast", "priority", "ultrafast"];
 const OUTPUT_MODES: &[&str] = &[
     "text",
     "stream-text",
@@ -59,6 +60,8 @@ pub struct ParsedArgs {
     pub cleanup_session: bool,
     pub yolo: bool,
     pub fast: Option<bool>,
+    pub service_tier: Option<String>,
+    pub standalone: Option<bool>,
     pub permission_mode: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
@@ -76,6 +79,8 @@ pub struct AliasDef {
     pub show_thinking: Option<bool>,
     pub sanitize_osc: Option<bool>,
     pub output_mode: Option<String>,
+    pub service_tier: Option<String>,
+    pub standalone: Option<bool>,
     pub provider: Option<String>,
     pub model: Option<String>,
     pub agent: Option<String>,
@@ -92,6 +97,8 @@ impl Default for AliasDef {
             show_thinking: None,
             sanitize_osc: None,
             output_mode: None,
+            service_tier: None,
+            standalone: None,
             provider: None,
             model: None,
             agent: None,
@@ -111,6 +118,8 @@ pub struct CccConfig {
     pub default_show_thinking: bool,
     pub default_sanitize_osc: Option<bool>,
     pub default_output_mode: String,
+    pub default_service_tier: Option<String>,
+    pub default_standalone: Option<bool>,
     pub update_check: bool,
     pub auto_update: bool,
     pub update_interval_hours: u64,
@@ -128,6 +137,8 @@ impl Default for CccConfig {
             default_show_thinking: true,
             default_sanitize_osc: None,
             default_output_mode: "text".to_string(),
+            default_service_tier: None,
+            default_standalone: None,
             update_check: true,
             auto_update: false,
             update_interval_hours: 24,
@@ -154,7 +165,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         binary: "opencode".into(),
         default_thinking: None,
         fast_flags: BTreeMap::new(),
-        extra_args: vec!["--pure".into(), "run".into()],
+        extra_args: vec!["run".into()],
         no_persist_flags: vec![],
         thinking_flags: BTreeMap::new(),
         show_thinking_flags: {
@@ -265,8 +276,8 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
         default_thinking: Some(2),
         fast_flags: {
             let mut ff = BTreeMap::new();
-            ff.insert(true, vec!["--enable".into(), "fast_mode".into()]);
-            ff.insert(false, vec!["--disable".into(), "fast_mode".into()]);
+            ff.insert(true, vec!["-c".into(), "service_tier=\"fast\"".into()]);
+            ff.insert(false, vec!["-c".into(), "service_tier=\"default\"".into()]);
             ff
         },
         extra_args: vec!["exec".into()],
@@ -279,6 +290,7 @@ pub static RUNNER_REGISTRY: LazyLock<RwLock<BTreeMap<String, RunnerInfo>>> = Laz
             tf.insert(3, vec!["-c".into(), "model_reasoning_effort=high".into()]);
             tf.insert(4, vec!["-c".into(), "model_reasoning_effort=xhigh".into()]);
             tf.insert(5, vec!["-c".into(), "model_reasoning_effort=max".into()]);
+            tf.insert(6, vec!["-c".into(), "model_reasoning_effort=ultra".into()]);
             tf
         },
         show_thinking_flags: BTreeMap::new(),
@@ -455,6 +467,7 @@ fn parse_thinking(s: &str) -> Option<i32> {
         "3" | "high" => Some(3),
         "4" | "xhigh" => Some(4),
         "5" | "max" => Some(5),
+        "6" | "ultra" => Some(6),
         _ => None,
     }
 }
@@ -554,6 +567,11 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
             parsed.save_session = true;
         } else if token == "--cleanup-session" {
             parsed.cleanup_session = true;
+        } else if matches!(
+            token.as_str(),
+            "--standalone" | "--no-daemon" | "--no-standalone"
+        ) {
+            parsed.standalone = Some(token != "--no-standalone");
         } else if token == "--timeout-secs" {
             if index + 1 >= argv.len() {
                 parsed.timeout_secs = Some(0);
@@ -576,6 +594,19 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
             parsed.output_mode = Some(mode);
         } else if token == "--fast" || token == "--no-fast" {
             parsed.fast = Some(token == "--fast");
+            parsed.service_tier = None;
+        } else if token == "--service-tier" {
+            parsed.fast = None;
+            parsed.service_tier = Some(if index + 1 >= argv.len() {
+                String::new()
+            } else {
+                index += 1;
+                argv[index].to_ascii_lowercase()
+            });
+            // Preserve invalid input for resolution; later controls must not hide it.
+            if validate_service_tier(parsed.service_tier.as_deref().unwrap()).is_err() {
+                break;
+            }
         } else if token == "--yolo" || token == "-y" {
             parsed.yolo = true;
             parsed.permission_mode = Some("yolo".to_string());
@@ -606,6 +637,15 @@ pub fn parse_args(argv: &[String]) -> ParsedArgs {
     parsed
 }
 
+pub fn validate_service_tier(value: &str) -> Result<String, String> {
+    let value = value.to_ascii_lowercase();
+    if SERVICE_TIERS.contains(&value.as_str()) {
+        Ok(value)
+    } else {
+        Err("service tier must be one of: default, fast, priority, ultrafast".to_string())
+    }
+}
+
 pub fn resolve_command(
     parsed: &ParsedArgs,
     config: Option<&CccConfig>,
@@ -626,8 +666,23 @@ pub fn resolve_command(
     if parsed.runner_args.iter().any(|arg| arg.is_empty()) {
         return Err("--runner-arg requires a non-empty value".to_string());
     }
+    if parsed.service_tier.as_deref() == Some("") {
+        return Err(
+            "--service-tier requires one of: default, fast, priority, ultrafast".to_string(),
+        );
+    }
 
+    let standalone = parsed
+        .standalone
+        .or_else(|| alias_def.and_then(|alias| alias.standalone))
+        .or(config.default_standalone)
+        .unwrap_or(false);
+    let is_codex = matches!(effective_runner_name.as_str(), "c" | "cx" | "codex");
     let mut argv: Vec<String> = vec![effective_runner.binary.clone()];
+    if standalone && is_codex {
+        // Codex accepts this root flag before `exec`, never after it.
+        argv.push("--no-daemon".to_string());
+    }
     argv.extend(effective_runner.extra_args.iter().cloned());
     warnings.extend(session_persistence_warnings(
         parsed,
@@ -793,7 +848,12 @@ pub fn resolve_command(
             argv.push("--permission-mode".to_string());
             argv.push("auto".to_string());
         } else if matches!(effective_runner_name.as_str(), "c" | "cx" | "codex") {
-            argv.push("--full-auto".to_string());
+            argv.extend([
+                "-c".to_string(),
+                "approval_policy=\"on-request\"".to_string(),
+                "--sandbox".to_string(),
+                "workspace-write".to_string(),
+            ]);
         } else if matches!(effective_runner_name.as_str(), "g" | "gemini") {
             argv.push("--approval-mode".to_string());
             argv.push("auto_edit".to_string());
@@ -849,14 +909,45 @@ pub fn resolve_command(
         }
     }
 
-    if let Some(fast) = parsed.fast {
-        if let Some(flags) = effective_runner.fast_flags.get(&fast) {
-            argv.extend(flags.iter().cloned());
+    let service_tier = parsed
+        .service_tier
+        .as_deref()
+        .or_else(|| {
+            parsed
+                .fast
+                .map(|fast| if fast { "fast" } else { "default" })
+        })
+        .or_else(|| alias_def.and_then(|alias| alias.service_tier.as_deref()))
+        .or(config.default_service_tier.as_deref());
+    if let Some(tier) = service_tier {
+        let tier = validate_service_tier(tier)?;
+        if matches!(effective_runner_name.as_str(), "c" | "cx" | "codex") {
+            argv.extend(["-c".to_string(), format!("service_tier=\"{tier}\"")]);
+        } else if let Some(fast) = parsed.fast {
+            if let Some(flags) = effective_runner.fast_flags.get(&fast) {
+                argv.extend(flags.iter().cloned());
+            } else {
+                let display = canonical_runner_name(&effective_runner_name, effective_runner);
+                let flag = if fast { "--fast" } else { "--no-fast" };
+                warnings.push(format!(
+                    "warning: runner \"{display}\" does not support fast mode; ignoring {flag}"
+                ));
+            }
         } else {
             let display = canonical_runner_name(&effective_runner_name, effective_runner);
-            let flag = if fast { "--fast" } else { "--no-fast" };
             warnings.push(format!(
-                "warning: runner \"{display}\" does not support fast mode; ignoring {flag}"
+                "warning: runner \"{display}\" does not support service tiers; ignoring service tier \"{tier}\""
+            ));
+        }
+    }
+
+    if standalone {
+        if matches!(effective_runner_name.as_str(), "oc" | "opencode") {
+            argv.push("--standalone".to_string());
+        } else if !is_codex {
+            let display = canonical_runner_name(&effective_runner_name, effective_runner);
+            warnings.push(format!(
+                "warning: runner \"{display}\" does not support standalone mode; ignoring it"
             ));
         }
     }

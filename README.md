@@ -128,14 +128,14 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
 
 - Python and Rust currently accept control tokens in any order before the prompt:
   - runner selectors such as `c`, `cx`, `cc`, `oc`, `k`, `cu`, `g`, `p`, `gb`, `rc`, `cr`, `codex`, `claude`, `opencode`, `kimi`, `cursor`, `gemini`, `pi`, `grok`, `roocode`, and `crush`
-  - `+0..+5` thinking levels (`0` none, `1` low, `2` medium, `3` high, `4` xhigh, `5` max); `+max` maps to `5` and `+xhigh` to `4`. Codex maps each level to `-c model_reasoning_effort=<none|low|medium|high|xhigh|max>` for gpt-5.6-style models and defaults to `medium`; runners with fewer tiers clamp `+5` down to their top tier
+  - `+0..+6` thinking levels (`0` none, `1` low, `2` medium, `3` high, `4` xhigh, `5` max, `6` ultra); `+ultra` maps to `6`, `+max` to `5`, and `+xhigh` to `4`. Codex maps each level to `-c model_reasoning_effort=<none|low|medium|high|xhigh|max|ultra>` and defaults to `medium`; runners with fewer tiers clamp higher requests to their top tier
   - `:provider:model` and `:model`
   - `@name` for preset lookup; if no preset exists, runner names such as `@k` select that runner before ordinary agent fallback; presets can also define a default prompt, and alias `prompt_mode = "prepend"|"append"` can compose alias prompt text around an explicitly supplied prompt
   - alias `fallback_models = ["model-a", "glm-5.3"]` retries once per listed model when the run fails with a capacity or overload error before any assistant output. Mapped models (`glm-5.3`, `llmp-glm-5-3`, `glm-5.3-flash`) are retried on grok; other models stay on the same runner. JSON and formatted output from that retry is parsed with the fallback runner's schema. `ccc` says which model ran on stderr and in the run transcript. Authentication errors and failures after output has started do not fall back. Claude runners are not retried, and MiniMax, Claude, or Astra model ids are skipped. Primary use of those models, including `@astra`, stays allowed. Cursor auto presets use `runner = "cursor"` and `model = "auto"` (`@cursor`, `@cu-auto`).
   - `help`, `-h`, and `--help` win anywhere in argv and print help immediately
   - `ccc --help` lists configured aliases visible from the current directory and includes short agent tips for checking config, choosing aliases, and using `--` for literal prompt text
   - Python and Rust search project-local `.ccc.toml` files upward from the current directory and override the global config chain
-  - `ccc config` prints every existing config file path and raw contents in merge order: `~/.config/ccc/config.toml`, `XDG_CONFIG_HOME/ccc/config.toml`, then the nearest project-local `.ccc.toml`; `CCC_CONFIG` still wins alone when it points at an existing file
+  - `ccc config` prints every existing config file path and raw contents in merge order: `~/.config/ccc/config.toml`, `XDG_CONFIG_HOME/ccc/config.toml`, then the nearest project-local `.ccc.toml`; an existing `CCC_CONFIG` file overrides this chain for execution, aliases, help, and config display
   - `ccc config --edit` opens the selected config in `$EDITOR`; add `--user` to edit the XDG/home user config or `--local` to edit the nearest `.ccc.toml` (creating one in the current directory if none exists)
   - `ccc add [-g] <alias>` starts a line-prompt wizard for writing `[aliases.<name>]` config; flags such as `--runner`, `--model`, `--prompt`, and `--prompt-mode` can prefill values, and `--yes` writes non-interactively
   - `formatted`, `stream-formatted`, and `ccc add` menu prompts honor `FORCE_COLOR` / `NO_COLOR` before falling back to TTY detection
@@ -148,15 +148,29 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
   - `--show-thinking` / `--no-show-thinking`
   - `--timeout-secs <N>` kills the wrapped runner after `N` seconds, prints `warning: timed out after N seconds; killed runner` to stderr, and exits with status `124`
   - `--yolo` / `-y`
-  - `--fast` / `--no-fast` toggles the runner's fast mode when supported (codex maps to `--enable fast_mode` / `--disable fast_mode`); runners without a fast mode warn and ignore the flag
+  - `--service-tier <default|fast|priority|ultrafast>` selects Codex service priority. `--fast` / `--no-fast` select `fast` / `default`; other runners warn and ignore these controls. The last CLI tier control wins
+  - `--standalone` / `--no-daemon` requests execution without the shared background daemon: Codex receives `codex --no-daemon exec`, and OpenCode receives `opencode run --standalone`. `--no-standalone` allows upstream defaults. Config defaults and aliases can set `standalone = true|false`; CLI overrides aliases, then defaults
 - `--` forces the rest of argv to be treated as prompt text, even if it starts with control-like tokens
 - Python and Rust currently use `claude -p --no-session-persistence`, `codex exec --ephemeral`, `cursor-agent --print --trust`, `gemini --prompt`, `pi -p --no-session`, `grok --no-auto-update -p`, and `crush run` for non-interactive invocation
 - By default Python and Rust avoid saved sessions where the selected CLI supports it; OpenCode, Kimi, Cursor, Gemini, Grok, Crush, and RooCode warn that the runner may save a session unless `--save-session` or `--cleanup-session` is used
 - `ccc --print-config` is the source of truth for the current canonical config schema: `[defaults]`, `[update]`, `[abbreviations]`, and `[aliases.<name>]`
+- Python and Rust accept `service_tier` in `[defaults]` and `[aliases.<name>]`. CLI tier controls override the alias, which overrides defaults. Omit the field to inherit Codex's own configuration; `default` explicitly selects its standard tier. Fast and Ultrafast availability depends on the model and account
 - Python and Rust optionally check after each run whether a newer `ccc` is available (crates.io, GitHub releases fallback) and warn on stderr; set `[update] check = false` or `CCC_UPDATE_CHECK=0` to disable, or `[update] auto_update = true` / `CCC_AUTO_UPDATE=1` to background `cargo install ccc` when the install is cargo-based
 - `ccc config` is the source of truth for which config files currently resolve in the active shell
 - `ccc config --edit [--user|--local]` opens the selected config in `$EDITOR`; user config means `XDG_CONFIG_HOME/ccc/config.toml` when XDG is set, otherwise `~/.config/ccc/config.toml`, and local config means the nearest existing `.ccc.toml` or a new `.ccc.toml` in the current directory
 - `ccc add <alias>` writes the active write target: project-local config when present, otherwise the effective global config; when no config exists it creates a new global config under `XDG_CONFIG_HOME/ccc/config.toml` or `~/.config/ccc/config.toml`, and `-g` forces the effective global config instead of a project-local file
+
+```sh
+ccc c --service-tier ultrafast "Review these changes"
+ccc c +ultra --service-tier ultrafast "Review these changes"
+ccc c +ultra --service-tier ultrafast --standalone "Review these changes"
+ccc @reviewer --no-fast "Review these changes"
+ccc add quick --runner c --service-tier fast --yes
+```
+
+The alias wizard includes a service-tier menu with separate **inherit** and **default** choices. To remove a saved tier, run `ccc add quick --unset service-tier --yes`.
+
+Codex ultra effort is `+ultra` / `+6`. Profiles use `thinking = 6`, and `ccc add quick --thinking ultra --yes` or the thinking menu can save it. Effort and service tier are independent controls.
 - `ccc` writes `output.txt` plus exactly one transcript file in each run directory: `transcript.txt` for text and human transcript paths, `transcript.jsonl` for JSON-oriented paths; `text` requests that are upgraded into structured streaming still use `transcript.txt`
 - each run directory is client-prefixed, for example `opencode-<run-id>`
 - `ccc` prints a stable stderr footer in the form `>> ccc:output-log >> /abs/path/to/run-dir` unless `--no-output-log-path` is set
@@ -186,7 +200,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
 - parser and config design for planned alias, thinking, runner, and provider/model selectors: `CCC_PARSER_CONFIG_DESIGN.md`
 - language scaffold doc: `ROADMAP_LANGUAGE_SCAFFOLDS.md`
 - cross-language test harness design: `TEST_HARNESS_PLAN.md`
-- broader rollout of expanded `ccc` token parsing for `@name`, `+0..+5`, `:provider:model`, `:model`, and runner selectors beyond Python/Rust
+- broader rollout of expanded `ccc` token parsing for `@name`, `+0..+6`, `:provider:model`, `:model`, and runner selectors beyond Python/Rust
 - future advanced tool allow/deny design note: [docs/clis/allow-deny-tool-plan.md](docs/clis/allow-deny-tool-plan.md)
 - shared model-thinking capability source of truth and refresh instructions: [docs/clis/model-capabilities.json](docs/clis/model-capabilities.json) and [docs/clis/updating-model-capabilities.md](docs/clis/updating-model-capabilities.md)
 

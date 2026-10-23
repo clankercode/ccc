@@ -51,7 +51,8 @@ What this means for `ccc`:
 
 - resolve `cursor-agent` through symlinks
 - verify the adjacent `package.json` has `name = "@anysphere/agent-cli-runtime"`
-- read the bundled `index.js` release marker such as `agent-cli@2026.03.30-a5d3e17`
+- stream the bundled `index.js` in bounded chunks, reading a static release marker such as `agent-cli@2026.03.30-a5d3e17` or the version literal in newer `option:version` handlers
+- skip dynamic release templates such as `agent-cli@${version}`; markers can occur beyond the first 32 KiB
 - fall back to `cursor-agent --version` if that metadata is missing
 
 ## Output modes

@@ -78,6 +78,8 @@ Codex takes its reasoning effort from the `model_reasoning_effort` config key, s
 
 ## Quick checks
 
+Python and Rust read `@openai/codex/package.json` directly, following symlinks and literal shell-wrapper paths, including paths using `$HOME`. They do not evaluate the wrapper or select an unrelated global package. Unknown layouts fall back to `codex --version`.
+
 ```sh
 codex --version
 codex exec --help

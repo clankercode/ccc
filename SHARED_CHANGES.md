@@ -22,6 +22,13 @@ Entry format:
 
 ## 2026-10-23
 
+### Direct installed-runner version discovery
+- Change: Python and Rust add file-based version lookup for OpenCode desktop sidecars, native Kimi successful-install receipts, Codex shell-wrapper package targets, Pi npm/pnpm packages, Crush ELF Go module information, and newer Cursor version-option literals beyond the bundle prefix. Rust resolves executables directly from `PATH` instead of spawning `which`. Launcher paths are read without shell evaluation; unrelated global package metadata and pending Kimi update versions are ignored. Unknown or invalid install metadata retains the CLI fallback.
+- Required implementations: Python and Rust
+- Additional rollout: deferred
+- Shared tests updated: `tests/test_ccc_contract_impl.py` covers direct discovery across help/version/usage with no tool or `which` execution, malformed and unknown layouts, selected-install metadata, executable `PATH` filtering, and one fallback invocation per unresolved runner.
+- Docs updated: [README.md](README.md), [CCC_BEHAVIOR_CONTRACT.md](CCC_BEHAVIOR_CONTRACT.md), [docs/clis/README.md](docs/clis/README.md), the OpenCode/Codex/Kimi/Pi/Crush/Cursor CLI notes, and [CHANGELOG.md](CHANGELOG.md).
+
 ### Runner version lookup timings
 - Change: Python and Rust runner tables in help, usage errors, and version output show executable names without redundant runner labels, aligned version/status text, and monotonic version-lookup milliseconds to one decimal place. Lookups strictly above 50 ms are red under existing color controls. Missing executables show `not found` and `-` for timing; failed installed-runner probes retain their measured duration. Metadata fast paths and the version report's unresolved summary are preserved.
 - Required implementations: Python and Rust

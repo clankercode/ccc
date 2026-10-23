@@ -47,6 +47,8 @@ What this means for `ccc`:
 
 ## Quick checks
 
+Python and Rust read the `github.com/charmbracelet/crush` module version directly from the ELF executable's `.go.buildinfo` section using bounded reads. This avoids starting Crush or `go version`. Other executable formats and builds without a module version fall back to `crush --version`.
+
 ```sh
 crush --version
 crush --help

@@ -117,6 +117,7 @@ Implementation-specific follow-up work is tracked in each language's `PLAN.md`. 
 - Python and Rust also support free-order control tokens before the prompt, `--` to force literal prompt text, `--show-thinking` / `--no-show-thinking`, `--yolo` / `-y`, and `--fast` / `--no-fast`
 - `-v` / `--version` prints the shared build version plus resolved client versions
 - Python and Rust runner tables in help, usage errors, and version output show the executable name (for example, `cursor-agent`), version/status, and version-lookup time in aligned columns. Timings use milliseconds with one decimal place; lookups over 50 ms appear red when color is enabled. Missing executables show `not found` and `-` for timing. Color follows `FORCE_COLOR` / `NO_COLOR`, then the output stream's TTY status.
+- Runner discovery searches `PATH` and resolves symlinks directly. Known installs read versions from package metadata, installer receipts, adjacent version files, or embedded build information instead of starting the CLI. Codex wrappers and npm/pnpm Pi launchers are followed through literal paths without evaluating shell code. See [runner version discovery](docs/clis/README.md) for supported layouts; unknown layouts retain the `<cli> --version` fallback.
 
 ## First-Pass `ccc` Contract
 

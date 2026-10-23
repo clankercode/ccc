@@ -4,6 +4,7 @@ import os
 import re
 import shlex
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -734,10 +735,7 @@ class SingleImplCccContractTests(unittest.TestCase):
                 for flag in ("--version", "-v"):
                     with self.subTest(language=lang.name, flag=flag):
                         env = self._make_env(opencode_path, lang)
-                        if lang.name == "Python":
-                            env["PATH"] = f"{bin_dir}:{package_bin}"
-                        else:
-                            env["PATH"] = str(bin_dir)
+                        env["PATH"] = f"{bin_dir}:{package_bin}"
                         result = lang.invoke_extra([flag], env)
                         self.assertEqual(result.returncode, 0, result.stderr)
                         self.assertEqual(result.stderr, "")
@@ -748,6 +746,146 @@ class SingleImplCccContractTests(unittest.TestCase):
                         self.assertIn("[+] opencode", result.stdout)
                         self.assertIn("1.3.17", result.stdout)
                         self.assertIn("unresolved", result.stdout)
+
+    def test_runner_versions_read_current_install_files_without_launching_tools(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            (bin_dir / "python3").symlink_to(Path(sys.executable))
+            log = root / "probes.log"
+            stub = (
+                '#!/bin/sh\n'
+                'printf "%s\\n" "$0 $*" >> "$CCC_VERSION_PROBE_LOG"\n'
+                'exit 99\n'
+            )
+
+            def install(name: str, target: Path, body: str = stub) -> None:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(body, encoding="utf-8")
+                target.chmod(0o755)
+                (bin_dir / name).symlink_to(target)
+
+            resources = root / "OpenCode" / "resources"
+            install("opencode", resources / "opencode-cli")
+            (resources / "opencode-cli.version").write_text("2.0.32\n")
+            kimi_root = root / "kimi-install"
+            install("kimi", kimi_root / "bin" / "kimi")
+            (kimi_root / "updates").mkdir()
+            (kimi_root / "updates" / "install.json").write_text(json.dumps({
+                "lastSuccess": {"version": "0.34.0"},
+                "active": {"version": "99.0.0"},
+            }))
+            # The selected launcher's own paths define the install, including pnpm shims.
+            codex_root = root / "home" / ".bun" / "install" / "global" / "node_modules" / "@openai" / "codex"
+            (codex_root / "bin").mkdir(parents=True)
+            (codex_root / "bin" / "codex.js").write_text(stub)
+            (codex_root / "package.json").write_text(json.dumps({"name": "@openai/codex", "version": "0.163.0"}))
+            (root / "home" / ".bun" / "bin").mkdir()
+            (root / "home" / ".bun" / "bin" / "codex").symlink_to(codex_root / "bin" / "codex.js")
+            install("codex", root / "wrappers" / "codex", stub + '\nexec "${HOME}/.bun/bin/codex" "$@"\n')
+            pi_root = root / "pnpm" / "global" / "5" / "node_modules" / "@earendil-works" / "pi-coding-agent"
+            (pi_root / "dist" / "bundle").mkdir(parents=True)
+            (pi_root / "dist" / "bundle" / "cli.js").write_text(stub)
+            (pi_root / "package.json").write_text(json.dumps({"name": "@earendil-works/pi-coding-agent", "version": "1.0.2"}))
+            install("pi", root / "pnpm" / "pi", stub + '\nexec node "$basedir/global/5/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js" "$@"\n')
+            cursor_root = root / "cursor"
+            install("cursor-agent", cursor_root / "cursor-agent")
+            (cursor_root / "package.json").write_text(json.dumps({"name": "@anysphere/agent-cli-runtime"}))
+            (cursor_root / "index.js").write_text(
+                'release:`agent-cli@${dynamic}`;' + ' ' * 100_000
+                + 'Ce.on("option:version",(()=>{const e="2026.10.14-0f9edde";process.stdout.write(e)}));'
+            )
+            # A small valid ELF section table exercises direct Go build-info reads.
+            crush = bin_dir / "crush"
+            names = b"\0.shstrtab\0.go.buildinfo\0"
+            build_info = b"\xff Go buildinf:\x08\x02" + b"\0" * 16 + b"\nmod\tgithub.com/charmbracelet/crush\tv0.91.0\t\n"
+            header = bytearray(64)
+            header[:6] = b"\x7fELF\x02\x01"
+            struct.pack_into("<Q", header, 40, 64)
+            struct.pack_into("<HHH", header, 58, 64, 3, 1)
+            sections = bytes(64) + struct.pack("<IIQQQQIIQQ", 1, 3, 0, 0, 256, len(names), 0, 0, 1, 0)
+            sections += struct.pack("<IIQQQQIIQQ", 11, 1, 0, 0, 256 + len(names), len(build_info), 0, 0, 16, 0)
+            crush.write_bytes(header + sections + names + build_info)
+            crush.chmod(0o755)
+            # Finding executables must work without invoking an external `which`.
+            (bin_dir / "which").write_text(stub)
+            (bin_dir / "which").chmod(0o755)
+
+            for lang in self.selected_languages:
+                if lang.name not in VERSION_IMPLEMENTATIONS:
+                    continue
+                for args in (["--help"], ["--version"], []):
+                    with self.subTest(language=lang.name, args=args):
+                        env = self._make_env(bin_dir / "opencode", lang)
+                        env["PATH"] = str(bin_dir)
+                        env["CCC_VERSION_PROBE_LOG"] = str(log)
+                        log.write_text("")
+                        result = lang.invoke_extra(args, env)
+                        self.assertEqual(result.returncode, 0 if args else 1, result.stderr)
+                        output = result.stdout if args else result.stderr
+                        for version in ("2.0.32", "0.34.0", "codex-cli 0.163.0", "1.0.2", "2026.10.14-0f9edde", "crush version v0.91.0"):
+                            self.assertIn(version, output)
+                        self.assertNotIn("99.0.0", output)
+                        self.assertEqual(log.read_text(), "", output)
+
+    def test_runner_version_file_discovery_falls_back_for_unknown_or_invalid_installs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bin_dir = root / "bin"
+            shadow = root / "shadow-bin"
+            bin_dir.mkdir()
+            shadow.mkdir()
+            (bin_dir / "python3").symlink_to(Path(sys.executable))
+            (shadow / "pi").write_text("not executable")
+            (shadow / "codex").mkdir()
+            log = root / "probes.log"
+            binaries = ("opencode", "kimi", "codex", "crush", "cursor-agent", "pi")
+            for binary in binaries:
+                install_root = root / "installs" / binary
+                target = install_root / "bin" / ("opencode-cli" if binary == "opencode" else binary)
+                target.parent.mkdir(parents=True)
+                target.write_text(
+                    '#!/bin/sh\n'
+                    f'printf "{binary} %s\\n" "$*" >> "$CCC_VERSION_PROBE_LOG"\n'
+                    f"printf '{binary} fallback-version\\n'\n"
+                )
+                target.chmod(0o755)
+                (bin_dir / binary).symlink_to(target)
+                # Invalid types, unfinished updates and dynamic markers cannot supply versions.
+                (install_root / "package.json").write_text("[]")
+                (target.parent / "package.json").write_text("[]")
+                if binary == "opencode":
+                    target.with_name("opencode-cli.version").write_text("invalid version\n")
+                elif binary == "kimi":
+                    (install_root / "updates").mkdir()
+                    (install_root / "updates" / "install.json").write_text(json.dumps({
+                        "lastSuccess": None, "active": {"version": "99.0.0"},
+                    }))
+                elif binary == "cursor-agent":
+                    (target.parent / "package.json").write_text(json.dumps({"name": "@anysphere/agent-cli-runtime"}))
+                    (target.parent / "index.js").write_text('release:`agent-cli@${dynamic}`;')
+            # An unrelated global package must not override the executable selected on PATH.
+            unrelated = root / "home" / ".bun" / "install" / "global" / "node_modules" / "@openai" / "codex"
+            unrelated.mkdir(parents=True)
+            (unrelated / "package.json").write_text(json.dumps({"name": "@openai/codex", "version": "99.0.0"}))
+            for lang in self.selected_languages:
+                if lang.name not in VERSION_IMPLEMENTATIONS:
+                    continue
+                with self.subTest(language=lang.name):
+                    env = self._make_env(bin_dir / "opencode", lang)
+                    env["PATH"] = f"{shadow}:{bin_dir}"
+                    env["CCC_VERSION_PROBE_LOG"] = str(log)
+                    log.write_text("")
+                    result = lang.invoke_extra(["--version"], env)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    for binary in binaries:
+                        self.assertIn(f"{binary} fallback-version", result.stdout)
+                    self.assertNotIn("99.0.0", result.stdout)
+                    self.assertEqual(
+                        sorted(log.read_text().splitlines()),
+                        sorted(f"{binary} --version" for binary in binaries),
+                    )
 
     def test_runner_version_tables_show_aligned_lookup_timings(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

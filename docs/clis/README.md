@@ -144,7 +144,21 @@ Then update the corresponding file here before changing `ccc` runner assembly.
 
 When adding a new CLI, its note should record the verified non-interactive argv shape, permission controls, session persistence behavior, output modes, structured-output schema, version command behavior, and any faster local metadata source that can keep the `ccc --help` runner checklist from spawning a slow CLI.
 
-For the Python and Rust help checklist, runner version discovery now prefers trusted install metadata when the local layout is known, then falls back to `<cli> --version`. Current fast paths cover OpenCode, Codex, and Gemini `package.json`, Kimi `dist-info/METADATA`, Claude versioned local install paths, Cursor Agent's bundled `agent-cli@...` release marker, Gemini's local npm `_npx` cache when the launcher uses `@google/gemini-cli`, and Grok Build's `$GROK_HOME/version.json` / `~/.grok/version.json`. Gemini npx wrappers report the wrapper identity instead of spawning npm when cached metadata is unavailable.
+Python and Rust search `PATH` directly, follow symlinks, and prefer install files for runner versions. Rust does not spawn `which`. These paths apply to help, usage errors, and `--version`:
+
+| Runner | Direct version source |
+| --- | --- |
+| OpenCode | `opencode-ai/package.json`, or `opencode-cli.version` beside the desktop install's `opencode-cli` |
+| Codex | `@openai/codex/package.json`, including packages referenced by literal paths in a shell wrapper |
+| Claude | Versioned `claude/versions/<version>` executable path |
+| Kimi | `updates/install.json` → `lastSuccess.version` in the resolved install root, then Python `kimi_cli-*.dist-info/METADATA` |
+| Crush | `github.com/charmbracelet/crush` module version in the ELF executable's `.go.buildinfo` section |
+| Cursor Agent | Static `agent-cli@...` release or version-option literal in the verified runtime's `index.js`, read in bounded chunks |
+| Gemini | `@google/gemini-cli/package.json`, including the local npm `_npx` cache for recognized npx launchers |
+| Pi | `@earendil-works/pi-coding-agent` or legacy `@mariozechner/pi-coding-agent` package metadata, including npm symlinks and pnpm shell launchers |
+| Grok | `$GROK_HOME/version.json` or `~/.grok/version.json` |
+
+Launcher discovery reads literal paths and expands known home/install-directory variables without evaluating shell code. It checks package names against the selected runner and does not guess from unrelated global installs. Kimi pending/latest update versions do not count as installed versions. Missing, malformed, or unrecognized metadata retains one `<cli> --version` fallback; Gemini npx wrappers retain their wrapper identity instead of spawning npm when cached metadata is unavailable. Crush binaries without usable ELF Go build information also use the CLI fallback.
 
 Runner tables in help, usage errors, and version output show executable names, versions, and version-lookup milliseconds in aligned columns. The timing covers metadata discovery and any fallback command, using a monotonic clock; it excludes executable resolution and table rendering. Timings have one decimal place and turn red above 50 ms when color is enabled by `FORCE_COLOR` / `NO_COLOR` or the destination stream's TTY status. Missing executables show `not found` and `-` for timing; an installed runner whose lookup fails shows `found` with its measured duration.
 

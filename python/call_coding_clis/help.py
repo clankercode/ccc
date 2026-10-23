@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import time
@@ -221,22 +222,76 @@ def _get_ccc_version() -> str:
 def _read_json_version(package_json_path: Path, expected_name: str) -> str:
     try:
         payload = json.loads(package_json_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return ""
-    if payload.get("name") != expected_name:
+    if not isinstance(payload, dict) or payload.get("name") != expected_name:
         return ""
     version = payload.get("version")
     return version if isinstance(version, str) else ""
 
 
+def _read_prefix(path: Path, limit: int = 16384) -> str:
+    try:
+        with path.open("rb") as handle:
+            return handle.read(limit).decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _launcher_paths(path: Path) -> list[Path]:
+    """Read literal shell launcher paths without executing or evaluating the script."""
+    launcher = _read_prefix(path)
+    if not launcher.startswith("#!"):
+        return []
+    paths = []
+    for token in re.findall(r'''["']([^"'\n]+)["']''', launcher):
+        for variable, value in (
+            ("HOME", str(Path.home())),
+            ("basedir", str(path.parent)),
+            ("SCRIPT_DIR", str(path.parent)),
+        ):
+            token = token.replace("${" + variable + "}", value)
+            token = re.sub(r"\$" + variable + r"\b", lambda _: value, token)
+        if token.startswith("~/"):
+            token = str(Path.home()) + token[1:]
+        if token.startswith("/") and not any(ch in token for ch in "$`\n"):
+            candidate = Path(token)
+            if candidate.is_file():
+                paths.append(candidate.resolve())
+    return paths
+
+
+def _node_package_version(binary_path: str, names: tuple[str, ...]) -> str:
+    def read_package(candidate: Path) -> str:
+        for parent in list(candidate.parents)[:6]:
+            for name in names:
+                version = _read_json_version(parent / "package.json", name)
+                if version:
+                    return version
+        return ""
+
+    path = Path(os.path.realpath(binary_path))
+    version = read_package(path)
+    if version:
+        return version
+    for candidate in _launcher_paths(path):
+        version = read_package(candidate)
+        if version:
+            return version
+    return ""
+
+
 def _discover_opencode_version(binary_path: str) -> str:
-    package_json = Path(os.path.realpath(binary_path)).parent.parent / "package.json"
-    return _read_json_version(package_json, "opencode-ai")
+    path = Path(os.path.realpath(binary_path))
+    if path.name == "opencode-cli":
+        version = _read_prefix(path.with_name("opencode-cli.version"), 128).strip()
+        if re.fullmatch(r"[0-9][A-Za-z0-9._+-]*", version):
+            return f"opencode v{version}"
+    return _node_package_version(binary_path, ("opencode-ai",))
 
 
 def _discover_codex_version(binary_path: str) -> str:
-    package_json = Path(os.path.realpath(binary_path)).parent.parent / "package.json"
-    version = _read_json_version(package_json, "@openai/codex")
+    version = _node_package_version(binary_path, ("@openai/codex",))
     return f"codex-cli {version}" if version else ""
 
 
@@ -251,6 +306,14 @@ def _discover_kimi_version(binary_path: str) -> str:
     real_path = Path(os.path.realpath(binary_path))
     if real_path.parent.name != "bin":
         return ""
+    try:
+        receipt = json.loads((real_path.parent.parent / "updates" / "install.json").read_text(encoding="utf-8"))
+        installed = receipt.get("lastSuccess") if isinstance(receipt, dict) else None
+        version = installed.get("version") if isinstance(installed, dict) else None
+        if isinstance(version, str) and re.fullmatch(r"[0-9][A-Za-z0-9._+-]*", version):
+            return version
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        pass
     site_packages_root = real_path.parent.parent / "lib"
     if not site_packages_root.is_dir():
         return ""
@@ -271,17 +334,64 @@ def _discover_cursor_version(binary_path: str) -> str:
     package_root = Path(os.path.realpath(binary_path)).parent
     try:
         package = json.loads((package_root / "package.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return ""
-    if package.get("name") != "@anysphere/agent-cli-runtime":
+    if not isinstance(package, dict) or package.get("name") != "@anysphere/agent-cli-runtime":
         return ""
     try:
-        with (package_root / "index.js").open(encoding="utf-8") as handle:
-            text = handle.read(32768)
+        with (package_root / "index.js").open("rb") as handle:
+            overlap = b""
+            # Bounded streaming reads also handle modern bundles with dynamic Sentry releases.
+            for _ in range(256):
+                chunk = handle.read(65536)
+                if not chunk:
+                    break
+                text = overlap + chunk
+                match = re.search(rb"agent-cli@(\d[A-Za-z0-9._-]*)", text)
+                if not match:
+                    match = re.search(rb'''option:version["'][^\n]{0,128}?=["'](\d[A-Za-z0-9._-]*)["']''', text)
+                if match and match.end() < len(text):
+                    return match.group(1).decode("ascii")
+                overlap = text[-512:]
     except OSError:
         return ""
-    match = re.search(r"agent-cli@([A-Za-z0-9._-]+)", text)
-    return match.group(1) if match else ""
+    return ""
+
+
+def _discover_crush_version(binary_path: str) -> str:
+    """Read the Go module version from an ELF section, without loading the executable."""
+    try:
+        with open(binary_path, "rb") as handle:
+            header = handle.read(64)
+            if len(header) < 64 or header[:4] != b"\x7fELF" or header[4] not in (1, 2) or header[5] not in (1, 2):
+                return ""
+            endian = "<" if header[5] == 1 else ">"
+            wide = header[4] == 2
+            offset = struct.unpack_from(endian + ("Q" if wide else "I"), header, 40 if wide else 32)[0]
+            size, count, names_index = struct.unpack_from(endian + "HHH", header, 58 if wide else 46)
+            section_format = endian + ("IIQQQQIIQQ" if wide else "IIIIIIIIII")
+            if size < struct.calcsize(section_format) or size > 256 or not 0 < count <= 4096 or names_index >= count:
+                return ""
+            handle.seek(offset)
+            table = handle.read(size * count)
+            sections = [struct.unpack_from(section_format, table, i * size) for i in range(count)]
+            names_section = sections[names_index]
+            if names_section[5] > 1048576:
+                return ""
+            handle.seek(names_section[4])
+            names = handle.read(names_section[5])
+            for section in sections:
+                if names[section[0]:].split(b"\0", 1)[0] != b".go.buildinfo" or section[5] > 1048576:
+                    continue
+                handle.seek(section[4])
+                data = handle.read(section[5])
+                if not data.startswith(b"\xff Go buildinf:"):
+                    return ""
+                match = re.search(rb"\nmod\tgithub.com/charmbracelet/crush\t(v[0-9][A-Za-z0-9._+-]*)\t", data)
+                return "crush version " + match.group(1).decode("ascii") if match else ""
+    except (OSError, ValueError, OverflowError, struct.error, UnicodeError):
+        pass
+    return ""
 
 
 def _discover_gemini_version(binary_path: str) -> str:
@@ -290,10 +400,7 @@ def _discover_gemini_version(binary_path: str) -> str:
         real_path.parent / "package.json",
         real_path.parent.parent / "package.json",
     ]
-    try:
-        launcher = real_path.read_text(encoding="utf-8")
-    except OSError:
-        launcher = ""
+    launcher = _read_prefix(real_path)
     is_npx_launcher = "@google/gemini-cli" in launcher
     if is_npx_launcher:
         candidates.extend(
@@ -367,6 +474,10 @@ def _get_runner_version(runner_name: str, binary: str, binary_path: str) -> str:
         version = _discover_gemini_version(binary_path)
     elif runner_name == "grok":
         version = _discover_grok_version(binary_path)
+    elif runner_name == "pi":
+        version = _node_package_version(binary_path, ("@earendil-works/pi-coding-agent", "@mariozechner/pi-coding-agent"))
+    elif runner_name == "crush":
+        version = _discover_crush_version(binary_path)
     else:
         version = ""
     return version if version else _get_version(binary)

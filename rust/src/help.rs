@@ -4,7 +4,7 @@ use crate::parser::AliasDef;
 use crate::RUNNER_REGISTRY;
 use serde_json::Value;
 use std::fs;
-use std::io::{self, IsTerminal};
+use std::io::{self, IsTerminal, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -185,32 +185,90 @@ fn read_json_version(package_json_path: &Path, expected_name: &str) -> String {
 }
 
 fn discover_opencode_version(binary_path: &Path) -> String {
-    read_json_version(
-        &binary_path
-            .parent()
-            .unwrap_or(binary_path)
-            .parent()
-            .unwrap_or(binary_path)
-            .join("package.json"),
-        "opencode-ai",
-    )
+    if binary_path.file_name().and_then(|name| name.to_str()) == Some("opencode-cli") {
+        let version = read_prefix(&binary_path.with_file_name("opencode-cli.version"), 128);
+        let version = version.trim();
+        if valid_version_token(version) {
+            return format!("opencode v{version}");
+        }
+    }
+    node_package_version(binary_path, &["opencode-ai"])
 }
 
 fn discover_codex_version(binary_path: &Path) -> String {
-    let version = read_json_version(
-        &binary_path
-            .parent()
-            .unwrap_or(binary_path)
-            .parent()
-            .unwrap_or(binary_path)
-            .join("package.json"),
-        "@openai/codex",
-    );
+    let version = node_package_version(binary_path, &["@openai/codex"]);
     if version.is_empty() {
         String::new()
     } else {
         format!("codex-cli {version}")
     }
+}
+
+fn read_prefix(path: &Path, limit: u64) -> String {
+    let Ok(file) = fs::File::open(path) else {
+        return String::new();
+    };
+    let mut bytes = Vec::new();
+    if file.take(limit).read_to_end(&mut bytes).is_err() {
+        return String::new();
+    }
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
+fn valid_version_token(version: &str) -> bool {
+    version.as_bytes().first().is_some_and(u8::is_ascii_digit)
+        && version
+            .bytes()
+            .all(|ch| ch.is_ascii_alphanumeric() || b"._+-".contains(&ch))
+}
+
+fn launcher_paths(path: &Path) -> Vec<PathBuf> {
+    let launcher = read_prefix(path, 16384);
+    if !launcher.starts_with("#!") {
+        return Vec::new();
+    }
+    let home = std::env::var("HOME").unwrap_or_default();
+    let basedir = path.parent().unwrap_or(path).to_string_lossy();
+    let mut paths = Vec::new();
+    // Only expand known literal path variables. Never evaluate shell code.
+    for token in launcher.split(['\'', '"']).skip(1).step_by(2) {
+        let mut token = token.to_string();
+        for (variable, value) in [
+            ("HOME", home.as_str()),
+            ("basedir", &basedir),
+            ("SCRIPT_DIR", &basedir),
+        ] {
+            token = token.replace(&format!("${{{variable}}}"), value);
+            token = token.replace(&format!("${variable}/"), &format!("{value}/"));
+        }
+        if token.starts_with("~/") && !home.is_empty() {
+            token = format!("{home}{}", &token[1..]);
+        }
+        if token.contains(['$', '`', '\n']) || !Path::new(&token).is_absolute() {
+            continue;
+        }
+        if let Ok(candidate) = fs::canonicalize(token) {
+            if candidate.is_file() && !paths.contains(&candidate) {
+                paths.push(candidate);
+            }
+        }
+    }
+    paths
+}
+
+fn node_package_version(binary_path: &Path, names: &[&str]) -> String {
+    let candidates = std::iter::once(binary_path.to_path_buf()).chain(launcher_paths(binary_path));
+    for candidate in candidates {
+        for parent in candidate.ancestors().skip(1).take(6) {
+            for name in names {
+                let version = read_json_version(&parent.join("package.json"), name);
+                if !version.is_empty() {
+                    return version;
+                }
+            }
+        }
+    }
+    String::new()
 }
 
 fn discover_claude_version(binary_path: &Path) -> String {
@@ -238,6 +296,20 @@ fn discover_kimi_version(binary_path: &Path) -> String {
         != Some("bin")
     {
         return String::new();
+    }
+    if let Some(root) = binary_path.parent().and_then(Path::parent) {
+        if let Ok(receipt) = fs::read_to_string(root.join("updates/install.json")) {
+            if let Ok(receipt) = serde_json::from_str::<Value>(&receipt) {
+                if let Some(version) = receipt
+                    .get("lastSuccess")
+                    .and_then(|installed| installed.get("version"))
+                    .and_then(Value::as_str)
+                    .filter(|version| valid_version_token(version))
+                {
+                    return version.to_string();
+                }
+            }
+        }
     }
     let lib_dir = match binary_path.parent().and_then(Path::parent) {
         Some(parent) => parent.join("lib"),
@@ -292,18 +364,124 @@ fn json_name_matches(package_json_path: &Path, expected_name: &str) -> bool {
 }
 
 fn read_cursor_release_version(index_path: &Path) -> String {
-    let text = match fs::read_to_string(index_path) {
-        Ok(text) => text,
-        Err(_) => return String::new(),
-    };
-    let marker = "agent-cli@";
-    let Some(start) = text.find(marker) else {
+    let Ok(mut file) = fs::File::open(index_path) else {
         return String::new();
     };
-    text[start + marker.len()..]
-        .chars()
-        .take_while(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
-        .collect()
+    let mut chunk = [0; 65536];
+    let mut overlap = Vec::new();
+    for _ in 0..256 {
+        let Ok(count) = file.read(&mut chunk) else {
+            break;
+        };
+        if count == 0 {
+            break;
+        }
+        overlap.extend_from_slice(&chunk[..count]);
+        let text = String::from_utf8_lossy(&overlap);
+        for (start, marker) in text.match_indices("agent-cli@") {
+            let tail = &text[start + marker.len()..];
+            let version: String = tail
+                .chars()
+                .take_while(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
+                .collect();
+            if valid_version_token(&version) && version.len() < tail.len() {
+                return version;
+            }
+        }
+        for (start, _) in text.match_indices("option:version") {
+            let tail = &text[start + "option:version".len()..];
+            let tail = tail.get(..128).unwrap_or(tail);
+            for quote in ["=\"", "='"] {
+                if let Some(start) = tail.find(quote) {
+                    let value = &tail[start + 2..];
+                    if let Some(end) = value.find(quote.chars().nth(1).unwrap()) {
+                        if valid_version_token(&value[..end]) {
+                            return value[..end].to_string();
+                        }
+                    }
+                }
+            }
+        }
+        if overlap.len() > 512 {
+            overlap.drain(..overlap.len() - 512);
+        }
+    }
+    String::new()
+}
+
+fn elf_number(bytes: &[u8], offset: usize, width: usize, little: bool) -> Option<u64> {
+    let field = bytes.get(offset..offset.checked_add(width)?)?;
+    Some(field.iter().enumerate().fold(0, |value, (i, byte)| {
+        value | (u64::from(*byte) << (8 * if little { i } else { width - 1 - i }))
+    }))
+}
+
+fn read_at(file: &mut fs::File, offset: u64, size: u64) -> Option<Vec<u8>> {
+    if size > 1_048_576 {
+        return None;
+    }
+    file.seek(SeekFrom::Start(offset)).ok()?;
+    let mut bytes = vec![0; size as usize];
+    file.read_exact(&mut bytes).ok()?;
+    Some(bytes)
+}
+
+fn crush_elf_version(binary_path: &Path) -> Option<String> {
+    let mut file = fs::File::open(binary_path).ok()?;
+    let header = read_at(&mut file, 0, 64)?;
+    if &header[..4] != b"\x7fELF" || ![1, 2].contains(&header[4]) || ![1, 2].contains(&header[5]) {
+        return None;
+    }
+    let wide = header[4] == 2;
+    let little = header[5] == 1;
+    let width = if wide { 8 } else { 4 };
+    let offset = elf_number(&header, if wide { 40 } else { 32 }, width, little)?;
+    let index = if wide { 58 } else { 46 };
+    let size = elf_number(&header, index, 2, little)? as usize;
+    let count = elf_number(&header, index + 2, 2, little)? as usize;
+    let names_index = elf_number(&header, index + 4, 2, little)? as usize;
+    if size < (if wide { 64 } else { 40 })
+        || size > 256
+        || count == 0
+        || count > 4096
+        || names_index >= count
+    {
+        return None;
+    }
+    let table = read_at(&mut file, offset, (size * count) as u64)?;
+    let section_data = |section: &[u8]| -> Option<(u64, u64)> {
+        let index = if wide { 24 } else { 16 };
+        Some((
+            elf_number(section, index, width, little)?,
+            elf_number(section, index + width, width, little)?,
+        ))
+    };
+    let (names_offset, names_size) = section_data(&table[names_index * size..][..size])?;
+    let names = read_at(&mut file, names_offset, names_size)?;
+    for section in table.chunks_exact(size) {
+        let name = elf_number(section, 0, 4, little)? as usize;
+        let Some(name) = names.get(name..) else {
+            continue;
+        };
+        if name.split(|byte| *byte == 0).next() != Some(b".go.buildinfo".as_slice()) {
+            continue;
+        }
+        let (offset, size) = section_data(section)?;
+        let data = read_at(&mut file, offset, size)?;
+        if !data.starts_with(b"\xff Go buildinf:") {
+            return None;
+        }
+        let text = String::from_utf8_lossy(&data);
+        for line in text.lines() {
+            if let Some(version) = line.strip_prefix("mod\tgithub.com/charmbracelet/crush\t") {
+                let version = version.split('\t').next()?;
+                if version.starts_with('v') && valid_version_token(&version[1..]) {
+                    return Some(format!("crush version {version}"));
+                }
+            }
+        }
+    }
+    None
 }
 
 fn discover_cursor_version(binary_path: &Path) -> String {
@@ -336,7 +514,8 @@ fn discover_gemini_version_with_home(binary_path: &Path, home: Option<&Path>) ->
             .join("package.json"),
     ];
     let mut is_npx_launcher = false;
-    if let Ok(launcher) = fs::read_to_string(binary_path) {
+    {
+        let launcher = read_prefix(binary_path, 16384);
         if launcher.contains("@google/gemini-cli") {
             is_npx_launcher = true;
             if let Some(home) = home {
@@ -404,6 +583,14 @@ fn get_runner_version(runner_name: &str, binary: &str, binary_path: &Path) -> St
         "cursor" => discover_cursor_version(&real_path),
         "gemini" => discover_gemini_version(&real_path),
         "grok" => discover_grok_version(&real_path),
+        "pi" => node_package_version(
+            &real_path,
+            &[
+                "@earendil-works/pi-coding-agent",
+                "@mariozechner/pi-coding-agent",
+            ],
+        ),
+        "crush" => crush_elf_version(&real_path).unwrap_or_default(),
         _ => String::new(),
     };
     if version.is_empty() {
@@ -414,21 +601,44 @@ fn get_runner_version(runner_name: &str, binary: &str, binary_path: &Path) -> St
 }
 
 fn resolve_binary_path(binary: &str) -> Option<String> {
-    Command::new("which")
-        .arg(binary)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .output()
-        .ok()
-        .and_then(|output| {
-            if output.status.success() {
-                String::from_utf8(output.stdout).ok()
-            } else {
-                None
+    let executable = |path: &Path| {
+        let Ok(metadata) = fs::metadata(path) else {
+            return false;
+        };
+        if !metadata.is_file() {
+            return false;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            metadata.permissions().mode() & 0o111 != 0
+        }
+        #[cfg(not(unix))]
+        {
+            true
+        }
+    };
+    if Path::new(binary).components().count() > 1 {
+        return executable(Path::new(binary)).then(|| binary.to_string());
+    }
+    let path = std::env::var_os("PATH")?;
+    for directory in std::env::split_paths(&path) {
+        let candidate = directory.join(binary);
+        if executable(&candidate) {
+            return Some(candidate.to_string_lossy().into_owned());
+        }
+        #[cfg(windows)]
+        for extension in std::env::var("PATHEXT")
+            .unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into())
+            .split(';')
+        {
+            let candidate = directory.join(format!("{binary}{extension}"));
+            if executable(&candidate) {
+                return Some(candidate.to_string_lossy().into_owned());
             }
-        })
-        .map(|text| text.trim().to_string())
-        .filter(|text| !text.is_empty())
+        }
+    }
+    None
 }
 
 fn runner_checklist() -> Vec<RunnerStatus> {

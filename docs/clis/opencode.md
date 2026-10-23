@@ -70,6 +70,8 @@ What this means for `ccc`:
 
 ## Quick checks
 
+Python and Rust read the adjacent `opencode-cli.version` file for desktop installs whose resolved executable is `opencode-cli`, or `opencode-ai/package.json` for npm installs. Unknown layouts fall back to `opencode --version`.
+
 ```sh
 opencode --version
 opencode run --help

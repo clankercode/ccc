@@ -121,15 +121,12 @@ fn test_version_prints_build_version_and_resolved_clients() {
     )
     .unwrap();
     fs::write(&package_bin.join("opencode"), "#!/bin/sh\nexit 99\n").unwrap();
-    fs::write(
-        bin_dir.join("which"),
-        format!(
-            "#!/bin/sh\nif [ \"$1\" = \"opencode\" ]; then\n  printf '%s\\n' '{}'\n  exit 0\nfi\nexit 1\n",
-            package_bin.join("opencode").display()
-        ),
+    fs::set_permissions(
+        package_bin.join("opencode"),
+        fs::Permissions::from_mode(0o755),
     )
     .unwrap();
-    fs::set_permissions(bin_dir.join("which"), fs::Permissions::from_mode(0o755)).unwrap();
+    std::os::unix::fs::symlink(package_bin.join("opencode"), bin_dir.join("opencode")).unwrap();
 
     for flag in ["--version", "-v"] {
         let output = Command::new(ccc_bin())

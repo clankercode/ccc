@@ -63,6 +63,8 @@ The JSON format emits NDJSON events with these types:
 
 ## Quick checks
 
+Python and Rust read Pi's package version directly from `@earendil-works/pi-coding-agent/package.json` (or the legacy `@mariozechner` package). Discovery follows npm symlinks and literal paths in pnpm launchers, expanding `$basedir` without executing the script. Unknown layouts fall back to `pi --version`.
+
 ```sh
 pi --version
 pi --help

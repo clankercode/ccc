@@ -58,6 +58,8 @@ What this means for `ccc`:
 
 ## Quick checks
 
+Python and Rust resolve the installed executable and read its install root's `updates/install.json` → `lastSuccess.version` for native installs, or Python `kimi_cli-*.dist-info/METADATA` for virtualenv installs. Pending updates and latest-version cache files do not supply the installed version. Unknown layouts fall back to `kimi --version`.
+
 ```sh
 kimi --version
 kimi --help

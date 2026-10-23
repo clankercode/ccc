@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Python and Rust now read versions directly for OpenCode desktop installs, native Kimi, wrapped Codex, npm/pnpm Pi, Crush ELF binaries, and current Cursor bundles. Rust searches `PATH` without spawning `which`; unknown install layouts retain the CLI version fallback.
 - Python and Rust help/version runner tables now show executable names, aligned versions, and per-runner version-lookup milliseconds. Timings above 50 ms appear red when color is enabled; existing metadata fast paths remain in use.
 
 ## 0.4.3 - 2026-10-22
